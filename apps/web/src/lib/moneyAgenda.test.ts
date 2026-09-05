@@ -43,6 +43,10 @@ vi.mock('@/models/Statement', () => ({ Statement: { find: statementFind } }));
 vi.mock('@/models/Item', () => ({ Item: { find: itemFind } }));
 vi.mock('@/models/Voucher', () => ({ Voucher: { find: voucherFind } }));
 vi.mock('@/models/Expense', () => ({ Expense: { find: expenseFind } }));
+// The five models now resolve through `currentModel` so the reads follow the caller's tenant.
+// SAAS_MODE is off in tests, where the real helper is the identity anyway; stubbing it keeps this
+// suite free of a Mongo connection while the mocked models above stay the ones under test.
+vi.mock('@/lib/tenancy/connection', () => ({ currentModel: async (m: unknown) => m }));
 
 import { computeMoneyAgenda } from './moneyAgenda';
 

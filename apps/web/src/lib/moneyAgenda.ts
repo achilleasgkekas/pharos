@@ -1,11 +1,12 @@
 import { connectDB } from '@/lib/db';
 import { addCycle, cycleRenews } from '@/lib/billingCycle';
 import { renewalOnOrAfter } from '@/lib/subscriptionRenewal';
-import { Subscription } from '@/models/Subscription';
-import { Voucher } from '@/models/Voucher';
-import { Item } from '@/models/Item';
-import { Statement } from '@/models/Statement';
-import { Expense } from '@/models/Expense';
+import { currentModel } from '@/lib/tenancy/connection';
+import { Subscription as SubscriptionModel } from '@/models/Subscription';
+import { Voucher as VoucherModel } from '@/models/Voucher';
+import { Item as ItemModel } from '@/models/Item';
+import { Statement as StatementModel } from '@/models/Statement';
+import { Expense as ExpenseModel } from '@/models/Expense';
 import { computeInstallmentPlans } from '@/lib/installments';
 import type { SerializedStatement } from '@/types';
 
@@ -35,6 +36,25 @@ export async function computeMoneyAgenda(now: Date = new Date()): Promise<{ mont
   await connectDB();
   const windowStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const windowEnd = new Date(now.getFullYear(), now.getMonth() + 3, 1);
+
+  // Tenant scoping: this helper is called from FOUR entrypoints (/reports page, /api/v1/reports,
+  // /api/v1/calendar, /api/calendar.ics) and three of them have already established a tenant
+  // context before getting here. Resolving the five models with `currentModel` is what makes the
+  // reads follow that context; the direct imports it replaces always hit the DEFAULT database, so
+  // a SaaS workspace was shown the default tenant's subscriptions, statements, warranties,
+  // vouchers and recurring expenses — amounts and vendor names included.
+  //
+  // No `withRequestTenant` wrap on purpose. `currentModel` reads the ambient context and falls
+  // back to DEFAULT_TENANT without ever throwing, so the one caller that has NO context (the
+  // token-authenticated .ics feed) keeps behaving exactly as before instead of being sent through
+  // the cookie gate. Self-hosted: no context anywhere, every `currentModel(X)` is `X`.
+  const [Subscription, Statement, Item, Voucher, Expense] = await Promise.all([
+    currentModel(SubscriptionModel),
+    currentModel(StatementModel),
+    currentModel(ItemModel),
+    currentModel(VoucherModel),
+    currentModel(ExpenseModel),
+  ]);
 
   const [subs, statements, items, vouchers, recurring] = await Promise.all([
     Subscription.find({ active: true, nextRenewal: { $ne: null } }).select('name amount billingCycle nextRenewal').lean(),

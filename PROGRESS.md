@@ -12984,3 +12984,65 @@ uncommitted WIP έμεινε ανέγγιχτο.** Το τοπικό `main` έμ
 **Επόμενο task**: το **P44** (RMA/επισκευή), το τρίτο αδελφάκι του P41/P47. Προσοχή όμως: αν το
 τοπικό δέντρο εξακολουθεί να έχει το ίδιο ξένο WIP πάνω στα locales, το επόμενο run πρέπει να
 διαλέξει δουλειά που δεν αγγίζει αρχεία γλώσσας, αλλιώς δεν μπορεί να κάνει καθαρό staging.
+
+## 2026-09-06 02:55 — pharos-brain
+
+**Prod health: ΥΓΙΗΣ.** `ph-aros.com` 200 με πραγματικό landing (`self-host` παρόν), `app.ph-aros.com/account/login`
+200, `POST /api/cron/saas/trials-sweep` χωρίς token → **401 `{"error":"unauthorized"}`**. Η λέξη `waitlist` λείπει,
+όπως στα έντεκα προηγούμενα run.
+
+**Το ΕΝΑ πράγμα: το money agenda έδειχνε τα οικονομικά του DEFAULT tenant σε κάθε workspace.** Το
+`computeMoneyAgenda()` στο `lib/moneyAgenda.ts` έκανε πέντε direct `Model.find` (Subscription/Statement/Item/
+Voucher/Expense) με τα imported models, άρα πάντα στη DEFAULT βάση.
+
+**Γιατί έχει σημασία.** Το τροφοδοτεί **τέσσερα** entrypoints: η σελίδα `/reports`, το `GET /api/v1/reports`, το
+`GET /api/v1/calendar` και το `.ics` feed. Τα **τρία πρώτα έχουν ήδη στήσει tenant context πριν το καλέσουν**,
+δηλαδή η δουλειά που έκαναν σωστά ακυρωνόταν μέσα στη συνάρτηση. Ένα workspace άνοιγε το `/reports` και έβλεπε
+συνδρομές, statements, εγγυήσεις, κουπόνια και επαναλαμβανόμενα έξοδα ΑΛΛΟΥ, με ποσά και ονόματα προμηθευτών.
+Ίδια κατηγορία με τη διαρροή της καθολικής αναζήτησης της προηγούμενης φοράς, εδώ όμως τα δεδομένα είναι αμιγώς
+οικονομικά.
+
+**Χωρίς `withRequestTenant` wrap, σκόπιμα.** Το `currentModel` διαβάζει το ambient context και πέφτει πίσω στο
+`DEFAULT_TENANT` χωρίς ποτέ να πετάξει, οπότε ο ένας caller που ΔΕΝ έχει context (το token-authenticated `.ics`
+feed) μένει ακριβώς όπως ήταν αντί να σταλεί στην cookie gate και να σκάσει 500. Self-hosted: κανένα context
+πουθενά, κάθε `currentModel(X)` είναι `X`.
+
+**Negative control πρώτα, όχι ισχυρισμός**: ένα μόνο `SubscriptionModel` πίσω σε direct model έριξε **4/4** από τα
+νέα tests, μετά επαναφορά. Νέο `moneyAgenda.tenant.test.ts` (4 tests) με per-tenant tagged models· η συνδρομή
+γυρίζει με το slug μέσα στο label, άρα διαρροή φαίνεται ως ξένο όνομα μέσα στην ατζέντα και όχι μόνο ως λάθος
+μέτρημα κλήσεων. Ο υπάρχων `moneyAgenda.test.ts` (33 tests) πήρε το γνωστό identity mock, αμετάβλητος.
+
+**Πώς βρέθηκε: η σάρωση της προηγούμενης φοράς ήταν πολύ στενή.** Έπιανε μόνο τα `actions.ts` κάτω από `app/`.
+Την επέκτεινα σε `app/` + `lib/` + `components/`, με σωστό διαχωρισμό control-plane vs feature models (τα
+control-plane αυτοπεριγράφονται στην κεφαλίδα τους, οπότε ένα direct `Membership.find` είναι ΣΩΣΤΟ). Αποτέλεσμα
+**13 αρχεία**, ίδιο σύνολο σε working tree και `origin/main`. Το ένα διορθώθηκε εδώ, τα εννέα είναι το `User`
+model και περιμένουν την αναπάντητη `pharos-brain-20260830-0250` (δωδέκατο run), τα τρία είναι η ουρά εργασιών.
+
+**Νέα ανοιχτή ερώτηση `pharos-brain-20260906-0250`: η ουρά εργασιών (Jobs) δεν διορθώνεται με wrap.** Κάθε
+`Job.*` τρέχει στη DEFAULT βάση, άρα σε SaaS το `/jobs` δείχνει τις εργασίες όλων και το `dismissJob` σβήνει ξένη.
+Δεν το άγγιξα επίτηδες: ο worker (`lib/jobRunner.ts`) είναι process-global loop χωρίς request context, οπότε
+tenant-scoped `Job.create` χωρίς αλλαγή στον worker σημαίνει ότι οι εργασίες **δεν θα τρέχουν ποτέ** σε SaaS.
+Αντικατάσταση διαρροής με σιωπηλή αχρηστία είναι χειρότερη. Είναι αρχιτεκτονική απόφαση με συνέπειες σε export
+και erasure, άρα πάει στον Αχιλλέα.
+
+**Verified**: `npm run type-check` **EXIT 0**. Full `npx vitest run` → **424/425 αρχεία, 6846 passed, 4 skipped,
+1 failed**. Το ένα fail **δεν είναι δικό μου**: το `lib/subscriptionRenewal.test.ts:93` (ήρθε με το `d440c33`)
+είναι timezone-fragile, συγκρίνει το ISO ενός UTC-midnight input με `new Date(2026, 9, 3).toISOString()` που στην
+Αθήνα είναι `2026-10-02T21:00:00.000Z`. Σκάει σε κάθε μηχάνημα εκτός UTC. Μονογραμμη διόρθωση, αλλά δεν μπήκε εδώ
+γιατί ο κανόνας είναι μία αλλαγή ανά run. Καμία επαλήθευση στον browser, η εφαρμογή δεν τρέχει σε αυτό το Mac.
+
+**Το push έγινε πάλι από προσωρινό worktree.** Το τοπικό `main` είναι ακόμα αποκλίνον (δύο commits που είναι
+cherry-picks των ίδιων αλλαγών που ήδη υπάρχουν στο `origin/main`) και το δέντρο κρατά το **ίδιο ξένο uncommitted
+WIP** με την προηγούμενη φορά (30 αρχεία: και τα οκτώ locales, και σβήσιμο του Save tab και του
+`subscriptionRenewal.ts`, δηλαδή μοιάζει με παλιό αντίγραφο των αρχείων που άλλαξαν τα `3d8f6c9`/`d440c33`).
+Ανάμεσά τους και το `lib/moneyAgenda.ts` που έπρεπε να αλλάξω, οπότε staging από το κύριο δέντρο θα κουβαλούσε
+ξένη δουλειά. Δούλεψα λοιπόν σε `git worktree` πάνω στο `origin/main`, με symlink στα `node_modules`, και το
+worktree διαγράφηκε μετά. **Το uncommitted WIP έμεινε ανέγγιχτο.**
+
+**Unshipped στην παραγωγή**: το deploy της 2026-09-05 18:08 (`d51a7bc2 → 1b88ca34`) καθάρισε τη στοίβα των 18.
+Τώρα μένουν **2 commits** μπροστά από το `1b88ca34`, από τα οποία **1 με κώδικα** (αυτό εδώ). Δεν κάνω deploy.
+
+**Επόμενο task**: **πρώτα** η μονογραμμη διόρθωση του TZ-fragile `subscriptionRenewal.test.ts:93` (χτίσε την
+αναμενόμενη ημερομηνία σε UTC), αλλιώς κάθε επόμενο run ξεκινά με κόκκινη σουίτα και δεν ξέρει ποιανού είναι.
+Μετά, αν δεν έχει απαντηθεί η νέα ερώτηση, το ασφαλές μικρό κομμάτι της ουράς: `getBulkAiGuard` στο
+`jobActions.ts` (`AppConfig.findOne` → `currentModel`), που δεν το αγγίζει worker.

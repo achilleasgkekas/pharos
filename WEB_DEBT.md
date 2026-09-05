@@ -167,6 +167,84 @@
 >   - `npm run type-check` EXIT 0 μετά τα δύο fixes· full `npx vitest run` **3613/3613 green** (ίδιο count με πριν, μηδέν regression).
 > **el.ts i18n gap**: **6** (όχι πια 126 — ο builder το έκλεισε ήδη στο `2cd33fb`, `en=1277, el=1271`). Πολύ μικρό υπόλοιπο πλέον, δεν αξίζει ξεχωριστό P3 item· θα μαζευτεί στο επόμενο batch αν μεγαλώσει.
 
+## Web Debt Queue — ενεργά items (σάρωση 2026-09-06, pharos-brain)
+
+> Η μηχανική σάρωση της 2026-09-05 έπιανε **μόνο** τα `actions.ts` κάτω από `app/`. Επεκτάθηκε
+> τώρα σε ολόκληρα τα `app/`, `lib/` και `components/`, με σωστό διαχωρισμό control-plane vs
+> feature models (τα control-plane αρχεία αυτοπεριγράφονται: `Account`, `AuditEvent`, `Invite`,
+> `Membership`, `PlatformConfig`, `Tenant`, `Usage` λένε «SaaS CONTROL-PLANE model» στην κεφαλίδα
+> τους, οπότε ένα direct `Membership.find` είναι ΣΩΣΤΟ και δεν μετράει σαν διαρροή). Αποτέλεσμα:
+> **13 αρχεία** διαβάζουν feature model απευθείας, δηλαδή πάντα από τη DEFAULT βάση. Το ένα από
+> αυτά (`lib/moneyAgenda.ts`) διορθώθηκε σε αυτό το run. Τα υπόλοιπα δώδεκα χωρίζονται σε τρεις
+> ομάδες:
+>
+> - **Εννέα αρχεία με το `User` model** (`login/actions.ts`, `login/page.tsx`, `setup/actions.ts`,
+>   `setup/page.tsx`, `settings/users.actions.ts`, `settings/calendarFeedActions.ts`,
+>   `settings/mcpActions.ts`, `api/calendar.ics/route.ts`, `lib/userMfaStore.ts`), όλα κρέμονται
+>   από την ίδια αναπάντητη ερώτηση `pharos-brain-20260830-0250`, δωδέκατο run τώρα. Μια λάθος
+>   κίνηση εδώ κλειδώνει κόσμο έξω από ζωντανή παραγωγή, οπότε δεν αγγίζονται χωρίς απάντηση.
+> - **Τρία αρχεία με την ουρά εργασιών** (`app/jobActions.ts`, `settings/healthActions.ts`,
+>   `lib/jobRunner.ts`), δικό τους item παρακάτω, είναι αρχιτεκτονικό όχι one-liner.
+> - Μηδέν άλλα. Τα υπόλοιπα read surfaces περνούν πλέον από `currentModel`/`withRequestTenant`.
+>
+> **Ξεχωριστό εύρημα, ΟΧΙ tenancy**: το `lib/subscriptionRenewal.test.ts:93` (ήρθε με το `d440c33`,
+> ακόμα αστάλτο στην παραγωγή) είναι **timezone-fragile** και σκάει σε κάθε μηχάνημα εκτός UTC: συγκρίνει το ISO
+> ενός UTC-midnight input με `new Date(2026, 9, 3).toISOString()`, που στην Αθήνα είναι
+> `2026-10-02T21:00:00.000Z`. Σε αυτό το Mac το full suite είναι **1 failed / 6846 passed** μόνο
+> γι' αυτό. Είναι μονογραμμη διόρθωση (χτίσε την αναμενόμενη ημερομηνία σε UTC), αλλά δεν μπήκε σε
+> αυτό το run γιατί ο κανόνας είναι μία αλλαγή ανά run. **Πρέπει να είναι το πρώτο πράγμα του
+> επόμενου run**, αλλιώς κάθε επόμενη επαλήθευση ξεκινά με κόκκινη σουίτα και δεν ξέρει ποιανού είναι.
+
+### `lib/moneyAgenda.ts` έδειχνε τα οικονομικά του DEFAULT tenant σε κάθε workspace
+- Priority: P1
+- Size: S
+- Area: db
+- Files: apps/web/src/lib/moneyAgenda.ts
+- Depends on: none
+- Acceptance:
+  - **Το πρόβλημα**: το `computeMoneyAgenda()` έκανε πέντε direct `Model.find`
+    (Subscription/Statement/Item/Voucher/Expense) με τα imported models, άρα πάντα στη DEFAULT βάση.
+  - **Γιατί έχει σημασία**: το τροφοδοτεί **τέσσερα** entrypoints, η σελίδα `/reports`, το
+    `GET /api/v1/reports`, το `GET /api/v1/calendar` και το `.ics` feed, και τα **τρία πρώτα έχουν
+    ήδη στήσει tenant context πριν το καλέσουν. Δηλαδή ένα workspace άνοιγε το `/reports` και έβλεπε
+    συνδρομές, statements, εγγυήσεις, κουπόνια και επαναλαμβανόμενα έξοδα ΑΛΛΟΥ, με ποσά και ονόματα
+    προμηθευτών πάνω τους. Ίδια κατηγορία με τη διαρροή της καθολικής αναζήτησης (`f9c1c9d`), εδώ
+    όμως τα δεδομένα είναι αμιγώς οικονομικά.
+  - **Fix**: τα πέντε models resolve-άρουν με `currentModel` στην αρχή της συνάρτησης.
+    **Χωρίς** `withRequestTenant` wrap, σκόπιμα: το `currentModel` διαβάζει το ambient context και
+    πέφτει πίσω στο `DEFAULT_TENANT` χωρίς ποτέ να πετάξει, οπότε ο ένας caller που ΔΕΝ έχει context
+    (το token-authenticated `.ics` feed) συμπεριφέρεται ακριβώς όπως πριν αντί να σταλεί στην cookie
+    gate. Self-hosted: κανένα context πουθενά, κάθε `currentModel(X)` είναι `X`.
+  - Επαλήθευση: `grep -c currentModel apps/web/src/lib/moneyAgenda.ts` ≥ 6· type-check exits 0.
+- Status: ✅ **DONE 2026-09-06** (pharos-brain). Νέο `moneyAgenda.tenant.test.ts` (4 tests) με
+  per-tenant tagged models: «και τα πέντε από το workspace που καλεί», «δεύτερο workspace δεν αγγίζει
+  το πρώτο», «οι εγγραφές της ατζέντας είναι του καλούντος» (η συνδρομή γυρίζει με το slug μέσα στο
+  label, άρα διαρροή θα φαινόταν ως ξένο όνομα και όχι μόνο ως λάθος μέτρημα κλήσεων), και
+  self-hosted parity χωρίς tenant. **Negative control πρώτα, όχι ισχυρισμός**: ένα μόνο
+  `SubscriptionModel` πίσω σε direct model έριξε **4/4**, μετά επαναφορά. Ο υπάρχων
+  `moneyAgenda.test.ts` (33 tests) πήρε το γνωστό identity mock και έμεινε αμετάβλητος.
+
+### Η ουρά εργασιών (Jobs) δεν έχει καθόλου tenancy, και δεν διορθώνεται με wrap
+- Priority: P1
+- Size: M/L
+- Area: db
+- Files: apps/web/src/app/jobActions.ts, apps/web/src/app/settings/healthActions.ts, apps/web/src/lib/jobRunner.ts
+- Depends on: απάντηση στο `pharos-brain-20260906-0250` (ASK_ACHILLEAS.md)
+- Acceptance:
+  - **Το πρόβλημα**: κάθε `Job.*` και το `AppConfig.findOne` του `getBulkAiGuard` τρέχουν στη DEFAULT
+    βάση. Σε SaaS mode η σελίδα `/jobs` κάθε workspace δείχνει τις εργασίες όλων, και το `dismissJob`
+    σβήνει ξένη εργασία με ένα κλικ. Τα `labels` της κάθε εργασίας είναι πραγματικά δεδομένα (ονόματα
+    αποδείξεων/αντικειμένων, διαδρομές αρχείων OneDrive), όχι απλώς μετρητές.
+  - **Γιατί ΔΕΝ είναι one-liner**: ο worker (`lib/jobRunner.ts`) είναι ένα process-global loop χωρίς
+    request context. Αν τα `Job.create` γίνουν tenant-scoped χωρίς να αλλάξει ο worker, οι εργασίες
+    απλώς **δεν θα τρέχουν ποτέ** σε SaaS, χειρότερο από τη διαρροή. Χρειάζεται απόφαση: ουρά ανά
+    tenant με worker που κάνει iterate τα tenants, ή μία κεντρική ουρά με πεδίο `tenantId` που ο
+    worker διαβάζει και μπαίνει σε `withTenant` πριν επεξεργαστεί το κάθε item.
+  - **Το μόνο ασφαλές μικρό κομμάτι** που μπορεί να φύγει ξεχωριστά: το `getBulkAiGuard`
+    (`AppConfig.findOne` → `currentModel`), γιατί το AppConfig είναι ρητά per-tenant και δεν το
+    αγγίζει worker.
+- Status: TODO (μπλοκαρισμένο στην ανοιχτή ερώτηση)
+
 ## Web Debt Queue — ενεργά items (σάρωση 2026-09-05, pharos-brain)
 
 > Η ουρά της 61ης σάρωσης παρακάτω είναι **ολόκληρη κλειστή**. Νέα μηχανική σάρωση όλων των
