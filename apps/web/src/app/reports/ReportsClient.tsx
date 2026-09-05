@@ -344,6 +344,9 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
   const spend12 = data.monthlySpend.reduce((a, m) => a + m.total, 0);
   const netWorthNow = s.ownedValue + data.netWorth.accountsTotal - s.installmentsRemaining - s.outstanding;
   const avgMonth = Math.round(spend12 / Math.max(1, data.monthlySpend.filter((m) => m.total > 0).length || 1));
+  // Every windowed figure below is labelled with the window it was actually built from.
+  // The 6/12/24 selector has always widened the data, but the captions said "last 12
+  // months" whatever you picked, so switching to 6mo or 24mo looked like it did nothing.
   const fxIssues = data.fxIssues ?? [];
   const fxBase = data.baseCurrency || 'EUR';
   // P83 — goals still open (an already-reached goal is a pointless sweep target).
@@ -491,13 +494,13 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
       {/* Summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         <Stat icon={<ReceiptIcon size={14} />} label={t('reports.receiptsTotal')} value={`${cur()}${s.receiptsTotal.toLocaleString('en-GB')}`} sub={t('reports.receiptsSub', { n: s.receiptsCount, vat: `${cur()}${s.receiptsVat}` })} />
-        <Stat icon={<TrendingUp size={14} />} label={t('reports.spendAvg')} value={`${cur()}${avgMonth.toLocaleString('en-GB')}`} sub={t('reports.spendAvgSub', { x: `${cur()}${spend12.toLocaleString('en-GB')}` })} />
+        <Stat icon={<TrendingUp size={14} />} label={t('reports.spendAvg')} value={`${cur()}${avgMonth.toLocaleString('en-GB')}`} sub={t('reports.spendAvgSub', { x: `${cur()}${spend12.toLocaleString('en-GB')}`, n: months })} />
         <Stat icon={<CreditCard size={14} />} label={t('reports.cardsBalance')} value={`${cur()}${s.outstanding.toLocaleString('en-GB')}`} sub={t('reports.cardsBalanceSub', { n: s.installmentsCount, x: `${cur()}${s.installmentsRemaining}` })} accent="var(--color-gold)" />
         <Stat icon={<CalendarClock size={14} />} label={t('nav.subscriptions')} value={`${cur()}${s.monthlySubs}/mo`} sub={`${cur()}${s.monthlySubs * 12}/yr`} />
       </div>
 
       {/* Monthly spend — full width hero chart */}
-      <Card title={t('reports.cMonthlySpend')} className="mb-4">
+      <Card title={t('reports.cMonthlySpend', { n: months })} className="mb-4">
         {spend12 === 0 ? (
           <Empty />
         ) : (
@@ -524,7 +527,7 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
       </Card>
 
       {/* Income vs Expense (cash flow) */}
-      <Card title={t('reports.cCashFlow')}>
+      <Card title={t('reports.cCashFlow', { n: months })}>
         {data.incomeExpense.every((m) => m.income === 0 && m.expense === 0) ? (
           <Empty text={t('reports.noCashFlow')} />
         ) : (

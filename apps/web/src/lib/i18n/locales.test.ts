@@ -59,6 +59,28 @@ describe.each(Object.entries(TRANSLATIONS))('%s dictionary', (code, dict) => {
   });
 });
 
+// The reports date-range selector (6 / 12 / 24 months) widens every windowed series on
+// the page, but its captions used to be written as "last 12 months" in each language, so
+// picking another window changed the charts while every label kept claiming 12 and the
+// selector read as broken. These keys now interpolate the chosen window; a translation
+// that drops the placeholder would silently bring the lie back.
+const WINDOWED_KEYS = ['reports.cMonthlySpend', 'reports.cCashFlow', 'reports.spendAvgSub'] as const;
+
+describe('windowed report captions', () => {
+  it.each(WINDOWED_KEYS)('%s interpolates the selected window in English', (key) => {
+    expect(en[key]).toContain('{n}');
+  });
+
+  it.each(WINDOWED_KEYS)('%s keeps the placeholder in every translation that defines it', (key) => {
+    for (const [code, dict] of Object.entries(TRANSLATIONS)) {
+      const value = dict[key];
+      if (value === undefined) continue; // untranslated keys fall back to English
+      expect(value, `${code}.${key} lost the {n} placeholder`).toContain('{n}');
+      expect(value, `${code}.${key} still hardcodes a window`).not.toMatch(/\b12\b/);
+    }
+  });
+});
+
 describe('registration', () => {
   it('every code in the LOCALES table resolves to a full dictionary', () => {
     for (const code of LOCALE_CODES) {
