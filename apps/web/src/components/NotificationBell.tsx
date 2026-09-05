@@ -1,7 +1,7 @@
 'use client';
 import { useState, useRef, useEffect, useCallback, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Bell, Tag, ShieldCheck, CreditCard, TrendingUp, AlarmClock, Wallet, FileText, Wrench, Undo2, X } from 'lucide-react';
+import { Bell, Tag, ShieldCheck, CreditCard, TrendingUp, AlarmClock, Wallet, FileText, Wrench, Handshake, X } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import { cur } from '@/lib/money';
 import { useT } from '@/components/LocaleProvider';
@@ -16,7 +16,7 @@ import {
   type NotifKind,
 } from '@/app/notifications/actions';
 
-const KIND_ICON: Record<NotifKind, typeof Bell> = { deal: Tag, warranty: ShieldCheck, installment: CreditCard, pricehike: TrendingUp, trialend: AlarmClock, giftcard: Wallet, bill: FileText, maintenance: Wrench, lending: Undo2, system: Bell };
+const KIND_ICON: Record<NotifKind, typeof Bell> = { deal: Tag, warranty: ShieldCheck, installment: CreditCard, pricehike: TrendingUp, trialend: AlarmClock, giftcard: Wallet, bill: FileText, maintenance: Wrench, lending: Handshake, system: Bell };
 const KIND_COLOR: Record<NotifKind, string> = {
   deal: 'var(--color-accent)',
   warranty: 'var(--color-gold)',
@@ -125,6 +125,14 @@ export function NotificationBell({ open, onOpenChange }: { open: boolean; onOpen
       const d = Number(n.body);
       const key = d < 0 ? 'notif.maintenanceOverdueSub' : d === 0 ? 'notif.maintenanceTodaySub' : 'notif.maintenanceSub';
       return { heading: n.title, sub: t(key, { days: Math.abs(d) }) };
+    }
+    if (n.kind === 'lending') {
+      // body = "<days>|<borrower>"; split on the first bar only, a name may contain one.
+      const bar = n.body.indexOf('|');
+      const d = Number(bar < 0 ? n.body : n.body.slice(0, bar));
+      const name = bar < 0 ? '' : n.body.slice(bar + 1);
+      const key = d < 0 ? 'notif.lendingOverdueSub' : d === 0 ? 'notif.lendingTodaySub' : 'notif.lendingSub';
+      return { heading: n.title, sub: t(key, { days: Math.abs(d), name }) };
     }
     return { heading: n.title, sub: n.body };
   }
