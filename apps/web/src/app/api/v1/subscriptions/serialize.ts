@@ -1,4 +1,5 @@
 import { iso } from '@/lib/apiList';
+import { effectiveNextRenewal } from '@/lib/subscriptionRenewal';
 
 export type SubLean = {
   _id: unknown; name: string; provider?: string; category?: string; amount?: number; currency?: string;
@@ -25,7 +26,11 @@ export function trim(s: SubLean) {
     fxRate: s.fxRate ?? 0,
     billingCycle: s.billingCycle ?? 'monthly',
     startDate: iso(s.startDate),
-    nextRenewal: iso(s.nextRenewal),
+    // The date the subscription is next charged on, not the snapshot on the row: nothing
+    // advances `nextRenewal` once its date arrives, so a stored value that has gone by is
+    // simply stale and would have every API consumer reporting a renewal as overdue for
+    // ever. Derived per cycle — see lib/subscriptionRenewal.ts.
+    nextRenewal: iso(effectiveNextRenewal(s.nextRenewal, s.billingCycle)),
     active: s.active !== false,
     paymentMethod: s.paymentMethod ?? '',
     url: s.url ?? '',

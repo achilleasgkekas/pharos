@@ -193,9 +193,11 @@ describe('computeMoneyAgenda — subscription renewals', () => {
   it('a weekly renewal steps by 7 days and can land multiple times in one month', async () => {
     setRows({ subs: [{ name: 'Weekly box', amount: 5, billingCycle: 'weekly', nextRenewal: new Date(2026, 2, 1) }] });
     const { months } = await computeMoneyAgenda(NOW);
-    // Mar 1, 8, 15, 22, 29 all land in March (5 occurrences), guard=8 total steps overall.
-    expect(months[0].entries.length).toBeGreaterThanOrEqual(4);
+    // Mar 1, 8, 15, 22, 29 all land in March. The step ceiling covers a whole quarter of
+    // weeks now, so the cheapest cycle is no longer the one truncated out of the window.
+    expect(months[0].entries).toHaveLength(5);
     expect(months[0].entries.every((e) => e.kind === 'renewal')).toBe(true);
+    expect(months.flatMap((m) => m.entries)).toHaveLength(14);
   });
 
   it('steps forward past occurrences before windowStart without pushing them', async () => {
@@ -208,11 +210,14 @@ describe('computeMoneyAgenda — subscription renewals', () => {
     expect(months[2].entries).toHaveLength(1);
   });
 
-  it('the 8-step guard can exhaust before a long-overdue weekly renewal ever reaches the window', async () => {
-    // 2 years overdue; weekly cycle only covers 8 weeks of stepping before the guard trips.
+  it('a long-overdue weekly renewal is seeded into the window instead of being lost', async () => {
+    // 2 years stale. `nextRenewal` is a snapshot nothing advances, and the loop used to
+    // spend its whole step budget catching up: the subscription reached neither the agenda
+    // nor the safe-to-spend figure built on it. Seeding at windowStart is what fixes it.
     setRows({ subs: [{ name: 'Ancient', amount: 1, billingCycle: 'weekly', nextRenewal: new Date(2024, 2, 1) }] });
     const { months } = await computeMoneyAgenda(NOW);
-    expect(months.every((m) => m.entries.length === 0)).toBe(true);
+    expect(months.every((m) => m.entries.length > 0)).toBe(true);
+    expect(months.flatMap((m) => m.entries).every((e) => e.label === 'Ancient')).toBe(true);
   });
 
   it('an unrecognized billing cycle string is echoed verbatim into the sub label (fallback)', async () => {

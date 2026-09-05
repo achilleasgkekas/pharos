@@ -247,6 +247,27 @@ describe('GET listing', () => {
     ]);
   });
 
+  it('serves the renewal date the subscription is next charged on, not a stale stored one', async () => {
+    // `nextRenewal` is written once at save time and never advanced, so a date that has
+    // gone by is stale rather than overdue. trim() rolls it forward by whole cycles; a
+    // consumer that stored the raw value used to read a renewal in the past for ever.
+    vi.setSystemTime(new Date('2026-07-15T12:00:00Z'));
+    state.docs = [{ _id: 's1', name: 'iCloud', billingCycle: 'monthly', nextRenewal: new Date('2026-04-03T00:00:00Z') }];
+    const res = await GET(makeReq());
+    const json = (await res.json()) as { data: Array<{ nextRenewal: string }> };
+    expect(json.data[0].nextRenewal).toBe('2026-08-03T00:00:00.000Z');
+    vi.useRealTimers();
+  });
+
+  it('leaves a renewal date that is still ahead exactly as stored', async () => {
+    vi.setSystemTime(new Date('2026-07-15T12:00:00Z'));
+    state.docs = [{ _id: 's1', name: 'iCloud', billingCycle: 'monthly', nextRenewal: new Date('2026-07-28T00:00:00Z') }];
+    const res = await GET(makeReq());
+    const json = (await res.json()) as { data: Array<{ nextRenewal: string }> };
+    expect(json.data[0].nextRenewal).toBe('2026-07-28T00:00:00.000Z');
+    vi.useRealTimers();
+  });
+
   it('active=1 filters on { active: true }', async () => {
     await GET(makeReq({ url: `${BASE}?active=1` }));
     expect(subFind).toHaveBeenCalledWith({ active: true });

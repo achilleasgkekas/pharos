@@ -14,6 +14,7 @@
 // default-connection model, i.e. exactly the imported model — unchanged behaviour.
 import { connectDB } from '@/lib/db';
 import { BILLING_CYCLES, isBillingCycle, monthlyEquivalent } from '@/lib/billingCycle';
+import { effectiveNextRenewal } from '@/lib/subscriptionRenewal';
 import { currentModel } from '@/lib/tenancy/connection';
 import { suggestSubscription } from '@/lib/ollama';
 import { computeInstallmentPlans } from '@/lib/installments';
@@ -373,14 +374,17 @@ export async function execute(name: string, input: Record<string, unknown>): Pro
       const overBudget = Object.entries(settings.budgets)
         .filter(([cat, b]) => (catSpent.get(cat) ?? 0) > b)
         .map(([cat, b]) => `${cat} €${(catSpent.get(cat) ?? 0).toFixed(0)}/€${b}`);
-      // Next renewal
+      // Next renewal. Sorted on the DERIVED date, not the stored one: `nextRenewal` is a
+      // snapshot nothing advances, so the subscription with the oldest stale date used to
+      // win this race and get announced as "next" with a renewal date in the past.
       const upcoming = subs
-        .filter((x) => x.nextRenewal)
-        .sort((a, b) => new Date(a.nextRenewal as unknown as string).getTime() - new Date(b.nextRenewal as unknown as string).getTime())[0];
+        .map((x) => ({ name: x.name, at: effectiveNextRenewal(x.nextRenewal, x.billingCycle) }))
+        .filter((x): x is { name: string; at: Date } => x.at !== null)
+        .sort((a, b) => a.at.getTime() - b.at.getTime())[0];
       const content =
         `Overview (this month ${mk}): expenses €${monthExp.toFixed(0)}, income €${monthInc.toFixed(0)}, net €${(monthInc - monthExp).toFixed(0)}.` +
         ` Net position: €${(ownedValue - owed).toFixed(0)} (inventory €${ownedValue.toFixed(0)} − installments owed €${owed.toFixed(0)}, ${plans.length} active plans).` +
-        ` Subscriptions: ${subs.length} active (~€${monthlySubs.toFixed(0)}/mo)${upcoming ? `, next renewal ${upcoming.name} on ${String(upcoming.nextRenewal).slice(0, 10)}` : ''}.` +
+        ` Subscriptions: ${subs.length} active (~€${monthlySubs.toFixed(0)}/mo)${upcoming ? `, next renewal ${upcoming.name} on ${upcoming.at.toISOString().slice(0, 10)}` : ''}.` +
         (overBudget.length ? ` OVER BUDGET: ${overBudget.join(', ')}.` : Object.keys(settings.budgets).length ? ' All budgets on track.' : '') +
         (expiring ? ` ${expiring} warranties expire within 90 days.` : '') +
         ` Items: ${itemCount}, receipts: ${receiptCount}.`;

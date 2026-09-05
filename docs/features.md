@@ -317,7 +317,10 @@ grid / list and filter layout as the rest of the app.
 Highlights:
 
 - **Next renewal date:** Computed from the most recent renewal + billing cycle, so
-  the calendar and alerts stay in sync as you pay.
+  the calendar and alerts stay in sync as you pay. It keeps up on its own once a
+  renewal date arrives: an active subscription rolls to its next charge instead of
+  sitting on a date in the past, so nothing has to be opened and re-saved to clear
+  a stale "renews overdue". A lifetime purchase never rolls; it has no next charge.
 - **Free-trial tracking (P33):** Optional trial period before the first charge;
   the app tracks when the trial ends and the paid subscription begins, with a
   notification as the trial expires.

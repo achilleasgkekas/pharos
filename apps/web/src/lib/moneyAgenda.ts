@@ -1,5 +1,6 @@
 import { connectDB } from '@/lib/db';
 import { addCycle, cycleRenews } from '@/lib/billingCycle';
+import { renewalOnOrAfter } from '@/lib/subscriptionRenewal';
 import { Subscription } from '@/models/Subscription';
 import { Voucher } from '@/models/Voucher';
 import { Item } from '@/models/Item';
@@ -17,6 +18,10 @@ import type { SerializedStatement } from '@/types';
 export type AgendaKind = 'renewal' | 'installments' | 'bill' | 'income' | 'warranty' | 'voucher';
 export type AgendaEntry = { date: string; kind: AgendaKind; label: string; sub: string; amount: number | null; pinned?: boolean };
 export type AgendaMonth = { key: string; label: string; entries: AgendaEntry[]; out: number; inc: number };
+
+// A weekly subscription lands ~13 times across the 3-month window; the ceiling only has to
+// bound the loop, so it sits just above that rather than truncating the cheapest cycle.
+const MAX_RENEWALS_PER_WINDOW = 16;
 
 const mk = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 // English fallback wording for the non-i18n agenda strings (the /calendar page renders
@@ -68,9 +73,14 @@ export async function computeMoneyAgenda(now: Date = new Date()): Promise<{ mont
     // A non-renewing cycle (lifetime) must not be stepped: addCycle returns the same
     // date, which would push the identical entry once per guard iteration.
     if (!cycleRenews(s.billingCycle || 'monthly')) continue;
-    let d = new Date(s.nextRenewal as unknown as string);
+    // Seed at the window instead of stepping to it: `nextRenewal` is a snapshot nothing
+    // advances, so a subscription last saved years ago used to burn the whole step budget
+    // catching up and never reach the window at all — the charge simply vanished from the
+    // agenda, and from the safe-to-spend figure built on it.
+    let d = renewalOnOrAfter(s.nextRenewal, s.billingCycle, windowStart);
+    if (!d) continue;
     let guard = 0;
-    while (d < windowEnd && guard < 8) {
+    while (d < windowEnd && guard < MAX_RENEWALS_PER_WINDOW) {
       guard++;
       if (d >= windowStart) {
         push(d, { kind: 'renewal', label: s.name || 'Subscription', sub: `Renews ${cycleWord(s.billingCycle || 'monthly')}`, amount: s.amount || 0 });

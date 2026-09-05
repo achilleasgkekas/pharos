@@ -1,5 +1,6 @@
 import { connectDB } from '@/lib/db';
 import { addCycle, cycleRenews } from '@/lib/billingCycle';
+import { renewalOnOrAfter } from '@/lib/subscriptionRenewal';
 import { Subscription as SubscriptionModel } from '@/models/Subscription';
 import { Statement as StatementModel } from '@/models/Statement';
 import { Item as ItemModel } from '@/models/Item';
@@ -71,9 +72,12 @@ async function getAgenda(t: TFunc, intlTag: string): Promise<{ months: MonthBloc
     // A non-renewing cycle (lifetime) must not be stepped: addCycle returns the same
     // date, which would push the identical entry once per guard iteration.
     if (!cycleRenews(s.billingCycle || 'monthly')) continue;
-    let d = new Date(s.nextRenewal as unknown as string);
+    // Seed at the window rather than stepping to it, and give the loop room for a weekly
+    // cycle across 3 months — see lib/moneyAgenda.ts, which draws the same projection.
+    let d = renewalOnOrAfter(s.nextRenewal, s.billingCycle, windowStart);
+    if (!d) continue;
     let guard = 0;
-    while (d < windowEnd && guard < 8) {
+    while (d < windowEnd && guard < 16) {
       guard++;
       if (d >= windowStart) {
         push(d, { kind: 'renewal', label: s.name || t('cal.lblSubscription'), sub: t('cal.subRenews', { cycle: t(`sub.${s.billingCycle || 'monthly'}` as TKey) }), amount: s.amount || 0 });

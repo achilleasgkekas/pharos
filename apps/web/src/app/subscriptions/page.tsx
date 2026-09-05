@@ -8,6 +8,7 @@ import { getAppSettings } from '@/lib/appSettings';
 import { discoverUntrackedRecurring } from './actions';
 import type { SerializedSubscription, SerializedCard } from '@/types';
 import type { RecurringCandidate } from '@/lib/recurringDiscovery';
+import { effectiveNextRenewalISO } from '@/lib/subscriptionRenewal';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,8 +26,17 @@ async function getData(): Promise<{
     Card.find({ active: true }).sort({ name: 1 }).lean(),
     discoverUntrackedRecurring(),
   ]);
+  // `nextRenewal` is a snapshot written at save time and never advanced, so once a
+  // renewal date goes by the card reads "Renews overdue" for good and re-saving the
+  // subscription was the only way to move it on. Derive the date the subscription is
+  // actually next charged on instead — see lib/subscriptionRenewal.ts.
+  const now = Date.now();
+  const subscriptions = (JSON.parse(JSON.stringify(subs)) as SerializedSubscription[]).map((s) => ({
+    ...s,
+    nextRenewal: effectiveNextRenewalISO(s.nextRenewal, s.billingCycle, now),
+  }));
   return {
-    subscriptions: JSON.parse(JSON.stringify(subs)),
+    subscriptions,
     cards: JSON.parse(JSON.stringify(cards)),
     candidates,
   };

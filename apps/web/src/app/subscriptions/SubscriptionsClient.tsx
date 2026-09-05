@@ -1,6 +1,9 @@
 'use client';
 import { cur, currencySymbol, CURRENCIES } from "@/lib/money";
 import { BILLING_CYCLES, monthlyEquivalent, isBillingCycle } from '@/lib/billingCycle';
+// The countdown lives with the roll-forward that keeps `nextRenewal` from going stale, so
+// the badge and the derived date can never disagree about the day a renewal stops being today.
+import { renewalDaysUntil } from '@/lib/subscriptionRenewal';
 import { isForeignCurrency, normalizeCurrency, convertToBase, deriveFxRate, formatMoney, toPrinted } from '@/lib/fx';
 import { FxBadge } from '@/components/FxBadge';
 import { FxRateButton } from '@/components/FxRateButton';
@@ -64,12 +67,6 @@ function currencyCodes(base: string): string[] {
 
 
 const money = (n: number) => `${cur()}${(n || 0).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
-function daysUntil(dateStr: string | null): number | null {
-  if (!dateStr) return null;
-  const diff = new Date(dateStr).getTime() - Date.now();
-  return Math.ceil(diff / (1000 * 60 * 60 * 24));
-}
 
 /** Multi-currency context (P9): the deployment's base currency code + whether the per-entry
  *  currency/FX controls are switched on at all. One object, so prop lists grow by one entry. */
@@ -139,10 +136,10 @@ export function SubscriptionsClient({
     () =>
       active
         .filter((s) => {
-          const d = daysUntil(s.nextRenewal);
+          const d = renewalDaysUntil(s.nextRenewal);
           return d !== null && d >= 0 && d <= 30;
         })
-        .sort((a, b) => (daysUntil(a.nextRenewal)! - daysUntil(b.nextRenewal)!)),
+        .sort((a, b) => (renewalDaysUntil(a.nextRenewal)! - renewalDaysUntil(b.nextRenewal)!)),
     [active]
   );
 
@@ -161,7 +158,7 @@ export function SubscriptionsClient({
         case 'amount':
           return monthlyEquivalent(b.amount, b.billingCycle) - monthlyEquivalent(a.amount, a.billingCycle);
         case 'renewal':
-          return (daysUntil(a.nextRenewal) ?? 9999) - (daysUntil(b.nextRenewal) ?? 9999);
+          return (renewalDaysUntil(a.nextRenewal) ?? 9999) - (renewalDaysUntil(b.nextRenewal) ?? 9999);
         default:
           return a.name.localeCompare(b.name);
       }
@@ -279,7 +276,7 @@ export function SubscriptionsClient({
           </h3>
           <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
             {upcoming.map((s) => {
-              const d = daysUntil(s.nextRenewal)!;
+              const d = renewalDaysUntil(s.nextRenewal)!;
               return (
                 <button
                   key={s._id}
@@ -434,7 +431,7 @@ function SubCard({ sub, base, onEdit }: { sub: SerializedSubscription; base: str
     });
     if (ok) startTransition(() => deleteSubscription(sub._id));
   }
-  const d = daysUntil(sub.nextRenewal);
+  const d = renewalDaysUntil(sub.nextRenewal);
   const cycleLabel = isBillingCycle(sub.billingCycle) ? t(`cyc.${sub.billingCycle}` as TKey) : sub.billingCycle;
 
   return (
