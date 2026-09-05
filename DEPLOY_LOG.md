@@ -1042,3 +1042,59 @@ deploy έγινε μόνο αφού το ζήτησε ρητά ο ιδιοκτή
   στο CI, logs του brain). Φεύγουν με το επόμενο χειροκίνητο «Run now».
 - Το `pharos-deploy-20260904-1640` του BakeCore μπορεί να κλείσει: η αιτία εξηγήθηκε (missed run
   scan) και τα χρονόμετρα έσβησαν.
+
+---
+
+## 2026-09-05 18:08 UTC — `d51a7bc2 → 1b88ca34`, exit 0
+
+Ad-hoc εκτέλεση κατόπιν ρητού αιτήματος του Αχιλλέα στη συνομιλία («κάνε deploy και στο SaaS και
+στο self-hosted, και τα δύο στο Proxmox»). Έτρεξε από τον interactive assistant, όχι από
+χρονόμετρο. Pre-flight `--check` exit 0 (η παραγωγή ήταν ήδη υγιής πριν ξεκινήσει).
+
+**Στάλθηκαν 19 commits.** Το μεγαλύτερο κομμάτι είναι i18n: όλα τα επτά μη-αγγλικά locales
+ξαναήρθαν σε πλήρη κάλυψη με το `en` (1581/1581 το καθένα) αφού είχαν ξεφύγει στα 973 καθώς
+μεγάλωνε το `en`. Μαζί, ένα bug fix στις lending ειδοποιήσεις, το tenancy fix του brain στο global
+search, και συσσωρευμένη δουλειά του brain (Save tab, P47 lending tracker, reports/subscriptions).
+
+```
+1b88ca3 docs(progress): log the global-search tenancy leak and the stale debt queue
+f9c1c9d fix(saas): scope the global search to the workspace that asked
+57c5552 feat(i18n): complete the Portuguese (pt) locale to full parity
+a8ea981 feat(i18n): complete the Dutch (nl) locale to full parity
+fe82125 feat(i18n): complete the Italian (it) locale to full parity
+cbd78d7 feat(i18n): complete the French (fr) locale to full parity
+8f5053c feat(i18n): complete the Spanish (es) locale to full parity
+34a9a48 feat(i18n): complete the German (de) locale to full parity
+b3f26a6 fix(notifications): render the lending alert subtitle (+ Handshake icon)
+799129d fix(i18n): complete the Greek locale (30 multi-currency/FX keys)
+3d8f6c9 feat(savings): a Save tab that forecasts the balance and answers "can I make it?"
+70f1f9f fix(reports): label the charts with the window you actually picked
+ce7560b fix(notifications): give the lending alert an icon and a colour
+d440c33 fix(subscriptions): roll a passed renewal forward instead of reading "overdue"
+0319201 docs(progress): log the P47 overdue-return alert and mark P47 complete
+cbcf9bf feat(alerts): nudge when a lent item is due back (P47)
+330861c docs(progress): log the first half of P47, the lending tracker
+8ca38b9 feat(items): track what you lent out and to whom (P47)
+9f769b3 docs(deploy): log the healthy b24762b -> d51a7bc deploy, 28 commits
+```
+
+Build `web` καθαρό (`next build` 2.3 λεπτά, type-check/lint πέρασαν, 5/5 static pages). Το image
+`pharos-web:prod` ξαναχτίστηκε, το `pharos-web` container recreated. Συνολική διάρκεια περίπου 7
+λεπτά στα 2 cores.
+
+| έλεγχος | αποτέλεσμα |
+|---|---|
+| `deploy-update.sh` exit | **0** — deployed και υγιές |
+| `[6/6] verifying` | attempt 1 έδωσε στιγμιαίο 502 κατά το startup, attempt 2 health OK |
+| `https://ph-aros.com/` | 200 + landing body (`waitlist`/`self-host`) |
+| `https://app.ph-aros.com/account/login` | 200 |
+| `POST /api/cron/saas/trials-sweep` χωρίς token | 401 JSON `{"error":"unauthorized"}` |
+
+### Self-hosted (το ίδιο VM, ξεχωριστό instance)
+
+Στο ίδιο αίτημα ενημερώθηκε και το self-hosted `pharos.home.agkekas.gr` (containers
+`pharos-local-*` στο ίδιο apps VM). Δεν χρειάστηκε ξεχωριστό build: ο κώδικας είναι ίδιος
+(`1b88ca34`), μόνο το runtime env διαφέρει, οπότε το φρέσκο `pharos-web:prod` image ξαναπήρε tag
+`pharos-web:local` και το `pharos-local-web` έγινε recreate πάνω του. Το `storage-init` έτρεξε
+(κρατά το EACCES self-heal), `/account/login` → 200, τα locales παρόντα στο build. Η παραγωγή
+δεν επηρεάστηκε (το prod container δεν πειράχτηκε).
