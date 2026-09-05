@@ -8,6 +8,7 @@ import {
   lendingDaysUntilReturn,
   lendingState,
   lendingDaysOut,
+  collectLendingOverdue,
 } from './lending';
 
 const DAY = 86400000;
@@ -107,5 +108,62 @@ describe('lendingDaysOut', () => {
     expect(lendingDaysOut('received', '', iso(-10), NOW)).toBeNull();
     expect(lendingDaysOut('received', 'Nikos', null, NOW)).toBeNull();
     expect(lendingDaysOut('received', 'Nikos', 'nonsense', NOW)).toBeNull();
+  });
+});
+
+describe('collectLendingOverdue', () => {
+  const row = (over: Partial<Record<string, unknown>> = {}) => ({
+    _id: 'i1',
+    title: 'Drill',
+    status: 'received',
+    lentTo: 'Nikos',
+    lentAt: iso(-10),
+    expectedReturnAt: iso(-2),
+    ...over,
+  });
+
+  it('includes a loan whose agreed date has passed, with negative days and the borrower', () => {
+    const out = collectLendingOverdue([row()], 3, NOW);
+    expect(out).toHaveLength(1);
+    expect(out[0].days).toBe(-2);
+    expect(out[0].borrower).toBe('Nikos');
+    expect(out[0].iso).toBe(new Date(iso(-2)).toISOString().slice(0, 10));
+  });
+
+  it('includes a loan inside the lead window but not one beyond it', () => {
+    expect(collectLendingOverdue([row({ expectedReturnAt: iso(2) })], 3, NOW)).toHaveLength(1);
+    expect(collectLendingOverdue([row({ expectedReturnAt: iso(9) })], 3, NOW)).toHaveLength(0);
+  });
+
+  it('never alerts on an open-ended loan — no date agreed, nothing broken', () => {
+    expect(collectLendingOverdue([row({ expectedReturnAt: null })], 3, NOW)).toHaveLength(0);
+  });
+
+  it('skips a row whose borrower is blank or whitespace — that thing is home', () => {
+    expect(collectLendingOverdue([row({ lentTo: '' })], 3, NOW)).toHaveLength(0);
+    expect(collectLendingOverdue([row({ lentTo: '   ' })], 3, NOW)).toHaveLength(0);
+  });
+
+  it('skips a sold or broken item even when the loan fields survived in the document', () => {
+    expect(collectLendingOverdue([row({ status: 'sold' })], 3, NOW)).toHaveLength(0);
+    expect(collectLendingOverdue([row({ status: 'broken' })], 3, NOW)).toHaveLength(0);
+  });
+
+  it('has no lower bound — a very old loan keeps nagging until it comes back', () => {
+    expect(collectLendingOverdue([row({ expectedReturnAt: iso(-400) })], 3, NOW)).toHaveLength(1);
+  });
+
+  it('sorts most overdue first', () => {
+    const rows = [
+      row({ _id: 'a', expectedReturnAt: iso(1) }),
+      row({ _id: 'b', expectedReturnAt: iso(-20) }),
+      row({ _id: 'c', expectedReturnAt: iso(-5) }),
+    ];
+    expect(collectLendingOverdue(rows, 3, NOW).map((l) => l._id)).toEqual(['b', 'c', 'a']);
+  });
+
+  it('a lead time of 0 still reports what is due today and what is late', () => {
+    expect(collectLendingOverdue([row({ expectedReturnAt: iso(1) })], 0, NOW)).toHaveLength(0);
+    expect(collectLendingOverdue([row({ expectedReturnAt: iso(-1) })], 0, NOW)).toHaveLength(1);
   });
 });

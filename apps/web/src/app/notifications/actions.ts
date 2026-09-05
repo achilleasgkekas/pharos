@@ -16,12 +16,13 @@ import { currentTenant, withTenant } from '@/lib/tenancy/current';
 import { giftCardBalance, giftCardDaysLeft } from '@/lib/giftcard';
 import { billDaysUntilDue, billRemaining } from '@/lib/bill';
 import { collectMaintenanceDue, MAINTENANCE_STATUSES, type MaintenanceRow } from '@/lib/maintenance';
+import { collectLendingOverdue, LENDING_STATUSES, type LendingRow } from '@/lib/lending';
 import { computeInstallmentPlans } from '@/lib/installments';
 import { detectPriceHikes, type HikeEntry } from '@/lib/priceHike';
 import type { SerializedStatement } from '@/types';
 import { assertCanWrite } from '@/lib/auth';
 
-export type NotifKind = 'deal' | 'installment' | 'warranty' | 'pricehike' | 'trialend' | 'giftcard' | 'bill' | 'maintenance' | 'system';
+export type NotifKind = 'deal' | 'installment' | 'warranty' | 'pricehike' | 'trialend' | 'giftcard' | 'bill' | 'maintenance' | 'lending' | 'system';
 
 export type SerializedNotification = {
   _id: string;
@@ -34,7 +35,7 @@ export type SerializedNotification = {
 };
 
 type Alert = { dedupeKey: string; kind: NotifKind; title: string; body: string; href: string };
-const AUTO_KINDS = ['deal', 'installment', 'warranty', 'pricehike', 'trialend', 'giftcard', 'bill', 'maintenance'] as const;
+const AUTO_KINDS = ['deal', 'installment', 'warranty', 'pricehike', 'trialend', 'giftcard', 'bill', 'maintenance', 'lending'] as const;
 
 /** Recompute the live alerts (deals / warranties / installments-due) — the same
  *  three the ntfy check uses, but as structured payloads the bell can localize.
@@ -192,6 +193,25 @@ async function computeAlerts(): Promise<Alert[]> {
       title: m.title,
       body: `${m.days}`,
       href: `/items?open=${String(m._id)}`,
+    });
+  }
+
+  // Lent items due back (P47): the drill at your brother's house, with a date agreed. The
+  // dedupeKey carries the AGREED date (lending:<id>:<iso>), so pushing the deadline back
+  // retires this alert and arms the new one, while "it came back" clears the borrower name
+  // and drops the row out of the query entirely — the auto-expire sweep does the rest.
+  const lendRows = (await Item.find({ lentTo: { $nin: ['', null] }, expectedReturnAt: { $ne: null }, status: { $in: LENDING_STATUSES } })
+    .select('title status lentTo lentAt expectedReturnAt')
+    .lean()) as LendingRow[];
+  for (const l of collectLendingOverdue(lendRows, s.lendingAlertDays, now)) {
+    // body = "<days>|<borrower>": the name is half the message ("ask Kostas"), and the bell
+    // localizes the rest. Split on the FIRST bar only, since a name may contain one.
+    alerts.push({
+      dedupeKey: `lending:${String(l._id)}:${l.iso}`,
+      kind: 'lending',
+      title: l.title,
+      body: `${l.days}|${l.borrower}`,
+      href: `/items?open=${String(l._id)}`,
     });
   }
 

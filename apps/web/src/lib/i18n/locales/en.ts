@@ -970,6 +970,7 @@ export const en = {
   'set.giftCardAlert': 'Gift-card expiry alert · days ahead',
   'set.billAlert': 'Bill due alert · days ahead',
   'set.maintenanceAlert': 'Maintenance due alert · days ahead',
+  'set.lendingAlert': 'Lent item due-back alert · days ahead',
   'set.syncStaleAlert': 'Mirror stale alert (days)',
   'set.lastSync': 'Remote copy last written {date}',
   'set.lastSyncJustNow': 'Remote copy last written just now',
@@ -1227,6 +1228,9 @@ export const en = {
   'notif.maintenanceSub': 'Service due in {days}d · mark it serviced to restart the clock',
   'notif.maintenanceTodaySub': 'Service is due today · mark it serviced to restart the clock',
   'notif.maintenanceOverdueSub': 'Service is {days}d overdue · mark it serviced to restart the clock',
+  'notif.lendingSub': '{name} is due to return it in {days}d · mark it returned when it is back',
+  'notif.lendingTodaySub': '{name} is due to return it today · mark it returned when it is back',
+  'notif.lendingOverdueSub': '{name} is {days}d late returning it · a nudge costs less than a new one',
   // Standalone shopping list (photo scan)
   'nav.shoppingList': 'Shopping list',
   'home.dShoppingList': 'Quick to-buy list with photo scanning',

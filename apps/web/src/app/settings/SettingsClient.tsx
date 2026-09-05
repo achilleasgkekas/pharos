@@ -1980,6 +1980,7 @@ function DefaultsManager({ settings }: { settings: AppSettings }) {
   const [giftDays, setGiftDays] = useState(String(settings.giftCardAlertDays));
   const [billDays, setBillDays] = useState(String(settings.billAlertDays));
   const [maintDays, setMaintDays] = useState(String(settings.maintenanceAlertDays));
+  const [lendDays, setLendDays] = useState(String(settings.lendingAlertDays));
   const [syncStaleDays, setSyncStaleDays] = useState(String(settings.syncStaleDays));
   const [autoAdd, setAutoAdd] = useState(settings.autoAddStores);
   const [currency, setCurrency] = useState(settings.currency);
@@ -1997,6 +1998,7 @@ function DefaultsManager({ settings }: { settings: AppSettings }) {
     fd.set('giftCardAlertDays', giftDays);
     fd.set('billAlertDays', billDays);
     fd.set('maintenanceAlertDays', maintDays);
+    fd.set('lendingAlertDays', lendDays);
     fd.set('syncStaleDays', syncStaleDays);
     fd.set('autoAddStores', String(autoAdd));
     fd.set('currency', currency);
@@ -2063,6 +2065,10 @@ function DefaultsManager({ settings }: { settings: AppSettings }) {
         <label className="block">
           <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.maintenanceAlert')}</span>
           <input type="number" min="0" max="180" value={maintDays} onChange={(e) => setMaintDays(e.target.value)} className={inputClass} />
+        </label>
+        <label className="block">
+          <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.lendingAlert')}</span>
+          <input type="number" min="0" max="180" value={lendDays} onChange={(e) => setLendDays(e.target.value)} className={inputClass} />
         </label>
         <label className="block">
           <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.syncStaleAlert')}</span>

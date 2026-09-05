@@ -97,3 +97,53 @@ export function lendingDaysOut(
   if (Number.isNaN(from.getTime())) return null;
   return Math.max(0, Math.floor((now - from.getTime()) / 86400000));
 }
+
+/** One inventory row as the alert scans need it (shape of the .lean() projection below). */
+export type LendingRow = {
+  _id: unknown;
+  title: string;
+  status?: string | null;
+  lentTo?: string | null;
+  lentAt?: string | Date | null;
+  expectedReturnAt?: string | Date | null;
+};
+
+/** A loan that is due back (or already late). `days` is negative once the date has passed. */
+export type LendingDueEntry = { _id: unknown; title: string; borrower: string; days: number; iso: string };
+
+/**
+ * The loans whose agreed return date falls within `leadDays` — most overdue first.
+ *
+ * Shared by BOTH alert paths on purpose: the in-app bell (computeAlerts) and the outbound
+ * summary (runAlertChecks) must agree on which drill is late, or the phone push and the
+ * bell would name different things.
+ *
+ * Open-ended loans are deliberately SKIPPED, exactly as lendingState() skips them: if no
+ * date was ever agreed, nothing has been broken, and nagging about a thing you handed over
+ * with "keep it as long as you need" would be the fastest way to get these alerts muted.
+ *
+ * No lower bound, like maintenance: a loan stays overdue until the thing actually comes
+ * back. The Mongo query cannot express "borrower name is non-empty after trimming" nor the
+ * status rule, so isLentOut() re-checks both here.
+ */
+export function collectLendingOverdue(
+  rows: LendingRow[],
+  leadDays = 3,
+  now: number = Date.now()
+): LendingDueEntry[] {
+  const out: LendingDueEntry[] = [];
+  for (const r of rows) {
+    const days = lendingDaysUntilReturn(r.status, r.lentTo, r.expectedReturnAt, now);
+    if (days === null) continue;
+    if (days > leadDays) continue;
+    const due = new Date(r.expectedReturnAt as string | Date);
+    out.push({
+      _id: r._id,
+      title: r.title,
+      borrower: normalizeBorrower(r.lentTo),
+      days,
+      iso: due.toISOString().slice(0, 10),
+    });
+  }
+  return out.sort((a, b) => a.days - b.days);
+}

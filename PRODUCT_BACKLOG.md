@@ -1019,7 +1019,7 @@
   φάση)· utility type free-form string (όχι hardcoded enum, ίδιο pattern με P42 document type)· καμία alert αρχικά
   εκτός αν ζητηθεί ρητά (MVP = tracking + chart, όχι notification).
 
-### P47. Item lending tracker (δανεικά σε φίλους/οικογένεια) — S/M — OSS
+### P47. Item lending tracker (δανεικά σε φίλους/οικογένεια) — ✅ SHIPPED 2026-09-05 (`8ca38b9` πεδία+badge+«γύρισε πίσω» + overdue-return alert· pharos-brain) — S/M — OSS
 - **Αξία:** πραγματικό «Personal Hub» κενό (βλ. CLAUDE.md backronym) — ο χρήστης έχει ακριβό εξοπλισμό (Battle
   Station parts, δίκτυο, εργαλεία, gadgets) που μπορεί να δανείζει σε φίλους/οικογένεια. Σήμερα κανένα module δεν
   κρατά «ποιος το έχει τώρα και πότε το περιμένεις πίσω» — το item status μένει owned (received/installed) σαν να

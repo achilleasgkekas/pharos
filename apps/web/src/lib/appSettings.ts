@@ -28,6 +28,7 @@ export type AppSettings = {
   giftCardAlertDays: number; // window (days) for "gift card expiring with balance" alert (P32); 0 = off
   billAlertDays: number; // lead-time (days) for "bill due / overdue" alert (P28); 0 = off
   maintenanceAlertDays: number; // lead-time (days) for the "maintenance due" alert (P41); overdue nags regardless
+  lendingAlertDays: number; // lead-time (days) for the "lent item due back" alert (P47); overdue nags regardless
   syncStaleDays: number; // days without a successful remote push before alerting (P48); 0 = off
   autoAddStores: boolean;
   ntfyUrl: string;
@@ -58,6 +59,7 @@ export type RawAppConfigDoc = {
   giftCardAlertDays?: number;
   billAlertDays?: number;
   maintenanceAlertDays?: number;
+  lendingAlertDays?: number;
   syncStaleDays?: number;
   autoAddStores?: boolean;
   ntfyUrl?: string;
@@ -97,6 +99,7 @@ const DEFAULTS: AppSettings = {
   giftCardAlertDays: 30,
   billAlertDays: 5,
   maintenanceAlertDays: 7,
+  lendingAlertDays: 3,
   syncStaleDays: 7,
   autoAddStores: true,
   ntfyUrl: '',
@@ -145,6 +148,7 @@ export function normalizeSettings(doc: RawAppConfigDoc | null | undefined): AppS
     billAlertDays: typeof doc?.billAlertDays === 'number' ? doc.billAlertDays : DEFAULTS.billAlertDays,
     maintenanceAlertDays:
       typeof doc?.maintenanceAlertDays === 'number' ? doc.maintenanceAlertDays : DEFAULTS.maintenanceAlertDays,
+    lendingAlertDays: typeof doc?.lendingAlertDays === 'number' ? doc.lendingAlertDays : DEFAULTS.lendingAlertDays,
     syncStaleDays: typeof doc?.syncStaleDays === 'number' ? doc.syncStaleDays : DEFAULTS.syncStaleDays,
     autoAddStores: doc?.autoAddStores !== false,
     ntfyUrl: doc?.ntfyUrl || '',
@@ -186,7 +190,7 @@ export async function getAppSettings(): Promise<AppSettings> {
     await connectDB();
     const Config = tenantModel(await tenantDb(ctx), AppConfig);
     doc = await Config.findOne({ key: 'singleton' })
-      .select('defaultItemView defaultWarrantyMonths warrantyAlertDays trialAlertDays giftCardAlertDays billAlertDays maintenanceAlertDays syncStaleDays autoAddStores ntfyUrl ntfyEnabled currency multiCurrency defaultVatRate defaultReturnWindowDays lists spaces budgets budgetRollover assetAccounts depreciation categoryRules onboardingDismissed notifyTypes')
+      .select('defaultItemView defaultWarrantyMonths warrantyAlertDays trialAlertDays giftCardAlertDays billAlertDays maintenanceAlertDays lendingAlertDays syncStaleDays autoAddStores ntfyUrl ntfyEnabled currency multiCurrency defaultVatRate defaultReturnWindowDays lists spaces budgets budgetRollover assetAccounts depreciation categoryRules onboardingDismissed notifyTypes')
       .lean();
   } catch {
     /* DB down → hard defaults */
