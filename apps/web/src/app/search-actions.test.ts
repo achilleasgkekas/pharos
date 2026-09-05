@@ -51,6 +51,12 @@ const {
 });
 
 vi.mock('@/lib/db', () => ({ connectDB: connectDBMock }));
+// Tenancy seam mocked the same way as the sibling tenancy-wrapped action modules
+// (bills/actions.test.ts, vouchers/actions.test.ts): withRequestTenant runs the body inline
+// and currentModel hands back the very model it was given, so these tests keep pinning the
+// hit-building behaviour. Tenant isolation itself lives in search-actions.tenant.test.ts.
+vi.mock('@/lib/tenancy/request', () => ({ withRequestTenant: async (fn: () => Promise<unknown>) => fn() }));
+vi.mock('@/lib/tenancy/connection', () => ({ currentModel: async (m: unknown) => m }));
 vi.mock('@/models/Item', () => ({ Item: { find: itemFind } }));
 vi.mock('@/models/Receipt', () => ({ Receipt: { find: receiptFind } }));
 vi.mock('@/models/Statement', () => ({ Statement: { find: statementFind } }));

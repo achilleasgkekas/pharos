@@ -167,6 +167,47 @@
 >   - `npm run type-check` EXIT 0 μετά τα δύο fixes· full `npx vitest run` **3613/3613 green** (ίδιο count με πριν, μηδέν regression).
 > **el.ts i18n gap**: **6** (όχι πια 126 — ο builder το έκλεισε ήδη στο `2cd33fb`, `en=1277, el=1271`). Πολύ μικρό υπόλοιπο πλέον, δεν αξίζει ξεχωριστό P3 item· θα μαζευτεί στο επόμενο batch αν μεγαλώσει.
 
+## Web Debt Queue — ενεργά items (σάρωση 2026-09-05, pharos-brain)
+
+> Η ουρά της 61ης σάρωσης παρακάτω είναι **ολόκληρη κλειστή**. Νέα μηχανική σάρωση όλων των
+> server-action αρχείων κάτω από `apps/web/src/app` (model import χωρίς κανένα `withRequestTenant`
+> ή `currentModel`) έβγαλε **τέσσερα** αρχεία: `search-actions.ts`, `login/actions.ts`,
+> `setup/actions.ts`, `settings/users.actions.ts`. Το πρώτο διορθώθηκε σε αυτό το run· τα άλλα τρία
+> είναι όλα το ίδιο ερώτημα (μέτρημα χρηστών στο auth gating) και περιμένουν την ανοιχτή ερώτηση
+> `pharos-brain-20260830-0250` στο `ASK_ACHILLEAS.md`, γι' αυτό δεν αγγίχτηκαν.
+
+### `search-actions.ts` (`searchAll`) παρακάμπτει το tenant-scoping σε **12 collections** ταυτόχρονα
+- Priority: P1
+- Size: S
+- Area: db
+- Files: apps/web/src/app/search-actions.ts
+- Depends on: none
+- Acceptance:
+  - **Το πρόβλημα**: το `searchAll()` έκανε δώδεκα direct `Model.find` (Item/Receipt/Statement/Task/
+    Subscription/Expense/Voucher/Bill/Goal/GiftCard/LoyaltyCard/ShoppingListItem) μέσα σε ένα
+    `Promise.all`, χωρίς κανένα wrap.
+  - **Γιατί έχει σημασία**: το ευρύτερο read surface της εφαρμογής, και το τροφοδοτεί **τριπλά** η
+    μπάρα αναζήτησης, το εργαλείο `search_data` του βοηθού AI, και το `GET /api/v1/search`. Σε SaaS
+    mode δύο πληκτρολογημένα γράμματα σε οποιοδήποτε workspace επέστρεφαν αποδείξεις, statements,
+    λογαριασμούς και δωροκάρτες του DEFAULT tenant, **με λειτουργικά deep links πάνω τους**. Μεγαλύτερο
+    blast radius από κάθε προηγούμενο item της ουράς. Μηδέν επίδραση self-hosted.
+  - **Fix**: ένα `withRequestTenant` block γύρω από ολόκληρο το σώμα, με τα δώδεκα models να
+    resolve-άρουν με `currentModel` μέσα σε αυτό (όχι δώδεκα ξεχωριστά wraps: μισο-scoped
+    `Promise.all` είναι χειρότερη αποτυχία από καθόλου, γιατί τα μισά αποτελέσματα θα ήταν σωστά και
+    κανένα hit δεν λέει από ποιο workspace ήρθε).
+  - Επαλήθευση: `grep -c "withRequestTenant\|currentModel" apps/web/src/app/search-actions.ts` ≥ 13·
+    npm run type-check exits 0.
+- Status: ✅ **DONE 2026-09-05** (pharos-brain). Τα δώδεκα model imports έγιναν `X as XModel` και
+  resolve-άρουν με `currentModel` μέσα σε ένα ενιαίο `withRequestTenant`· grep count **17**. Το
+  `connectDB()` και ο guard «λιγότεροι από 2 χαρακτήρες» έμειναν **πριν** το wrap, ώστε μια κενή
+  αναζήτηση να μη ζητά καν tenant resolution. Νέο `search-actions.tenant.test.ts` (5 tests) με
+  per-tenant tagged models: «και τα δώδεκα από το workspace που καλεί», «δεύτερο workspace δεν αγγίζει
+  το πρώτο», «τα rows είναι του καλούντος», self-hosted parity χωρίς tenant, και ο min-length guard.
+  **Negative control πρώτα, όχι ισχυρισμός**: ένα μόνο `Receipt.find` πίσω σε direct model έριξε
+  **4/5** tests, μετά επαναφορά. Ο υπάρχων `search-actions.test.ts` πήρε το γνωστό flat tenancy mock
+  (identity `currentModel`), 14 tests αμετάβλητα. Verify: `npm run type-check` EXIT 0· full
+  `npx vitest run` **422/422 αρχεία, 6766 passed / 4 skipped, μηδέν fail**.
+
 ## Web Debt Queue — ενεργά items (61η σάρωση 2026-07-30)
 
 ### `subscriptions/actions.ts` παρακάμπτει το tenant-scoping (Subscription ήδη αντιμετωπίζεται ως tenant-scoped αλλού)
@@ -235,7 +276,15 @@
   - **Fix**: ίδιο recipe, μικρό αρχείο (3 exports).
   - Επαλήθευση: `grep -c "withRequestTenant\|currentModel" apps/web/src/app/history/actions.ts` ≥ 3· npm run type-check exits 0.
   - npm run type-check exits 0
-- Status: TODO (flagged 2026-07-30, 61η σάρωση reviewer routine)
+- Status: ✅ **DONE 2026-08-10** (commit `a3398af`, «η πύλη tenant, παρτίδα 3, η επιφάνεια των εργαλείων
+  AI»). Το item έμεινε γραμμένο ως TODO για 26 ημέρες ενώ ο κώδικας ήταν ήδη διορθωμένος: η 70ή σάρωση
+  (2026-08-09) το κατέγραψε «αμετάβλητο, 10 ημέρες» και το fix προσγειώθηκε την **επόμενη** μέρα, χωρίς
+  να ξαναπεράσει auditor από πάνω (το reviewer routine έχει έκτοτε διαγραφεί, η περιοχή ανήκει στο
+  pharos-brain). Live επαλήθευση 2026-09-05: `scoped() = withRequestTenant(() => currentModel(Conversation))`
+  και τα τρία exports (`getConversations`/`deleteConversation`/`clearConversations`) περνάνε από εκεί,
+  `grep -c "withRequestTenant\|currentModel"` = **3** (Acceptance ζητούσε ≥3), και υπάρχει
+  `history/actions.tenant.test.ts` (95 γραμμές) με per-tenant tagged model. **Η ουρά της 61ης σάρωσης
+  είναι πλέον ολόκληρη κλειστή.**
 
 ### `notifications/actions.ts` παρακάμπτει το tenant-scoping (διαβάζει 6 models, γράφει Notification)
 - Priority: P2
