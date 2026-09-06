@@ -1716,6 +1716,24 @@ export const en = {
   'sav.gAddAmount': 'Add amount',
   'sav.gDeleteTitle': 'Delete "{title}"?',
   'sav.gDeleteBody': 'This permanently removes the goal and its contribution history. It cannot be undone.',
+  // First-run guided tour (components/FirstRunTour.tsx)
+  'tour.title': 'Welcome to Pharos',
+  'tour.skip': 'Skip',
+  'tour.back': 'Back',
+  'tour.next': 'Next',
+  'tour.done': 'Start using Pharos',
+  'tour.s1Title': 'Your money, all in one place',
+  'tour.s1Body': 'Pharos tracks purchases, receipts, subscriptions, bills and budgets — with AI along the way. Here is a quick tour.',
+  'tour.s2Title': 'Snap a receipt, AI does the rest',
+  'tour.s2Body': 'Add a receipt photo and AI reads the store, date, total and items, and tracks warranties and return windows.',
+  'tour.s3Title': 'Track products and their prices',
+  'tour.s3Body': 'Save products, add store links, and Pharos re-checks their prices for you and alerts you on drops.',
+  'tour.s4Title': 'Subscriptions, bills and budgets',
+  'tour.s4Body': 'See every recurring charge, set monthly budgets, and know what is due before it hits your card.',
+  'tour.s5Title': 'Alerts where you already are',
+  'tour.s5Body': 'Get notified about deals, price hikes, expiring warranties and upcoming bills.',
+  'tour.s6Title': 'Ask Pharos anything',
+  'tour.s6Body': 'Use the command bar to search and act in plain language. Turn AI on in Settings whenever you are ready.',
 } as const;
 
 export type Dict = Record<keyof typeof en, string>;

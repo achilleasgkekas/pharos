@@ -1637,4 +1637,22 @@ export const de: Partial<Dict> = {
   'pp.refresh': 'Aktualisieren',
 
   'lang.language': 'Sprache',
+  // First-run guided tour (components/FirstRunTour.tsx)
+  'tour.title': 'Willkommen bei Pharos',
+  'tour.skip': 'Überspringen',
+  'tour.back': 'Zurück',
+  'tour.next': 'Weiter',
+  'tour.done': 'Los geht’s',
+  'tour.s1Title': 'Deine Finanzen an einem Ort',
+  'tour.s1Body': 'Pharos verfolgt Einkäufe, Belege, Abos, Rechnungen und Budgets – mit KI-Unterstützung. Hier eine kurze Tour.',
+  'tour.s2Title': 'Beleg fotografieren, die KI macht den Rest',
+  'tour.s2Body': 'Füge ein Belegfoto hinzu und die KI liest Geschäft, Datum, Summe und Positionen und verfolgt Garantien und Rückgabefristen.',
+  'tour.s3Title': 'Produkte und ihre Preise verfolgen',
+  'tour.s3Body': 'Speichere Produkte, füge Shop-Links hinzu, und Pharos prüft ihre Preise und meldet dir Preissenkungen.',
+  'tour.s4Title': 'Abos, Rechnungen und Budgets',
+  'tour.s4Body': 'Sieh jede wiederkehrende Zahlung, setze Monatsbudgets und weiß, was fällig ist, bevor es abgebucht wird.',
+  'tour.s5Title': 'Benachrichtigungen, wo du schon bist',
+  'tour.s5Body': 'Werde über Angebote, Preiserhöhungen, ablaufende Garantien und anstehende Rechnungen informiert.',
+  'tour.s6Title': 'Frag Pharos alles',
+  'tour.s6Body': 'Nutze die Befehlsleiste, um in normaler Sprache zu suchen und zu handeln. Aktiviere die KI jederzeit in den Einstellungen.',
 };

@@ -1637,4 +1637,22 @@ export const pt: Partial<Dict> = {
   'pp.refresh': 'Atualizar',
 
   'lang.language': 'Idioma',
+  // First-run guided tour (components/FirstRunTour.tsx)
+  'tour.title': 'Bem-vindo ao Pharos',
+  'tour.skip': 'Ignorar',
+  'tour.back': 'Voltar',
+  'tour.next': 'Seguinte',
+  'tour.done': 'Começar a usar o Pharos',
+  'tour.s1Title': 'As tuas finanças, num só lugar',
+  'tour.s1Body': 'O Pharos acompanha compras, recibos, subscrições, faturas e orçamentos — com IA pelo caminho. Aqui vai uma visita rápida.',
+  'tour.s2Title': 'Tira uma foto do recibo e a IA faz o resto',
+  'tour.s2Body': 'Adiciona a foto de um recibo e a IA lê a loja, a data, o total e os artigos, e acompanha garantias e prazos de devolução.',
+  'tour.s3Title': 'Acompanha produtos e os seus preços',
+  'tour.s3Body': 'Guarda produtos, adiciona links de lojas e o Pharos verifica os preços por ti e avisa-te das descidas.',
+  'tour.s4Title': 'Subscrições, faturas e orçamentos',
+  'tour.s4Body': 'Vê cada cobrança recorrente, define orçamentos mensais e sabe o que vence antes de chegar ao teu cartão.',
+  'tour.s5Title': 'Alertas onde já estás',
+  'tour.s5Body': 'Recebe alertas sobre promoções, subidas de preço, garantias a expirar e faturas a chegar.',
+  'tour.s6Title': 'Pergunta tudo ao Pharos',
+  'tour.s6Body': 'Usa a barra de comandos para pesquisar e agir em linguagem natural. Ativa a IA nas Definições quando quiseres.',
 };

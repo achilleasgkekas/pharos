@@ -1637,4 +1637,22 @@ export const it: Partial<Dict> = {
   'pp.refresh': 'Aggiorna',
 
   'lang.language': 'Lingua',
+  // First-run guided tour (components/FirstRunTour.tsx)
+  'tour.title': 'Benvenuto su Pharos',
+  'tour.skip': 'Salta',
+  'tour.back': 'Indietro',
+  'tour.next': 'Avanti',
+  'tour.done': 'Inizia a usare Pharos',
+  'tour.s1Title': 'Le tue finanze, tutte in un posto',
+  'tour.s1Body': 'Pharos tiene traccia di acquisti, scontrini, abbonamenti, bollette e budget — con l’IA a supporto. Ecco un breve tour.',
+  'tour.s2Title': 'Fotografa uno scontrino, l’IA fa il resto',
+  'tour.s2Body': 'Aggiungi la foto di uno scontrino e l’IA legge negozio, data, totale e articoli, e tiene traccia di garanzie e resi.',
+  'tour.s3Title': 'Tieni d’occhio prodotti e prezzi',
+  'tour.s3Body': 'Salva i prodotti, aggiungi i link dei negozi e Pharos ricontrolla i prezzi e ti avvisa dei cali.',
+  'tour.s4Title': 'Abbonamenti, bollette e budget',
+  'tour.s4Body': 'Vedi ogni addebito ricorrente, imposta budget mensili e sai cosa scade prima che arrivi sulla carta.',
+  'tour.s5Title': 'Avvisi dove sei già',
+  'tour.s5Body': 'Ricevi avvisi su offerte, aumenti di prezzo, garanzie in scadenza e bollette in arrivo.',
+  'tour.s6Title': 'Chiedi qualsiasi cosa a Pharos',
+  'tour.s6Body': 'Usa la barra dei comandi per cercare e agire in linguaggio naturale. Attiva l’IA nelle Impostazioni quando vuoi.',
 };

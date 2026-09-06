@@ -12,6 +12,7 @@ import { saasUiEnabled } from '@/lib/tenancy/saasPage';
 import { assertKnownWorkspaceHost } from '@/lib/tenancy/request';
 import { getAiConfig } from '@/lib/aiConfig';
 import { AiOnboardingBanner } from '@/components/AiOnboardingBanner';
+import { FirstRunTour } from '@/components/FirstRunTour';
 import { getServerT } from '@/lib/i18n/server';
 import { LocaleProvider } from '@/components/LocaleProvider';
 import { headers } from 'next/headers';
@@ -141,6 +142,7 @@ export default async function RootLayout({
             <ChromeGate>
               <SiteNav aiReady={aiReady} saas={saasUiEnabled()} operator={operator} user={{ name: user.name || 'account', role: user.role }} productBaseUrl={productBaseUrl} />
               {banner && <AiOnboardingBanner reason={banner} productBaseUrl={productBaseUrl} />}
+              <FirstRunTour />
             </ChromeGate>
           )}
           {children}

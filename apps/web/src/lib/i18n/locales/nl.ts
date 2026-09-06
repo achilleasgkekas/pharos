@@ -1637,4 +1637,22 @@ export const nl: Partial<Dict> = {
   'pp.refresh': 'Vernieuwen',
 
   'lang.language': 'Taal',
+  // First-run guided tour (components/FirstRunTour.tsx)
+  'tour.title': 'Welkom bij Pharos',
+  'tour.skip': 'Overslaan',
+  'tour.back': 'Terug',
+  'tour.next': 'Volgende',
+  'tour.done': 'Aan de slag met Pharos',
+  'tour.s1Title': 'Je geldzaken op één plek',
+  'tour.s1Body': 'Pharos houdt aankopen, bonnen, abonnementen, rekeningen en budgetten bij — met AI als hulp. Hier is een korte rondleiding.',
+  'tour.s2Title': 'Maak een foto van een bon, AI doet de rest',
+  'tour.s2Body': 'Voeg een foto van een bon toe en AI leest winkel, datum, totaal en artikelen, en houdt garanties en retourtermijnen bij.',
+  'tour.s3Title': 'Volg producten en hun prijzen',
+  'tour.s3Body': 'Bewaar producten, voeg winkellinks toe en Pharos controleert hun prijzen en waarschuwt je bij dalingen.',
+  'tour.s4Title': 'Abonnementen, rekeningen en budgetten',
+  'tour.s4Body': 'Zie elke terugkerende afschrijving, stel maandbudgetten in en weet wat er komt voordat het van je kaart gaat.',
+  'tour.s5Title': 'Meldingen waar je al bent',
+  'tour.s5Body': 'Krijg meldingen over aanbiedingen, prijsstijgingen, verlopende garanties en aankomende rekeningen.',
+  'tour.s6Title': 'Vraag Pharos alles',
+  'tour.s6Body': 'Gebruik de opdrachtbalk om in gewone taal te zoeken en te handelen. Zet AI aan in Instellingen wanneer je wilt.',
 };
