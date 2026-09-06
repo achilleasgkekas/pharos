@@ -382,9 +382,9 @@ export function ReceiptsClient({
       )}
       <div>
         <p className={labelCls} style={{ fontFamily: 'var(--font-mono)' }}>{t('rc.fltPeriod')}</p>
-        <div className="flex flex-col gap-1.5">
-          <Input type="date" value={dateFrom} max={dateTo || undefined} onChange={(e) => setDateFrom(e.target.value)} aria-label={t('rc.fltFrom')} />
-          <Input type="date" value={dateTo} min={dateFrom || undefined} onChange={(e) => setDateTo(e.target.value)} aria-label={t('rc.fltTo')} />
+        <div className="flex flex-col gap-1.5 min-w-0">
+          <Input type="date" value={dateFrom} max={dateTo || undefined} onChange={(e) => setDateFrom(e.target.value)} aria-label={t('rc.fltFrom')} className="min-w-0" />
+          <Input type="date" value={dateTo} min={dateFrom || undefined} onChange={(e) => setDateTo(e.target.value)} aria-label={t('rc.fltTo')} className="min-w-0" />
         </div>
         <div className="flex flex-wrap gap-1 mt-1.5">
           {([
