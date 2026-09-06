@@ -64,7 +64,7 @@ export async function anthropicJSON(opts: {
   system: string;
   user: string;
   imagesBase64?: string[];
-}): Promise<{ json: unknown; raw: string; model: string }> {
+}): Promise<{ json: unknown; raw: string; model: string; usage: { inputTokens: number; outputTokens: number } }> {
   const content: ContentBlock[] = [];
   for (const img of opts.imagesBase64 ?? []) {
     content.push({ type: 'image', source: { type: 'base64', media_type: mediaTypeOf(img), data: img } });
@@ -96,10 +96,18 @@ export async function anthropicJSON(opts: {
     throw new Error(`Anthropic ${res.status}: ${redactKey(detail, opts.apiKey)}`);
   }
 
-  const data = (await res.json()) as { content?: { type: string; text?: string }[] };
+  const data = (await res.json()) as {
+    content?: { type: string; text?: string }[];
+    usage?: { input_tokens?: number; output_tokens?: number };
+  };
   const raw = (data.content?.find((b) => b.type === 'text')?.text ?? '').trim();
   if (!raw) throw new Error('Anthropic returned an empty response');
-  return { json: JSON.parse(stripFences(raw)), raw, model: opts.model };
+  return {
+    json: JSON.parse(stripFences(raw)),
+    raw,
+    model: opts.model,
+    usage: { inputTokens: data.usage?.input_tokens ?? 0, outputTokens: data.usage?.output_tokens ?? 0 },
+  };
 }
 
 // ─── Tool-use (for the homepage AI command bar) ─────────────────────────────

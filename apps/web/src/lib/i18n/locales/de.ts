@@ -1314,6 +1314,11 @@ export const de: Partial<Dict> = {
   'set.baseUrlOpenai': 'Base URL (OpenAI-kompatibel)',
   'set.baseUrlHint': 'Funktioniert mit LM Studio, Groq, Mistral, DeepSeek, vLLM… allem, was die OpenAI-Chat-API spricht.',
   'set.confirmBulk': 'Vor Massen-KI bestätigen',
+  'set.aiBudget': 'Monatliches KI-Ausgabenlimit',
+  'set.aiBudgetHint':
+    'Feste Obergrenze, was Cloud-KI pro Monat kosten darf (0 = kein Limit). Ist es erreicht, werden KI-Aufrufe blockiert, bis du es erhöhst oder der Monat wechselt. Lokales Ollama ist immer kostenlos.',
+  'set.aiSpentThisMonth': 'Diesen Monat ausgegeben',
+  'set.aiBudgetNoCap': 'kein Limit',
   'set.confirmBulkDesc': 'Zeigt eine Kostenschätzung und fragt, bevor ein Massenjob startet — schützt vor versehentlichen Cloud-Kosten.',
   'set.saveAi': 'KI-Einstellungen speichern',
   'set.scraperModel': 'Scraper-Modell',

@@ -8,6 +8,7 @@ import { anthropicJSON } from './anthropic';
 import { openaiCompatJSON, geminiJSON } from './aiProviders';
 import { getPromptOverride } from './prompts';
 import { assertAiQuota, meterAiResult } from './billing/aiMeter';
+import { assertAiBudget, recordAiSpend } from './aiBudget';
 
 const OLLAMA_HOST = process.env.OLLAMA_HOST ?? 'http://localhost:11434';
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL ?? 'qwen2.5vl:7b';
@@ -51,7 +52,7 @@ async function cloudJSON(
   system: string,
   user: string,
   imagesBase64?: string[]
-): Promise<{ json: unknown; raw: string; model: string } | null> {
+): Promise<{ json: unknown; raw: string; model: string; usage?: { inputTokens: number; outputTokens: number } } | null> {
   switch (cfg.provider) {
     case 'anthropic':
       return anthropicJSON({ apiKey: cfg.anthropicApiKey, workspaceId: cfg.anthropicWorkspaceId, model: cfg.anthropicModel, system, user, imagesBase64 });
@@ -80,9 +81,13 @@ export async function runVisionJSON(
   // SaaS metering: block an over-quota tenant before any provider cost is incurred.
   // No-op for the self-hosted default tenant / SAAS_MODE off / BYO-key tenants.
   await assertAiQuota();
+  // Self-hosted spend cap: block a CLOUD call once this month's estimated AI spend reaches the
+  // configured budget. No-op in SaaS mode and for local Ollama (free).
+  if (cfg.provider !== 'ollama') await assertAiBudget();
   const cloud = await cloudJSON(cfg, systemPrompt, userPrompt, imagesBase64);
   if (cloud) {
-    await meterAiResult();
+    await recordAiSpend(cloud.model, cloud.usage?.inputTokens ?? 0, cloud.usage?.outputTokens ?? 0);
+    await meterAiResult({ inputTokens: cloud.usage?.inputTokens, outputTokens: cloud.usage?.outputTokens });
     return cloud;
   }
   // Vision tasks must run on a vision-capable model, not the active text model.
@@ -116,9 +121,13 @@ async function runTextJSONWith(
   // SaaS metering: block an over-quota tenant before any provider cost is incurred.
   // No-op for the self-hosted default tenant / SAAS_MODE off / BYO-key tenants.
   await assertAiQuota();
+  // Self-hosted spend cap: block a CLOUD call once this month's estimated AI spend reaches the
+  // configured budget. No-op in SaaS mode and for local Ollama (free).
+  if (cfg.provider !== 'ollama') await assertAiBudget();
   const cloud = await cloudJSON(cfg, systemPrompt, userPrompt);
   if (cloud) {
-    await meterAiResult();
+    await recordAiSpend(cloud.model, cloud.usage?.inputTokens ?? 0, cloud.usage?.outputTokens ?? 0);
+    await meterAiResult({ inputTokens: cloud.usage?.inputTokens, outputTokens: cloud.usage?.outputTokens });
     return cloud;
   }
   const response = await clientFor(cfg.ollamaHost).chat({

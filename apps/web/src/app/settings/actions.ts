@@ -185,6 +185,10 @@ export async function saveAiConfig(formData: FormData): Promise<{ ok: boolean }>
     openrouterModel: String(formData.get('openrouterModel') || '').trim(),
     customBaseUrl: String(formData.get('customBaseUrl') || '').trim().replace(/\/$/, ''),
     customModel: String(formData.get('customModel') || '').trim(),
+    // Self-hosted AI spend cap: monthly ceiling in the display currency; 0 = no cap. Clamped
+    // to a non-negative number (a blank or garbage field reads as 0 = off). The running spend
+    // ledger (aiSpendPeriod/aiSpendMicros) is written by lib/aiBudget.ts, never from the form.
+    aiMonthlyBudget: Math.max(0, Number(formData.get('aiMonthlyBudget')) || 0),
   };
   // Keys: only overwrite when a new one is typed (blank = keep the existing one).
   for (const k of ['anthropicApiKey', 'openaiApiKey', 'geminiApiKey', 'openrouterApiKey', 'customApiKey'] as const) {

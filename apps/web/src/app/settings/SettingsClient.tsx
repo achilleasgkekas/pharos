@@ -72,6 +72,9 @@ type AiInfo = {
   customModel: string;
   hasCustomKey: boolean;
   confirmBulk: boolean;
+  monthlyBudget: number; // self-hosted AI spend cap in `currency`/month; 0 = no cap
+  spentThisMonth: number; // this month's estimated AI spend, same currency
+  currency: string;
   installed: { name: string; sizeGB: number }[];
   enabled: boolean; // AI master switch
   features: Record<string, boolean>; // per-feature overrides (absent = on)
@@ -619,6 +622,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
   const [msg, setMsg] = useState<string | null>(null);
   const [test, setTest] = useState<string | null>(null);
   const [confirmBulk, setConfirmBulk] = useState(ai.confirmBulk);
+  const [monthlyBudget, setMonthlyBudget] = useState(ai.monthlyBudget ? String(ai.monthlyBudget) : '');
 
   function save() {
     const fd = new FormData();
@@ -633,6 +637,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
     fd.set('openrouterModel', openrouterModel.trim());
     fd.set('customBaseUrl', customBaseUrl.trim());
     fd.set('customModel', customModel.trim());
+    fd.set('aiMonthlyBudget', String(Number(monthlyBudget) || 0));
     if (apiKey.trim()) fd.set('anthropicApiKey', apiKey.trim());
     if (openaiKey.trim()) fd.set('openaiApiKey', openaiKey.trim());
     if (geminiKey.trim()) fd.set('geminiApiKey', geminiKey.trim());
@@ -995,6 +1000,31 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
             <span className={cn('absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform', confirmBulk && 'translate-x-4')} />
           </button>
         </div>
+      </div>
+
+      {/* AI monthly spend cap (self-hosted). Part of the form — saved with the button below. */}
+      <div className="pt-3 border-t border-[color:var(--color-border)] mt-1">
+        <Field label={t('set.aiBudget')}>
+          <input
+            type="number"
+            min="0"
+            step="1"
+            inputMode="decimal"
+            value={monthlyBudget}
+            onChange={(e) => setMonthlyBudget(e.target.value)}
+            placeholder="0"
+            className={inputClass}
+            style={{ fontFamily: 'var(--font-mono)' }}
+          />
+        </Field>
+        <p className="text-[10px] text-[color:var(--color-text-faint)] mt-1">{t('set.aiBudgetHint')}</p>
+        <p className="text-[11px] mt-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
+          {t('set.aiSpentThisMonth')}:{' '}
+          <span className={ai.monthlyBudget > 0 && ai.spentThisMonth >= ai.monthlyBudget ? 'text-[color:var(--color-red)]' : 'text-[color:var(--color-text)]'}>
+            {ai.spentThisMonth.toFixed(2)} {ai.currency}
+          </span>
+          {ai.monthlyBudget > 0 ? ` / ${ai.monthlyBudget.toFixed(2)} ${ai.currency}` : ` · ${t('set.aiBudgetNoCap')}`}
+        </p>
       </div>
 
       {/* Save */}

@@ -1165,6 +1165,11 @@ export const el: Partial<Dict> = {
   'set.baseUrlOpenai': 'Base URL (OpenAI-compatible)',
   'set.baseUrlHint': 'Δουλεύει με LM Studio, Groq, Mistral, DeepSeek, vLLM… ό,τι μιλάει το OpenAI chat API.',
   'set.confirmBulk': 'Επιβεβαίωση πριν από bulk AI',
+  'set.aiBudget': 'Μηνιαίο όριο δαπάνης AI',
+  'set.aiBudgetHint':
+    'Ανώτατο όριο στο πόσο μπορεί να κοστίσει το cloud AI ανά μήνα (0 = χωρίς όριο). Όταν εξαντληθεί, οι AI κλήσεις μπλοκάρονται μέχρι να το αυξήσεις ή να αλλάξει ο μήνας. Το τοπικό Ollama είναι πάντα δωρεάν.',
+  'set.aiSpentThisMonth': 'Δαπάνη αυτόν τον μήνα',
+  'set.aiBudgetNoCap': 'χωρίς όριο',
   'set.confirmBulkDesc': 'Δείχνει εκτίμηση κόστους και ρωτά πριν ξεκινήσει bulk job — προστατεύει από κατά λάθος cloud χρεώσεις.',
   'set.saveAi': 'Αποθήκευση ρυθμίσεων AI',
   'set.scraperModel': 'Μοντέλο scraper',

@@ -22,6 +22,14 @@ const AppConfigSchema = new Schema(
     // Cost guard: confirm (with a rough cost estimate) before starting a BULK AI job.
     // On by default so cloud (Anthropic) runs never start by accident.
     aiConfirmBulk: { type: Boolean, default: true },
+    // ── Self-hosted AI spend cap (lib/aiBudget.ts) ──
+    // A monthly ceiling, in the display `currency`, on what CLOUD AI calls may cost. When this
+    // month's estimated spend reaches it, further cloud calls are blocked until the user raises
+    // it or the month rolls over. 0 = no cap (default, so existing installs are unchanged). The
+    // ledger below is the running estimate the cap reads; SaaS uses per-tenant quotas instead.
+    aiMonthlyBudget: { type: Number, default: 0 },
+    aiSpendPeriod: { type: String, default: '' }, // "YYYY-MM" of the current ledger window
+    aiSpendMicros: { type: Number, default: 0 }, // this month's estimated spend, in currency micros
     // ── AI master switch + per-feature toggles ──
     // The app is fully usable with AI off. `aiEnabled` is the master switch;
     // `aiFeatures` is a map featureKey→boolean where an ABSENT key means ON (so new

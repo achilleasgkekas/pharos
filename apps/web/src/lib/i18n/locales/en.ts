@@ -1184,6 +1184,11 @@ export const en = {
   'set.baseUrlOpenai': 'Base URL (OpenAI-compatible)',
   'set.baseUrlHint': 'Works with LM Studio, Groq, Mistral, DeepSeek, vLLM… anything speaking the OpenAI chat API.',
   'set.confirmBulk': 'Confirm before bulk AI',
+  'set.aiBudget': 'Monthly AI spend cap',
+  'set.aiBudgetHint':
+    'Hard limit on what cloud AI may cost per month (0 = no cap). When reached, AI calls are blocked until you raise it or the month rolls over. Local Ollama is always free.',
+  'set.aiSpentThisMonth': 'Spent this month',
+  'set.aiBudgetNoCap': 'no cap',
   'set.confirmBulkDesc': 'Shows a cost estimate and asks before starting a bulk job — guards against accidental cloud charges.',
   'set.saveAi': 'Save AI settings',
   'set.scraperModel': 'Scraper model',

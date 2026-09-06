@@ -9,6 +9,7 @@ import { withRequestTenant } from '@/lib/tenancy/request';
 import { currentModel } from '@/lib/tenancy/connection';
 import { isOllamaHealthy, isAiReady } from '@/lib/ollama';
 import { getAiConfig } from '@/lib/aiConfig';
+import { getAiBudgetStatus } from '@/lib/aiBudget';
 import { getAppSettings } from '@/lib/appSettings';
 import { saasUiEnabled } from '@/lib/tenancy/saasPage';
 import { getStores } from '@/lib/storeService';
@@ -49,6 +50,7 @@ async function getInfo() {
       getImapInfo(),
     ]);
   const lists = await getListsForEditor();
+  const aiBudget = await getAiBudgetStatus();
   return {
     counts: { items, receipts, statements, subscriptions, cards },
     cardList: JSON.parse(JSON.stringify(cardList)) as SerializedCard[],
@@ -82,6 +84,10 @@ async function getInfo() {
       customModel: cfg.customModel,
       hasCustomKey: !!cfg.customApiKey,
       confirmBulk: doc?.aiConfirmBulk !== false, // cost guard, default ON
+      // Self-hosted AI spend cap + this month's running spend (both in `currency`); 0 = no cap.
+      monthlyBudget: aiBudget.budget,
+      spentThisMonth: aiBudget.spent,
+      currency: settings.currency,
       installed, // [{ name, sizeGB }]
       // Optional-AI controls
       enabled: doc?.aiEnabled !== false, // master switch, default ON

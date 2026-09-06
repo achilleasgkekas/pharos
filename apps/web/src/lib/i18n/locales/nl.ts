@@ -1314,6 +1314,11 @@ export const nl: Partial<Dict> = {
   'set.baseUrlOpenai': 'Base URL (OpenAI-compatibel)',
   'set.baseUrlHint': 'Werkt met LM Studio, Groq, Mistral, DeepSeek, vLLM… alles dat de OpenAI-chat-API spreekt.',
   'set.confirmBulk': 'Bevestigen vóór bulk-AI',
+  'set.aiBudget': 'Maandelijks AI-uitgavenplafond',
+  'set.aiBudgetHint':
+    'Harde limiet op wat cloud-AI per maand mag kosten (0 = geen limiet). Bij het bereiken worden AI-aanroepen geblokkeerd tot je het verhoogt of de maand wisselt. Lokale Ollama is altijd gratis.',
+  'set.aiSpentThisMonth': 'Deze maand uitgegeven',
+  'set.aiBudgetNoCap': 'geen limiet',
   'set.confirmBulkDesc': 'Toont een kostenraming en vraagt voordat een bulktaak start — beschermt tegen onbedoelde cloudkosten.',
   'set.saveAi': 'AI-instellingen opslaan',
   'set.scraperModel': 'Scraper-model',

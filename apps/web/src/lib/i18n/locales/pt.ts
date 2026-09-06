@@ -1314,6 +1314,11 @@ export const pt: Partial<Dict> = {
   'set.baseUrlOpenai': 'Base URL (compatível com OpenAI)',
   'set.baseUrlHint': 'Funciona com LM Studio, Groq, Mistral, DeepSeek, vLLM… qualquer coisa que fale a API de chat da OpenAI.',
   'set.confirmBulk': 'Confirmar antes de IA em massa',
+  'set.aiBudget': 'Limite mensal de gasto em IA',
+  'set.aiBudgetHint':
+    'Limite rígido do que a IA na nuvem pode custar por mês (0 = sem limite). Ao ser atingido, as chamadas de IA são bloqueadas até o aumentares ou o mês mudar. O Ollama local é sempre grátis.',
+  'set.aiSpentThisMonth': 'Gasto este mês',
+  'set.aiBudgetNoCap': 'sem limite',
   'set.confirmBulkDesc': 'Mostra uma estimativa de custo e pergunta antes de iniciar um trabalho em massa — protege de cobranças acidentais na nuvem.',
   'set.saveAi': 'Guardar definições de IA',
   'set.scraperModel': 'Modelo do scraper',
