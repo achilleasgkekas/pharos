@@ -1658,4 +1658,7 @@ export const fr: Partial<Dict> = {
   'tour.s5Body': 'Soyez averti des bonnes affaires, hausses de prix, garanties qui expirent et factures à venir.',
   'tour.s6Title': 'Demandez tout à Pharos',
   'tour.s6Body': 'Utilisez la barre de commandes pour chercher et agir en langage naturel. Activez l’IA dans les Réglages quand vous voulez.',
+  'set.aiProviderKey': 'Fournisseur et clé IA',
+  'set.aiManagedInWorkspace': 'Dans Pharos hébergé, le fournisseur IA et la clé API sont gérés dans votre espace de travail. Une clé saisie ici est ignorée — définissez-la dans les paramètres de l’espace de travail.',
+  'set.openWorkspaceAi': 'Ouvrir Espace de travail → IA',
 };

@@ -285,7 +285,23 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
           {tab === 'ai' && (
             <>
               <AiMasterAndFeatures ai={info.ai} canEdit={isAdmin} />
-              <AiSettings ai={info.ai} ollamaUp={info.ollamaUp} />
+              {saas ? (
+                // Hosted: the AI provider + API key live in Workspace → AI (control plane,
+                // metered). A key typed into the self-host AiSettings AppConfig here is
+                // overridden by the workspace BYO key (lib/aiConfig applyTenantByoKey), so
+                // showing it too was a second, ignored key entry. Point at the one that wins.
+                <Section title={t('set.aiProviderKey')} icon={<Sparkles size={15} />}>
+                  <p className="text-sm text-[color:var(--color-text-dim)] leading-relaxed">{t('set.aiManagedInWorkspace')}</p>
+                  <a
+                    href="/account/workspace/settings"
+                    className="inline-flex items-center gap-1.5 mt-3 text-sm font-medium text-[color:var(--color-accent)] hover:underline"
+                  >
+                    {t('set.openWorkspaceAi')} →
+                  </a>
+                </Section>
+              ) : (
+                <AiSettings ai={info.ai} ollamaUp={info.ollamaUp} />
+              )}
               <ScraperAiSettings scraperAi={info.scraperAi} installed={info.ai.installed} hasAnthropicKey={info.ai.hasKey} />
               <AiPromptsManager prompts={info.prompts} />
               <Section title={t('set.mobileMcpTitle')} icon={<Plug size={15} />}>
@@ -300,7 +316,10 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
 
           {tab === 'storage' && (
             <>
-              <StorageManager storage={info.storage} counts={info.counts} />
+              {/* Hosted: the remote-mirror backend (SMB / OneDrive / FTP) is a self-host
+                  concept — the platform owns storage in SaaS — so hide the connector. The
+                  per-tenant data tools below (export/backup, import, trash) still apply. */}
+              {!saas && <StorageManager storage={info.storage} counts={info.counts} />}
               <Section title={t('set.dataSection')} icon={<Database size={15} />}>
                 <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                   <Stat label={t('set.statItems')} value={info.counts.items} />

@@ -1658,4 +1658,7 @@ export const nl: Partial<Dict> = {
   'tour.s5Body': 'Krijg meldingen over aanbiedingen, prijsstijgingen, verlopende garanties en aankomende rekeningen.',
   'tour.s6Title': 'Vraag Pharos alles',
   'tour.s6Body': 'Gebruik de opdrachtbalk om in gewone taal te zoeken en te handelen. Zet AI aan in Instellingen wanneer je wilt.',
+  'set.aiProviderKey': 'AI-provider & sleutel',
+  'set.aiManagedInWorkspace': 'In gehost Pharos worden de AI-provider en API-sleutel in je workspace beheerd. Een hier ingevoerde sleutel wordt genegeerd — stel deze in bij de workspace-instellingen.',
+  'set.openWorkspaceAi': 'Open Workspace → AI',
 };

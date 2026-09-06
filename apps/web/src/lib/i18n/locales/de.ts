@@ -1658,4 +1658,7 @@ export const de: Partial<Dict> = {
   'tour.s5Body': 'Werde über Angebote, Preiserhöhungen, ablaufende Garantien und anstehende Rechnungen informiert.',
   'tour.s6Title': 'Frag Pharos alles',
   'tour.s6Body': 'Nutze die Befehlsleiste, um in normaler Sprache zu suchen und zu handeln. Aktiviere die KI jederzeit in den Einstellungen.',
+  'set.aiProviderKey': 'KI-Anbieter & Schlüssel',
+  'set.aiManagedInWorkspace': 'Im gehosteten Pharos werden KI-Anbieter und API-Schlüssel in deinem Workspace verwaltet. Ein hier eingegebener Schlüssel wird ignoriert — lege ihn stattdessen in den Workspace-Einstellungen fest.',
+  'set.openWorkspaceAi': 'Workspace → KI öffnen',
 };

@@ -1737,6 +1737,9 @@ export const en = {
   'tour.s5Body': 'Get notified about deals, price hikes, expiring warranties and upcoming bills.',
   'tour.s6Title': 'Ask Pharos anything',
   'tour.s6Body': 'Use the command bar to search and act in plain language. Turn AI on in Settings whenever you are ready.',
+  'set.aiProviderKey': 'AI provider & key',
+  'set.aiManagedInWorkspace': 'In hosted Pharos your AI provider and API key are managed in your workspace. A key entered here is ignored — set it in Workspace settings instead.',
+  'set.openWorkspaceAi': 'Open Workspace → AI',
 } as const;
 
 export type Dict = Record<keyof typeof en, string>;
