@@ -28,6 +28,7 @@ import {
   Printer,
   Wrench,
   HandHelping,
+  ShieldAlert,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -44,6 +45,17 @@ import { convertToBase, deriveFxRate, formatMoney, isForeignCurrency, normalizeC
 import { COMMON_CARRIERS, hasKnownCarrier, resolveTrackingUrl } from '@/lib/tracking';
 import { maintenanceApplies, maintenanceDaysUntilDue, maintenanceState } from '@/lib/maintenance';
 import { isLentOut, lendingApplies, lendingDaysOut, lendingDaysUntilReturn, lendingState } from '@/lib/lending';
+import {
+  CLAIM_STATUSES,
+  MAX_CLAIM_NOTES_LENGTH,
+  MAX_CLAIM_REF_LENGTH,
+  MAX_CLAIM_TRACKING_LENGTH,
+  activeClaim,
+  claimDaysSinceUpdate,
+  claimIsStale,
+  warrantyClaimsApply,
+  type WarrantyClaim,
+} from '@/lib/warrantyClaims';
 import {
   customFieldsMatch,
   MAX_KEY_LENGTH,
@@ -166,6 +178,38 @@ function lendBadge(item: SerializedItem, t: TFunc): { label: string; color: stri
   const color =
     state === 'overdue' ? 'var(--color-red)' : state === 'due-soon' ? 'var(--color-gold)' : 'var(--color-text-dim)';
   return { label: t('it.lentToX', { name: item.lentTo }), color };
+}
+
+/** The five claim outcomes, spelled out rather than built from the stored value: the
+ *  translation keys are a closed set the type system checks, and an unknown status read
+ *  from an older document still renders as the state every claim starts in. */
+function claimStatusLabel(status: string, t: TFunc): string {
+  switch (status) {
+    case 'in-repair':
+      return t('it.claimInRepair');
+    case 'replaced':
+      return t('it.claimReplaced');
+    case 'refunded':
+      return t('it.claimRefunded');
+    case 'rejected':
+      return t('it.claimRejected');
+    default:
+      return t('it.claimSubmitted');
+  }
+}
+
+/** P44 — the "RMA open" pill for the list and grid cards. Null for every item that has
+ *  never been sent back, which is every pre-P44 record. Gold while the claim is moving,
+ *  red once nobody has touched it for two weeks: a claim going quiet is the actual
+ *  failure mode of an RMA, not the claim existing. */
+function claimBadge(item: SerializedItem, t: TFunc): { label: string; color: string } | null {
+  const claim = activeClaim(item.status, item.warrantyClaims as WarrantyClaim[] | undefined);
+  if (!claim) return null;
+  const stale = claimIsStale(claim);
+  return {
+    label: claim.ref ? t('it.claimOpenRef', { ref: claim.ref }) : t('it.claimOpen'),
+    color: stale ? 'var(--color-red)' : 'var(--color-gold)',
+  };
 }
 
 // ─── Main page component ───────────────────────────────────────────────────
@@ -1099,6 +1143,7 @@ function ItemRow({ item, view, base, plan, onClick, selected, onToggleSelect, se
   const deal = view === 'shopping' && isDeal(item);
   const w = warrantyState(item.warrantyUntil, t);
   const lend = lendBadge(item, t);
+  const claim = claimBadge(item, t);
   const mainClick = selectMode ? onToggleSelect : onClick;
   return (
     <div
@@ -1146,6 +1191,7 @@ function ItemRow({ item, view, base, plan, onClick, selected, onToggleSelect, se
             <span className="uppercase tracking-wider">{item.num ? `${item.num} / ` : ''}{item.category}</span>
             {w && <span style={{ color: w.color }}>{w.label}</span>}
             {lend && <span className="truncate max-w-[14rem]" style={{ color: lend.color }}>{lend.label}</span>}
+            {claim && <span className="truncate max-w-[14rem]" style={{ color: claim.color }}>{claim.label}</span>}
             {plan && <span className="text-[color:var(--color-purple)]">{t('it.installmentsXY', { paid: plan.paidInstallments, total: plan.totalInstallments })}</span>}
             {best && (
               <span className="text-[color:var(--color-text-dim)]">
@@ -1338,6 +1384,18 @@ function ItemCard({
                 >
                   <HandHelping size={9} className="shrink-0" />
                   <span className="truncate">{lend.label}</span>
+                </span>
+              ) : null;
+            })()}
+            {(() => {
+              const claim = claimBadge(item, t);
+              return claim ? (
+                <span
+                  className="inline-flex items-center gap-1 text-[9px] font-semibold px-1.5 py-0.5 rounded uppercase tracking-wider max-w-full"
+                  style={{ fontFamily: 'var(--font-mono)', background: `${claim.color}1a`, color: claim.color, border: `1px solid ${claim.color}40` }}
+                >
+                  <ShieldAlert size={9} className="shrink-0" />
+                  <span className="truncate">{claim.label}</span>
                 </span>
               ) : null;
             })()}
@@ -1601,6 +1659,12 @@ function ItemDetailModal({
   const lendUrgency = lentOut ? lendingState(item.status, item.lentTo, item.expectedReturnAt) : null;
   const lendColor =
     lendUrgency === 'overdue' ? 'var(--color-red)' : lendUrgency === 'due-soon' ? 'var(--color-gold)' : 'var(--color-text-dim)';
+  // P44 — every claim ever opened on this thing, newest first, so the panel is the RMA
+  // history and not only the live one. `openNow` is what the pill on the card names.
+  const claims = ((item.warrantyClaims ?? []) as WarrantyClaim[])
+    .slice()
+    .sort((a, b) => String(b.reportedAt ?? '').localeCompare(String(a.reportedAt ?? '')));
+  const openNow = activeClaim(item.status, item.warrantyClaims as WarrantyClaim[] | undefined);
   const realized =
     soldFor != null && item.purchasedPrice != null && item.purchasedPrice > 0
       ? Math.round((soldFor - item.purchasedPrice) * 100) / 100
@@ -1796,6 +1860,41 @@ function ItemDetailModal({
               <Button variant="ghost" onClick={handleReturned} disabled={pending} className="self-start">
                 {t('it.markReturned')}
               </Button>
+            </div>
+          )}
+
+          {/* P44 — the warranty claims opened on this item. Sits by the loan block for the
+              same reason: where the thing IS matters more than what it cost, and a machine
+              at the manufacturer is not on your shelf either. Read-only here; the rows are
+              edited in the form, which is where the dates and the ticket number are typed. */}
+          {claims.length > 0 && (
+            <div className="bg-[color:var(--color-surface-2)] rounded-xl p-4 flex flex-col gap-3">
+              <div className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider flex items-center gap-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
+                <ShieldAlert size={12} />
+                {t('it.claimsN', { n: claims.length })}
+              </div>
+              {claims.map((c, i) => {
+                const idle = claimDaysSinceUpdate(c);
+                const stale = claimIsStale(c);
+                const live = openNow != null && c === openNow;
+                const color = stale ? 'var(--color-red)' : live ? 'var(--color-gold)' : 'var(--color-text-dim)';
+                return (
+                  <div key={`${c.ref}-${c.reportedAt}-${i}`} className="min-w-0">
+                    <div className="text-sm font-semibold truncate" style={{ fontFamily: 'var(--font-mono)', color }}>
+                      {claimStatusLabel(c.status, t)}
+                      {c.ref ? ` · ${c.ref}` : ''}
+                    </div>
+                    <div className="text-[10px] text-[color:var(--color-text-faint)] mt-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
+                      {c.reportedAt ? t('it.claimReportedOn', { date: String(c.reportedAt).slice(0, 10) }) : ''}
+                      {idle !== null && ` · ${t('it.claimNoUpdateFor', { n: idle })}`}
+                      {c.trackingNumber ? ` · ${c.trackingNumber}` : ''}
+                    </div>
+                    {c.notes && (
+                      <p className="text-xs text-[color:var(--color-text-dim)] mt-1 whitespace-pre-wrap break-words">{c.notes}</p>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
 
@@ -2225,6 +2324,33 @@ function ItemForm({
   // string map posted field-by-field) for the same reason links are: it is an array.
   const [customFields, setCustomFields] = useState<CustomField[]>(item?.customFields ?? []);
 
+  // P44: warranty claims, edited as their own rows for the same reason as the two arrays
+  // above. A new row is pre-dated TODAY: `reportedAt` is the anchor the server requires,
+  // and you open an RMA on the day the thing broke, so typing that date is pure friction.
+  const [claims, setClaims] = useState<WarrantyClaim[]>(
+    ((item?.warrantyClaims ?? []) as WarrantyClaim[]).map((c) => ({
+      ...c,
+      reportedAt: c.reportedAt ? String(c.reportedAt).slice(0, 10) : '',
+      lastUpdateAt: c.lastUpdateAt ? String(c.lastUpdateAt).slice(0, 10) : '',
+    }))
+  );
+
+  const updateClaim = (i: number, k: keyof WarrantyClaim, v: string) =>
+    setClaims((prev) => prev.map((c, idx) => (idx === i ? { ...c, [k]: v } : c)));
+  const addClaim = () =>
+    setClaims((prev) => [
+      ...prev,
+      {
+        ref: '',
+        status: 'submitted',
+        reportedAt: new Date().toISOString().slice(0, 10),
+        lastUpdateAt: '',
+        trackingNumber: '',
+        notes: '',
+      },
+    ]);
+  const removeClaim = (i: number) => setClaims((prev) => prev.filter((_, idx) => idx !== i));
+
   const updateCustomField = (i: number, k: 'key' | 'value', v: string) =>
     setCustomFields((prev) => prev.map((f, idx) => (idx === i ? { ...f, [k]: v } : f)));
   const addCustomField = () => setCustomFields((prev) => [...prev, { key: '', value: '' }]);
@@ -2248,6 +2374,8 @@ function ItemForm({
     // A row with no name is dropped here as well as server-side, so the editor shows the
     // same outcome the record will have. The server rules are the ones that count.
     fd.set('customFields', JSON.stringify(customFields.filter((f) => f.key.trim())));
+    // Same rule as the server: a row with no report date is an empty line, not a claim.
+    fd.set('warrantyClaims', JSON.stringify(claims.filter((c) => c.reportedAt)));
     startTransition(async () => {
       if (item) {
         await updateItem(item._id, fd);
@@ -2622,6 +2750,107 @@ function ItemForm({
           )}
         </div>
       </div>
+
+      {/* P44 — warranty claims / RMAs. Only on things you own and can still send back, the
+          same reason the maintenance and lending blocks are gated: an RMA on a machine you
+          sold belongs to whoever bought it. The rows stay visible while editing so an old
+          claim can be closed off, which is the edit that actually happens most. */}
+      {warrantyClaimsApply(form.status) && (
+        <div className="md:col-span-2">
+          <div className="flex items-center justify-between mb-1.5">
+            <label
+              className="block text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider"
+              style={{ fontFamily: 'var(--font-mono)' }}
+            >
+              {t('it.claimsN', { n: claims.length })}
+            </label>
+            <button
+              type="button"
+              onClick={addClaim}
+              className="text-[10px] text-[color:var(--color-accent)] flex items-center gap-1 hover:opacity-80"
+              style={{ fontFamily: 'var(--font-mono)' }}
+            >
+              <Plus size={11} /> {t('common.add')}
+            </button>
+          </div>
+          <div className="space-y-2.5">
+            {claims.map((c, i) => (
+              <div key={i} className="bg-[color:var(--color-surface-2)] rounded-lg p-2.5 flex flex-col gap-1.5">
+                <div className="flex gap-1.5 items-center">
+                  <input
+                    value={c.ref}
+                    onChange={(e) => updateClaim(i, 'ref', e.target.value)}
+                    placeholder={t('it.fClaimRef')}
+                    maxLength={MAX_CLAIM_REF_LENGTH}
+                    className="w-36 bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:border-[color:var(--color-accent)]"
+                    style={{ fontFamily: 'var(--font-mono)' }}
+                  />
+                  <select
+                    value={c.status}
+                    onChange={(e) => updateClaim(i, 'status', e.target.value)}
+                    className="flex-1 min-w-0 bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:border-[color:var(--color-accent)]"
+                    style={{ fontFamily: 'var(--font-mono)' }}
+                  >
+                    {CLAIM_STATUSES.map((st) => (
+                      <option key={st} value={st}>
+                        {claimStatusLabel(st, t)}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => removeClaim(i)}
+                    className="text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] transition-colors p-1 shrink-0"
+                  >
+                    <X size={13} />
+                  </button>
+                </div>
+                <div className="flex gap-1.5 items-center flex-wrap">
+                  <label className="text-[9px] text-[color:var(--color-text-faint)] uppercase tracking-wider" style={{ fontFamily: 'var(--font-mono)' }}>
+                    {t('it.fClaimReportedAt')}
+                  </label>
+                  <input
+                    type="date"
+                    value={c.reportedAt ?? ''}
+                    onChange={(e) => updateClaim(i, 'reportedAt', e.target.value)}
+                    className="bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-md px-2 py-1.5 text-xs focus:outline-none focus:border-[color:var(--color-accent)]"
+                    style={{ fontFamily: 'var(--font-mono)' }}
+                  />
+                  <label className="text-[9px] text-[color:var(--color-text-faint)] uppercase tracking-wider" style={{ fontFamily: 'var(--font-mono)' }}>
+                    {t('it.fClaimLastUpdateAt')}
+                  </label>
+                  <input
+                    type="date"
+                    value={c.lastUpdateAt ?? ''}
+                    onChange={(e) => updateClaim(i, 'lastUpdateAt', e.target.value)}
+                    className="bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-md px-2 py-1.5 text-xs focus:outline-none focus:border-[color:var(--color-accent)]"
+                    style={{ fontFamily: 'var(--font-mono)' }}
+                  />
+                  <input
+                    value={c.trackingNumber}
+                    onChange={(e) => updateClaim(i, 'trackingNumber', e.target.value)}
+                    placeholder={t('it.fClaimTracking')}
+                    maxLength={MAX_CLAIM_TRACKING_LENGTH}
+                    className="flex-1 min-w-[8rem] bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:border-[color:var(--color-accent)]"
+                    style={{ fontFamily: 'var(--font-mono)' }}
+                  />
+                </div>
+                <textarea
+                  value={c.notes}
+                  onChange={(e) => updateClaim(i, 'notes', e.target.value)}
+                  placeholder={t('it.fClaimNotes')}
+                  maxLength={MAX_CLAIM_NOTES_LENGTH}
+                  rows={2}
+                  className="w-full bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:border-[color:var(--color-accent)] resize-y"
+                />
+              </div>
+            ))}
+            {claims.length === 0 && (
+              <p className="text-xs text-[color:var(--color-text-faint)] italic">{t('it.noClaims')}</p>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Buttons */}
       <div className="flex gap-3 pt-2 md:col-span-2">

@@ -1042,7 +1042,7 @@
 - **Ανοιχτή απόφαση (builder default):** «Pause until…» date picker στη φόρμα (κενό = όχι paused)· expired pause
   ξαναμετράει αυτόματα στο επόμενο load (όχι background job, ίδιο on-read pattern με το `generateDueRecurring`).
 
-### P44. Warranty claim / RMA tracker (κύκλος ζωής μιας πραγματικής επιστροφής) — S/M — OSS (κυρίως)
+### P44. Warranty claim / RMA tracker (κύκλος ζωής μιας πραγματικής επιστροφής) — ✅ SHIPPED φάση 1 2026-09-06 (πεδία + πίλλα στην κάρτα + πάνελ ιστορικού· pharos-brain) — S/M — OSS (κυρίως)
 - **Αξία:** σήμερα το warranty tracking σταματά στο «λήγει σε Nd» (expiry alert). Καμία δομή δεν καλύπτει τι
   γίνεται **όταν χαλάσει κάτι και ανοίγεις πραγματικό RMA/claim**: ημ. αναφοράς βλάβης, αριθμός RMA/ticket του
   κατασκευαστή/καταστήματος, status (submitted/shipped-for-repair/replaced/refunded/rejected), tracking number,
@@ -1055,6 +1055,15 @@
 - **Ανοιχτή απόφαση (builder default):** embedded subdoc πάνω στο Item (απλούστερο, ίδιο pattern με το `attachments[]`
   του P21) αντί νέο top-level module· status ως enum (submitted/in-repair/replaced/refunded/rejected)· manual
   entry μόνο (μηδέν AI email-parsing σε αυτή τη φάση).
+- **Τι βγήκε στη φάση 1:** το `Item.warrantyClaims[]` (embedded, όπως έλεγε το builder default), οι πέντε
+  καταστάσεις, ο editor με τις σειρές μέσα στη φόρμα, η πίλλα «Ανοιχτό RMA» σε λίστα και πλέγμα (χρυσή όσο
+  κινείται, κόκκινη όταν έχει σιωπήσει), και το πάνελ ιστορικού στο detail. Οι κανόνες είναι καθαροί στο
+  `lib/warrantyClaims.ts` με 32 tests, συν 5 στο `actions.warrantyClaims.test.ts` για το wiring.
+- **Τι μένει (φάση 2, ίδιο split με P41/P47):** το stale-claim nudge, δηλαδή ειδοποίηση όταν ένα ανοιχτό RMA
+  δεν έχει κουνηθεί 14+ μέρες. Χρειάζεται bell dedupe key, outbound κανάλια, per-type toggle και ρύθμιση
+  lead-time· ο κανόνας ο ίδιος (`claimIsStale`) είναι ήδη γραμμένος και δοκιμασμένος εδώ.
+- **Συνειδητά εκτός:** συνημμένα ΑΝΑ claim. Το item έχει ήδη το vault του P21 για εγγυήσεις και αλληλογραφία,
+  και ένα δεύτερο, στενότερο storage path θα ήταν διπλή υλοποίηση για την ίδια δουλειά.
 
 ### P43. Public read-only wishlist share link (χωρίς login, για δωροεπιλογή) — S/M — both (SaaS = growth lever)
 - **Αξία:** τα shopping-status items είναι ήδη ένα δομημένο wishlist (τίτλος/τιμή/link/specs) αλλά ορατό μόνο στον

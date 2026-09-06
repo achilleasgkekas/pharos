@@ -54,6 +54,23 @@ const CustomFieldSchema = new Schema(
   { _id: false }
 );
 
+// P44: one warranty claim / RMA on this item — the process AFTER the thing broke, which
+// `warrantyUntil` (a single expiry date) cannot express. Embedded because a claim is
+// meaningless without its item, is read whenever the item is read, and should die with it.
+// An array: an expensive machine can go back more than once, and the earlier return is
+// part of its history. Empty = exactly the pre-P44 record. Rules in lib/warrantyClaims.ts.
+const WarrantyClaimSchema = new Schema(
+  {
+    ref: { type: String, default: '' }, // RMA / ticket number, often empty at the start
+    status: { type: String, default: 'submitted' }, // see CLAIM_STATUSES
+    reportedAt: { type: Date, default: null }, // the day the fault was reported
+    lastUpdateAt: { type: Date, default: null }, // null = nothing has moved since
+    trackingNumber: { type: String, default: '' }, // the in-transit leg, no carrier API
+    notes: { type: String, default: '' },
+  },
+  { _id: false }
+);
+
 const ItemSchema = new Schema(
   {
     num: { type: String, default: '' },
@@ -124,6 +141,11 @@ const ItemSchema = new Schema(
 
     // P70: optional named attributes. Empty array = exactly the pre-P70 record.
     customFields: { type: [CustomFieldSchema], default: [] },
+
+    // P44: warranty claims / RMAs opened on this item. Empty = never sent back, which is
+    // every pre-P44 record. Distinct from `warrantyUntil` below: that one says how long
+    // the cover lasts, this one is what happened once you had to use it.
+    warrantyClaims: { type: [WarrantyClaimSchema], default: [] },
 
     // P41: periodic physical maintenance (filter clean, nozzle change, dust-out). Both
     // null = exactly the pre-P41 record. Distinct from `warrantyUntil` below, which

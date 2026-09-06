@@ -32,6 +32,7 @@ import { assertCanWrite } from '@/lib/auth';
 import { parseCustomFields } from '@/lib/customFields';
 import { maintenanceApplies, normalizeMaintenanceInterval } from '@/lib/maintenance';
 import { isLentOut, lendingApplies, normalizeBorrower } from '@/lib/lending';
+import { parseWarrantyClaims } from '@/lib/warrantyClaims';
 import { addExpense } from '@/app/expenses/actions';
 
 const CATEGORIES = ['network', 'storage', 'compute', 'audio', 'video', 'mobile', 'peripheral', 'consumable', 'other'] as const;
@@ -104,6 +105,9 @@ const ItemFormSchema = z.object({
   // P70: JSON-encoded [{key,value}]. Absent (an older client, or the API routes) parses to
   // [], which is exactly the pre-P70 record — it never wipes anything a form did not send.
   customFields: z.string().default('[]'),
+  // P44: JSON-encoded warranty claims / RMAs, same transport as the two editors above.
+  // Absent parses to [], which is exactly the pre-P44 record.
+  warrantyClaims: z.string().default('[]'),
 });
 
 function parseTags(raw: string): string[] {
@@ -164,7 +168,7 @@ export async function createItem(formData: FormData) {
   return withRequestTenant(async () => {
   const raw = Object.fromEntries(formData);
   const parsed = ItemFormSchema.parse(raw);
-  const { links, tags, customFields, ...rest } = parsed;
+  const { links, tags, customFields, warrantyClaims, ...rest } = parsed;
   const money = await resolveItemFx(parsed);
   await connectDB();
   const Item = await currentModel(ItemModel);
@@ -181,6 +185,7 @@ export async function createItem(formData: FormData) {
     tags: parseTags(tags),
     links: parsedLinks,
     customFields: parseCustomFields(customFields),
+    warrantyClaims: parseWarrantyClaims(warrantyClaims),
   });
   revalidatePath('/items');
   });
@@ -191,7 +196,7 @@ export async function updateItem(id: string, formData: FormData) {
   return withRequestTenant(async () => {
   const raw = Object.fromEntries(formData);
   const parsed = ItemFormSchema.parse(raw);
-  const { links, tags, customFields, ...rest } = parsed;
+  const { links, tags, customFields, warrantyClaims, ...rest } = parsed;
   const money = await resolveItemFx(parsed);
   await connectDB();
   const Item = await currentModel(ItemModel);
@@ -205,6 +210,7 @@ export async function updateItem(id: string, formData: FormData) {
     tags: parseTags(tags),
     links: parsedLinks,
     customFields: parseCustomFields(customFields),
+    warrantyClaims: parseWarrantyClaims(warrantyClaims),
   });
   revalidatePath('/items');
   });

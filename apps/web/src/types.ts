@@ -56,6 +56,17 @@ export type SerializedItem = {
   /** P70: user-named attributes. May be absent on documents written before P70 — read it
    *  as `item.customFields ?? []`, lean queries do not fill schema defaults in. */
   customFields: { key: string; value: string }[];
+  /** P44: warranty claims / RMAs. Absent on documents written before P44 — read it as
+   *  `item.warrantyClaims ?? []`, lean queries do not fill schema defaults in. See
+   *  lib/warrantyClaims.ts for what each combination of fields means. */
+  warrantyClaims: {
+    ref: string;
+    status: string;
+    reportedAt: string | null;
+    lastUpdateAt: string | null;
+    trackingNumber: string;
+    notes: string;
+  }[];
   /** P41: periodic maintenance. `maintenanceIntervalDays` null = no schedule (every
    *  pre-P41 item); `lastMaintenanceAt` null = never serviced, so the purchase date
    *  is what the next due date counts from. See lib/maintenance.ts. */
