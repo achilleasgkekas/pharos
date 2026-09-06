@@ -440,6 +440,10 @@ A three-month agenda (`/calendar`) that unifies everything with a date:
 - subscription renewals (repeated per cycle),
 - credit-card installments aggregated per month,
 - projected recurring bills and income,
+- open bills you still owe, on their due date (only the unpaid balance counts,
+  so a part-paid bill shows what is left),
+- goal target dates (a deadline to notice, with no amount: a goal you have
+  already funded stays quiet),
 - warranty and voucher expiries.
 
 Each month shows money-out / money-in totals and a "due this month" header.
@@ -448,7 +452,8 @@ Everything is derived live from your data; nothing extra is stored.
 **Calendar subscription feed.** The same three-month agenda is published as a
 read-only iCal (`.ics`) feed at `/api/calendar.ics?token=…`, so you can subscribe
 to it from Google, Apple, or Outlook Calendar and see renewals, installments,
-projected bills, and expiries alongside your other events. The feed is authed by a
+projected bills, unpaid bills, goal deadlines, and expiries alongside your other
+events. The feed is authed by a
 dedicated low-scope calendar token (not your full API bearer, so a leaked subscribe
 URL never grants API access); generate, copy, rotate, or revoke it in
 Settings → AI.

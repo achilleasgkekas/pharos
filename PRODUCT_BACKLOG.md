@@ -737,7 +737,7 @@
   εγγραφή ίδιου store/vendor όπου εφαρμόζεται)· ξεκίνα από Receipts (μεγαλύτερος όγκος εγγραφών, μεγαλύτερη αξία
   στο P&L) πριν Subscriptions/Bills.
 
-### P67. Bills + Goals λείπουν από το ενιαίο money agenda (`/calendar` + `.ics` feed) — S — OSS (κυρίως)
+### P67. Bills + Goals λείπουν από το ενιαίο money agenda (`/calendar` + `.ics` feed) — ✅ SHIPPED 2026-09-07 (pharos-brain) — S — OSS (κυρίως)
 - **Αξία:** live-verified `import`-block του `lib/moneyAgenda.ts` (shared και από `/calendar` ΚΑΙ από το
   token-scoped `.ics` feed του P6): φέρνει `Subscription`/`Voucher`/`Item`/`Statement`/`Expense` αλλά **ΟΧΙ**
   `Bill` ούτε `Goal`. Το ίδιο επιβεβαιώνεται στο `app/calendar/page.tsx` (ίδιο import-set). Πρακτικό αποτέλεσμα:
@@ -751,6 +751,16 @@
   wired Subscriptions/Statements) — μόνο unpaid/pending bills (τα paid δεν χρειάζονται πια θέση στο forward
   agenda)· Goals ως δεύτερο βήμα (target date, όχι recurring, απλούστερο mapping)· χρωματισμός/label ίδιο idiom
   με τα υπόλοιπα entry types.
+- **Τι έγινε (2026-09-07):** δύο νέα entry kinds, `payable` (ανοιχτός λογαριασμός P28, εικονίδιο απόδειξης,
+  πορτοκαλί) και `goal` (προθεσμία στόχου P12, εικονίδιο στόχου, μωβ), και στα δύο αντίγραφα του υπολογισμού:
+  `lib/moneyAgenda.ts` (τροφοδοτεί `/api/v1/calendar`, το `.ics` feed και το safe-to-spend των Reports) και
+  `app/calendar/page.tsx` (η μεταφρασμένη έκδοση της σελίδας). Τα δύο νέα models περνούν από `currentModel`,
+  όπως τα άλλα πέντε, και το `moneyAgenda.tenant.test.ts` ελέγχει πλέον και τα επτά.
+- **Τρεις αποφάσεις του builder:** (α) ο λογαριασμός μετράει **μόνο το υπόλοιπο** (`billRemaining`), ώστε ένας
+  μισοπληρωμένος να μη διπλομετρά ό,τι ήδη έδωσες· (β) ο στόχος μπαίνει **χωρίς ποσό**, γιατί μια προθεσμία δεν
+  είναι χρέωση — αλλιώς θα φούσκωνε το «due this month» και το safe-to-spend με λεφτά που δεν φεύγουν· (γ)
+  στόχος ήδη καλυμμένος από τις εισφορές του **σωπαίνει**. Παρενέργεια που θεωρήθηκε σωστή: ένας απλήρωτος
+  λογαριασμός τώρα **μειώνει** το safe-to-spend, όπως κάθε άλλη δεσμευμένη εκροή.
 
 ### P65. Voice quick-capture στο AI command bar (Web Speech API, μηδέν νέο backend) — S — both, quick-capture friction
 - **Αξία:** το app έχει ήδη ένα ενιαίο conversational AI command bar (text-based, `runAiCommand`) που καταλαβαίνει

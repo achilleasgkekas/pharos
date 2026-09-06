@@ -2,11 +2,11 @@
 import { useState, useEffect } from 'react';
 import { useT } from '@/components/LocaleProvider';
 import type { TKey } from '@/lib/i18n';
-import { CalendarClock, Layers, ShieldCheck, Ticket, Wallet, Banknote, CalendarDays, List, LayoutGrid, ChevronLeft, ChevronRight } from 'lucide-react';
+import { CalendarClock, Layers, ShieldCheck, Ticket, Wallet, Banknote, Receipt, Target, CalendarDays, List, LayoutGrid, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cur } from '@/lib/money';
 import { cn } from '@/components/ui/cn';
 
-export type Kind = 'renewal' | 'installments' | 'bill' | 'income' | 'warranty' | 'voucher';
+export type Kind = 'renewal' | 'installments' | 'bill' | 'payable' | 'income' | 'goal' | 'warranty' | 'voucher';
 export type Entry = { date: string; pinned?: boolean; kind: Kind; label: string; sub: string; amount: number | null };
 export type MonthBlock = { key: string; label: string; entries: Entry[]; out: number; inc: number };
 
@@ -17,7 +17,9 @@ const KIND_META: Record<Kind, { icon: React.ReactNode; color: string; short: str
   renewal: { icon: <CalendarClock size={15} />, color: 'var(--color-purple)', short: 'renewal' },
   installments: { icon: <Layers size={15} />, color: 'var(--color-gold)', short: 'installments' },
   bill: { icon: <Wallet size={15} />, color: 'var(--color-red)', short: 'bill' },
+  payable: { icon: <Receipt size={15} />, color: 'var(--color-orange)', short: 'payable' },
   income: { icon: <Banknote size={15} />, color: 'var(--color-accent)', short: 'income' },
+  goal: { icon: <Target size={15} />, color: 'var(--color-purple)', short: 'goal' },
   warranty: { icon: <ShieldCheck size={15} />, color: 'var(--color-cyan)', short: 'warranty' },
   voucher: { icon: <Ticket size={15} />, color: 'var(--color-gold)', short: 'voucher' },
 };

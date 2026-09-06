@@ -33,6 +33,10 @@ const {
   voucherState,
   expenseFind,
   expenseState,
+  billFind,
+  billState,
+  goalFind,
+  goalState,
   computePlansMock,
   plansState,
   getAppSettingsMock,
@@ -48,6 +52,10 @@ const {
   const voucherFind = vi.fn(() => ({ select: () => ({ lean: async () => voucherState.rows }) }));
   const expenseState: { rows: unknown[] } = { rows: [] };
   const expenseFind = vi.fn(() => ({ sort: () => ({ select: () => ({ lean: async () => expenseState.rows }) }) }));
+  const billState: { rows: unknown[] } = { rows: [] };
+  const billFind = vi.fn(() => ({ select: () => ({ lean: async () => billState.rows }) }));
+  const goalState: { rows: unknown[] } = { rows: [] };
+  const goalFind = vi.fn(() => ({ select: () => ({ lean: async () => goalState.rows }) }));
   const plansState: {
     plans: Array<{ done: boolean; remainingInstallments: number; perAmount: number }>;
   } = { plans: [] };
@@ -70,6 +78,10 @@ const {
     voucherState,
     expenseFind,
     expenseState,
+    billFind,
+    billState,
+    goalFind,
+    goalState,
     computePlansMock,
     plansState,
     getAppSettingsMock,
@@ -84,6 +96,8 @@ vi.mock('@/models/Statement', () => ({ Statement: { find: statementFind } }));
 vi.mock('@/models/Item', () => ({ Item: { find: itemFind } }));
 vi.mock('@/models/Voucher', () => ({ Voucher: { find: voucherFind } }));
 vi.mock('@/models/Expense', () => ({ Expense: { find: expenseFind } }));
+vi.mock('@/models/Bill', () => ({ Bill: { find: billFind } }));
+vi.mock('@/models/Goal', () => ({ Goal: { find: goalFind } }));
 vi.mock('@/lib/installments', () => ({ computeInstallmentPlans: computePlansMock }));
 vi.mock('@/lib/appSettings', () => ({ getAppSettings: getAppSettingsMock }));
 
@@ -123,6 +137,8 @@ beforeEach(() => {
   itemState.rows = [];
   voucherState.rows = [];
   expenseState.rows = [];
+  billState.rows = [];
+  goalState.rows = [];
   plansState.plans = [];
   settingsState.currency = 'EUR';
   userState.doc = { _id: 'u1', name: 'Achilleas', username: 'ach', role: 'admin' };
@@ -133,6 +149,8 @@ beforeEach(() => {
   itemFind.mockImplementation(() => ({ select: () => ({ lean: async () => itemState.rows }) }));
   voucherFind.mockImplementation(() => ({ select: () => ({ lean: async () => voucherState.rows }) }));
   expenseFind.mockImplementation(() => ({ sort: () => ({ select: () => ({ lean: async () => expenseState.rows }) }) }));
+  billFind.mockImplementation(() => ({ select: () => ({ lean: async () => billState.rows }) }));
+  goalFind.mockImplementation(() => ({ select: () => ({ lean: async () => goalState.rows }) }));
   computePlansMock.mockImplementation(() => plansState.plans);
   getAppSettingsMock.mockImplementation(async () => ({ currency: settingsState.currency }));
 });

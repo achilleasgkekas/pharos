@@ -61,7 +61,9 @@ const KIND_LABEL: Record<AgendaKind, string> = {
   renewal: 'Renewal',
   installments: 'Installments',
   bill: 'Bill',
+  payable: 'Bill due',
   income: 'Income',
+  goal: 'Goal',
   warranty: 'Warranty',
   voucher: 'Voucher',
 };

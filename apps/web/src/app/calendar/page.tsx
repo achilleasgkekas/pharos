@@ -6,6 +6,9 @@ import { Statement as StatementModel } from '@/models/Statement';
 import { Item as ItemModel } from '@/models/Item';
 import { Voucher as VoucherModel } from '@/models/Voucher';
 import { Expense as ExpenseModel } from '@/models/Expense';
+import { Bill as BillModel } from '@/models/Bill';
+import { Goal as GoalModel } from '@/models/Goal';
+import { billRemaining } from '@/lib/bill';
 import { withRequestTenant } from '@/lib/tenancy/request';
 import { currentModel } from '@/lib/tenancy/connection';
 import { computeInstallmentPlans } from '@/lib/installments';
@@ -15,8 +18,8 @@ import { getServerT } from '@/lib/i18n/server';
 import type { TFunc, TKey } from '@/lib/i18n';
 
 // Money calendar — everything money-related coming up in the next 3 months:
-// subscription renewals, card installments, recurring bills/income, and warranty
-// / voucher expiries. Derived live here, rendered (Month / Agenda / List) client-side.
+// subscription renewals, card installments, recurring bills/income, open bills
+// (P28) and goal deadlines (P12), and warranty / voucher expiries. Derived live here, rendered (Month / Agenda / List) client-side.
 
 export const dynamic = 'force-dynamic';
 
@@ -30,11 +33,13 @@ async function getAgenda(t: TFunc, intlTag: string): Promise<{ months: MonthBloc
   const Item = await currentModel(ItemModel);
   const Voucher = await currentModel(VoucherModel);
   const Expense = await currentModel(ExpenseModel);
+  const Bill = await currentModel(BillModel);
+  const Goal = await currentModel(GoalModel);
   const now = new Date();
   const windowStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const windowEnd = new Date(now.getFullYear(), now.getMonth() + 3, 1);
 
-  const [subs, statements, items, vouchers, recurring] = await Promise.all([
+  const [subs, statements, items, vouchers, recurring, bills, goals] = await Promise.all([
     Subscription.find({ active: true, nextRenewal: { $ne: null } }).select('name amount billingCycle nextRenewal').lean(),
     Statement.find().lean(),
     Item.find({ warrantyUntil: { $gte: windowStart, $lt: windowEnd } }).select('title warrantyUntil').lean(),
@@ -42,6 +47,13 @@ async function getAgenda(t: TFunc, intlTag: string): Promise<{ months: MonthBloc
     Expense.find({ recurring: true, recurringCycle: { $nin: ['', null] }, amount: { $gt: 0 } })
       .sort({ date: -1 })
       .select('kind vendor vendorKey amount date recurringCycle')
+      .lean(),
+    // P67 — the two money dates this agenda used to miss: an open payable and a goal deadline.
+    Bill.find({ paidAt: null, archived: { $ne: true }, dueDate: { $gte: windowStart, $lt: windowEnd } })
+      .select('title vendor amount payments dueDate')
+      .lean(),
+    Goal.find({ archived: { $ne: true }, targetDate: { $gte: windowStart, $lt: windowEnd } })
+      .select('title targetAmount contributions targetDate')
       .lean(),
   ]);
 
@@ -118,6 +130,31 @@ async function getAgenda(t: TFunc, intlTag: string): Promise<{ months: MonthBloc
       }
       d = addCycle(d, String(r.recurringCycle));
     }
+  }
+
+  // Open bills (P28) — what is still OWED, so a part-paid bill counts only the balance.
+  for (const b of bills) {
+    push(new Date(b.dueDate as unknown as string), {
+      kind: 'payable',
+      label: b.title || b.vendor || t('cal.lblBill'),
+      sub: t('cal.subPayable'),
+      amount: billRemaining(b.amount, b.payments, null),
+    });
+  }
+
+  // Goal deadlines (P12) — a date to notice, not a charge, so no amount: the month
+  // totals stay a picture of money actually moving. A goal already covered by its
+  // contributions has nothing left to warn about.
+  for (const g of goals) {
+    const target = Number(g.targetAmount) || 0;
+    const saved = (g.contributions || []).reduce((sum, c) => sum + (Number(c?.amount) || 0), 0);
+    if (target > 0 && saved >= target) continue;
+    push(new Date(g.targetDate as unknown as string), {
+      kind: 'goal',
+      label: g.title || t('cal.lblGoal'),
+      sub: t('cal.subGoal'),
+      amount: null,
+    });
   }
 
   // Expiries (no amount — just don't miss them).

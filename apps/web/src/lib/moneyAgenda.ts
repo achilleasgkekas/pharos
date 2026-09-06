@@ -7,16 +7,23 @@ import { Voucher as VoucherModel } from '@/models/Voucher';
 import { Item as ItemModel } from '@/models/Item';
 import { Statement as StatementModel } from '@/models/Statement';
 import { Expense as ExpenseModel } from '@/models/Expense';
+import { Bill as BillModel } from '@/models/Bill';
+import { Goal as GoalModel } from '@/models/Goal';
+import { billRemaining } from '@/lib/bill';
 import { computeInstallmentPlans } from '@/lib/installments';
 import type { SerializedStatement } from '@/types';
 
 // Shared 3-month "money agenda" computation: subscription renewals (stepped per
 // cycle), card installments aggregated per month, recurring bills/income projected,
-// warranty + voucher expiries, plus per-month in/out totals. Used by the /api/v1
+// open bills (P28) and goal deadlines (P12), warranty + voucher expiries, plus
+// per-month in/out totals. Used by the /api/v1
 // calendar route and the iCal (.ics) subscription feed. English labels —
 // the web /calendar page keeps its own i18n copy since it renders per-locale.
 
-export type AgendaKind = 'renewal' | 'installments' | 'bill' | 'income' | 'warranty' | 'voucher';
+// 'bill' is a PROJECTED recurring expense; 'payable' is a tracked Bill (P28) with a real
+// due date you settle by hand. Two different things, so two kinds — merging them would
+// make a projection indistinguishable from an actual obligation.
+export type AgendaKind = 'renewal' | 'installments' | 'bill' | 'payable' | 'income' | 'goal' | 'warranty' | 'voucher';
 export type AgendaEntry = { date: string; kind: AgendaKind; label: string; sub: string; amount: number | null; pinned?: boolean };
 export type AgendaMonth = { key: string; label: string; entries: AgendaEntry[]; out: number; inc: number };
 
@@ -48,15 +55,17 @@ export async function computeMoneyAgenda(now: Date = new Date()): Promise<{ mont
   // back to DEFAULT_TENANT without ever throwing, so the one caller that has NO context (the
   // token-authenticated .ics feed) keeps behaving exactly as before instead of being sent through
   // the cookie gate. Self-hosted: no context anywhere, every `currentModel(X)` is `X`.
-  const [Subscription, Statement, Item, Voucher, Expense] = await Promise.all([
+  const [Subscription, Statement, Item, Voucher, Expense, Bill, Goal] = await Promise.all([
     currentModel(SubscriptionModel),
     currentModel(StatementModel),
     currentModel(ItemModel),
     currentModel(VoucherModel),
     currentModel(ExpenseModel),
+    currentModel(BillModel),
+    currentModel(GoalModel),
   ]);
 
-  const [subs, statements, items, vouchers, recurring] = await Promise.all([
+  const [subs, statements, items, vouchers, recurring, bills, goals] = await Promise.all([
     Subscription.find({ active: true, nextRenewal: { $ne: null } }).select('name amount billingCycle nextRenewal').lean(),
     Statement.find().lean(),
     Item.find({ warrantyUntil: { $gte: windowStart, $lt: windowEnd } }).select('title warrantyUntil').lean(),
@@ -64,6 +73,14 @@ export async function computeMoneyAgenda(now: Date = new Date()): Promise<{ mont
     Expense.find({ recurring: true, recurringCycle: { $nin: ['', null] }, amount: { $gt: 0 } })
       .sort({ date: -1 })
       .select('kind vendor vendorKey amount date recurringCycle')
+      .lean(),
+    // P67 — open payables (P28) and goal deadlines (P12), the two money dates the
+    // agenda used to miss entirely. Both window-bounded like the expiries below.
+    Bill.find({ paidAt: null, archived: { $ne: true }, dueDate: { $gte: windowStart, $lt: windowEnd } })
+      .select('title vendor amount payments dueDate')
+      .lean(),
+    Goal.find({ archived: { $ne: true }, targetDate: { $gte: windowStart, $lt: windowEnd } })
+      .select('title targetAmount contributions targetDate')
       .lean(),
   ]);
 
@@ -140,6 +157,32 @@ export async function computeMoneyAgenda(now: Date = new Date()): Promise<{ mont
       }
       d = addCycle(d, String(r.recurringCycle));
     }
+  }
+
+  // Open bills (P28) — what is still OWED, so a part-paid bill counts only the balance.
+  for (const b of bills as { title?: string; vendor?: string; amount?: number; payments?: { amount?: number }[]; dueDate?: Date }[]) {
+    const remaining = billRemaining(b.amount, b.payments, null);
+    push(new Date(b.dueDate as unknown as string), {
+      kind: 'payable',
+      label: b.title || b.vendor || 'Bill',
+      sub: 'Bill due',
+      amount: remaining,
+    });
+  }
+
+  // Goal deadlines (P12) — a date to notice, not a charge: no amount, so the month
+  // totals and the safe-to-spend figure built on them stay untouched. A goal already
+  // covered by its contributions has nothing left to warn about.
+  for (const g of goals as { title?: string; targetAmount?: number; contributions?: { amount?: number }[]; targetDate?: Date }[]) {
+    const target = Number(g.targetAmount) || 0;
+    const saved = (g.contributions || []).reduce((t, c) => t + (Number(c?.amount) || 0), 0);
+    if (target > 0 && saved >= target) continue;
+    push(new Date(g.targetDate as unknown as string), {
+      kind: 'goal',
+      label: g.title || 'Goal',
+      sub: 'Goal target date',
+      amount: null,
+    });
   }
 
   // Expiries (no amount — just don't miss them).

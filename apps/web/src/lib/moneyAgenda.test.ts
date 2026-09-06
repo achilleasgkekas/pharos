@@ -23,6 +23,8 @@ const {
   itemFind,
   voucherFind,
   expenseFind,
+  billFind,
+  goalFind,
 } = vi.hoisted(() => {
   function selectLean(rows: unknown[]) {
     return { select: () => ({ lean: async () => rows }) };
@@ -34,6 +36,8 @@ const {
     itemFind: vi.fn((_f: Record<string, unknown>) => selectLean([])),
     voucherFind: vi.fn((_f: Record<string, unknown>) => selectLean([])),
     expenseFind: vi.fn((_f: Record<string, unknown>) => ({ sort: () => selectLean([]) })),
+    billFind: vi.fn((_f: Record<string, unknown>) => selectLean([])),
+    goalFind: vi.fn((_f: Record<string, unknown>) => selectLean([])),
   };
 });
 
@@ -43,6 +47,8 @@ vi.mock('@/models/Statement', () => ({ Statement: { find: statementFind } }));
 vi.mock('@/models/Item', () => ({ Item: { find: itemFind } }));
 vi.mock('@/models/Voucher', () => ({ Voucher: { find: voucherFind } }));
 vi.mock('@/models/Expense', () => ({ Expense: { find: expenseFind } }));
+vi.mock('@/models/Bill', () => ({ Bill: { find: billFind } }));
+vi.mock('@/models/Goal', () => ({ Goal: { find: goalFind } }));
 // The five models now resolve through `currentModel` so the reads follow the caller's tenant.
 // SAAS_MODE is off in tests, where the real helper is the identity anyway; stubbing it keeps this
 // suite free of a Mongo connection while the mocked models above stay the ones under test.
@@ -60,6 +66,8 @@ function setRows(opts: {
   items?: unknown[];
   vouchers?: unknown[];
   recurring?: unknown[];
+  bills?: unknown[];
+  goals?: unknown[];
 }) {
   function selectLean(rows: unknown[]) {
     return { select: () => ({ lean: async () => rows }) };
@@ -69,6 +77,8 @@ function setRows(opts: {
   itemFind.mockImplementation(() => selectLean(opts.items ?? []));
   voucherFind.mockImplementation(() => selectLean(opts.vouchers ?? []));
   expenseFind.mockImplementation(() => ({ sort: () => selectLean(opts.recurring ?? []) }));
+  billFind.mockImplementation(() => selectLean(opts.bills ?? []));
+  goalFind.mockImplementation(() => selectLean(opts.goals ?? []));
 }
 
 let idc = 0;
@@ -424,5 +434,83 @@ describe('computeMoneyAgenda — sorting, rounding, dueThisMonth', () => {
     const { months } = await computeMoneyAgenda(NOW);
     expect(() => new Date(months[0].entries[0].date).toISOString()).not.toThrow();
     expect(months[0].entries[0].date).toBe(new Date(2026, 2, 20).toISOString());
+  });
+});
+
+// P67 — open bills (P28) and goal deadlines (P12). Before this, a payable with a
+// looming due date and a goal with a target date existed only in their own modules:
+// the 3-month agenda and the .ics feed both skipped them entirely.
+describe('computeMoneyAgenda — open bills (P67)', () => {
+  it('places an unpaid bill on its due date and counts what is owed as money out', async () => {
+    setRows({ bills: [{ title: 'ΔΕΗ ρεύμα', amount: 84.5, payments: [], dueDate: new Date(2026, 2, 20) }] });
+    const { months, dueThisMonth } = await computeMoneyAgenda(NOW);
+    const e = months[0].entries[0];
+    expect(e.kind).toBe('payable');
+    expect(e.label).toBe('ΔΕΗ ρεύμα');
+    expect(e.amount).toBe(84.5);
+    expect(e.date).toBe(new Date(2026, 2, 20).toISOString());
+    expect(dueThisMonth).toBe(84.5);
+  });
+
+  it('counts only the remaining balance of a part-paid bill, not the full amount', async () => {
+    setRows({ bills: [{ title: 'Κοινόχρηστα', amount: 100, payments: [{ amount: 30 }, { amount: 20 }], dueDate: new Date(2026, 3, 10) }] });
+    const { months } = await computeMoneyAgenda(NOW);
+    expect(months[1].entries[0].amount).toBe(50);
+    expect(months[1].out).toBe(50);
+  });
+
+  it('asks the DB only for unpaid, unarchived bills inside the window', async () => {
+    setRows({});
+    await computeMoneyAgenda(NOW);
+    const f = billFind.mock.calls[0][0] as { paidAt: null; archived: unknown; dueDate: { $gte: Date; $lt: Date } };
+    expect(f.paidAt).toBeNull();
+    expect(f.archived).toEqual({ $ne: true });
+    expect(f.dueDate.$gte).toEqual(new Date(2026, 2, 1));
+    expect(f.dueDate.$lt).toEqual(new Date(2026, 5, 1));
+  });
+
+  it('falls back to the vendor when a bill has no title', async () => {
+    setRows({ bills: [{ title: '', vendor: 'ΟΤΕ', amount: 30, payments: [], dueDate: new Date(2026, 2, 12) }] });
+    const { months } = await computeMoneyAgenda(NOW);
+    expect(months[0].entries[0].label).toBe('ΟΤΕ');
+  });
+});
+
+describe('computeMoneyAgenda — goal deadlines (P67)', () => {
+  it('shows a goal on its target date without touching the month totals', async () => {
+    setRows({ goals: [{ title: 'Ταξίδι', targetAmount: 2000, contributions: [{ amount: 500 }], targetDate: new Date(2026, 4, 1) }] });
+    const { months } = await computeMoneyAgenda(NOW);
+    const e = months[2].entries[0];
+    expect(e.kind).toBe('goal');
+    expect(e.label).toBe('Ταξίδι');
+    // A deadline is a date to notice, not a charge: no amount, so `out` stays clean.
+    expect(e.amount).toBeNull();
+    expect(months[2].out).toBe(0);
+  });
+
+  it('stays quiet about a goal already covered by its contributions', async () => {
+    setRows({
+      goals: [
+        { title: 'Reached', targetAmount: 1000, contributions: [{ amount: 600 }, { amount: 400 }], targetDate: new Date(2026, 2, 20) },
+        { title: 'Still short', targetAmount: 1000, contributions: [{ amount: 999 }], targetDate: new Date(2026, 2, 21) },
+      ],
+    });
+    const { months } = await computeMoneyAgenda(NOW);
+    expect(months[0].entries.map((e) => e.label)).toEqual(['Still short']);
+  });
+
+  it('keeps a goal with no target amount, since nothing can be "covered" yet', async () => {
+    setRows({ goals: [{ title: 'Open ended', targetAmount: 0, contributions: [], targetDate: new Date(2026, 2, 9) }] });
+    const { months } = await computeMoneyAgenda(NOW);
+    expect(months[0].entries[0].label).toBe('Open ended');
+  });
+
+  it('asks the DB only for unarchived goals whose target date falls in the window', async () => {
+    setRows({});
+    await computeMoneyAgenda(NOW);
+    const f = goalFind.mock.calls[0][0] as { archived: unknown; targetDate: { $gte: Date; $lt: Date } };
+    expect(f.archived).toEqual({ $ne: true });
+    expect(f.targetDate.$gte).toEqual(new Date(2026, 2, 1));
+    expect(f.targetDate.$lt).toEqual(new Date(2026, 5, 1));
   });
 });

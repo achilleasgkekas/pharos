@@ -7,7 +7,7 @@ import type { TenantContext } from '@/lib/tenancy/context';
 // establish a tenant before calling it, yet every read used the imported model, so a SaaS
 // workspace opening /reports was shown the DEFAULT database's subscriptions, statements,
 // warranties, vouchers and recurring expenses — with amounts and vendor names on them.
-// This file pins the property that matters: the five collections are read from the CALLING
+// This file pins the property that matters: every collection is read from the CALLING
 // workspace, and the rows that come back belong to it.
 const ops = new Map<string, string[]>();
 const modelsOf = (tag: string) => (ops.get(tag) ?? []).slice().sort();
@@ -51,10 +51,13 @@ vi.mock('@/models/Statement', () => ({ Statement: { modelName: 'Statement' } }))
 vi.mock('@/models/Item', () => ({ Item: { modelName: 'Item' } }));
 vi.mock('@/models/Voucher', () => ({ Voucher: { modelName: 'Voucher' } }));
 vi.mock('@/models/Expense', () => ({ Expense: { modelName: 'Expense' } }));
+vi.mock('@/models/Bill', () => ({ Bill: { modelName: 'Bill' } }));
+vi.mock('@/models/Goal', () => ({ Goal: { modelName: 'Goal' } }));
 
 import { computeMoneyAgenda } from './moneyAgenda';
 
-const ALL_FIVE = ['Expense', 'Item', 'Statement', 'Subscription', 'Voucher'];
+// P67 added the open bills and the goal deadlines; they are read exactly like the other five.
+const ALL_SEVEN = ['Bill', 'Expense', 'Goal', 'Item', 'Statement', 'Subscription', 'Voucher'];
 const NOW = new Date(2026, 0, 15);
 
 function ctx(slug: string): TenantContext {
@@ -64,9 +67,9 @@ function ctx(slug: string): TenantContext {
 describe('computeMoneyAgenda reads the CURRENT workspace only', () => {
   beforeEach(() => ops.clear());
 
-  it('resolves all five collections from the calling workspace', async () => {
+  it('resolves all seven collections from the calling workspace', async () => {
     await withTenant(ctx('acme'), () => computeMoneyAgenda(NOW));
-    expect(modelsOf('acme')).toEqual(ALL_FIVE);
+    expect(modelsOf('acme')).toEqual(ALL_SEVEN);
     expect(modelsOf('default')).toEqual([]);
     expect(modelsOf('globex')).toEqual([]);
   });
@@ -75,7 +78,7 @@ describe('computeMoneyAgenda reads the CURRENT workspace only', () => {
     await withTenant(ctx('acme'), () => computeMoneyAgenda(NOW));
     ops.clear();
     await withTenant(ctx('globex'), () => computeMoneyAgenda(NOW));
-    expect(modelsOf('globex')).toEqual(ALL_FIVE);
+    expect(modelsOf('globex')).toEqual(ALL_SEVEN);
     expect(modelsOf('acme')).toEqual([]);
     expect(modelsOf('default')).toEqual([]);
   });
@@ -89,6 +92,6 @@ describe('computeMoneyAgenda reads the CURRENT workspace only', () => {
 
   it('self-hosted parity: with no tenant established everything runs on the default', async () => {
     await computeMoneyAgenda(NOW);
-    expect(modelsOf('default')).toEqual(ALL_FIVE);
+    expect(modelsOf('default')).toEqual(ALL_SEVEN);
   });
 });
