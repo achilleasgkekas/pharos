@@ -160,13 +160,13 @@ describe('getScraperAi', () => {
 
   it('defaults to ollama + empty model when nothing is stored', async () => {
     const cfg = await getScraperAi();
-    expect(cfg).toEqual({ provider: 'ollama', model: '' });
+    expect(cfg).toEqual({ provider: 'ollama', model: '', enabled: true, maxLinks: 0 });
   });
 
   it('returns anthropic only on an exact stored match', async () => {
     appConfigFindOneLean.mockResolvedValueOnce({ scraperProvider: 'anthropic', scraperModel: 'claude-haiku-4-5' });
     const cfg = await getScraperAi();
-    expect(cfg).toEqual({ provider: 'anthropic', model: 'claude-haiku-4-5' });
+    expect(cfg).toEqual({ provider: 'anthropic', model: 'claude-haiku-4-5', enabled: true, maxLinks: 0 });
   });
 
   it('falls back to ollama for any other stored value', async () => {
@@ -193,31 +193,47 @@ describe('saveScraperAi', () => {
     await saveScraperAi(fd({ scraperProvider: 'anthropic', scraperModel: 'claude-haiku-4-5' }));
     const [filter, update, opts] = appConfigUpdateOne.mock.calls[0];
     expect(filter).toEqual({ key: 'singleton' });
-    expect(update).toEqual({ $set: { scraperProvider: 'anthropic', scraperModel: 'claude-haiku-4-5' } });
+    expect(update).toEqual({ $set: { scraperProvider: 'anthropic', scraperModel: 'claude-haiku-4-5', scraperEnabled: true, scraperMaxLinks: 0 } });
     expect(opts).toEqual({ upsert: true });
   });
 
   it('falls back to ollama for any other or missing provider field', async () => {
     await saveScraperAi(fd({ scraperModel: 'qwen2.5:14b' }));
     const [, update] = appConfigUpdateOne.mock.calls[0];
-    expect(update).toEqual({ $set: { scraperProvider: 'ollama', scraperModel: 'qwen2.5:14b' } });
+    expect(update).toEqual({ $set: { scraperProvider: 'ollama', scraperModel: 'qwen2.5:14b', scraperEnabled: true, scraperMaxLinks: 0 } });
   });
 
   it('trims the model field', async () => {
     await saveScraperAi(fd({ scraperProvider: 'ollama', scraperModel: '  qwen2.5:14b  ' }));
     const [, update] = appConfigUpdateOne.mock.calls[0];
-    expect(update).toEqual({ $set: { scraperProvider: 'ollama', scraperModel: 'qwen2.5:14b' } });
+    expect(update).toEqual({ $set: { scraperProvider: 'ollama', scraperModel: 'qwen2.5:14b', scraperEnabled: true, scraperMaxLinks: 0 } });
   });
 
   it('defaults model to empty string when missing', async () => {
     await saveScraperAi(fd({ scraperProvider: 'ollama' }));
     const [, update] = appConfigUpdateOne.mock.calls[0];
-    expect(update).toEqual({ $set: { scraperProvider: 'ollama', scraperModel: '' } });
+    expect(update).toEqual({ $set: { scraperProvider: 'ollama', scraperModel: '', scraperEnabled: true, scraperMaxLinks: 0 } });
   });
 
   it('always upserts and revalidates /settings on success', async () => {
     const res = await saveScraperAi(fd({ scraperProvider: 'ollama', scraperModel: 'x' }));
     expect(res).toEqual({ ok: true });
     expect(revalidatePathMock).toHaveBeenCalledWith('/settings');
+  });
+
+  it('persists the scraper kill switch: scraperEnabled="false" stores false, anything else true', async () => {
+    await saveScraperAi(fd({ scraperProvider: 'ollama', scraperModel: 'x', scraperEnabled: 'false' }));
+    expect(appConfigUpdateOne.mock.calls[0][1].$set).toMatchObject({ scraperEnabled: false });
+    appConfigUpdateOne.mockClear();
+    await saveScraperAi(fd({ scraperProvider: 'ollama', scraperModel: 'x', scraperEnabled: 'true' }));
+    expect(appConfigUpdateOne.mock.calls[0][1].$set).toMatchObject({ scraperEnabled: true });
+  });
+
+  it('clamps scraperMaxLinks to a non-negative number (blank/garbage → 0)', async () => {
+    await saveScraperAi(fd({ scraperProvider: 'ollama', scraperModel: 'x', scraperMaxLinks: '25' }));
+    expect(appConfigUpdateOne.mock.calls[0][1].$set).toMatchObject({ scraperMaxLinks: 25 });
+    appConfigUpdateOne.mockClear();
+    await saveScraperAi(fd({ scraperProvider: 'ollama', scraperModel: 'x', scraperMaxLinks: '-5' }));
+    expect(appConfigUpdateOne.mock.calls[0][1].$set).toMatchObject({ scraperMaxLinks: 0 });
   });
 });
