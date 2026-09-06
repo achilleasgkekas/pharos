@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { saasMode } from '@/lib/tenancy/saasMode';
 import { checkCronAuth } from '@/lib/cronAuth';
 import { runPriceScrape } from '@/app/items/actions';
+import { recordCronRun } from '@/lib/cronHeartbeat';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -41,6 +42,7 @@ export async function POST(req: Request) {
 
   try {
     const result = await runPriceScrape();
+    await recordCronRun('prices'); // heartbeat for the System-status "Scheduled tasks" check
     return NextResponse.json(result); // already { ok: true, scanned, itemsChanged, ... }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

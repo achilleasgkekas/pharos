@@ -21,7 +21,7 @@ export type HealthLevel = 'ok' | 'warn' | 'down' | 'unknown';
 /** One measured number in a check's row. `key` is an i18n key; `value` is already formatted. */
 export type HealthMetric = { key: string; value: string };
 
-export type HealthCheckId = 'database' | 'disk' | 'ai' | 'jobs' | 'sync';
+export type HealthCheckId = 'database' | 'disk' | 'ai' | 'jobs' | 'sync' | 'cron';
 
 export type HealthCheck = {
   id: HealthCheckId;
@@ -52,6 +52,10 @@ export const DISK_FREE_WARN_BYTES = 1024 * 1024 * 1024; // 1 GiB
 export const DISK_FREE_WARN_RATIO = 0.05; // 5%
 /** A job that has not moved in this long is wedged, not busy (AI items take ~2 min each). */
 export const JOB_STUCK_MINUTES = 30;
+/** A self-host cron (alerts, price scrape) that WAS running but hasn't reported in this long
+ *  has almost certainly stopped — a forgotten/removed crontab line. Both ship daily, so two
+ *  missed days is the actionable signal. */
+export const CRON_STALE_HOURS = 48;
 
 // --- per-check verdicts ------------------------------------------------------------------
 
@@ -87,6 +91,29 @@ export function syncLevel(input: { backend: string; reachable?: boolean | null; 
   if (!input.backend || input.backend === 'local') return 'unknown'; // no mirror configured
   if (input.reachable === false) return 'down';
   return input.stale ? 'warn' : 'ok';
+}
+
+/** One self-host cron's last-run heartbeat. `lastRunAt` null = it has never reported. */
+export type CronBeat = { name: string; lastRunAt: string | null };
+
+/**
+ * Verdict for the scheduled self-host crons (alerts, price scrape).
+ *
+ * The app can't know WHICH crons the operator actually scheduled, so a cron that has NEVER
+ * reported reads as `unknown` (grey — maybe deliberately not wired, don't alarm). The
+ * actionable case is a cron that WAS running and went quiet: any heartbeat older than
+ * CRON_STALE_HOURS flips the check to `warn` — that's the silent-crontab-death signal.
+ * All measured beats fresh → `ok`.
+ */
+export function cronLevel(beats: CronBeat[], now: number): HealthLevel {
+  const ran = beats.filter((b) => b.lastRunAt);
+  if (ran.length === 0) return 'unknown';
+  const staleMs = CRON_STALE_HOURS * 3600 * 1000;
+  const anyStale = ran.some((b) => {
+    const t = new Date(b.lastRunAt as string).getTime();
+    return !Number.isFinite(t) || now - t > staleMs;
+  });
+  return anyStale ? 'warn' : 'ok';
 }
 
 /**

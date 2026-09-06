@@ -30,6 +30,9 @@ const AppConfigSchema = new Schema(
     aiMonthlyBudget: { type: Number, default: 0 },
     aiSpendPeriod: { type: String, default: '' }, // "YYYY-MM" of the current ledger window
     aiSpendMicros: { type: Number, default: 0 }, // this month's estimated spend, in currency micros
+    // Self-host cron heartbeats: map cronName → ISO of last successful run (lib/cronHeartbeat.ts).
+    // Powers the System-status "Scheduled tasks" check that flags a cron that stopped running.
+    cronLastRun: { type: Schema.Types.Mixed, default: {} },
     // ── AI master switch + per-feature toggles ──
     // The app is fully usable with AI off. `aiEnabled` is the master switch;
     // `aiFeatures` is a map featureKey→boolean where an ABSENT key means ON (so new

@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
-import { Activity, AlertTriangle, CheckCircle2, CircleSlash, Database, HardDrive, Loader2, RefreshCw, Sparkles, Cloud, ListChecks, XCircle } from 'lucide-react';
+import { Activity, AlertTriangle, CheckCircle2, CircleSlash, Database, HardDrive, Loader2, RefreshCw, Sparkles, Cloud, ListChecks, Clock, XCircle } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import { useT } from '@/components/LocaleProvider';
 import type { TKey } from '@/lib/i18n';
@@ -53,6 +53,7 @@ const CHECK_META: Record<HealthCheckId, { icon: React.ReactNode; key: TKey }> = 
   ai: { icon: <Sparkles size={15} />, key: 'sys.checkAi' },
   jobs: { icon: <ListChecks size={15} />, key: 'sys.checkJobs' },
   sync: { icon: <Cloud size={15} />, key: 'sys.checkSync' },
+  cron: { icon: <Clock size={15} />, key: 'sys.checkCron' },
 };
 
 export function SystemHealthPanel() {

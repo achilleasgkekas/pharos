@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { saasMode } from '@/lib/tenancy/saasMode';
 import { checkCronAuth } from '@/lib/cronAuth';
 import { runAlertChecks } from '@/app/settings/actions';
+import { recordCronRun } from '@/lib/cronHeartbeat';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -46,6 +47,7 @@ export async function POST(req: Request) {
 
   try {
     const { sent, summary } = await runAlertChecks({ dedupe: true });
+    await recordCronRun('alerts'); // heartbeat for the System-status "Scheduled tasks" check
     // `sent: false` with an "All clear" summary is a healthy run, not a failure — the cron
     // log should be able to tell "nothing to report" apart from "the scan blew up".
     return NextResponse.json({ ok: true, sent, summary });

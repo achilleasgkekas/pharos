@@ -5,6 +5,7 @@ import {
   aiLevel,
   jobsLevel,
   syncLevel,
+  cronLevel,
   stuckMinutes,
   isStuck,
   overallLevel,
@@ -12,6 +13,7 @@ import {
   DB_PING_WARN_MS,
   DISK_FREE_WARN_BYTES,
   JOB_STUCK_MINUTES,
+  CRON_STALE_HOURS,
 } from './systemHealth';
 
 // P77 — Settings → System status. What is pinned here is the judgement, not the plumbing:
@@ -124,6 +126,32 @@ describe('overallLevel', () => {
   it('stays grey when nothing at all could be measured', () => {
     expect(overallLevel([{ level: 'unknown' }])).toBe('unknown');
     expect(overallLevel([])).toBe('unknown');
+  });
+});
+
+describe('cronLevel', () => {
+  const now = Date.UTC(2026, 8, 6, 12, 0, 0); // fixed "now"
+  const hoursAgo = (h: number) => new Date(now - h * 3600 * 1000).toISOString();
+
+  it('is unknown when NO cron has ever reported (likely not scheduled — do not alarm)', () => {
+    expect(cronLevel([{ name: 'alerts', lastRunAt: null }, { name: 'prices', lastRunAt: null }], now)).toBe('unknown');
+    expect(cronLevel([], now)).toBe('unknown');
+  });
+
+  it('is ok when every reported cron ran within the window', () => {
+    expect(cronLevel([{ name: 'alerts', lastRunAt: hoursAgo(2) }, { name: 'prices', lastRunAt: hoursAgo(6) }], now)).toBe('ok');
+  });
+
+  it('warns when a cron that WAS running went quiet past the threshold (silent crontab death)', () => {
+    expect(cronLevel([{ name: 'alerts', lastRunAt: hoursAgo(2) }, { name: 'prices', lastRunAt: hoursAgo(CRON_STALE_HOURS + 1) }], now)).toBe('warn');
+  });
+
+  it('a never-run cron alongside a fresh one does not warn (only stale reporters do)', () => {
+    expect(cronLevel([{ name: 'alerts', lastRunAt: hoursAgo(1) }, { name: 'prices', lastRunAt: null }], now)).toBe('ok');
+  });
+
+  it('treats an unparseable timestamp as stale (warn), never as fresh', () => {
+    expect(cronLevel([{ name: 'alerts', lastRunAt: 'not-a-date' }], now)).toBe('warn');
   });
 });
 

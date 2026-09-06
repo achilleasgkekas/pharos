@@ -22,6 +22,10 @@ const h = vi.hoisted(() => ({
   lastSync: vi.fn(async () => null as Date | null),
   testRemote: vi.fn(async () => ({ ok: true }) as { ok: boolean; error?: string }),
   testOnedrive: vi.fn(async () => ({ ok: true }) as { ok: boolean; error?: string }),
+  cronBeats: vi.fn(async () => [
+    { name: 'alerts', lastRunAt: new Date().toISOString() },
+    { name: 'prices', lastRunAt: new Date().toISOString() },
+  ] as { name: string; lastRunAt: string | null }[]),
 }));
 
 vi.mock('@/lib/auth', () => ({ requireAdmin: h.requireAdmin }));
@@ -44,6 +48,7 @@ vi.mock('@/lib/appSettings', () => ({ getAppSettings: async () => ({ syncStaleDa
 vi.mock('@/lib/billing/fileStorage', () => ({ measureDir: h.measureDir }));
 vi.mock('@/lib/remoteStorage', () => ({ testRemote: h.testRemote }));
 vi.mock('@/lib/onedrive', () => ({ testOnedrive: h.testOnedrive }));
+vi.mock('@/lib/cronHeartbeat', () => ({ getCronHeartbeats: h.cronBeats }));
 
 import { getSystemHealth } from './healthActions';
 
@@ -84,7 +89,7 @@ describe('a healthy self-hosted instance', () => {
   it('reports every subsystem, and stays green with AI on and no remote mirror', async () => {
     const health = await getSystemHealth();
     expect(health.supported).toBe(true);
-    expect(health.checks.map((c) => c.id)).toEqual(['database', 'disk', 'ai', 'jobs', 'sync']);
+    expect(health.checks.map((c) => c.id)).toEqual(['database', 'disk', 'ai', 'jobs', 'sync', 'cron']);
     expect(byId(health, 'database').level).toBe('ok');
     expect(byId(health, 'ai').level).toBe('ok');
     expect(byId(health, 'jobs').level).toBe('ok');
@@ -123,7 +128,7 @@ describe('failure isolation', () => {
     expect(db.noteVars?.error).toMatch(/ECONNREFUSED/);
     expect(health.overall).toBe('down');
     // ...and the rest of the grid still rendered.
-    expect(health.checks).toHaveLength(5);
+    expect(health.checks).toHaveLength(6);
   });
 
   it('does not double-alarm on jobs when the database is the thing that is down', async () => {

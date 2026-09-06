@@ -21,13 +21,16 @@ import {
   aiLevel,
   jobsLevel,
   syncLevel,
+  cronLevel,
   isStuck,
   overallLevel,
   formatMs,
   JOB_STUCK_MINUTES,
+  CRON_STALE_HOURS,
   type HealthCheck,
   type SystemHealth,
 } from '@/lib/systemHealth';
+import { getCronHeartbeats } from '@/lib/cronHeartbeat';
 
 /**
  * P77 — Settings → System status: "is my deployment healthy?" on one screen.
@@ -235,6 +238,25 @@ async function syncCheck(deep: boolean): Promise<HealthCheck> {
   };
 }
 
+/** The scheduled self-host crons (alerts, price scrape): did they run, and recently? A cron
+ *  that was running and went quiet (> CRON_STALE_HOURS) is a removed/forgotten crontab line. */
+async function cronCheck(): Promise<HealthCheck> {
+  const beats = await getCronHeartbeats();
+  const level = cronLevel(beats, Date.now());
+  const ranCount = beats.filter((b) => b.lastRunAt).length;
+  const byName = (n: string) => beats.find((b) => b.name === n)?.lastRunAt ?? '';
+  return {
+    id: 'cron',
+    level,
+    noteKey: ranCount === 0 ? 'sys.cronNever' : level === 'warn' ? 'sys.cronStale' : 'sys.cronOk',
+    noteVars: { hours: CRON_STALE_HOURS },
+    metrics: [
+      { key: 'sys.mCronPrices', value: byName('prices') || '—' },
+      { key: 'sys.mCronAlerts', value: byName('alerts') || '—' },
+    ],
+  };
+}
+
 /**
  * Run every check. `deep` adds the live remote-storage probe (slow, opt-in).
  *
@@ -246,7 +268,7 @@ export async function getSystemHealth(deep = false): Promise<SystemHealth> {
   // Host-level numbers are not a tenant's business; the tab is hidden there anyway.
   if (saasMode()) return idle({ supported: false });
 
-  const checks = await Promise.all([databaseCheck(), diskCheck(), aiCheck(), jobsCheck(), syncCheck(deep)]);
+  const checks = await Promise.all([databaseCheck(), diskCheck(), aiCheck(), jobsCheck(), syncCheck(deep), cronCheck()]);
   return {
     supported: true,
     checkedAt: new Date().toISOString(),
