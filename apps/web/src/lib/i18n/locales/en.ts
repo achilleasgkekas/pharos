@@ -995,6 +995,7 @@ export const en = {
   'set.billAlert': 'Bill due alert · days ahead',
   'set.maintenanceAlert': 'Maintenance due alert · days ahead',
   'set.lendingAlert': 'Lent item due-back alert · days ahead',
+  'set.claimStaleAlert': 'Warranty claim gone quiet · days of silence',
   'set.syncStaleAlert': 'Mirror stale alert (days)',
   'set.lastSync': 'Remote copy last written {date}',
   'set.lastSyncJustNow': 'Remote copy last written just now',
@@ -1264,6 +1265,8 @@ export const en = {
   'notif.lendingSub': '{name} is due to return it in {days}d · mark it returned when it is back',
   'notif.lendingTodaySub': '{name} is due to return it today · mark it returned when it is back',
   'notif.lendingOverdueSub': '{name} is {days}d late returning it · a nudge costs less than a new one',
+  'notif.claimStaleSub': 'RMA {ref} has not moved in {days}d · chase the shop while the cover still holds',
+  'notif.claimStaleNoRefSub': 'The claim has not moved in {days}d · chase the shop while the cover still holds',
   // Standalone shopping list (photo scan)
   'nav.shoppingList': 'Shopping list',
   'home.dShoppingList': 'Quick to-buy list with photo scanning',

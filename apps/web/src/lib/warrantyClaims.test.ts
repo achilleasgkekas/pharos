@@ -8,6 +8,7 @@ import {
   claimDaysSinceUpdate,
   claimIsOpen,
   claimIsStale,
+  collectStaleClaims,
   normalizeClaimStatus,
   normalizeWarrantyClaims,
   openClaims,
@@ -231,5 +232,72 @@ describe('claimIsStale', () => {
 
   it('never fires on a closed claim, however long ago it ended', () => {
     expect(claimIsStale(claim({ reportedAt: '2020-01-01', status: 'rejected' }), DEFAULT_STALE_CLAIM_DAYS, NOW)).toBe(false);
+  });
+});
+
+describe('collectStaleClaims', () => {
+  const stale = (days: number, over: Partial<WarrantyClaim> = {}) =>
+    claim({ reportedAt: new Date(NOW - days * DAY).toISOString().slice(0, 10), ...over });
+
+  function row(over: Partial<{ _id: unknown; title: string; status: string | null; warrantyClaims: unknown }> = {}) {
+    return { _id: 'i1', title: 'Laptop', status: 'received', warrantyClaims: [stale(30)], ...over };
+  }
+
+  it('reports an item whose open claim has gone quiet past the window', () => {
+    const out = collectStaleClaims([row()], DEFAULT_STALE_CLAIM_DAYS, NOW);
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatchObject({ _id: 'i1', title: 'Laptop', ref: 'RMA-1', status: 'submitted', days: 30 });
+  });
+
+  it('anchors the dedupe key on the last movement, not on the report day', () => {
+    const claims = [stale(90, { lastUpdateAt: '2026-08-01' })];
+    const out = collectStaleClaims([row({ warrantyClaims: claims })], DEFAULT_STALE_CLAIM_DAYS, NOW);
+    expect(out[0].iso).toBe('2026-08-01');
+    expect(out[0].days).toBe(36);
+  });
+
+  it('stays quiet one day short of the window', () => {
+    const claims = [stale(DEFAULT_STALE_CLAIM_DAYS - 1)];
+    expect(collectStaleClaims([row({ warrantyClaims: claims })], DEFAULT_STALE_CLAIM_DAYS, NOW)).toEqual([]);
+  });
+
+  it('ignores a sold item — the claim belongs to whoever bought it', () => {
+    expect(collectStaleClaims([row({ status: 'sold' })], DEFAULT_STALE_CLAIM_DAYS, NOW)).toEqual([]);
+  });
+
+  it('ignores closed claims however long ago they ended', () => {
+    const claims = [stale(400, { status: 'refunded' }), stale(400, { status: 'rejected' })];
+    expect(collectStaleClaims([row({ warrantyClaims: claims })], DEFAULT_STALE_CLAIM_DAYS, NOW)).toEqual([]);
+  });
+
+  it('emits one entry per item, the most forgotten claim', () => {
+    const claims = [stale(20, { ref: 'A' }), stale(60, { ref: 'B' }), stale(40, { ref: 'C' })];
+    const out = collectStaleClaims([row({ warrantyClaims: claims })], DEFAULT_STALE_CLAIM_DAYS, NOW);
+    expect(out).toHaveLength(1);
+    expect(out[0].ref).toBe('B');
+    expect(out[0].days).toBe(60);
+  });
+
+  it('sorts the longest silence first', () => {
+    const rows = [
+      row({ _id: 'a', warrantyClaims: [stale(20)] }),
+      row({ _id: 'b', warrantyClaims: [stale(99)] }),
+      row({ _id: 'c', warrantyClaims: [stale(50)] }),
+    ];
+    expect(collectStaleClaims(rows, DEFAULT_STALE_CLAIM_DAYS, NOW).map((c) => c._id)).toEqual(['b', 'c', 'a']);
+  });
+
+  it('keeps a claim with no RMA number yet — the ref is simply empty', () => {
+    const out = collectStaleClaims([row({ warrantyClaims: [stale(30, { ref: '' })] })], DEFAULT_STALE_CLAIM_DAYS, NOW);
+    expect(out[0].ref).toBe('');
+  });
+
+  it('survives rows with garbage or missing claims', () => {
+    const rows = [row({ _id: 'x', warrantyClaims: null }), row({ _id: 'y', warrantyClaims: 'nope' }), row({ _id: 'z' })];
+    expect(collectStaleClaims(rows, DEFAULT_STALE_CLAIM_DAYS, NOW).map((c) => c._id)).toEqual(['z']);
+  });
+
+  it('honours a widened window — a 30-day silence is fine when you asked for 60', () => {
+    expect(collectStaleClaims([row()], 60, NOW)).toEqual([]);
   });
 });

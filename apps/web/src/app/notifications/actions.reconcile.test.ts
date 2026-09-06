@@ -316,7 +316,7 @@ describe('generateNotifications — reconcile shape (insert / refresh / auto-exp
     state.existingNotifications = [{ dedupeKey: 'deal:i1' }];
     await generateNotifications();
     expect(notificationUpdateMany).toHaveBeenCalledWith(
-      { kind: { $in: ['deal', 'installment', 'warranty', 'pricehike', 'trialend', 'giftcard', 'bill', 'maintenance', 'lending'] }, dedupeKey: { $nin: [] } },
+      { kind: { $in: ['deal', 'installment', 'warranty', 'pricehike', 'trialend', 'giftcard', 'bill', 'maintenance', 'lending', 'claim'] }, dedupeKey: { $nin: [] } },
       { $set: { deletedAt: expect.any(Date) } }
     );
   });

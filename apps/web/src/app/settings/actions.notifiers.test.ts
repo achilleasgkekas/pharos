@@ -261,6 +261,7 @@ describe('saveDefaults', () => {
       billAlertDays: 0,
       maintenanceAlertDays: 0, // blank form → 0, same explicit-zero rule as the siblings (P41)
       lendingAlertDays: 0, // same explicit-zero rule (P47)
+      staleClaimDays: 0, // same explicit-zero rule (P44 phase 2): zero silence = nudge off
       syncStaleDays: 0,
       autoAddStores: false,
       currency: 'EUR',

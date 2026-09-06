@@ -52,6 +52,7 @@ describe('normalizeSettings', () => {
       billAlertDays: 5,
       maintenanceAlertDays: 7,
   lendingAlertDays: 3,
+  staleClaimDays: 14,
       syncStaleDays: 7,
       autoAddStores: true,
       ntfyUrl: '',
