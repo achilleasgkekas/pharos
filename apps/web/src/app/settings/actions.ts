@@ -15,6 +15,7 @@ import { Bill } from '@/models/Bill';
 import { billDaysUntilDue } from '@/lib/bill';
 import { collectMaintenanceDue, MAINTENANCE_STATUSES, type MaintenanceRow } from '@/lib/maintenance';
 import { collectLendingOverdue, LENDING_STATUSES, type LendingRow } from '@/lib/lending';
+import { collectStaleClaims, CLAIM_STATUSES_APPLY_TO, DEFAULT_STALE_CLAIM_DAYS, type StaleClaimRow } from '@/lib/warrantyClaims';
 import { Card } from '@/models/Card';
 import { Task } from '@/models/Task';
 import { Expense } from '@/models/Expense';
@@ -360,6 +361,11 @@ export async function saveDefaults(formData: FormData): Promise<{ ok: boolean }>
   // for a drill back a couple of days out, not a week. 0 is meaningful, so parse explicitly.
   const lendRaw = Number(formData.get('lendingAlertDays'));
   const lendingAlertDays = Number.isFinite(lendRaw) ? Math.max(0, Math.min(180, Math.round(lendRaw))) : 3;
+  // Silence before an open RMA counts as forgotten (P44 phase 2). Not a lead time: there is
+  // no deadline to run up to, only a claim that stopped moving. 0 = the nudge is off, which
+  // is the only sane reading of "nag me after zero days of silence".
+  const claimRaw = Number(formData.get('staleClaimDays'));
+  const staleClaimDays = Number.isFinite(claimRaw) ? Math.max(0, Math.min(180, Math.round(claimRaw))) : DEFAULT_STALE_CLAIM_DAYS;
   // 0 is meaningful (remote-mirror staleness alerts off), so parse explicitly (P48).
   const syncRaw = Number(formData.get('syncStaleDays'));
   const syncStaleDays = Number.isFinite(syncRaw) ? Math.max(0, Math.min(365, Math.round(syncRaw))) : 7;
@@ -382,6 +388,7 @@ export async function saveDefaults(formData: FormData): Promise<{ ok: boolean }>
         billAlertDays,
         maintenanceAlertDays,
         lendingAlertDays,
+        staleClaimDays,
         syncStaleDays,
         autoAddStores: autoAdd,
         currency,
@@ -683,6 +690,18 @@ export async function runAlertChecks(opts: { dedupe?: boolean } = {}): Promise<{
     .lean()) as LendingRow[];
   const lendingDue = collectLendingOverdue(lendRows, s.lendingAlertDays, now);
 
+  // Forgotten warranty claims (P44 phase 2): the other half of an RMA. The expiry alert
+  // warns you BEFORE the cover ends; this one speaks after the thing already broke and the
+  // shop went quiet. Same collector the item panel reads, so the pill and the push agree.
+  // Zero = off, and then the query is skipped entirely rather than run and thrown away.
+  const claimRows =
+    s.staleClaimDays > 0
+      ? ((await (await scoped(Item)).find({ 'warrantyClaims.0': { $exists: true }, status: { $in: CLAIM_STATUSES_APPLY_TO } })
+          .select('title status warrantyClaims')
+          .lean()) as StaleClaimRow[])
+      : [];
+  const staleClaims = collectStaleClaims(claimRows, s.staleClaimDays, now);
+
   // Remote-mirror staleness (P48): the only alert here about the backup itself rather
   // than about money or things. Reads a stored timestamp, no network call — a NAS being
   // unreachable must not make the whole alert sweep slow or fail.
@@ -730,6 +749,7 @@ export async function runAlertChecks(opts: { dedupe?: boolean } = {}): Promise<{
   const billsSplit = splitFreshAlerts(nt.bills ? billsDue : [], (b) => `bill:${String(b._id)}:${b.iso}`, previouslySent);
   const maintenanceSplit = splitFreshAlerts(nt.maintenance ? maintenanceDue : [], (m) => `maintenance:${String(m._id)}:${m.iso}`, previouslySent);
   const lendingSplit = splitFreshAlerts(nt.lending ? lendingDue : [], (l) => `lending:${String(l._id)}:${l.iso}`, previouslySent);
+  const claimsSplit = splitFreshAlerts(nt.warrantyClaims ? staleClaims : [], (c) => `claim:${String(c._id)}:${c.iso}`, previouslySent);
   const budgetsSplit = splitFreshAlerts(nt.budgets ? budgetsExceeded : [], (b) => `budget:${b.category}:${budgetMonthKey}`, previouslySent);
   const installmentItems = nt.installments && dueThisMonth > 0 ? [{ key: `installments:${period}` }] : [];
   const installmentsSplit = splitFreshAlerts(installmentItems, (i) => i.key, previouslySent);
@@ -749,6 +769,7 @@ export async function runAlertChecks(opts: { dedupe?: boolean } = {}): Promise<{
     ...billsSplit.keys,
     ...maintenanceSplit.keys,
     ...lendingSplit.keys,
+    ...claimsSplit.keys,
     ...budgetsSplit.keys,
     ...installmentsSplit.keys,
     ...syncStaleSplit.keys,
@@ -764,6 +785,7 @@ export async function runAlertChecks(opts: { dedupe?: boolean } = {}): Promise<{
   const freshBillsDue = billsSplit.fresh;
   const freshMaintenanceDue = maintenanceSplit.fresh;
   const freshLendingDue = lendingSplit.fresh;
+  const freshStaleClaims = claimsSplit.fresh;
   const freshBudgetsExceeded = budgetsSplit.fresh;
   const dueThisMonthFresh = installmentsSplit.fresh.length > 0 ? dueThisMonth : 0;
   const freshSyncStale = syncStaleSplit.fresh.length > 0 ? syncStale : null;
@@ -820,6 +842,13 @@ export async function runAlertChecks(opts: { dedupe?: boolean } = {}): Promise<{
       `🤝 ${freshLendingDue.length} lent item(s) due back: ${freshLendingDue
         .slice(0, 5)
         .map((l) => `${l.title} @ ${l.borrower} (${l.days < 0 ? `${-l.days}d overdue` : `${l.days}d`})`)
+        .join(', ')}`
+    );
+  if (freshStaleClaims.length)
+    lines.push(
+      `📮 ${freshStaleClaims.length} warranty claim(s) with no movement: ${freshStaleClaims
+        .slice(0, 5)
+        .map((c) => `${c.title}${c.ref ? ` #${c.ref}` : ''} (${c.days}d silent)`)
         .join(', ')}`
     );
   if (freshBudgetsExceeded.length)

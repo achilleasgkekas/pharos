@@ -8,6 +8,7 @@ import { setCurrencySymbol, currencySymbol } from './money';
 // getAppSettings is server-only and runs on every request before render, so importing it
 // here guarantees the resolver is bound server-side without money.ts needing a node import.
 import './tenancy/currencyBinding';
+import { DEFAULT_STALE_CLAIM_DAYS } from './warrantyClaims';
 import {
   resolveTaxonomy,
   normalizeSpaces,
@@ -29,6 +30,7 @@ export type AppSettings = {
   billAlertDays: number; // lead-time (days) for "bill due / overdue" alert (P28); 0 = off
   maintenanceAlertDays: number; // lead-time (days) for the "maintenance due" alert (P41); overdue nags regardless
   lendingAlertDays: number; // lead-time (days) for the "lent item due back" alert (P47); overdue nags regardless
+  staleClaimDays: number; // days of silence before an open warranty claim counts as forgotten (P44); 0 = off
   syncStaleDays: number; // days without a successful remote push before alerting (P48); 0 = off
   autoAddStores: boolean;
   ntfyUrl: string;
@@ -60,6 +62,7 @@ export type RawAppConfigDoc = {
   billAlertDays?: number;
   maintenanceAlertDays?: number;
   lendingAlertDays?: number;
+  staleClaimDays?: number;
   syncStaleDays?: number;
   autoAddStores?: boolean;
   ntfyUrl?: string;
@@ -100,6 +103,7 @@ const DEFAULTS: AppSettings = {
   billAlertDays: 5,
   maintenanceAlertDays: 7,
   lendingAlertDays: 3,
+  staleClaimDays: DEFAULT_STALE_CLAIM_DAYS,
   syncStaleDays: 7,
   autoAddStores: true,
   ntfyUrl: '',
@@ -149,6 +153,7 @@ export function normalizeSettings(doc: RawAppConfigDoc | null | undefined): AppS
     maintenanceAlertDays:
       typeof doc?.maintenanceAlertDays === 'number' ? doc.maintenanceAlertDays : DEFAULTS.maintenanceAlertDays,
     lendingAlertDays: typeof doc?.lendingAlertDays === 'number' ? doc.lendingAlertDays : DEFAULTS.lendingAlertDays,
+    staleClaimDays: typeof doc?.staleClaimDays === 'number' ? doc.staleClaimDays : DEFAULTS.staleClaimDays,
     syncStaleDays: typeof doc?.syncStaleDays === 'number' ? doc.syncStaleDays : DEFAULTS.syncStaleDays,
     autoAddStores: doc?.autoAddStores !== false,
     ntfyUrl: doc?.ntfyUrl || '',
@@ -190,7 +195,7 @@ export async function getAppSettings(): Promise<AppSettings> {
     await connectDB();
     const Config = tenantModel(await tenantDb(ctx), AppConfig);
     doc = await Config.findOne({ key: 'singleton' })
-      .select('defaultItemView defaultWarrantyMonths warrantyAlertDays trialAlertDays giftCardAlertDays billAlertDays maintenanceAlertDays lendingAlertDays syncStaleDays autoAddStores ntfyUrl ntfyEnabled currency multiCurrency defaultVatRate defaultReturnWindowDays lists spaces budgets budgetRollover assetAccounts depreciation categoryRules onboardingDismissed notifyTypes')
+      .select('defaultItemView defaultWarrantyMonths warrantyAlertDays trialAlertDays giftCardAlertDays billAlertDays maintenanceAlertDays lendingAlertDays staleClaimDays syncStaleDays autoAddStores ntfyUrl ntfyEnabled currency multiCurrency defaultVatRate defaultReturnWindowDays lists spaces budgets budgetRollover assetAccounts depreciation categoryRules onboardingDismissed notifyTypes')
       .lean();
   } catch {
     /* DB down → hard defaults */

@@ -113,6 +113,10 @@ services:
       APP_URL: "https://app.${SAAS_BASE_DOMAIN}"
       # Real TLS here, unlike the local stacks.
       AUTH_COOKIE_SECURE: "true"
+      # Price/product search backend (lib/search.ts). Reachable only over the compose network;
+      # SearXNG publishes no ports. Without this the "search prices online" discovery returns
+      # nothing (lib/search.ts falls back to http://localhost:8888, which does not exist here).
+      SEARXNG_URL: "http://searxng:8080"
     volumes:
       - ./storage:/storage
       # The fail2ban bridge. `deploy/f2b-bridge.sh` runs on the HOST (cron, every minute) and
@@ -124,6 +128,21 @@ services:
     depends_on:
       mongo:
         condition: service_healthy
+      searxng:
+        condition: service_started
+
+  searxng:
+    # Price/product search for the scraper (discovery of shops for "search prices online").
+    # Mirrors the self-hosted stack. NO published ports — only `web` reaches it over the compose
+    # network, exactly like mongo. Config is version-controlled in ./searxng/settings.yml; the
+    # key line there is `search.formats: [html, json]`, since the JSON API is OFF by default.
+    image: searxng/searxng:latest
+    container_name: pharos-searxng
+    restart: unless-stopped
+    environment:
+      SEARXNG_BASE_URL: "http://searxng:8080/"
+    volumes:
+      - ./searxng:/etc/searxng
 
   mongo:
     image: mongo:7

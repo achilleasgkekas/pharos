@@ -2048,6 +2048,7 @@ function DefaultsManager({ settings }: { settings: AppSettings }) {
   const [billDays, setBillDays] = useState(String(settings.billAlertDays));
   const [maintDays, setMaintDays] = useState(String(settings.maintenanceAlertDays));
   const [lendDays, setLendDays] = useState(String(settings.lendingAlertDays));
+  const [claimStaleDays, setClaimStaleDays] = useState(String(settings.staleClaimDays));
   const [syncStaleDays, setSyncStaleDays] = useState(String(settings.syncStaleDays));
   const [autoAdd, setAutoAdd] = useState(settings.autoAddStores);
   const [currency, setCurrency] = useState(settings.currency);
@@ -2066,6 +2067,7 @@ function DefaultsManager({ settings }: { settings: AppSettings }) {
     fd.set('billAlertDays', billDays);
     fd.set('maintenanceAlertDays', maintDays);
     fd.set('lendingAlertDays', lendDays);
+    fd.set('staleClaimDays', claimStaleDays);
     fd.set('syncStaleDays', syncStaleDays);
     fd.set('autoAddStores', String(autoAdd));
     fd.set('currency', currency);
@@ -2136,6 +2138,10 @@ function DefaultsManager({ settings }: { settings: AppSettings }) {
         <label className="block">
           <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.lendingAlert')}</span>
           <input type="number" min="0" max="180" value={lendDays} onChange={(e) => setLendDays(e.target.value)} className={inputClass} />
+        </label>
+        <label className="block">
+          <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.claimStaleAlert')}</span>
+          <input type="number" min="0" max="180" value={claimStaleDays} onChange={(e) => setClaimStaleDays(e.target.value)} className={inputClass} />
         </label>
         <label className="block">
           <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.syncStaleAlert')}</span>

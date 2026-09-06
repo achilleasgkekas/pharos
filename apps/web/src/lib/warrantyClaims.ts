@@ -187,3 +187,65 @@ export function claimIsStale(
   const days = claimDaysSinceUpdate(claim, now);
   return days !== null && days >= staleDays;
 }
+
+/** One item as the stale-claim sweep reads it: the claims plus the two fields that decide
+ *  whether an RMA is meaningful at all (`status`) and what to call it (`title`). */
+export type StaleClaimRow = {
+  _id: unknown;
+  title: string;
+  status?: string | null;
+  warrantyClaims?: unknown;
+};
+
+export type StaleClaimEntry = {
+  _id: unknown;
+  title: string;
+  /** RMA number, often empty — a claim opened today has no number yet. */
+  ref: string;
+  status: ClaimStatus;
+  /** Whole days of silence, always >= staleDays. */
+  days: number;
+  /** The day the silence counts from (last update, else the report day). This is the
+   *  dedupe anchor: the moment you log any movement it changes, which retires the old
+   *  alert and arms a fresh one only if the claim goes quiet again. */
+  iso: string;
+};
+
+/**
+ * P44 phase 2 — open RMAs nobody has touched for `staleDays`, the nudge half of the
+ * feature. Reads exactly the same `claimIsStale` rule the item panel already shows, so
+ * the pill and the push can never disagree about which claim is forgotten.
+ *
+ * ONE entry per item, the most-forgotten claim, deliberately: it mirrors the maintenance
+ * (P41) and lending (P47) collectors, it keeps the dedupe key `claim:<id>:<iso>` free of
+ * a positional index that would shift when a row is deleted, and an item with two stalled
+ * RMAs at once is rare enough that opening it and seeing both is the right answer anyway.
+ */
+export function collectStaleClaims(
+  rows: StaleClaimRow[],
+  staleDays: number = DEFAULT_STALE_CLAIM_DAYS,
+  now: number = Date.now()
+): StaleClaimEntry[] {
+  const out: StaleClaimEntry[] = [];
+  for (const r of rows) {
+    // Sold/returned things drop out here, same gate as the pill: the claim then belongs to
+    // whoever owns the machine, and nagging about it is noise.
+    if (!warrantyClaimsApply(r.status)) continue;
+    let worst: WarrantyClaim | null = null;
+    let worstDays = -1;
+    for (const c of normalizeWarrantyClaims(r.warrantyClaims)) {
+      if (!claimIsStale(c, staleDays, now)) continue;
+      const days = claimDaysSinceUpdate(c, now) ?? 0;
+      if (days > worstDays) {
+        worst = c;
+        worstDays = days;
+      }
+    }
+    if (!worst) continue;
+    const iso = toIsoDay(worst.lastUpdateAt ?? worst.reportedAt);
+    if (!iso) continue; // unreachable via claimIsStale, but the key must never be "null"
+    out.push({ _id: r._id, title: r.title, ref: worst.ref, status: worst.status, days: worstDays, iso });
+  }
+  // Longest silence first: the claim everyone forgot is the one worth a message.
+  return out.sort((a, b) => b.days - a.days);
+}

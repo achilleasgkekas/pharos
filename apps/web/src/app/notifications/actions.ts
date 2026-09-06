@@ -17,12 +17,13 @@ import { giftCardBalance, giftCardDaysLeft } from '@/lib/giftcard';
 import { billDaysUntilDue, billRemaining } from '@/lib/bill';
 import { collectMaintenanceDue, MAINTENANCE_STATUSES, type MaintenanceRow } from '@/lib/maintenance';
 import { collectLendingOverdue, LENDING_STATUSES, type LendingRow } from '@/lib/lending';
+import { collectStaleClaims, CLAIM_STATUSES_APPLY_TO, type StaleClaimRow } from '@/lib/warrantyClaims';
 import { computeInstallmentPlans } from '@/lib/installments';
 import { detectPriceHikes, type HikeEntry } from '@/lib/priceHike';
 import type { SerializedStatement } from '@/types';
 import { assertCanWrite } from '@/lib/auth';
 
-export type NotifKind = 'deal' | 'installment' | 'warranty' | 'pricehike' | 'trialend' | 'giftcard' | 'bill' | 'maintenance' | 'lending' | 'system';
+export type NotifKind = 'deal' | 'installment' | 'warranty' | 'pricehike' | 'trialend' | 'giftcard' | 'bill' | 'maintenance' | 'lending' | 'claim' | 'system';
 
 export type SerializedNotification = {
   _id: string;
@@ -35,7 +36,7 @@ export type SerializedNotification = {
 };
 
 type Alert = { dedupeKey: string; kind: NotifKind; title: string; body: string; href: string };
-const AUTO_KINDS = ['deal', 'installment', 'warranty', 'pricehike', 'trialend', 'giftcard', 'bill', 'maintenance', 'lending'] as const;
+const AUTO_KINDS = ['deal', 'installment', 'warranty', 'pricehike', 'trialend', 'giftcard', 'bill', 'maintenance', 'lending', 'claim'] as const;
 
 /** Recompute the live alerts (deals / warranties / installments-due) — the same
  *  three the ntfy check uses, but as structured payloads the bell can localize.
@@ -212,6 +213,28 @@ async function computeAlerts(): Promise<Alert[]> {
       title: l.title,
       body: `${l.days}|${l.borrower}`,
       href: `/items?open=${String(l._id)}`,
+    });
+  }
+
+  // Forgotten warranty claims (P44 phase 2): an open RMA that stopped moving. The dedupeKey
+  // carries the ANCHOR day (claim:<id>:<iso>), so logging any progress on the claim retires
+  // this alert, and closing it drops the row out of the collector altogether.
+  // Zero = the nudge is off; skip the query rather than run it and discard the result.
+  const claimRows =
+    s.staleClaimDays > 0
+      ? ((await Item.find({ 'warrantyClaims.0': { $exists: true }, status: { $in: CLAIM_STATUSES_APPLY_TO } })
+          .select('title status warrantyClaims')
+          .lean()) as StaleClaimRow[])
+      : [];
+  for (const c of collectStaleClaims(claimRows, s.staleClaimDays, now)) {
+    // body = "<days>|<ref>": the RMA number is what you quote back at the shop, and the ref
+    // is often empty. Split on the FIRST bar only, a ticket number may contain one.
+    alerts.push({
+      dedupeKey: `claim:${String(c._id)}:${c.iso}`,
+      kind: 'claim',
+      title: c.title,
+      body: `${c.days}|${c.ref}`,
+      href: `/items?open=${String(c._id)}`,
     });
   }
 

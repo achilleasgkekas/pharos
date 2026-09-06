@@ -17,6 +17,7 @@ export const ALERT_TYPES = [
   { key: 'bills', label: 'Bills due / overdue' },
   { key: 'maintenance', label: 'Maintenance due on owned items' },
   { key: 'lending', label: 'Lent items due back' },
+  { key: 'warrantyClaims', label: 'Warranty claims with no movement' },
   { key: 'budgets', label: 'Budgets exceeded' },
   { key: 'syncStale', label: 'Remote backup fallen behind' },
 ] as const;

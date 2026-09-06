@@ -54,6 +54,7 @@ const AppConfigSchema = new Schema(
     billAlertDays: { type: Number, default: 5 }, // "bill due / overdue" lead time (P28)
     maintenanceAlertDays: { type: Number, default: 7 }, // "maintenance due" lead time (P41)
     lendingAlertDays: { type: Number, default: 3 }, // "lent item due back" lead time (P47); tighter than maintenance on purpose
+    staleClaimDays: { type: Number, default: 14 }, // silence before an open RMA counts as forgotten (P44 phase 2)
     syncStaleDays: { type: Number, default: 7 }, // "remote mirror has fallen behind" window (P48); 0 = off
     autoAddStores: { type: Boolean, default: true }, // auto-add unknown receipt stores to the list
     currency: { type: String, default: 'EUR' }, // display currency symbol (ISO 4217 code)
