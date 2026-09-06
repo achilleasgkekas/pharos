@@ -3,7 +3,7 @@ import { BILLING_CYCLE_VALUES, RECURRING_CYCLE_VALUES } from '@/lib/billingCycle
 import { z } from 'zod';
 import { STORE_NAMES } from './stores';
 import { resolveStore } from './storeService';
-import { getAiConfig } from './aiConfig';
+import { getAiConfig, scraperConfig } from './aiConfig';
 import { anthropicJSON } from './anthropic';
 import { openaiCompatJSON, geminiJSON } from './aiProviders';
 import { getPromptOverride } from './prompts';
@@ -106,12 +106,12 @@ export async function runVisionJSON(
 /** Run a text-only prompt and return parsed JSON. `numCtx` lets long inputs (e.g.
  *  multi-page statements) use a bigger local context window so transactions at the
  *  end aren't truncated away. */
-export async function runTextJSON(
+async function runTextJSONWith(
+  cfg: Awaited<ReturnType<typeof getAiConfig>>,
   systemPrompt: string,
   userPrompt: string,
   opts?: { numCtx?: number }
 ): Promise<{ json: unknown; raw: string; model: string }> {
-  const cfg = await getAiConfig();
   if (!cfg.aiEnabled) throw new Error('AI is turned off');
   // SaaS metering: block an over-quota tenant before any provider cost is incurred.
   // No-op for the self-hosted default tenant / SAAS_MODE off / BYO-key tenants.
@@ -135,6 +135,25 @@ export async function runTextJSON(
   const result = { json: JSON.parse(stripFences(raw)), raw, model: cfg.ollamaModel };
   await meterAiResult();
   return result;
+}
+
+export async function runTextJSON(
+  systemPrompt: string,
+  userPrompt: string,
+  opts?: { numCtx?: number }
+): Promise<{ json: unknown; raw: string; model: string }> {
+  return runTextJSONWith(await getAiConfig(), systemPrompt, userPrompt, opts);
+}
+
+/** Like runTextJSON but on the SEPARATE 'scraper' model (Settings → Scraper AI): product/
+ *  price extraction is a simple text task, so it runs on a lighter/cheaper model (or local
+ *  Ollama) than the heavy receipt/statement parses. See scraperConfig() in aiConfig.ts. */
+export async function runScraperTextJSON(
+  systemPrompt: string,
+  userPrompt: string,
+  opts?: { numCtx?: number }
+): Promise<{ json: unknown; raw: string; model: string }> {
+  return runTextJSONWith(scraperConfig(await getAiConfig()), systemPrompt, userPrompt, opts);
 }
 
 // ─── Receipt parsing ────────────────────────────────────────────────────────
@@ -360,7 +379,9 @@ export async function parseProductFromPage(page: {
     }
   })();
   const content = `Site: ${host}\nPage title: ${page.title}\n\nJSON-LD:\n${page.jsonLd || '(none)'}\n\nVisible text:\n${page.text}`;
-  const { json, raw, model } = await runTextJSON((await getPromptOverride('product')) ?? PRODUCT_PROMPT, content);
+  // Product/price extraction uses the SEPARATE scraper model (cheaper/local), not the main
+  // provider — so the 6h price cron and per-item price checks don't bill at the heavy model's rate.
+  const { json, raw, model } = await runScraperTextJSON((await getPromptOverride('product')) ?? PRODUCT_PROMPT, content);
   const parsed = ParsedProductSchema.parse(json);
   if (!parsed.store && host) parsed.store = host.replace(/^www\./, '');
   return { parsed, raw, model };

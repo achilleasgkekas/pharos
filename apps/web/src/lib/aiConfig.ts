@@ -33,6 +33,12 @@ export type AiConfig = {
   aiEnabled: boolean; // master switch
   aiFeatures: Record<string, boolean>; // per-feature overrides; ABSENT key = enabled
   aiOnboardingDismissed: boolean; // hide the "set up AI" banner
+  // ── Separate 'scraper' model (Settings → Scraper AI) ──
+  // Product/price extraction is a simple text task, so it can run on a lighter/cheaper model
+  // (Haiku) or a local Ollama, independent of the main provider that does the heavy
+  // receipt/statement parses. Consumed via `scraperConfig()` below.
+  scraperProvider: 'ollama' | 'anthropic';
+  scraperModel: string;
 };
 
 // Model-name hints for "this can see images". Used to let an explicitly-chosen
@@ -148,6 +154,8 @@ export async function getAiConfig(): Promise<AiConfig> {
     aiEnabled?: boolean;
     aiFeatures?: Record<string, boolean>;
     aiOnboardingDismissed?: boolean;
+    scraperProvider?: string;
+    scraperModel?: string;
   } | null = null;
   try {
     await connectDB();
@@ -185,6 +193,8 @@ export async function getAiConfig(): Promise<AiConfig> {
     aiEnabled: doc?.aiEnabled !== false, // default ON for existing installs
     aiFeatures: (doc?.aiFeatures as Record<string, boolean>) || {},
     aiOnboardingDismissed: !!doc?.aiOnboardingDismissed,
+    scraperProvider: doc?.scraperProvider === 'anthropic' ? 'anthropic' : 'ollama',
+    scraperModel: doc?.scraperModel || '',
   };
   // A hosted workspace keeps its provider key encrypted in the CONTROL plane (the BYO-key
   // panel in workspace settings), not in this tenant's AppConfig. Without this, the key was
@@ -207,6 +217,25 @@ export async function getAiConfig(): Promise<AiConfig> {
   }
   cache.set(key, { v, t: Date.now() });
   return v;
+}
+
+/**
+ * Derive the config the PRICE/PRODUCT scraper should use from a resolved AiConfig.
+ *
+ * Product/price extraction is a simple text task, so Settings → Scraper AI lets it run on a
+ * lighter/cheaper model (e.g. Haiku) or a local Ollama, separate from the main provider that
+ * does the heavy receipt/statement parses. Until this was wired, `parseProductFromPage` ran on
+ * the MAIN model, so an operator who picked "Haiku" for the scraper was silently billed at the
+ * main model's rate on every product page — including the unattended 6h price cron, one call
+ * per tracked link. Pure transform: swaps provider + model, keeps the same credentials/hosts,
+ * and falls back to Ollama when the scraper is set to Anthropic but no key is configured
+ * (mirrors getAiConfig's half-configured guard).
+ */
+export function scraperConfig(cfg: AiConfig): AiConfig {
+  if (cfg.scraperProvider === 'anthropic' && cfg.anthropicApiKey) {
+    return { ...cfg, provider: 'anthropic', anthropicModel: cfg.scraperModel || cfg.anthropicModel };
+  }
+  return { ...cfg, provider: 'ollama', ollamaModel: cfg.scraperModel || cfg.ollamaModel };
 }
 
 /** Call after saving settings so the next parse picks up the change immediately.
