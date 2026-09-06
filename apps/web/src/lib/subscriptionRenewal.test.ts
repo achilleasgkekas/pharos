@@ -90,7 +90,11 @@ describe('effectiveNextRenewal', () => {
   });
 
   it('accepts the ISO strings the serialized shapes carry', () => {
-    expect(effectiveNextRenewalISO('2026-08-03T00:00:00.000Z', 'monthly', NOW)).toBe(
+    // Both sides built from LOCAL dates on purpose. The roll steps whole months with
+    // setMonth, which keeps the wall-clock time, so a hardcoded UTC input against a
+    // local-midnight expectation only lined up on a machine running in UTC — in Athens
+    // the right-hand side is 2026-10-02T21:00Z and the test failed everywhere else.
+    expect(effectiveNextRenewalISO(new Date(2026, 7, 3).toISOString(), 'monthly', NOW)).toBe(
       new Date(2026, 9, 3).toISOString()
     );
   });
