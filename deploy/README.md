@@ -109,6 +109,30 @@ empty env with cron's default `PATH`) rather than your login shell:
 env -i PATH=/usr/bin:/bin /opt/pharos/deploy/cron-call.sh trials-sweep
 ```
 
+### Self-hosted crons (`SAAS_MODE` off)
+
+Two more endpoints exist for the self-hosted app and are **404 under `SAAS_MODE`** (they read the
+one shared database with no tenant scoping, so they belong only to a single-tenant instance):
+
+- `POST /api/cron/alerts` — the alert engine (deals, bills, warranties, price hikes → notifiers + bell).
+- `POST /api/cron/prices` — the price scraper: re-checks every tracked item's store links and
+  updates prices + history. This is what the Settings copy and the "Search prices" modal mean by
+  "re-checked every 6 hours"; nothing runs it unless a cron does. **Schedule prices a little before
+  alerts** so deal/price-hike alerts read fresh numbers.
+
+`cron-call.sh` targets the hosted app, so it does not fit these — call the instance's own origin with
+its own `CRON_SECRET`. On the self-hosted box (e.g. `pharos.home.<domain>`), with `CRON_SECRET` set
+in that instance's env:
+
+```cron
+# UTC. Prices every 6h at :05, alerts 10 min later so they see the fresh prices.
+5  */6 * * * curl -fsS -X POST -H "Authorization: Bearer $CRON_SECRET" https://pharos.home.example/api/cron/prices >> /var/log/pharos-cron.log 2>&1
+15 */6 * * * curl -fsS -X POST -H "Authorization: Bearer $CRON_SECRET" https://pharos.home.example/api/cron/alerts >> /var/log/pharos-cron.log 2>&1
+```
+
+(As with the hosted crons, prefer feeding the token via a file/stdin over an inline `-H` if the box
+has other local users — `ps` leaks argv. On a single-user box the inline form is acceptable.)
+
 ## 5. Backups
 
 `deploy/backup.sh` dumps **every** database (the registry plus one per workspace) and tars

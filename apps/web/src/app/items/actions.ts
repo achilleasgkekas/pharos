@@ -1922,6 +1922,100 @@ export async function refreshItemPrices(
 }
 
 /**
+ * The 6-hourly price scraper (unattended batch behind /api/cron/prices).
+ *
+ * Re-checks EVERY tracked item's store links, updates each link's price plus a
+ * price-history point, and recomputes currentPrice — the same scrape as the on-demand
+ * refreshItemPrices() above, fanned out over the whole inventory. This is the mechanism
+ * the Settings copy ("the price scraper runs on its own schedule, every 6h") has always
+ * promised; until now the only trigger was the per-item button, so an instance nobody
+ * opened never re-priced anything.
+ *
+ * Runs with no request scope (a scheduler POSTs the route), so it mirrors runAlertChecks:
+ * assertCanWrite() no-ops without a session, and withRequestTenant resolves to the single
+ * shared tenant on self-hosted. The cron route is self-host only (404 under SAAS_MODE),
+ * because this reads the one shared database with no per-tenant fan-out — the same reason
+ * the alert cron carries that gate.
+ *
+ * Each item is wrapped in its own try/catch: one shop behind Cloudflare or one dead link
+ * must not abort the whole pass. No notifications are sent here — the alert cron (deals,
+ * price hikes) reads the prices this writes, so scheduling prices a little before alerts
+ * feeds the summary fresh numbers.
+ */
+export async function runPriceScrape(): Promise<{
+  ok: boolean;
+  scanned: number;
+  itemsChanged: number;
+  linksChecked: number;
+  drops: number;
+  errors: number;
+  skipped?: string;
+}> {
+  await assertCanWrite();
+  return withRequestTenant(async () => {
+    const empty = { ok: true, scanned: 0, itemsChanged: 0, linksChecked: 0, drops: 0, errors: 0 };
+    if (!(await isFeatureEnabled('itemsImport'))) return { ...empty, skipped: 'product AI is off' };
+    await connectDB();
+    const Item = await currentModel(ItemModel);
+    const items = await Item.find({ deletedAt: null, 'links.0': { $exists: true } });
+
+    let scanned = 0;
+    let itemsChanged = 0;
+    let linksChecked = 0;
+    let drops = 0;
+    let errors = 0;
+
+    for (const item of items) {
+      const links = (item.links ?? []).filter((l) => l.url && /^https?:\/\//i.test(l.url));
+      if (links.length === 0) continue;
+      scanned++;
+      let anyChange = false;
+      for (const link of links) {
+        linksChecked++;
+        const store = link.label || storeFromUrl(link.url!);
+        const oldPrice = link.price ?? null;
+        try {
+          const page = await fetchPageText(link.url!);
+          const parsed = (await parseProductFromPage(page)).parsed;
+          if (!productMatchesItem(item.title, parsed)) {
+            errors++;
+            continue; // page drifted to an unrelated product — keep the old price
+          }
+          const newPrice = parsed.price > 0 ? parsed.price : null;
+          if (newPrice == null) {
+            errors++;
+            continue; // no readable price on the page this pass
+          }
+          if (oldPrice == null || newPrice !== oldPrice) {
+            link.price = newPrice;
+            item.priceHistory.push({ price: newPrice, store, url: link.url!, date: new Date() } as (typeof item.priceHistory)[number]);
+            anyChange = true;
+            if (oldPrice != null && newPrice < oldPrice) drops++;
+          }
+        } catch {
+          errors++; // Cloudflare, timeout, dead link — counted, never fatal
+        }
+      }
+      const lowest = lowestKnownPrice(item);
+      if (lowest != null && lowest !== item.currentPrice) {
+        item.currentPrice = lowest;
+        anyChange = true;
+      }
+      if (anyChange) {
+        item.markModified('links');
+        item.markModified('priceHistory');
+        await item.save();
+        itemsChanged++;
+      }
+    }
+
+    safeRevalidate('/items');
+    safeRevalidate('/shopping');
+    return { ok: true, scanned, itemsChanged, linksChecked, drops, errors };
+  });
+}
+
+/**
  * One-time maintenance: recompute every item's currentPrice from its links + price
  * history (lowest known). Fixes stale/seeded headline prices (e.g. a €475 with no
  * store behind it) so the big number always reflects real, tracked prices.
