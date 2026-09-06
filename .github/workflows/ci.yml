@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch: # allow re-running CI on demand (e.g. after re-enabling the workflow)
 
 jobs:
   build:
