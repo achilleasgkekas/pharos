@@ -40,6 +40,15 @@ function anthropicHeaders(apiKey: string, workspaceId?: string): Record<string, 
   return h;
 }
 
+/** Newer Anthropic models (Sonnet 5, Opus 5, Opus 4.7/4.8, Fable/Mythos 5.x) REJECT sampling
+ *  params: a request carrying `temperature` returns HTTP 400. The older families (Sonnet
+ *  4.5/4.6, Opus 4.6, Haiku 4.5, Claude 3.x) still accept it. Omitting `temperature` is valid
+ *  on EVERY model, so we send it only where it is allowed (a mild determinism nudge for JSON
+ *  extraction) and drop it wherever it would 400. Exported for tests. */
+export function acceptsTemperature(model: string): boolean {
+  return !/(sonnet-5|opus-5|opus-4-[78]|fable-5|mythos-5)/i.test(model);
+}
+
 type ContentBlock =
   | { type: 'text'; text: string }
   | { type: 'image'; source: { type: 'base64'; media_type: ImageMedia; data: string } };
@@ -68,7 +77,8 @@ export async function anthropicJSON(opts: {
     body: JSON.stringify({
       model: opts.model,
       max_tokens: 4096,
-      temperature: 0.1,
+      // Sampling params 400 on the newest models — send temperature only where accepted.
+      ...(acceptsTemperature(opts.model) ? { temperature: 0.1 } : {}),
       system: `${opts.system}\n\nReturn ONLY valid minified JSON. No markdown fences, no prose.`,
       messages: [{ role: 'user', content }],
     }),

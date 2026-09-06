@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mediaTypeOf, stripFences, redactKey } from './anthropic';
+import { mediaTypeOf, stripFences, redactKey, acceptsTemperature } from './anthropic';
 
 // anthropic.ts is the minimal Claude client over fetch. Its network functions
 // (anthropicJSON/anthropicRaw/anthropicTest) need a live API, but three pure
@@ -113,5 +113,40 @@ describe('redactKey', () => {
   it('catches an sk-ant token when the passed key is empty', () => {
     const out = redactKey('boom sk-ant-abc123 boom', '');
     expect(out).toBe('boom [redacted] boom');
+  });
+});
+
+describe('acceptsTemperature', () => {
+  // Newer models 400 on `temperature`; anthropicJSON must omit it for them. Guard the exact
+  // model families so a wrong classification does not silently break every cloud parse.
+  it('returns FALSE for the models that reject sampling params', () => {
+    for (const m of [
+      'claude-sonnet-5',
+      'claude-opus-5',
+      'claude-opus-4-7',
+      'claude-opus-4-8',
+      'claude-fable-5',
+      'claude-fable-5-1',
+      'claude-mythos-5-1',
+    ]) {
+      expect(acceptsTemperature(m), m).toBe(false);
+    }
+  });
+
+  it('returns TRUE for the older families that still accept temperature', () => {
+    for (const m of [
+      'claude-sonnet-4-5-20250929',
+      'claude-sonnet-4-6',
+      'claude-opus-4-6',
+      'claude-haiku-4-5',
+      'claude-3-5-haiku-latest',
+    ]) {
+      expect(acceptsTemperature(m), m).toBe(true);
+    }
+  });
+
+  it('does not confuse opus-4-5 / sonnet-4-5 with the rejecting opus-5 / sonnet-5', () => {
+    expect(acceptsTemperature('claude-opus-4-5')).toBe(true);
+    expect(acceptsTemperature('claude-sonnet-4-5')).toBe(true);
   });
 });
