@@ -92,15 +92,23 @@ The script reads it from there and hands it to curl through a config file on std
 
 ```cron
 20 3 * * * /opt/pharos/deploy/backup.sh >> /var/log/pharos-backup.log 2>&1
+10 2 * * * /opt/pharos/deploy/cron-call.sh prices          >> /var/log/pharos-cron.log 2>&1
 17 4 * * * /opt/pharos/deploy/cron-call.sh usage-sample     >> /var/log/pharos-cron.log 2>&1
 27 4 * * * /opt/pharos/deploy/cron-call.sh trials-sweep     >> /var/log/pharos-cron.log 2>&1
 32 4 * * * /opt/pharos/deploy/cron-call.sh suspended-sweep  >> /var/log/pharos-cron.log 2>&1
 37 4 * * * /opt/pharos/deploy/cron-call.sh erasure-purge    >> /var/log/pharos-cron.log 2>&1
 ```
 
-The order is load-bearing, not cosmetic: `trials-sweep` creates suspensions, `suspended-sweep`
-warns them and schedules the expired ones for erasure, `erasure-purge` reports what is due. Run
-back to front and each stage acts on yesterday's state.
+The **control-plane** order (`trials-sweep` → `suspended-sweep` → `erasure-purge`) is
+load-bearing, not cosmetic: `trials-sweep` creates suspensions, `suspended-sweep` warns them and
+schedules the expired ones for erasure, `erasure-purge` reports what is due. Run back to front and
+each stage acts on yesterday's state.
+
+`prices` (`POST /api/cron/saas/prices`) is the **data-plane** counterpart — it runs the price
+scraper for every live workspace, each inside its own tenant DB (the SaaS fan-out of the
+self-host `/api/cron/prices`). It is independent of the control-plane chain, so its time only
+needs to sit off-peak; once daily is plenty because the shared cross-tenant price cache (24h TTL)
+already means a URL that many workspaces track is fetched once per day, not once per workspace.
 
 Confirm one works before trusting the schedule, in the environment cron will actually use (an
 empty env with cron's default `PATH`) rather than your login shell:

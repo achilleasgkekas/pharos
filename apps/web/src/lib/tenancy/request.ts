@@ -180,11 +180,18 @@ export const softRequestTenant = cache(async function softRequestTenant(): Promi
  * `not_authenticated` → `failTenantGate` → `redirect()`, whose control-flow throw `withAuth`
  * catches and reports as a **500** — every one of those endpoints, in SaaS mode only.
  *
- * Skipping the re-check is safe because an ambient tenant only ever comes from a gate that
- * already resolved AND authorised: `withAuth` (bearer, above), this function (cookie), or
- * `getNotifications` via `resolveRequestTenantOrNull` (cookie + membership). Those are the
- * only three `withTenant` call sites in the app; a fourth that skips authorisation would
- * break this invariant, so it must not be added.
+ * Skipping the re-check is safe because in a USER REQUEST an ambient tenant only ever comes
+ * from a gate that already resolved AND authorised: `withAuth` (bearer), this function
+ * (cookie), or `getNotifications` via `resolveRequestTenantOrNull` (cookie + membership).
+ * Those are the only three request-path `withTenant` call sites; a fourth in a user path that
+ * skipped authorisation would break this invariant, so it must not be added.
+ *
+ * The one call site OUTSIDE a user request is the SaaS cron fan-out
+ * (`runPriceScrapeAllTenants`, and future sweeps like it): it establishes each tenant from the
+ * REGISTRY under the route's CRON_SECRET (operator/scheduler, never user input) and runs in
+ * its own async context, so it cannot leak into or weaken the user-facing short-circuit above.
+ * That is a different trust basis (a shared secret authorising fleet-wide operator work), not
+ * an exception to the user-request rule.
  *
  * Nested calls collapse too: `settings/actions.ts` alone enters this wrapper 65+ times per
  * action (once per model), and only the outermost one now does any work.

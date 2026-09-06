@@ -74,6 +74,25 @@ function toContext(t: TenantDoc): TenantContext {
   };
 }
 
+/**
+ * Every tenant a SaaS-wide sweep should act on: those whose workspace is live (`trialing`
+ * or `active`). Suspended/canceled/pending tenants are skipped — a background sweep must
+ * not scrape, alert, or bill for a workspace that is turned off. Returns a TenantContext per
+ * tenant, ready to hand to `withTenant(ctx, …)` so the work runs against that tenant's data
+ * database. Empty array when SAAS_MODE is off (the self-hosted app has no registry to list —
+ * its single implicit tenant is driven directly, not via a fan-out). This is THE list a cron
+ * fan-out iterates; keeping the "which tenants count as live" rule here means the price
+ * sweep, the storage sampler, and any future sweep agree on it.
+ */
+export async function listActiveTenantContexts(): Promise<TenantContext[]> {
+  if (!saasMode()) return [];
+  await connectDB();
+  const tenants = (await Tenant.find({ status: { $in: ['trialing', 'active'] } })
+    .select('slug dbName plan status aiByoKey')
+    .lean()) as unknown as TenantDoc[];
+  return tenants.map(toContext);
+}
+
 export type ResolveInput = {
   /** The request Host header (subdomain routing). */
   host?: string | null;

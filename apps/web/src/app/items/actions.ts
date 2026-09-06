@@ -7,6 +7,8 @@ import { Receipt as ReceiptModel } from '@/models/Receipt';
 import { Statement as StatementModel } from '@/models/Statement';
 import { Task as TaskModel } from '@/models/Task';
 import { withRequestTenant } from '@/lib/tenancy/request';
+import { withTenant } from '@/lib/tenancy/current';
+import { listActiveTenantContexts } from '@/lib/tenancy/context';
 import { currentModel } from '@/lib/tenancy/connection';
 import { fetchPageText } from '@/lib/scrape';
 import { parseProductFromPage } from '@/lib/ollama';
@@ -2027,6 +2029,64 @@ export async function runPriceScrape(): Promise<{
     safeRevalidate('/shopping');
     return { ok: true, scanned, itemsChanged, linksChecked, drops, errors };
   });
+}
+
+/**
+ * SaaS fan-out of the price scraper: run `runPriceScrape()` once per LIVE workspace, each
+ * inside its own tenant context, and aggregate the counts. This is the multi-tenant half the
+ * self-host `/api/cron/prices` route deliberately left out ("per-tenant scraping needs its
+ * own fan-out and is not this") — driven by `/api/cron/saas/prices`.
+ *
+ * WHY A FAN-OUT AND NOT A LOOP OVER ONE DB: in SaaS every workspace has its own data
+ * database, so there is no single `Item` collection to scan. We enumerate the live tenants
+ * from the registry (`listActiveTenantContexts`) and enter each with `withTenant(ctx, …)`;
+ * because `runPriceScrape` already reads the ambient tenant (its inner `withRequestTenant`
+ * short-circuits to an established context), it then scrapes exactly that workspace's items.
+ *
+ * WHY IT IS CHEAP AT SCALE: the shared, cross-tenant `ScrapedPrice` cache (24h TTL) means a
+ * URL that N workspaces track is fetched + AI-parsed ONCE per window; every other tenant that
+ * links it reads the cache. So the total distinct network/AI work is bounded by the number of
+ * distinct URLs across the whole fleet, not by tenants × links. Each tenant's own
+ * `scraperEnabled` kill-switch and `scraperMaxLinks` cap still apply inside `runPriceScrape`.
+ *
+ * ISOLATION: one workspace's bad database or scrape error is counted, never fatal — a later
+ * tenant still runs. Mirrors `sampleAllTenants` (lib/billing/dbStats.ts). No-op (zeroed
+ * result) when SAAS_MODE is off; the self-hosted app uses `runPriceScrape()` directly.
+ *
+ * TENANCY NOTE: this is a deliberate `withTenant` call site beyond the three user-facing
+ * gates documented in lib/tenancy/request.ts. It is authorised by the route's CRON_SECRET
+ * (operator/scheduler, not a user), sources its tenants from the registry (never user input),
+ * and runs in its own async context, so it cannot weaken the cookie/bearer short-circuit that
+ * protects user requests.
+ */
+export async function runPriceScrapeAllTenants(): Promise<{
+  ok: boolean;
+  tenants: number;
+  tenantErrors: number;
+  scanned: number;
+  itemsChanged: number;
+  linksChecked: number;
+  drops: number;
+  errors: number;
+}> {
+  const out = { ok: true, tenants: 0, tenantErrors: 0, scanned: 0, itemsChanged: 0, linksChecked: 0, drops: 0, errors: 0 };
+  const contexts = await listActiveTenantContexts(); // [] when SAAS_MODE is off
+  for (const ctx of contexts) {
+    try {
+      const r = await withTenant(ctx, () => runPriceScrape());
+      out.tenants += 1;
+      out.scanned += r.scanned;
+      out.itemsChanged += r.itemsChanged;
+      out.linksChecked += r.linksChecked;
+      out.drops += r.drops;
+      out.errors += r.errors;
+    } catch {
+      // A whole-workspace failure (unreachable DB, provisioning race): count it and move on
+      // so one broken tenant cannot starve the rest of the fleet of price updates.
+      out.tenantErrors += 1;
+    }
+  }
+  return out;
 }
 
 /**

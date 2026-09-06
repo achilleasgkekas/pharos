@@ -11,18 +11,22 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 // `parseTenantSlug`, `normalizeHost` and `baseDomain` run FOR REAL off process.env, so the
 // host→slug rules are pinned as wired here rather than echoed from a mock.
 
-const { connectDBMock, findOneMock } = vi.hoisted(() => ({
+const { connectDBMock, findOneMock, findMock } = vi.hoisted(() => ({
   connectDBMock: vi.fn(async () => {}),
   findOneMock: vi.fn((_filter: Record<string, unknown>) => ({
     lean: async () => null as Record<string, unknown> | null,
   })),
+  findMock: vi.fn((_filter: Record<string, unknown>) => ({
+    select: () => ({ lean: async () => [] as Array<Record<string, unknown>> }),
+  })),
 }));
 
 vi.mock('@/lib/db', () => ({ connectDB: connectDBMock }));
-vi.mock('@/models/Tenant', () => ({ Tenant: { findOne: findOneMock } }));
+vi.mock('@/models/Tenant', () => ({ Tenant: { findOne: findOneMock, find: findMock } }));
 
 import {
   getTenantContext,
+  listActiveTenantContexts,
   dbNameFor,
   scoped,
   DEFAULT_TENANT,
@@ -451,6 +455,56 @@ describe('scoped', () => {
 
   it('an empty filter still gets scoped', () => {
     expect(scoped({}, tenantCtx)).toEqual({ tenant: 'tid1' });
+  });
+});
+
+describe('listActiveTenantContexts', () => {
+  function wireFind(docs: Array<Record<string, unknown>>) {
+    findMock.mockImplementation(() => ({ select: () => ({ lean: async () => docs }) }));
+  }
+
+  it.each([undefined, '', 'off', 'false', '0'])(
+    'SAAS_MODE=%j returns [] with zero DB access (self-hosted has no registry to sweep)',
+    async (mode) => {
+      if (mode === undefined) delete process.env.SAAS_MODE;
+      else process.env.SAAS_MODE = mode;
+      wireFind([doc()]);
+
+      const list = await listActiveTenantContexts();
+
+      expect(list).toEqual([]);
+      expect(connectDBMock).not.toHaveBeenCalled();
+      expect(findMock).not.toHaveBeenCalled();
+    }
+  );
+
+  it('queries only trialing/active tenants, connecting first', async () => {
+    wireFind([]);
+
+    await listActiveTenantContexts();
+
+    expect(findMock).toHaveBeenCalledWith({ status: { $in: ['trialing', 'active'] } });
+    expect(connectDBMock.mock.invocationCallOrder[0]).toBeLessThan(findMock.mock.invocationCallOrder[0]);
+  });
+
+  it('maps every returned doc onto a non-default TenantContext ready for withTenant', async () => {
+    wireFind([
+      doc({ _id: 'tid1', slug: 'acme', dbName: 'pharos_acme', plan: 'shared', status: 'active', aiByoKey: true }),
+      doc({ _id: 'tid2', slug: 'globex', dbName: 'pharos_globex', plan: 'free', status: 'trialing', aiByoKey: false }),
+    ]);
+
+    const list = await listActiveTenantContexts();
+
+    expect(list).toEqual([
+      { tenantId: 'tid1', slug: 'acme', dbName: 'pharos_acme', plan: 'shared', status: 'active', isDefault: false, byoKey: true },
+      { tenantId: 'tid2', slug: 'globex', dbName: 'pharos_globex', plan: 'free', status: 'trialing', isDefault: false, byoKey: false },
+    ]);
+    expect(list.every((c) => c.isDefault === false)).toBe(true);
+  });
+
+  it('an empty registry is a clean empty list, not a throw', async () => {
+    wireFind([]);
+    await expect(listActiveTenantContexts()).resolves.toEqual([]);
   });
 });
 
