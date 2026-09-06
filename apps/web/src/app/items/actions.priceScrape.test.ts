@@ -20,6 +20,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const {
   connectDBMock,
   itemFind,
+  configFindLean,
   fetchPageTextMock,
   parseProductFromPageMock,
   isFeatureEnabledMock,
@@ -27,6 +28,7 @@ const {
 } = vi.hoisted(() => ({
   connectDBMock: vi.fn(async () => {}),
   itemFind: vi.fn(async (_q: Record<string, any>) => [] as Array<Record<string, any>>),
+  configFindLean: vi.fn(async () => ({ scraperEnabled: true, scraperMaxLinks: 0 }) as Record<string, any> | null),
   fetchPageTextMock: vi.fn(async (_url: string) => ({ url: '', title: '', jsonLd: '', text: '' })),
   parseProductFromPageMock: vi.fn(async () => ({ parsed: { title: '', store: '', price: 0, currency: 'EUR' }, raw: '', model: 'm' })),
   isFeatureEnabledMock: vi.fn(async () => true),
@@ -34,14 +36,16 @@ const {
 }));
 
 const itemModel = { find: itemFind };
+const configModel = { findOne: () => ({ select: () => ({ lean: configFindLean }) }) };
 
 vi.mock('@/models/Item', () => ({ Item: 'ITEM_MODEL_TOKEN' }));
+vi.mock('@/models/AppConfig', () => ({ AppConfig: 'APPCONFIG_TOKEN' }));
 vi.mock('@/models/Receipt', () => ({ Receipt: 'RECEIPT_MODEL_TOKEN' }));
 vi.mock('@/models/Statement', () => ({ Statement: 'STATEMENT_MODEL_TOKEN' }));
 vi.mock('@/models/Task', () => ({ Task: 'TASK_MODEL_TOKEN' }));
 vi.mock('@/lib/db', () => ({ connectDB: connectDBMock }));
 vi.mock('@/lib/tenancy/request', () => ({ withRequestTenant: async (fn: () => Promise<any>) => fn() }));
-vi.mock('@/lib/tenancy/connection', () => ({ currentModel: async () => itemModel }));
+vi.mock('@/lib/tenancy/connection', () => ({ currentModel: async (token: unknown) => (token === 'APPCONFIG_TOKEN' ? configModel : itemModel) }));
 vi.mock('@/lib/scrape', () => ({ fetchPageText: fetchPageTextMock }));
 vi.mock('@/lib/ollama', () => ({ parseProductFromPage: parseProductFromPageMock }));
 vi.mock('@/lib/aiFeatures.server', () => ({ isFeatureEnabled: isFeatureEnabledMock }));
@@ -76,6 +80,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   isFeatureEnabledMock.mockResolvedValue(true);
   itemFind.mockResolvedValue([]);
+  configFindLean.mockResolvedValue({ scraperEnabled: true, scraperMaxLinks: 0 }); // enabled, no cap
   fetchPageTextMock.mockResolvedValue({ url: 'https://shop.example/p', title: 'RTX 5080', jsonLd: '', text: 'RTX 5080 €900' });
 });
 
@@ -86,6 +91,24 @@ describe('runPriceScrape', () => {
     expect(r).toMatchObject({ ok: true, scanned: 0, skipped: 'product AI is off' });
     expect(connectDBMock).not.toHaveBeenCalled();
     expect(itemFind).not.toHaveBeenCalled();
+  });
+
+  it('skips when the scraper is disabled in settings (scraperEnabled=false)', async () => {
+    configFindLean.mockResolvedValue({ scraperEnabled: false, scraperMaxLinks: 0 });
+    itemFind.mockResolvedValue([makeItemDoc({ links: [{ label: 'Shop', url: 'https://shop.example/p', price: 900 }] })]);
+    const r = await runPriceScrape();
+    expect(r).toMatchObject({ ok: true, scanned: 0, skipped: 'scraper disabled' });
+    expect(itemFind).not.toHaveBeenCalled(); // bailed before querying items
+  });
+
+  it('stops at the per-run link cap (scraperMaxLinks)', async () => {
+    configFindLean.mockResolvedValue({ scraperEnabled: true, scraperMaxLinks: 2 });
+    const mk = (id: string) => makeItemDoc({ _id: id, links: [{ label: 'S', url: `https://shop.example/${id}`, price: 100 }] });
+    itemFind.mockResolvedValue([mk('a'), mk('b'), mk('c'), mk('d')]); // 4 items, 1 link each
+    parseProductFromPageMock.mockResolvedValue(parsedAt(90));
+    const r = await runPriceScrape();
+    expect(r.linksChecked).toBe(2); // stopped after 2, not 4
+    expect(r.scanned).toBeLessThanOrEqual(2);
   });
 
   it('only queries non-deleted items that have at least one link', async () => {

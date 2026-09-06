@@ -2,6 +2,7 @@
 import { cur } from "@/lib/money";
 import { connectDB } from '@/lib/db';
 import { Item as ItemModel } from '@/models/Item';
+import { AppConfig as AppConfigModel } from '@/models/AppConfig';
 import { Receipt as ReceiptModel } from '@/models/Receipt';
 import { Statement as StatementModel } from '@/models/Statement';
 import { Task as TaskModel } from '@/models/Task';
@@ -1963,6 +1964,13 @@ export async function runPriceScrape(): Promise<{
     if (!(await isFeatureEnabled('itemsImport'))) return { ...empty, skipped: 'product AI is off' };
     await connectDB();
     const Item = await currentModel(ItemModel);
+    // Scraper controls (Settings → Scraper AI): a kill switch + a per-run link cap. The cap
+    // bounds both AI cost per run and the IP-flagging risk of hammering many shops at once.
+    const ctl = (await (await currentModel(AppConfigModel)).findOne({ key: 'singleton' }).select('scraperEnabled scraperMaxLinks').lean()) as
+      | { scraperEnabled?: boolean; scraperMaxLinks?: number }
+      | null;
+    if (ctl?.scraperEnabled === false) return { ...empty, skipped: 'scraper disabled' };
+    const maxLinks = Math.max(0, Number(ctl?.scraperMaxLinks) || 0); // 0 = no cap
     const items = await Item.find({ deletedAt: null, 'links.0': { $exists: true } });
 
     let scanned = 0;
@@ -1972,11 +1980,13 @@ export async function runPriceScrape(): Promise<{
     let errors = 0;
 
     for (const item of items) {
+      if (maxLinks > 0 && linksChecked >= maxLinks) break; // per-run cap reached
       const links = (item.links ?? []).filter((l) => l.url && /^https?:\/\//i.test(l.url));
       if (links.length === 0) continue;
       scanned++;
       let anyChange = false;
       for (const link of links) {
+        if (maxLinks > 0 && linksChecked >= maxLinks) break;
         linksChecked++;
         const store = link.label || storeFromUrl(link.url!);
         const oldPrice = link.price ?? null;

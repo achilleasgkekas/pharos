@@ -958,14 +958,16 @@ export async function resetPrompt(key: string): Promise<{ ok: boolean }> {
 
 // ─── Scraper AI (separate provider/model from the main app) ───────────────────
 
-export type ScraperAiConfig = { provider: 'ollama' | 'anthropic'; model: string };
+export type ScraperAiConfig = { provider: 'ollama' | 'anthropic'; model: string; enabled: boolean; maxLinks: number };
 
 export async function getScraperAi(): Promise<ScraperAiConfig> {
   await connectDB();
-  const doc = await (await scoped(AppConfig)).findOne({ key: 'singleton' }).select('scraperProvider scraperModel').lean();
+  const doc = await (await scoped(AppConfig)).findOne({ key: 'singleton' }).select('scraperProvider scraperModel scraperEnabled scraperMaxLinks').lean();
   return {
     provider: doc?.scraperProvider === 'anthropic' ? 'anthropic' : 'ollama',
     model: doc?.scraperModel || '',
+    enabled: doc?.scraperEnabled !== false, // default ON for existing installs
+    maxLinks: Math.max(0, Number(doc?.scraperMaxLinks) || 0),
   };
 }
 
@@ -974,9 +976,11 @@ export async function saveScraperAi(formData: FormData): Promise<{ ok: boolean }
   await connectDB();
   const provider = String(formData.get('scraperProvider') || 'ollama') === 'anthropic' ? 'anthropic' : 'ollama';
   const model = String(formData.get('scraperModel') || '').trim();
+  const enabled = String(formData.get('scraperEnabled') || 'true') !== 'false';
+  const maxLinks = Math.max(0, Number(formData.get('scraperMaxLinks')) || 0);
   await (await scoped(AppConfig)).updateOne(
     { key: 'singleton' },
-    { $set: { scraperProvider: provider, scraperModel: model } },
+    { $set: { scraperProvider: provider, scraperModel: model, scraperEnabled: enabled, scraperMaxLinks: maxLinks } },
     { upsert: true }
   );
   revalidatePath('/settings');

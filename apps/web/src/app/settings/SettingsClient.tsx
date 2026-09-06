@@ -1057,6 +1057,8 @@ function ScraperAiSettings({ scraperAi, installed, hasAnthropicKey }: { scraperA
   const [pending, startTransition] = useTransition();
   const [provider, setProvider] = useState<'ollama' | 'anthropic'>(scraperAi.provider);
   const [model, setModel] = useState(scraperAi.model);
+  const [enabled, setEnabled] = useState(scraperAi.enabled);
+  const [maxLinks, setMaxLinks] = useState(scraperAi.maxLinks ? String(scraperAi.maxLinks) : '');
   const [msg, setMsg] = useState<string | null>(null);
   const installedNames = installed.map((m) => m.name);
 
@@ -1064,6 +1066,8 @@ function ScraperAiSettings({ scraperAi, installed, hasAnthropicKey }: { scraperA
     const fd = new FormData();
     fd.set('scraperProvider', provider);
     fd.set('scraperModel', model.trim());
+    fd.set('scraperEnabled', String(enabled));
+    fd.set('scraperMaxLinks', String(Number(maxLinks) || 0));
     setMsg(null);
     startTransition(async () => {
       await saveScraperAi(fd);
@@ -1135,6 +1139,39 @@ function ScraperAiSettings({ scraperAi, installed, hasAnthropicKey }: { scraperA
           </p>
         </div>
       )}
+
+      <div className="flex items-center justify-between gap-3 pt-2 border-t border-[color:var(--color-border)] mt-1">
+        <div className="min-w-0">
+          <p className="text-xs font-medium">{t('set.scraperEnabled')}</p>
+          <p className="text-[10px] text-[color:var(--color-text-faint)] mt-0.5">{t('set.scraperEnabledHint')}</p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={enabled}
+          onClick={() => setEnabled((v) => !v)}
+          className={cn(
+            'relative w-10 h-6 rounded-full transition-colors shrink-0',
+            enabled ? 'bg-[color:var(--color-accent)]' : 'bg-[color:var(--color-surface-3)] border border-[color:var(--color-border)]'
+          )}
+        >
+          <span className={cn('absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform', enabled && 'translate-x-4')} />
+        </button>
+      </div>
+      <Field label={t('set.scraperMaxLinks')}>
+        <input
+          type="number"
+          min="0"
+          step="1"
+          inputMode="numeric"
+          value={maxLinks}
+          onChange={(e) => setMaxLinks(e.target.value)}
+          placeholder="0"
+          className={inputClass}
+          style={{ fontFamily: 'var(--font-mono)' }}
+        />
+        <p className="text-[10px] text-[color:var(--color-text-faint)] mt-1">{t('set.scraperMaxLinksHint')}</p>
+      </Field>
 
       <div className="flex items-center gap-3 pt-2 border-t border-[color:var(--color-border)] mt-1">
         <button type="button" onClick={save} disabled={pending} className={saveBtn}>

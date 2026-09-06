@@ -123,6 +123,10 @@ const AppConfigSchema = new Schema(
     // ── Scraper AI (separate from the main AI) ──
     scraperProvider: { type: String, enum: ['ollama', 'anthropic'], default: 'ollama' },
     scraperModel: { type: String, default: '' }, // '' → OLLAMA_MODEL env / qwen2.5:14b
+    // Kill switch + per-run link cap for the 6h/daily price scraper (lib/aiBudget-gated for
+    // cost; the cap also bounds IP-flagging from hitting many shops in one pass). 0 = no cap.
+    scraperEnabled: { type: Boolean, default: true },
+    scraperMaxLinks: { type: Number, default: 0 },
 
     // ── File storage (PDFs/images) ──
     // Local is ALWAYS the working copy (serving, thumbnails, AI). A remote backend is
