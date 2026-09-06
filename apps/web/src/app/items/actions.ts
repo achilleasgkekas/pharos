@@ -10,6 +10,7 @@ import { withRequestTenant } from '@/lib/tenancy/request';
 import { currentModel } from '@/lib/tenancy/connection';
 import { fetchPageText } from '@/lib/scrape';
 import { parseProductFromPage } from '@/lib/ollama';
+import { getParsedProductForUrl } from '@/lib/scrapedPriceCache';
 import { isFeatureEnabled } from '@/lib/aiFeatures.server';
 import { searchWeb, searchImages } from '@/lib/search';
 import { type ItemView } from '@/lib/itemStatus';
@@ -1766,8 +1767,7 @@ export async function searchItemPriceCandidates(
   const candidates: PriceCandidate[] = [];
   for (const url of urls) {
     try {
-      const page = await fetchPageText(url);
-      const parsed = (await parseProductFromPage(page)).parsed;
+      const { parsed, pageTitle } = await getParsedProductForUrl(url); // shared cache: scrape each URL once/TTL
       if (!productMatchesItem(item.title, parsed)) continue; // unrelated search hit
       candidates.push({
         store: parsed.store || storeFromUrl(url),
@@ -1775,7 +1775,7 @@ export async function searchItemPriceCandidates(
         price: parsed.price > 0 ? parsed.price : 0,
         currency: parsed.currency || 'EUR',
         inStock: true,
-        title: parsed.title || page.title || '',
+        title: parsed.title || pageTitle || '',
         alreadyLinked: linked.has(normUrl(url)),
       });
     } catch (err) {
@@ -1880,8 +1880,7 @@ export async function refreshItemPrices(
     const store = link.label || storeFromUrl(link.url!);
     const oldPrice = link.price ?? null;
     try {
-      const page = await fetchPageText(link.url!);
-      const parsed = (await parseProductFromPage(page)).parsed;
+      const parsed = (await getParsedProductForUrl(link.url!)).parsed; // shared cache: scrape each URL once/TTL
       if (!productMatchesItem(item.title, parsed)) {
         results.push({ store, url: link.url!, oldPrice, newPrice: oldPrice, changed: 'error', error: 'Page no longer matches this product' });
         continue;
@@ -1991,8 +1990,7 @@ export async function runPriceScrape(): Promise<{
         const store = link.label || storeFromUrl(link.url!);
         const oldPrice = link.price ?? null;
         try {
-          const page = await fetchPageText(link.url!);
-          const parsed = (await parseProductFromPage(page)).parsed;
+          const parsed = (await getParsedProductForUrl(link.url!)).parsed; // shared cache: scrape each URL once/TTL
           if (!productMatchesItem(item.title, parsed)) {
             errors++;
             continue; // page drifted to an unrelated product — keep the old price

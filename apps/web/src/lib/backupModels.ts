@@ -91,4 +91,6 @@ export const BACKUP_EXCLUDED: Record<string, string> = {
   Conversation:
     'AI command-bar chat log (/history). User-visible but large and regenerable; the backup stays a data-recovery file rather than a log archive.',
   Phase: 'Legacy setup-phases model from the original tracker import; no UI imports it any more.',
+  ScrapedPrice:
+    'Global scraped-price cache (shared, not per-tenant); pure derived data that regenerates on the next scrape, and per-tenant restore does not apply to it.',
 };

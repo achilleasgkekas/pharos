@@ -48,6 +48,15 @@ vi.mock('@/lib/tenancy/request', () => ({ withRequestTenant: async (fn: () => Pr
 vi.mock('@/lib/tenancy/connection', () => ({ currentModel: async (token: unknown) => (token === 'APPCONFIG_TOKEN' ? configModel : itemModel) }));
 vi.mock('@/lib/scrape', () => ({ fetchPageText: fetchPageTextMock }));
 vi.mock('@/lib/ollama', () => ({ parseProductFromPage: parseProductFromPageMock }));
+// runPriceScrape now scrapes via the shared cache; delegate it to the same fetch/parse mocks
+// so these tests still drive fetch behaviour (error isolation, cap) without a real DB.
+vi.mock('@/lib/scrapedPriceCache', () => ({
+  getParsedProductForUrl: async (url: string) => {
+    const page = await fetchPageTextMock(url);
+    const { parsed } = await parseProductFromPageMock();
+    return { parsed, pageTitle: (page as { title?: string })?.title ?? '', cached: false };
+  },
+}));
 vi.mock('@/lib/aiFeatures.server', () => ({ isFeatureEnabled: isFeatureEnabledMock }));
 vi.mock('@/lib/search', () => ({ searchWeb: vi.fn(), searchImages: vi.fn() }));
 vi.mock('@/lib/storage', () => ({ saveFile: vi.fn(), deleteFile: vi.fn() }));

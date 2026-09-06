@@ -80,6 +80,15 @@ vi.mock('@/models/Statement', () => ({ Statement: {} }));
 vi.mock('@/models/Task', () => ({ Task: {} }));
 vi.mock('@/lib/scrape', () => ({ fetchPageText: fetchPageTextMock }));
 vi.mock('@/lib/ollama', () => ({ parseProductFromPage: parseProductFromPageMock }));
+// The price paths now go through the shared cache; delegate it to the same fetch/parse mocks so
+// these tests keep exercising the item logic (call counts, error handling) without a real DB.
+vi.mock('@/lib/scrapedPriceCache', () => ({
+  getParsedProductForUrl: async (url: string) => {
+    const page = await fetchPageTextMock(url);
+    const { parsed } = await parseProductFromPageMock(page);
+    return { parsed, pageTitle: (page as { title?: string })?.title ?? '', cached: false };
+  },
+}));
 vi.mock('@/lib/aiFeatures.server', () => ({ isFeatureEnabled: isFeatureEnabledMock }));
 vi.mock('@/lib/search', () => ({ searchWeb: searchWebMock, searchImages: vi.fn() }));
 vi.mock('@/lib/storage', () => ({ saveFile: vi.fn(), deleteFile: vi.fn() }));
