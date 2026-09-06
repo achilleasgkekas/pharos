@@ -4,7 +4,9 @@ import { Job } from '@/models/Job';
 import { ensureProcessor } from '@/lib/jobRunner';
 import { getAiConfig } from '@/lib/aiConfig';
 import { isFeatureEnabled } from '@/lib/aiFeatures.server';
-import { AppConfig } from '@/models/AppConfig';
+import { AppConfig as AppConfigModel } from '@/models/AppConfig';
+import { withRequestTenant } from '@/lib/tenancy/request';
+import { currentModel } from '@/lib/tenancy/connection';
 import { getSyncManifest } from './settings/actions';
 import { assertCanWrite } from '@/lib/auth';
 
@@ -12,15 +14,23 @@ import { assertCanWrite } from '@/lib/auth';
  *  (so the client can show a rough cost estimate before starting a paid job). */
 export async function getBulkAiGuard(): Promise<{ confirm: boolean; provider: string; model: string }> {
   await connectDB();
-  const [cfg, doc] = await Promise.all([
-    getAiConfig(),
-    AppConfig.findOne({ key: 'singleton' }).select('aiConfirmBulk').lean(),
-  ]);
-  return {
-    confirm: doc?.aiConfirmBulk !== false, // default ON
-    provider: cfg.provider,
-    model: cfg.provider === 'anthropic' ? cfg.anthropicModel : cfg.ollamaModel,
-  };
+  // Both halves must answer for the SAME workspace: the toggle lives in this tenant's
+  // AppConfig, and getAiConfig() reads whatever tenant is ambient. Outside a wrap the
+  // ambient tenant is the DEFAULT one, so in SaaS every workspace was shown the default
+  // workspace's confirm toggle and provider/model, i.e. someone else's cost estimate.
+  // Self-hosted is unchanged: with no tenant established currentModel(X) is X.
+  return withRequestTenant(async () => {
+    const AppConfig = await currentModel(AppConfigModel);
+    const [cfg, doc] = await Promise.all([
+      getAiConfig(),
+      AppConfig.findOne({ key: 'singleton' }).select('aiConfirmBulk').lean(),
+    ]);
+    return {
+      confirm: doc?.aiConfirmBulk !== false, // default ON
+      provider: cfg.provider,
+      model: cfg.provider === 'anthropic' ? cfg.anthropicModel : cfg.ollamaModel,
+    };
+  });
 }
 
 export type SerializedJob = {

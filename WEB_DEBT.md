@@ -243,7 +243,51 @@
   - **Το μόνο ασφαλές μικρό κομμάτι** που μπορεί να φύγει ξεχωριστά: το `getBulkAiGuard`
     (`AppConfig.findOne` → `currentModel`), γιατί το AppConfig είναι ρητά per-tenant και δεν το
     αγγίζει worker.
-- Status: TODO (μπλοκαρισμένο στην ανοιχτή ερώτηση)
+- Status: **ΜΕΡΙΚΩΣ** — το ασφαλές μικρό κομμάτι (`getBulkAiGuard`) **DONE 2026-09-06** (pharos-brain,
+  βλ. item παρακάτω). Η ίδια η ουρά (`Job.*` σε `jobActions.ts`, `settings/healthActions.ts`,
+  `lib/jobRunner.ts`) μένει **TODO, μπλοκαρισμένη στην ανοιχτή ερώτηση**.
+
+### `getBulkAiGuard` έδειχνε το confirm toggle και το μοντέλο ΑΛΛΟΥ workspace πριν από πληρωμένο job
+- Priority: P2
+- Size: S
+- Area: db
+- Files: apps/web/src/app/jobActions.ts
+- Depends on: none (το κομμάτι της ουράς που ΔΕΝ αγγίζει τον worker)
+- Acceptance:
+  - **Το πρόβλημα**: το `getBulkAiGuard()` είναι αυτό που ρωτά η σελίδα `/jobs` πριν ξεκινήσει
+    **πληρωμένο** bulk AI run: «να ζητήσω επιβεβαίωση;» και «ποιος provider/model θα χρεωθεί;».
+    **Και τα δύο μισά** απαντούσαν από τη DEFAULT βάση: το `aiConfirmBulk` ερχόταν από direct
+    `AppConfig.findOne`, και το `getAiConfig()` διαβάζει το ambient tenant, που **εκτός wrap είναι
+    ο default**. Άρα ένα workspace που είχε επίτηδες ανοίξει την επιβεβαίωση μπορούσε να δει το
+    OFF κάποιου άλλου, και η εκτίμηση κόστους ονόμαζε μοντέλο που δεν επρόκειτο να χρησιμοποιηθεί.
+  - **Γιατί ξεχωρίζει από την υπόλοιπη ουρά**: το `AppConfig` είναι ρητά per-tenant και **δεν το
+    αγγίζει ο worker**, οπότε ένα `withRequestTenant` + `currentModel` εδώ δεν ρισκάρει να
+    σταματήσουν σιωπηλά τα jobs. Κανένα `Job.*` δεν άλλαξε.
+  - Επαλήθευση: `grep -c "withRequestTenant\|currentModel" apps/web/src/app/jobActions.ts` >= 3 ·
+    npm run type-check exits 0.
+- Status: DONE 2026-09-06 (pharos-brain). Το σώμα του `getBulkAiGuard` μπήκε σε ένα
+  `withRequestTenant`, με το `AppConfig` να resolve-άρει με `currentModel` μέσα σε αυτό, ώστε το
+  `getAiConfig()` του ίδιου `Promise.all` να δει το **ίδιο** tenant. Το `connectDB()` έμεινε έξω.
+  Νέο `jobActions.tenant.test.ts` (4 tests) με per-tenant tagged AppConfig **και** per-tenant
+  `getAiConfig` mock, ώστε να φαίνεται αν άνοιξε το wrap και όχι μόνο αν άλλαξε το model binding:
+  «το toggle είναι του καλούντος», «το model είναι αυτό που θα χρεωθεί», «δύο workspaces δεν
+  μπερδεύονται», self-hosted parity χωρίς tenant. **Negative control πρώτα, όχι ισχυρισμός**:
+  επαναφορά του direct model έριξε **4/4**. Ο υπάρχων `jobActions.test.ts` (34 tests) πήρε τα δύο
+  γνωστά flat seams και έμεινε πράσινος.
+
+### `lib/subscriptionRenewal.test.ts:93` timezone-fragile (ΟΧΙ tenancy)
+- Priority: P3
+- Size: XS
+- Area: web
+- Files: apps/web/src/lib/subscriptionRenewal.test.ts
+- Depends on: none
+- Acceptance: full `npx vitest run` χωρίς κανένα fail σε μηχάνημα εκτός UTC.
+- Status: DONE 2026-09-06 (pharos-brain). Το test συνέκρινε το ISO ενός **hardcoded UTC**
+  input (`'2026-08-03T00:00:00.000Z'`) με **local** `new Date(2026, 9, 3).toISOString()`. Το roll
+  βηματίζει ολόκληρους μήνες με `setMonth`, δηλαδή κρατά την τοπική ώρα, οπότε τα δύο μισά έδεναν
+  μόνο σε μηχάνημα UTC. Το input χτίζεται πλέον κι αυτό τοπικά (`new Date(2026, 7, 3).toISOString()`,
+  ακόμα ISO string, ο σκοπός του test μένει), άρα και τα δύο μισά μετακινούνται μαζί. Η σουίτα
+  ξαναείναι **426/426 αρχεία, 6851 passed, 4 skipped, ΜΗΔΕΝ fail**.
 
 ## Web Debt Queue — ενεργά items (σάρωση 2026-09-05, pharos-brain)
 

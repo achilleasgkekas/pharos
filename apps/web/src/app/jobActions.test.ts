@@ -4,11 +4,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 // three "enqueue" actions that create a Job document and kick the in-process worker
 // (lib/jobRunner, mocked entirely here — its actual loop has no test coverage in this
 // file), the read actions that power the /jobs page and the cross-device polling widget,
-// and dismissJob/isJobRunning. Never directly unit-tested before. Unlike most other
-// action modules in this repo, jobActions.ts talks to the Job model directly (no
-// tenancy wrapper, no withRequestTenant/currentModel seam — matches what's actually
-// imported at the top of the file), so the mock shape mirrors the simpler
-// vouchers/loyaltyActions.test.ts pattern rather than the tenancy-wrapped ones.
+// and dismissJob/isJobRunning. Never directly unit-tested before. jobActions.ts still
+// talks to the Job model directly (the queue has no tenancy yet — that is the open
+// architectural question in ASK_ACHILLEAS.md), so the mock shape mirrors the simpler
+// vouchers/loyaltyActions.test.ts pattern. The one exception is getBulkAiGuard, which
+// now goes through withRequestTenant/currentModel; both seams are mocked flat below,
+// and jobActions.tenant.test.ts is what actually pins the per-workspace behaviour.
 //
 // Behaviour pinned:
 //  - getBulkAiGuard: no write-gate (read-only); confirm defaults ON (true) unless the
@@ -94,6 +95,11 @@ vi.mock('@/models/AppConfig', () => ({
     }),
   },
 }));
+// getBulkAiGuard is the only tenancy-wrapped action in this file. Flat seams here (the
+// real wrapper reads request headers, which a unit test has none of); the per-workspace
+// property lives in jobActions.tenant.test.ts.
+vi.mock('@/lib/tenancy/request', () => ({ withRequestTenant: async (fn: () => Promise<unknown>) => fn() }));
+vi.mock('@/lib/tenancy/connection', () => ({ currentModel: async (m: unknown) => m }));
 vi.mock('./settings/actions', () => ({ getSyncManifest: getSyncManifestMock }));
 vi.mock('@/lib/auth', () => ({ assertCanWrite: assertCanWriteMock }));
 
