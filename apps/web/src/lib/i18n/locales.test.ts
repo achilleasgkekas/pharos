@@ -10,13 +10,14 @@ import { nl } from './locales/nl';
 import { LOCALE_CODES } from './config';
 import { resolveDict } from './index';
 
-// The translation dictionaries are pure data. English is the source of truth (it
-// defines every key); the other locales are Partial<Dict> and fall back to English
-// for anything they omit. These tests guard the two failure modes the type system
-// does NOT catch at runtime: a stale/renamed key lingering in a translation (which
-// would silently never be used), and empty/whitespace values (which would render
-// blank instead of falling back). We deliberately do NOT assert full coverage —
-// partial translations are intentional and English fills the gaps.
+// The translation dictionaries are pure data. English is the source of truth (it defines
+// every key); the other locales are Partial<Dict>. The English fallback in resolveDict is a
+// runtime SAFETY NET so a half-finished translation never renders blank — it is NOT a licence
+// to let locales drift. POLICY (enforced below, 2026-09): every locale must define EVERY
+// English key. This test fails on any gap, so a feature that adds English strings cannot merge
+// until the seven locales are filled too — the drift that repeatedly left the UI half-English
+// (it went unnoticed precisely because the fallback hid it) is now a red build, not a surprise.
+// The guards also catch a stale/renamed key lingering in a translation and empty values.
 
 const TRANSLATIONS: Record<string, Partial<Dict>> = {
   el,
@@ -49,6 +50,15 @@ describe.each(Object.entries(TRANSLATIONS))('%s dictionary', (code, dict) => {
     for (const key of Object.keys(dict)) {
       expect(EN_KEYS.has(key), `${code}: stale/renamed key "${key}" not in en.ts`).toBe(true);
     }
+  });
+
+  it('translates EVERY English key (no drift — fallback is a safety net, not a license to drift)', () => {
+    const missing = [...EN_KEYS].filter((key) => !(key in dict));
+    expect(
+      missing,
+      `${code}.ts is missing ${missing.length} key(s): ${missing.slice(0, 12).join(', ')}${missing.length > 12 ? ' …' : ''}. ` +
+        `Fill them in src/lib/i18n/locales/${code}.ts — English fallback hides the gap in the UI but this build stays red until every key is translated.`,
+    ).toEqual([]);
   });
 
   it('has no empty or whitespace-only values', () => {
