@@ -190,11 +190,10 @@ function UserMenu({ user, saas, operator, base }: { user: SessionUser; saas: boo
                   live: "it gets me to the main page". /account/workspace is the real overview,
                   and it carries its own workspace switcher when there is more than one, so the
                   chooser is still one click away. */}
+              {/* One entry to the workspace; Billing is a tab inside it (workspaceTabs), so a
+                  second top-level Billing shortcut here was just the same destination twice. */}
               <Link href="/account/workspace" prefetch={false} onClick={() => setOpen(false)} className={menuRow}>
                 <Building2 size={15} /> {t('nav.workspaces')}
-              </Link>
-              <Link href="/account/workspace/billing" prefetch={false} onClick={() => setOpen(false)} className={menuRow}>
-                <CreditCard size={15} /> {t('nav.billing')}
               </Link>
               {/* Operator console. Only rendered for an account on the superadmin allowlist,
                   and the page re-checks that itself — this link is convenience, not the gate.
