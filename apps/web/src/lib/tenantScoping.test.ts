@@ -1,0 +1,95 @@
+import { describe, it, expect } from 'vitest';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { join, relative } from 'node:path';
+import {
+  SCOPING_EXEMPT_FILES,
+  SCOPING_IDIOMS,
+  MODEL_ACCESS_METHODS,
+} from './tenantScoping';
+
+// GUARD: no file may touch a Mongoose model on the ambient/base connection without a
+// tenant-scoping idiom unless it is explicitly exempted in tenantScoping.ts WITH a reason.
+//
+// In SaaS mode each workspace has its own database; a model accessed without one of the
+// scoping idioms reads/writes the base registry DB instead of the tenant's — a silent
+// cross-tenant leak or no-op that only surfaces under real multi-tenant traffic. This test
+// walks src, finds every file that (a) imports a model, (b) calls a collection method, and
+// (c) has NO scoping idiom, and requires each to be in SCOPING_EXEMPT_FILES. Adding an
+// unscoped-model-access file therefore fails the suite until someone records WHY it may
+// skip scoping (control plane / pre-tenant identity / global-by-design).
+//
+// Read-only audit on 2026-09-06: this reflects the real tree — every current hit is one of
+// the three legitimate reasons; no genuine tenant-scoping bypass was found.
+
+const srcDir = fileURLToPath(new URL('..', import.meta.url)); // apps/web/src
+
+function walk(dir: string): string[] {
+  const out: string[] = [];
+  for (const name of readdirSync(dir)) {
+    if (name === 'node_modules' || name === '.next') continue;
+    const p = join(dir, name);
+    if (statSync(p).isDirectory()) out.push(...walk(p));
+    else if (name.endsWith('.ts') && !name.endsWith('.test.ts') && !name.endsWith('.d.ts')) out.push(p);
+  }
+  return out;
+}
+
+const methodCall = new RegExp(`\\.(${MODEL_ACCESS_METHODS.join('|')})\\(`);
+
+/** Files that touch a model collection method with no scoping idiom anywhere in the file. */
+function findUnscopedModelFiles(): string[] {
+  const hits: string[] = [];
+  for (const file of walk(srcDir)) {
+    const src = readFileSync(file, 'utf8');
+    if (!src.includes("from '@/models/")) continue;
+    if (!methodCall.test(src)) continue;
+    if (SCOPING_IDIOMS.some((idiom) => src.includes(idiom))) continue;
+    hits.push(relative(srcDir, file).split('\\').join('/'));
+  }
+  return hits.sort();
+}
+
+describe('tenant-scoping guard', () => {
+  it('finds source files (guards against the walk silently matching nothing)', () => {
+    const all = walk(srcDir);
+    expect(all.length).toBeGreaterThan(100);
+  });
+
+  it('every file that touches a model without a scoping idiom is explicitly exempted with a reason', () => {
+    const undecided = findUnscopedModelFiles().filter((f) => !(f in SCOPING_EXEMPT_FILES));
+    // If this fails you added a file that reads/writes a model on the base connection.
+    // Route it through a tenant-scoping idiom (currentModel / tenantModel / withRequestTenant),
+    // OR — only if it is SaaS control plane, pre-tenant/User identity, or global-by-design —
+    // add it to SCOPING_EXEMPT_FILES in tenantScoping.ts with the reason.
+    expect(undecided).toEqual([]);
+  });
+
+  it('has no exempt entry for a file that no longer bypasses scoping (stale allowlist)', () => {
+    const actual = new Set(findUnscopedModelFiles());
+    const stale = Object.keys(SCOPING_EXEMPT_FILES).filter((f) => !actual.has(f));
+    // If this fails, a listed file was deleted or now scopes properly — remove it from the
+    // allowlist so the list keeps meaning "these and only these skip scoping on purpose".
+    expect(stale).toEqual([]);
+  });
+
+  it('gives every exemption a non-empty reason', () => {
+    for (const [file, reason] of Object.entries(SCOPING_EXEMPT_FILES)) {
+      expect(reason.length, `${file} needs a reason`).toBeGreaterThan(20);
+    }
+  });
+
+  it('keeps the tenant-data actions OUT of the allowlist (they must scope)', () => {
+    // These handle per-workspace data and are known to use currentModel(); if one ever
+    // appears in the exempt list it means it stopped scoping — that is the regression.
+    for (const f of [
+      'app/items/actions.ts',
+      'app/receipts/actions.ts',
+      'app/tasks/actions.ts',
+      'app/expenses/actions.ts',
+      'app/settings/actions.ts',
+    ]) {
+      expect(Object.keys(SCOPING_EXEMPT_FILES)).not.toContain(f);
+    }
+  });
+});
