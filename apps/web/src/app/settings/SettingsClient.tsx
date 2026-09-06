@@ -3271,7 +3271,7 @@ function StoreRow({ store }: { store: StoreLite }) {
       <button onClick={() => setEditing(true)} className="text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)] shrink-0" aria-label="Edit">
         <Pencil size={12} />
       </button>
-      <button onClick={del} disabled={pending} className="text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] opacity-0 group-hover:opacity-100 transition-all shrink-0" aria-label="Delete">
+      <button onClick={del} disabled={pending} className="text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-all shrink-0" aria-label="Delete">
         <Trash2 size={12} />
       </button>
     </div>

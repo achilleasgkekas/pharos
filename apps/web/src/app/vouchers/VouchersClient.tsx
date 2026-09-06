@@ -266,7 +266,7 @@ function VoucherCard({ voucher, onEdit }: { voucher: SerializedVoucher; onEdit: 
             <ExternalLink size={13} />
           </a>
         )}
-        <button onClick={handleDelete} disabled={pending} className="ml-auto p-1.5 rounded-md text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] opacity-0 group-hover:opacity-100 transition-all" aria-label="Delete">
+        <button onClick={handleDelete} disabled={pending} className="ml-auto p-1.5 rounded-md text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-all" aria-label="Delete">
           <Trash2 size={13} />
         </button>
       </div>

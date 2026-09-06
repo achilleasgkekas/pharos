@@ -501,7 +501,7 @@ function Card({ it, color, selectMode, selected, onSelect, onToggle, onRemove }:
         <Meta it={it} />
       </div>
       {!selectMode && (
-        <button onClick={(e) => { e.stopPropagation(); onRemove(); }} className="shrink-0 p-1.5 text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity" aria-label="remove">
+        <button onClick={(e) => { e.stopPropagation(); onRemove(); }} className="shrink-0 p-1.5 text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 focus:opacity-100 transition-opacity" aria-label="remove">
           <Trash2 size={14} />
         </button>
       )}
@@ -537,7 +537,7 @@ function Row({ it, color, selectMode, selected, onSelect, onToggle, onRemove }: 
         )}
       </div>
       {!selectMode && (
-        <button onClick={(e) => { e.stopPropagation(); onRemove(); }} className="shrink-0 p-1.5 text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity" aria-label="remove">
+        <button onClick={(e) => { e.stopPropagation(); onRemove(); }} className="shrink-0 p-1.5 text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 focus:opacity-100 transition-opacity" aria-label="remove">
           <Trash2 size={15} />
         </button>
       )}

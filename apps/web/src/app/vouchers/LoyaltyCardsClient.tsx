@@ -122,7 +122,7 @@ function LoyaltyCardTile({ card, onView, onEdit }: { card: SerializedLoyaltyCard
           e.stopPropagation();
           onEdit();
         }}
-        className="absolute top-2 right-2 p-1.5 rounded-md text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface-2)] opacity-0 group-hover:opacity-100 transition-opacity"
+        className="absolute top-2 right-2 p-1.5 rounded-md text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface-2)] opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity"
         aria-label="Edit card"
         title="Edit"
       >

@@ -517,7 +517,7 @@ function SubCard({ sub, base, onEdit }: { sub: SerializedSubscription; base: str
         <button
           onClick={handleDelete}
           disabled={pending}
-          className="ml-auto p-1.5 rounded-md text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] hover:bg-[color:var(--color-surface-2)] transition-colors opacity-0 group-hover:opacity-100"
+          className="ml-auto p-1.5 rounded-md text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] hover:bg-[color:var(--color-surface-2)] transition-colors opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100"
           aria-label={t('common.delete')}
         >
           <Trash2 size={13} />

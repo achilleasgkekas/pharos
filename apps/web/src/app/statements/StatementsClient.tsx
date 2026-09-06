@@ -1072,7 +1072,7 @@ function TransactionRow({
         <button
           onClick={onDelete}
           disabled={pending}
-          className="shrink-0 opacity-0 group-hover:opacity-100 text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] transition-all"
+          className="shrink-0 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] transition-all"
         >
           <X size={12} />
         </button>

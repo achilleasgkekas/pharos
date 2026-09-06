@@ -132,10 +132,10 @@ export function ItemPhotoGallery({ itemId, photos: initialPhotos, canFetch }: { 
 
         {photos.length > 1 && (
           <>
-            <button type="button" onClick={() => setActive((a) => (a - 1 + photos.length) % photos.length)} className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+            <button type="button" onClick={() => setActive((a) => (a - 1 + photos.length) % photos.length)} className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity">
               <ChevronLeft size={16} />
             </button>
-            <button type="button" onClick={() => setActive((a) => (a + 1) % photos.length)} className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+            <button type="button" onClick={() => setActive((a) => (a + 1) % photos.length)} className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity">
               <ChevronRight size={16} />
             </button>
             <span className="absolute bottom-2 right-2 text-[10px] px-1.5 py-0.5 rounded bg-black/60 text-white" style={{ fontFamily: 'var(--font-mono)' }}>
@@ -145,7 +145,7 @@ export function ItemPhotoGallery({ itemId, photos: initialPhotos, canFetch }: { 
         )}
 
         {/* Per-photo actions */}
-        <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity">
           {active !== 0 && (
             <button type="button" title={t('it.setCover')} onClick={() => startTransition(async () => { const r = await setItemCover(itemId, hero); setPhotos(r.photos); setActive(0); })} disabled={pending} className="w-7 h-7 rounded-full bg-black/55 text-white flex items-center justify-center hover:bg-black/75">
               <Star size={13} />

@@ -244,7 +244,7 @@ export function NotificationBell({ open, onOpenChange }: { open: boolean; onOpen
                     </span>
                     <button
                       onClick={(e) => dismiss(e, n)}
-                      className="shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] transition-all"
+                      className="shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] transition-all"
                       aria-label={t('notif.clearAll')}
                     >
                       <X size={13} />

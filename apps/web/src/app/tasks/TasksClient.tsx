@@ -431,7 +431,7 @@ function TaskCard({
         <button
           onClick={() => onDelete(task._id)}
           title={t('common.delete')}
-          className="p-1 rounded opacity-0 group-hover:opacity-100 text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] transition-all"
+          className="p-1 rounded opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] transition-all"
         >
           <Trash2 size={13} />
         </button>
@@ -573,7 +573,7 @@ function TaskRow({ task, onOpen }: { task: SerializedTask; onOpen: () => void })
       <button
         onClick={handleDelete}
         disabled={pending}
-        className="shrink-0 opacity-0 group-hover:opacity-100 text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] transition-all disabled:opacity-30"
+        className="shrink-0 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] transition-all disabled:opacity-30"
         aria-label={t('common.delete')}
       >
         <Trash2 size={14} />
@@ -671,7 +671,7 @@ function TaskDetailModal({ task, onClose }: { task: SerializedTask; onClose: () 
                   {step.done ? <CheckCircle2 size={16} className="text-[color:var(--color-accent)]" /> : <Circle size={16} className="text-[color:var(--color-text-faint)]" />}
                 </button>
                 <span className={cn('flex-1 text-sm', step.done && 'line-through text-[color:var(--color-text-faint)]')}>{step.text}</span>
-                <button onClick={() => startTransition(() => deleteStep(task._id, step._id))} className="shrink-0 opacity-0 group-hover:opacity-100 text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)]">
+                <button onClick={() => startTransition(() => deleteStep(task._id, step._id))} className="shrink-0 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)]">
                   <X size={13} />
                 </button>
               </div>
