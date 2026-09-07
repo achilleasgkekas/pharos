@@ -5,7 +5,7 @@ import { iso } from '@/lib/apiList';
 export type ReceiptLean = {
   _id: unknown; store: string; date?: Date; total?: number; subtotal?: number; vatAmount?: number;
   currency?: string; origAmount?: number; fxRate?: number;
-  paymentMethod?: string; warrantyMonths?: number; verified?: boolean; archived?: boolean;
+  paymentMethod?: string; warrantyMonths?: number; space?: string; verified?: boolean; archived?: boolean;
   lineItems?: unknown[]; filePath?: string; thumbPath?: string; updatedAt?: Date; deletedAt?: Date | null;
 };
 
@@ -47,6 +47,7 @@ export function trimReceipt(r: ReceiptLean, returnDaysLeft?: number) {
     fxRate: r.fxRate ?? 0,
     paymentMethod: r.paymentMethod ?? '',
     warrantyMonths: r.warrantyMonths ?? 0,
+    space: r.space ?? '', // P68: per-property ledger tag; '' = unassigned
     itemCount: r.lineItems?.length ?? 0,
     verified: !!r.verified,
     archived: !!r.archived,

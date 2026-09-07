@@ -69,6 +69,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       if (b[k] != null && Number.isFinite(Number(b[k]))) set[k] = Number(b[k]);
     }
     if (typeof b.paymentMethod === 'string') set.paymentMethod = b.paymentMethod;
+    if (typeof b.space === 'string') set.space = b.space.trim().slice(0, 40); // P68: per-property ledger tag
     if (typeof b.notes === 'string') set.notes = b.notes;
     if (typeof b.verified === 'boolean') set.verified = b.verified;
     if (typeof b.archived === 'boolean') set.archived = b.archived;

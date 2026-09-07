@@ -66,6 +66,7 @@ export function ReceiptsClient({
   ollamaUp,
   storeNames,
   categories,
+  spaces,
   emailInboxCount,
   baseCurrency,
   multiCurrency,
@@ -75,6 +76,7 @@ export function ReceiptsClient({
   ollamaUp: boolean;
   storeNames: string[];
   categories: string[]; // P64: expense taxonomy, for the per-line category picker
+  spaces: string[]; // P68: per-property ledger tags (AppConfig.spaces), same list the Expenses form uses
   emailInboxCount: number;
   baseCurrency: string;
   multiCurrency: boolean;
@@ -242,6 +244,7 @@ export function ReceiptsClient({
           r.store,
           r.notes,
           r.paymentMethod,
+          r.space, // P68: "Kalamos" finds every receipt tagged to the summer house
           r.total,
           (r.date || '').slice(0, 10),
           (r.lineItems ?? []).map((l) => haystack(l.name, l.refinedName, l.category))
@@ -635,7 +638,7 @@ export function ReceiptsClient({
 
       {/* Detail modal */}
       {selected && (
-        <ReceiptDetailModal receipt={selected} cards={cards} storeNames={storeNames} categories={categories} fx={fx} onClose={() => setSelected(null)} />
+        <ReceiptDetailModal receipt={selected} cards={cards} storeNames={storeNames} categories={categories} spaces={spaces} fx={fx} onClose={() => setSelected(null)} />
       )}
 
       {/* Duplicate finder + merge */}
@@ -854,6 +857,7 @@ type EditState = {
   currency: string;
   fxRate: string;
   paymentMethod: string;
+  space: string; // P68: per-property ledger tag for the whole receipt
   notes: string;
   // `price` = unit NET (excl. VAT, the stored value). `grossStr` = the line GROSS
   // (qty × net × (1+rate)), kept as its own editable string so the user can type
@@ -938,6 +942,7 @@ function ReceiptDetailModal({
   cards,
   storeNames,
   categories,
+  spaces,
   fx,
   onClose,
 }: {
@@ -945,6 +950,7 @@ function ReceiptDetailModal({
   cards: SerializedCard[];
   storeNames: string[];
   categories: string[];
+  spaces: string[];
   fx: FxCtx;
   onClose: () => void;
 }) {
@@ -974,6 +980,7 @@ function ReceiptDetailModal({
       currency: foreign ? normalizeCurrency(r.currency) : fx.base,
       fxRate: foreign && r.fxRate ? String(r.fxRate) : '',
       paymentMethod: r.paymentMethod,
+      space: r.space || '',
       notes: r.notes,
       lineItems: r.lineItems.map((li) => {
         const price = printed(li.price);
@@ -1038,6 +1045,7 @@ function ReceiptDetailModal({
         currency: form.currency,
         fxRate: Number(form.fxRate) || 0,
         paymentMethod: form.paymentMethod,
+        space: form.space,
         notes: form.notes,
         verified,
         lineItems: form.lineItems.map((li) => ({
@@ -1274,6 +1282,15 @@ function ReceiptDetailModal({
               <Input type="number" min="0" value={form.warrantyMonths} onChange={(e) => setForm((p) => ({ ...p, warrantyMonths: e.target.value }))} placeholder="24" />
             </Field>
           </div>
+
+          {/* P68: per-property ledger tag. Hidden until the user has named at least one
+              space in Settings, exactly like the Expenses form — a dormant feature must
+              not add a field nobody can fill. */}
+          {spaces.length > 0 && (
+            <Field label={t('ex.fSpace')}>
+              <SearchableSelect value={form.space} onChange={(v) => setForm((p) => ({ ...p, space: v }))} options={spaces} placeholder={t('ex.spaceNone')} allowCustom clearable />
+            </Field>
+          )}
 
           {/* VAT breakdown */}
           <div className="grid grid-cols-2 gap-3">

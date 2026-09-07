@@ -133,6 +133,7 @@ export type SerializedReceipt = {
   origAmount: number; // total as printed on the receipt; 0 when not foreign
   fxRate: number; // base units per 1 `currency` unit; 0 = unknown / not foreign
   paymentMethod: string;
+  space: string; // P68: per-property ledger tag (same taxonomy as Expense.space); '' = unassigned
   lineItems: SerializedLineItem[];
   itemIds: string[];
   filePath: string;

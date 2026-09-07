@@ -722,7 +722,15 @@
   μήνες πίσω, αλλιώς κρυμμένο card — όχι misleading σύγκριση με μηδενικά)· MVP = μόνο total spend, per-category
   breakdown ως follow-up.
 
-### P68. Επέκτασε το per-space tag (P34) σε Receipts/Subscriptions/Bills — S — OSS, dogfooding-heavy
+### P68. Επέκτασε το per-space tag (P34) σε Receipts/Subscriptions/Bills — 🚧 ΦΑΣΗ 1 (Receipts) SHIPPED 2026-09-07 (pharos-brain) — S — OSS, dogfooding-heavy
+- **Φάση 1 (Receipts), shipped:** `Receipt.space` (ίδιο taxonomy `AppConfig.spaces`, '' = χωρίς χώρο), πεδίο στη
+  φόρμα της απόδειξης (κρυμμένο όσο δεν υπάρχει ονομασμένος χώρος, όπως στα Expenses), κληρονομιά από την
+  τελευταία tagged απόδειξη του ΙΔΙΟΥ καταστήματος στο upload (mirror του `inheritFromSeries` του P34),
+  αναζήτηση με το tag, `space` στο v1 API (GET + PATCH, openapi + API.md), και τα tagged σύνολα αποδείξεων
+  μπαίνουν στο ήδη υπάρχον card «δαπάνες ανά χώρο» των Reports μέσω του `lib/receiptSpaceSpend.ts`.
+  Untagged install: μηδέν αλλαγή, ακριβώς όπως το P64 φάση 2.
+- **Μένει (φάση 2):** το ίδιο πεδίο σε `Subscription` + `Bill`, και ο global space-filter στα money views
+  (σήμερα φίλτρο ανά χώρο έχουν μόνο τα Expenses/Income· οι αποδείξεις βρίσκονται με ελεύθερη αναζήτηση).
 - **Αξία:** το P34 (per-space ledger tag, shipped 2026-07-14) έμεινε ρητά **Expenses-only ως MVP**, με follow-up
   note «space σε Receipts/Subscriptions... global space-filter σε όλα τα money views (τώρα μόνο Expenses/Income)»
   που ποτέ δεν έγινε δικό του actionable item (ίδιο μοτίβο με το P63 πριν προωθηθεί). Live-verified: `grep -rn

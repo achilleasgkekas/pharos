@@ -38,6 +38,10 @@ const ReceiptSchema = new Schema(
     origAmount: { type: Number, default: 0 }, // total as printed; 0 when not foreign
     fxRate: { type: Number, default: 0 }, // base per 1 `currency` unit; 0 = unknown/not foreign
     paymentMethod: { type: String, default: '' },
+    // P68: same optional per-property/context ledger tag as `Expense.space` (P34), from
+    // the same `AppConfig.spaces` taxonomy. '' = unassigned, which is every receipt
+    // written before P68 — so an untagged install sees no change anywhere.
+    space: { type: String, default: '', index: true },
     lineItems: { type: [LineItemSchema], default: [] },
 
     filePath: { type: String, required: true }, // /storage/receipts/...

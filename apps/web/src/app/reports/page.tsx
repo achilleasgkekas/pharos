@@ -15,6 +15,7 @@ import { estimatedItemValue } from '@/lib/depreciation';
 import { categoryRollover, ROLLOVER_WINDOW } from '@/lib/budgetRollover';
 import { sweepableLeftover, sweptForMonth } from '@/lib/budgetSweep';
 import { receiptCategorySpend } from '@/lib/receiptCategorySpend';
+import { receiptSpaceSpend } from '@/lib/receiptSpaceSpend';
 import { captureAndListSnapshots } from '@/lib/netWorth';
 import { computeMoneyAgenda } from '@/lib/moneyAgenda';
 import { computeSafeToSpend } from '@/lib/safeToSpend';
@@ -35,6 +36,9 @@ type LeanReceipt = {
   date?: string | Date | null;
   total?: number;
   vatAmount?: number;
+  // P68: per-property ledger tag for the whole receipt, fed into the same
+  // per-space breakdown as Expense.space.
+  space?: string;
   // P64: per-line spend category, fed into the same breakdown as Expense.category.
   lineItems?: { qty?: number; price?: number; vatRate?: number; category?: string }[];
 };
@@ -73,7 +77,7 @@ async function getReports(monthsBack = 12) {
   const Goal = await currentModel(GoalModel);
 
   const [receiptsRaw, itemsRaw, subsRaw, statementsRaw, expensesRaw, goalsRaw] = await Promise.all([
-    Receipt.find().select('store date total vatAmount lineItems.qty lineItems.price lineItems.vatRate lineItems.category').lean(),
+    Receipt.find().select('store date total vatAmount space lineItems.qty lineItems.price lineItems.vatRate lineItems.category').lean(),
     Item.find().select('title category status purchasedPrice currentPrice purchasedAt warrantyUntil').lean(),
     Subscription.find({ active: true }).select('amount billingCycle category').lean(),
     Statement.find().lean(),
@@ -194,6 +198,11 @@ async function getReports(monthsBack = 12) {
     }
   }
   for (const [mk, amt] of rcSpend.totalByMonth) totalByMonth.set(mk, (totalByMonth.get(mk) ?? 0) + amt);
+  // ── P68 φάση 1: οι tagged αποδείξεις στο ΙΔΙΟ per-space breakdown ────────
+  // Ίδιος κανόνας με το P64 ακριβώς από πάνω: μόνο ό,τι έχει tag μετράει (μια απόδειξη
+  // χωρίς `space` δεν αλλάζει τίποτα), και μπαίνει ΜΟΝΟ στο space-scoped άθροισμα, όχι
+  // στο cash flow ή στα μηνιαία σύνολα, γιατί εκεί οι αποδείξεις μετριούνται ήδη.
+  for (const [sp, amt] of receiptSpaceSpend(receipts)) expSpaceMap.set(sp, (expSpaceMap.get(sp) ?? 0) + amt);
   const incomeExpense = ie.map((m) => ({ ...m, income: Math.round(m.income), expense: Math.round(m.expense) }));
   // Budget vs actual (this month), per budgeted category. In envelope mode (P25)
   // each category also gets a `carried` (net unspent from recent complete months)

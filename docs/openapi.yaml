@@ -613,6 +613,7 @@ paths:
                 subtotal: { type: number }
                 vatAmount: { type: number }
                 paymentMethod: { type: string }
+                space: { type: string, description: 'Per-property ledger tag (P68); trimmed, max 40 chars. Empty = unassigned.' }
                 notes: { type: string }
                 verified: { type: boolean }
                 archived: { type: boolean }
@@ -2458,6 +2459,7 @@ components:
         fxRate: { type: number, description: 'Base units per 1 unit of `currency`; 0 = not foreign, or no rate entered yet (then `total` is still the printed number and must not be summed as base).' }
         paymentMethod: { type: string }
         warrantyMonths: { type: number }
+        space: { type: string, description: 'Per-property ledger tag (P68), same taxonomy as Settings → Spaces; empty = unassigned.' }
         itemCount: { type: integer, description: Derived — number of stored line items. The list endpoint does not inline them; the detail endpoint returns `lineItems`. }
         verified: { type: boolean }
         archived: { type: boolean }

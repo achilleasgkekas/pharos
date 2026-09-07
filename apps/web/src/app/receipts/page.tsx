@@ -13,7 +13,7 @@ import type { SerializedReceipt, SerializedCard } from '@/types';
 
 export const dynamic = 'force-dynamic';
 
-async function getData(): Promise<{ receipts: SerializedReceipt[]; cards: SerializedCard[]; ollamaUp: boolean; storeNames: string[]; categories: string[]; emailInboxCount: number; baseCurrency: string; multiCurrency: boolean }> {
+async function getData(): Promise<{ receipts: SerializedReceipt[]; cards: SerializedCard[]; ollamaUp: boolean; storeNames: string[]; categories: string[]; spaces: string[]; emailInboxCount: number; baseCurrency: string; multiCurrency: boolean }> {
   return withRequestTenant(async () => {
   await connectDB();
   const Receipt = await currentModel(ReceiptModel);
@@ -48,6 +48,7 @@ async function getData(): Promise<{ receipts: SerializedReceipt[]; cards: Serial
     ollamaUp,
     storeNames: stores.map((s) => s.name),
     categories: settings.expenseCategories, // P64: same taxonomy the Expenses form uses
+    spaces: settings.spaces, // P68: same per-property ledger tags the Expenses form uses
     emailInboxCount,
     baseCurrency: settings.currency,
     multiCurrency: settings.multiCurrency, // P9: off = no per-receipt currency controls at all
@@ -56,7 +57,7 @@ async function getData(): Promise<{ receipts: SerializedReceipt[]; cards: Serial
 }
 
 export default async function ReceiptsPage() {
-  const { receipts, cards, ollamaUp, storeNames, categories, emailInboxCount, baseCurrency, multiCurrency } = await getData();
+  const { receipts, cards, ollamaUp, storeNames, categories, spaces, emailInboxCount, baseCurrency, multiCurrency } = await getData();
   return (
     <ReceiptsClient
       receipts={receipts}
@@ -64,6 +65,7 @@ export default async function ReceiptsPage() {
       ollamaUp={ollamaUp}
       storeNames={storeNames}
       categories={categories}
+      spaces={spaces}
       emailInboxCount={emailInboxCount}
       baseCurrency={baseCurrency}
       multiCurrency={multiCurrency}

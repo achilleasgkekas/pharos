@@ -130,13 +130,13 @@ describe('GET listing', () => {
     expect(json).toMatchObject({ total: 2, limit: 50, offset: 0 });
     expect(json.data[0]).toEqual({
       id: 'r1', store: 'Plaisio', date: '2026-06-01T00:00:00.000Z', total: 287.25, subtotal: 231.65,
-      vatAmount: 55.6, currency: 'USD', origAmount: 0, fxRate: 0, paymentMethod: 'card', warrantyMonths: 24, itemCount: 3,
+      vatAmount: 55.6, currency: 'USD', origAmount: 0, fxRate: 0, paymentMethod: 'card', warrantyMonths: 24, space: '', itemCount: 3,
       verified: true, archived: false, file: '/r.pdf', thumb: '/t.jpg',
       updatedAt: '2026-07-01T00:00:00.000Z', deleted: false,
     });
     expect(json.data[1]).toEqual({
       id: 'r2', store: 'Bare', date: null, total: 0, subtotal: 0, vatAmount: 0, currency: 'EUR',
-      origAmount: 0, fxRate: 0, paymentMethod: '', warrantyMonths: 0, itemCount: 0, verified: false, archived: false,
+      origAmount: 0, fxRate: 0, paymentMethod: '', warrantyMonths: 0, space: '', itemCount: 0, verified: false, archived: false,
       file: null, thumb: null, updatedAt: null, deleted: false,
     });
   });

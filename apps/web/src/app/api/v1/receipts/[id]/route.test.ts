@@ -262,6 +262,29 @@ describe('PATCH /api/v1/receipts/:id — auth + id guard', () => {
 });
 
 describe('PATCH /api/v1/receipts/:id — scalar coercion', () => {
+  // P68: ο χώρος (per-property ledger tag) γράφεται και από το API, όχι μόνο από τη φόρμα,
+  // αλλιώς ένας client που φτιάχνει αποδείξεις μαζικά δεν μπορεί να τις χρεώσει σε σπίτι.
+  it('trims the space and caps it at 40 chars (P68)', async () => {
+    const res = await PATCH(makeReq({ body: { space: `  ${'K'.repeat(45)}  ` } }), ctx(OID));
+    expect(res.status).toBe(200);
+    const set = (updateState.calls[0].update as { $set: Record<string, unknown> }).$set;
+    expect(set.space).toBe('K'.repeat(40));
+  });
+
+  it('accepts an empty space as "clear the tag", not as a missing field', async () => {
+    const res = await PATCH(makeReq({ body: { space: '' } }), ctx(OID));
+    expect(res.status).toBe(200);
+    const set = (updateState.calls[0].update as { $set: Record<string, unknown> }).$set;
+    expect(set.space).toBe('');
+  });
+
+  it('ignores a non-string space instead of writing garbage', async () => {
+    const res = await PATCH(makeReq({ body: { space: 42, notes: 'x' } }), ctx(OID));
+    expect(res.status).toBe(200);
+    const set = (updateState.calls[0].update as { $set: Record<string, unknown> }).$set;
+    expect(set.space).toBeUndefined();
+  });
+
   it('400 "no valid fields" for an all-invalid body, without writing', async () => {
     const res = await PATCH(makeReq({ body: { store: '   ', date: 'not-a-date', total: 'abc', verified: 'yes' } }), ctx(OID));
     expect(res.status).toBe(400);

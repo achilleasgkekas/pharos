@@ -1,6 +1,6 @@
 'use server';
 import { connectDB } from '@/lib/db';
-import { Receipt as ReceiptModel } from '@/models/Receipt';
+import { Receipt as ReceiptModel, type ReceiptDoc } from '@/models/Receipt';
 import { Item as ItemModel } from '@/models/Item';
 import { withRequestTenant } from '@/lib/tenancy/request';
 import { currentModel } from '@/lib/tenancy/connection';
@@ -18,7 +18,7 @@ import { dispatchEventWebhooks } from '@/lib/webhooks';
 import { htmlReceiptToText } from '@/lib/htmlReceipt';
 import { resolveFx, resolveReceiptAmounts, convertToBase, normalizeCurrency } from '@/lib/fx';
 import { revalidatePath } from 'next/cache';
-import { Types } from 'mongoose';
+import { Types, type Model } from 'mongoose';
 import { z } from 'zod';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
@@ -46,6 +46,8 @@ const UpdateReceiptSchema = z.object({
   currency: z.string().default('EUR'),
   fxRate: z.coerce.number().min(0).default(0),
   paymentMethod: z.string().default(''),
+  // P68: per-property ledger tag, same taxonomy + same 40-char ceiling as Expense.space.
+  space: z.string().max(40).default(''),
   lineItems: z.array(LineItemSchema).default([]),
   notes: z.string().default(''),
   verified: z.boolean().default(false),
@@ -147,6 +149,24 @@ async function runReceiptParse(bytes: Buffer, ext: string, isPdf: boolean, mode:
 // Matches next.config serverActions.bodySizeLimit; also bounds in-memory buffering + OCR.
 const MAX_UPLOAD_BYTES = 15 * 1024 * 1024;
 
+/** P68 — μια νέα απόδειξη κληρονομεί τον χώρο από την τελευταία απόδειξη του ΙΔΙΟΥ
+ *  καταστήματος, ακριβώς όπως ένα νέο έξοδο κληρονομεί το `space` του vendor του (P34,
+ *  `inheritFromSeries`). Χωρίς αυτό, το tag θα έπρεπε να μπαίνει με το χέρι σε κάθε
+ *  απόδειξη, δηλαδή δεν θα έμπαινε ποτέ και το P&L ανά σπίτι θα έμενε πάλι ημιτελές. */
+async function inheritedSpace(Receipt: Model<ReceiptDoc>, store: string): Promise<string> {
+  const name = (store || '').trim();
+  if (!name) return '';
+  try {
+    const prev = await Receipt.findOne({ store: name, space: { $nin: ['', null] } })
+      .sort({ date: -1 })
+      .select('space')
+      .lean();
+    return (prev?.space || '').trim();
+  } catch {
+    return ''; // ποτέ να μη ρίξει ένα upload επειδή δεν βρέθηκε προηγούμενο tag
+  }
+}
+
 export async function uploadReceipt(formData: FormData): Promise<UploadResult> {
   // Every failure has to come back as a RESULT, never as a thrown action. A server action
   // that rejects reaches the browser as Next's generic scrubbed digest, so the user is told
@@ -223,6 +243,7 @@ async function uploadReceiptInner(formData: FormData): Promise<UploadResult> {
       origAmount: fx.origAmount,
       fxRate: fx.fxRate,
       paymentMethod: parsed?.paymentMethod || '',
+      space: await inheritedSpace(Receipt, parsed?.store || ''), // P68
       lineItems: cleanLineItems(parsed?.lineItems, settings.defaultVatRate),
       filePath: relativePath,
       fileType: file.type || (isPdf ? 'application/pdf' : `image/${ext}`),
@@ -293,7 +314,7 @@ export async function updateReceipt(
   const { currency: base } = await getAppSettings();
   const doc = await Receipt.findByIdAndUpdate(
     id,
-    { ...parsed, date: safeDate(parsed.date), ...fxFields(parsed, base) },
+    { ...parsed, space: parsed.space.trim(), date: safeDate(parsed.date), ...fxFields(parsed, base) },
     { new: true, select: 'store date total filePath verified' }
   ).lean();
   // Mirror-on-verify: once a receipt is confirmed, push its file to the remote

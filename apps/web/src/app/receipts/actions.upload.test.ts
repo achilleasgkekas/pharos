@@ -58,6 +58,7 @@ const {
   htmlReceiptToTextMock,
   saveFileMock,
   readFileMock,
+  receiptFindOne,
   dispatchEventWebhooksMock,
   safeRevalidateMock,
   revalidatePathMock,
@@ -67,6 +68,13 @@ const {
   // webhook dispatch reads store/total/date off the *returned* doc, not the input object.
   receiptCreate: vi.fn(async (doc: Record<string, any>) => ({ ...doc, _id: 'r1' })),
   receiptFindById: vi.fn(async (_id: string) => null as Record<string, any> | null),
+  // P68 `inheritedSpace`: findOne(...).sort(...).select(...).lean() — the same chain the
+  // expenses "inherit from the vendor's last entry" helper uses.
+  receiptFindOne: vi.fn((_query: Record<string, any>) => ({
+    sort: (_s: Record<string, number>) => ({
+      select: (_p: string) => ({ lean: async () => null as Record<string, any> | null }),
+    }),
+  })),
   receiptFindByIdAndUpdate: vi.fn(async (_id: string, _update: Record<string, any>) => ({})),
   // backfillReceiptThumbs' `Receipt.find({...}).limit(n)` shape — a chained `.limit()`
   // resolving to the array, not a plain find() promise like the other model calls here.
@@ -91,6 +99,7 @@ const {
 const receiptModel = {
   create: receiptCreate,
   findById: receiptFindById,
+  findOne: receiptFindOne,
   findByIdAndUpdate: receiptFindByIdAndUpdate,
   find: receiptFindMock,
 };
@@ -751,5 +760,48 @@ describe('backfillReceiptThumbs', () => {
     saveFileMock.mockResolvedValueOnce({ relativePath: 'receipts/2026/06/r-thumb.jpg' });
     const done = await backfillReceiptThumbs();
     expect(done).toBe(0);
+  });
+});
+
+// ── P68: ο χώρος κληρονομείται από την τελευταία απόδειξη του ίδιου καταστήματος ──
+// Χωρίς αυτό, το tag θα έπρεπε να μπαίνει με το χέρι σε κάθε απόδειξη, δηλαδή στην πράξη
+// δεν θα έμπαινε ποτέ και το «πόσο κοστίζει το εξοχικό» θα έμενε πάλι ημιτελές. Ίδιο
+// idiom με το `inheritFromSeries` των Expenses (P34).
+describe('uploadReceipt — P68 space inheritance', () => {
+  const spaceChain = (space: string | null) => ({
+    sort: () => ({ select: () => ({ lean: async () => (space === null ? null : { space }) }) }),
+  });
+
+  it('παίρνει τον χώρο από την τελευταία tagged απόδειξη του ΙΔΙΟΥ καταστήματος', async () => {
+    parseReceiptTextMock.mockResolvedValue({ parsed: { store: 'Sklavenitis', total: 41 }, raw: '', model: 'qwen' });
+    ocrImageMock.mockResolvedValue('legible');
+    looksLikeUsableOcrMock.mockReturnValue(true);
+    receiptFindOne.mockReturnValueOnce(spaceChain('Kalamos') as never);
+    const fd = new FormData();
+    fd.set('file', makeFile('r.jpg', 'x', 'image/jpeg'));
+    await uploadReceipt(fd);
+    expect(receiptFindOne.mock.calls[0][0]).toEqual({ store: 'Sklavenitis', space: { $nin: ['', null] } });
+    expect(receiptCreate.mock.calls[0][0].space).toBe('Kalamos');
+  });
+
+  it('μένει κενός όταν το κατάστημα δεν έχει καμία tagged απόδειξη', async () => {
+    parseReceiptTextMock.mockResolvedValue({ parsed: { store: 'Sklavenitis', total: 41 }, raw: '', model: 'qwen' });
+    ocrImageMock.mockResolvedValue('legible');
+    looksLikeUsableOcrMock.mockReturnValue(true);
+    receiptFindOne.mockReturnValueOnce(spaceChain(null) as never);
+    const fd = new FormData();
+    fd.set('file', makeFile('r.jpg', 'x', 'image/jpeg'));
+    await uploadReceipt(fd);
+    expect(receiptCreate.mock.calls[0][0].space).toBe('');
+  });
+
+  it('δεν ρωτάει καν τη βάση όταν το AI δεν βρήκε κατάστημα, και δεν ρίχνει το upload', async () => {
+    parseReceiptTextMock.mockResolvedValue({ parsed: null, raw: '', model: 'qwen' });
+    const fd = new FormData();
+    fd.set('file', makeFile('r.jpg', 'x', 'image/jpeg'));
+    const res = await uploadReceipt(fd);
+    expect(res.ok).toBe(true);
+    expect(receiptFindOne).not.toHaveBeenCalled();
+    expect(receiptCreate.mock.calls[0][0].space).toBe('');
   });
 });
