@@ -52,6 +52,7 @@ export const AUDIT_ACTIONS = [
   'workspace.purged',
   'ai_key.set',
   'ai_key.cleared',
+  'ai_config.set', // workspace AI master/feature toggles (per-tenant, via /api/saas/workspace/ai-config)
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

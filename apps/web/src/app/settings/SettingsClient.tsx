@@ -123,7 +123,9 @@ type CurrentUser = { id: string; name: string; role: Role };
 const TABS: { id: TabId; label: string; icon: React.ReactNode; adminOnly?: boolean; selfHostOnly?: boolean }[] = [
   { id: 'general', label: 'General', icon: <SlidersHorizontal size={15} /> },
   { id: 'money', label: 'Money', icon: <CreditCard size={15} /> },
-  { id: 'ai', label: 'AI', icon: <Sparkles size={15} /> },
+  // Hosted: AI moves to Workspace → AI (key + toggles in one control-plane place), so hide the
+  // product AI tab in SaaS. Self-host keeps it — it is the only AI settings surface there.
+  { id: 'ai', label: 'AI', icon: <Sparkles size={15} />, selfHostOnly: true },
   { id: 'storage', label: 'Storage & backup', icon: <HardDrive size={15} /> },
   { id: 'data', label: 'Stores & lists', icon: <StoreIcon size={15} /> },
   { id: 'notifications', label: 'Notifications', icon: <Bell size={15} />, adminOnly: true },
@@ -237,6 +239,12 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
 
               <DefaultsManager settings={info.settings} />
 
+              {/* Calendar feed (ICS) is a per-user integration, not AI — it moved here out of the
+                  AI tab so hosted workspaces (where the AI tab lives in Workspace → AI) keep it. */}
+              <Section title={t('ics.title')} icon={<CalendarPlus size={15} />}>
+                <CalendarFeedManager />
+              </Section>
+
               {/* Password and two-factor belong to the ACCOUNT, not to a workspace. On a hosted
                   deployment /account/settings already owns both, and rendering them here too
                   produced two live copies of the same control on the same screen — with the
@@ -282,33 +290,18 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
             </>
           )}
 
+          {/* Self-host only: in hosted mode ALL of a workspace's AI settings live in
+              Workspace → AI (the BYO key + the master/feature toggles, which write per-tenant
+              via /api/saas/workspace/ai-config). The tab is marked selfHostOnly, so this block
+              only ever renders for the self-hosted app. */}
           {tab === 'ai' && (
             <>
               <AiMasterAndFeatures ai={info.ai} canEdit={isAdmin} />
-              {saas ? (
-                // Hosted: the AI provider + API key live in Workspace → AI (control plane,
-                // metered). A key typed into the self-host AiSettings AppConfig here is
-                // overridden by the workspace BYO key (lib/aiConfig applyTenantByoKey), so
-                // showing it too was a second, ignored key entry. Point at the one that wins.
-                <Section title={t('set.aiProviderKey')} icon={<Sparkles size={15} />}>
-                  <p className="text-sm text-[color:var(--color-text-dim)] leading-relaxed">{t('set.aiManagedInWorkspace')}</p>
-                  <a
-                    href="/account/workspace/settings"
-                    className="inline-flex items-center gap-1.5 mt-3 text-sm font-medium text-[color:var(--color-accent)] hover:underline"
-                  >
-                    {t('set.openWorkspaceAi')} →
-                  </a>
-                </Section>
-              ) : (
-                <AiSettings ai={info.ai} ollamaUp={info.ollamaUp} />
-              )}
+              <AiSettings ai={info.ai} ollamaUp={info.ollamaUp} />
               <ScraperAiSettings scraperAi={info.scraperAi} installed={info.ai.installed} hasAnthropicKey={info.ai.hasKey} />
               <AiPromptsManager prompts={info.prompts} />
               <Section title={t('set.mobileMcpTitle')} icon={<Plug size={15} />}>
                 <McpManager />
-              </Section>
-              <Section title={t('ics.title')} icon={<CalendarPlus size={15} />}>
-                <CalendarFeedManager />
               </Section>
             </>
           )}
