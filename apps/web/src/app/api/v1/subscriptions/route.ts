@@ -110,6 +110,7 @@ export async function POST(req: NextRequest) {
       paymentMethod: strField(b, 'paymentMethod'),
       url: strField(b, 'url'),
       notes: strField(b, 'notes'),
+      space: strField(b, 'space').trim().slice(0, 40), // P68: per-property ledger tag
       trialEndsAt,
       // Same rate as `amount` (see resolveSubFx in app/subscriptions/actions.ts for why both
       // money fields must move together); unknown rate leaves the printed number alone.

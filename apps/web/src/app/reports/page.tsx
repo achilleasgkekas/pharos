@@ -16,6 +16,7 @@ import { categoryRollover, ROLLOVER_WINDOW } from '@/lib/budgetRollover';
 import { sweepableLeftover, sweptForMonth } from '@/lib/budgetSweep';
 import { receiptCategorySpend } from '@/lib/receiptCategorySpend';
 import { receiptSpaceSpend } from '@/lib/receiptSpaceSpend';
+import { subscriptionSpaceCost } from '@/lib/subscriptionSpaceCost';
 import { captureAndListSnapshots } from '@/lib/netWorth';
 import { computeMoneyAgenda } from '@/lib/moneyAgenda';
 import { computeSafeToSpend } from '@/lib/safeToSpend';
@@ -51,7 +52,7 @@ type LeanItem = {
   purchasedAt?: string | Date | null;
   warrantyUntil?: string | Date | null;
 };
-type LeanSub = { amount?: number; billingCycle?: string; category?: string };
+type LeanSub = { amount?: number; billingCycle?: string; category?: string; space?: string };
 
 function monthKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -79,7 +80,7 @@ async function getReports(monthsBack = 12) {
   const [receiptsRaw, itemsRaw, subsRaw, statementsRaw, expensesRaw, goalsRaw] = await Promise.all([
     Receipt.find().select('store date total vatAmount space lineItems.qty lineItems.price lineItems.vatRate lineItems.category').lean(),
     Item.find().select('title category status purchasedPrice currentPrice purchasedAt warrantyUntil').lean(),
-    Subscription.find({ active: true }).select('amount billingCycle category').lean(),
+    Subscription.find({ active: true }).select('amount billingCycle category space').lean(),
     Statement.find().lean(),
     Expense.find().select('kind amount date period category space vendor vendorKey recurring').lean(),
     Goal.find({ archived: { $ne: true } }).sort({ createdAt: -1 }).lean(),
@@ -380,6 +381,15 @@ async function getReports(monthsBack = 12) {
   }
   const subsByCategory = [...subsByCat.entries()].map(([name, value]) => ({ name, value: Math.round(value * 100) / 100 }));
 
+  // ── P68 φάση 2: μηνιαίο κόστος συνδρομών ανά χώρο ────────────────────────
+  // ΞΕΧΩΡΙΣΤΟ card, όχι μέσα στο «δαπάνες ανά χώρο» από πάνω: εκεί αθροίζονται
+  // πραγματικές δαπάνες (Expense.amount, Receipt.total), ενώ η συνδρομή δίνει ρυθμό.
+  // Ένα μηνιαίο ισοδύναμο ριγμένο σε ένα all-time σύνολο δεν θα ήταν ημιτελές νούμερο,
+  // θα ήταν λάθος. Άδειο όσο καμία συνδρομή δεν έχει tag → το card δεν εμφανίζεται.
+  const subsBySpace = [...subscriptionSpaceCost(subs).entries()]
+    .map(([name, value]) => ({ name, value: Math.round(value * 100) / 100 }))
+    .sort((a, b) => b.value - a.value);
+
   // ── Net worth (PA2): assets (inventory + manual accounts) − liabilities ──
   // Refreshes this month's snapshot on every load (idempotent, forward-only —
   // past months freeze as they roll over) and returns the series for the trend.
@@ -435,6 +445,7 @@ async function getReports(monthsBack = 12) {
     spendByStore,
     spendByCategory,
     subsByCategory,
+    subsBySpace,
     warrantiesExpiring,
     biggestPurchases,
     installmentPlans,

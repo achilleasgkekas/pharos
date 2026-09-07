@@ -237,6 +237,7 @@ export const en = {
   'reports.cExpByCat': 'Expenses by category',
   'reports.cExpBySpace': 'Expenses by space',
   'reports.cSubsByCat': 'Subscriptions (monthly {cur}) by category',
+  'reports.cSubsBySpace': 'Subscriptions (monthly {cur}) by space',
   'reports.cWarranties': 'Warranties expiring · next 150 days',
   'reports.cBiggest': 'Biggest purchases',
   'reports.noData': 'No data yet',

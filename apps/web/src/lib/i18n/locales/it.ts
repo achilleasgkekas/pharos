@@ -812,6 +812,7 @@ export const it: Partial<Dict> = {
   'reports.cInvByCat': "Valore dell'inventario per categoria",
   'reports.cExpByCat': 'Spese per categoria',
   'reports.cSubsByCat': 'Abbonamenti (mensile {cur}) per categoria',
+  'reports.cSubsBySpace': 'Abbonamenti (mensile {cur}) per ambito',
   'reports.cWarranties': 'Garanzie in scadenza · prossimi 150 giorni',
   'reports.cBiggest': 'Acquisti maggiori',
   'reports.noData': 'Ancora nessun dato',

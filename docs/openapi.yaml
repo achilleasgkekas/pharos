@@ -1107,6 +1107,7 @@ paths:
                 url: { type: string }
                 paymentMethod: { type: string }
                 notes: { type: string }
+                space: { type: string, description: 'Per-property ledger tag (P68), same taxonomy as Settings → Spaces; trimmed, max 40 chars. Empty = unassigned.' }
                 trialEndsAt: { type: string, description: 'Free-trial end date (P33). Drives the cancel-before-charge reminder; 400 if unparseable.' }
                 firstChargeAmount: { type: number, description: 'What is charged when the trial ends, if it differs from the recurring amount. Converted like `amount`.' }
                 currency: { type: string, description: Currency of the printed amounts. Omit for base currency. }
@@ -1141,6 +1142,7 @@ paths:
                 billingCycle: { type: string, enum: [weekly, monthly, quarterly, yearly] }
                 nextRenewal: { type: string }
                 category: { type: string }
+                space: { type: string, description: 'Per-property ledger tag (P68); trimmed, max 40 chars. Empty = unassigned.' }
                 active: { type: boolean }
                 trialEndsAt: { type: string, nullable: true, description: 'Explicit null clears the free trial (P33).' }
                 firstChargeAmount: { type: number }
@@ -2545,6 +2547,7 @@ components:
         paymentMethod: { type: string }
         url: { type: string }
         notes: { type: string }
+        space: { type: string, description: 'Per-property ledger tag (P68), same taxonomy as Settings → Spaces; empty = unassigned.' }
         trialEndsAt: { type: string, format: date-time, nullable: true, description: 'Free-trial end (P33); the cancel-before-charge alert fires `trialAlertDays` before it.' }
         firstChargeAmount: { type: number, description: 'What the first real charge will be when it differs from `amount`; 0 when it does not.' }
         updatedAt: { type: string, format: date-time, nullable: true }

@@ -812,6 +812,7 @@ export const nl: Partial<Dict> = {
   'reports.cInvByCat': 'Inventariswaarde per categorie',
   'reports.cExpByCat': 'Uitgaven per categorie',
   'reports.cSubsByCat': 'Abonnementen (maandelijks {cur}) per categorie',
+  'reports.cSubsBySpace': 'Abonnementen (maandelijks {cur}) per ruimte',
   'reports.cWarranties': 'Verlopende garanties · komende 150 dagen',
   'reports.cBiggest': 'Grootste aankopen',
   'reports.noData': 'Nog geen gegevens',

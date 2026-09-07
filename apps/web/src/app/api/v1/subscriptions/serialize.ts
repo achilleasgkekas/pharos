@@ -5,7 +5,7 @@ export type SubLean = {
   _id: unknown; name: string; provider?: string; category?: string; amount?: number; currency?: string;
   origAmount?: number; fxRate?: number;
   billingCycle?: string; startDate?: Date; nextRenewal?: Date | null; active?: boolean; paymentMethod?: string;
-  url?: string; notes?: string; trialEndsAt?: Date | null; firstChargeAmount?: number; updatedAt?: Date; deletedAt?: Date | null;
+  url?: string; notes?: string; space?: string; trialEndsAt?: Date | null; firstChargeAmount?: number; updatedAt?: Date; deletedAt?: Date | null;
 };
 
 /** Single source of truth for the v1 Subscription JSON shape (list, POST, PATCH).
@@ -35,6 +35,7 @@ export function trim(s: SubLean) {
     paymentMethod: s.paymentMethod ?? '',
     url: s.url ?? '',
     notes: s.notes ?? '',
+    space: s.space ?? '', // P68: per-property ledger tag; '' = unassigned
     trialEndsAt: iso(s.trialEndsAt),
     firstChargeAmount: s.firstChargeAmount ?? 0,
     updatedAt: iso(s.updatedAt),

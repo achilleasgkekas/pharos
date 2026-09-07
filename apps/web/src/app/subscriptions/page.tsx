@@ -50,6 +50,7 @@ export default async function SubscriptionsPage() {
       subscriptions={subscriptions}
       cards={cards}
       categoryList={settings.subscriptionCategories}
+      spaces={settings.spaces} // P68: ίδια per-property tags που χρησιμοποιεί η φόρμα των Expenses
       candidates={candidates}
       baseCurrency={settings.currency}
       multiCurrency={settings.multiCurrency} // P9: off = no per-subscription currency controls at all

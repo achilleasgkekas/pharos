@@ -50,6 +50,11 @@ const SubscriptionSchema = new Schema(
     notes: { type: String, default: '' },
     url: { type: String, default: '' },
 
+    // P68 φάση 2: ίδιο optional per-property ledger tag με το `Expense.space` (P34) και το
+    // `Receipt.space` (φάση 1), από το ίδιο taxonomy `AppConfig.spaces`. '' = χωρίς χώρο,
+    // που είναι κάθε συνδρομή πριν το P68, άρα καμία εγκατάσταση δεν αλλάζει από μόνη της.
+    space: { type: String, default: '', index: true },
+
     split: { type: [SplitEntrySchema], default: [] },
 
     // Demo/sample-data mode (P1): see Item.isSample.

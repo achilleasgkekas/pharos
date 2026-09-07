@@ -236,6 +236,7 @@ export const el: Partial<Dict> = {
   'reports.cExpByCat': 'Έξοδα ανά κατηγορία',
   'reports.cExpBySpace': 'Έξοδα ανά χώρο',
   'reports.cSubsByCat': 'Συνδρομές (μηνιαία {cur}) ανά κατηγορία',
+  'reports.cSubsBySpace': 'Συνδρομές (μηνιαία {cur}) ανά χώρο',
   'reports.cWarranties': 'Εγγυήσεις που λήγουν · επόμενες 150 ημέρες',
   'reports.cBiggest': 'Μεγαλύτερες αγορές',
   'reports.noData': 'Κανένα δεδομένο ακόμα',

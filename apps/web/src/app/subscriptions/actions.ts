@@ -54,6 +54,9 @@ const SubFormSchema = z.object({
   paymentMethod: z.string().default(''),
   url: z.string().default(''),
   notes: z.string().default(''),
+  // P68: per-property ledger tag, ίδιο taxonomy και ίδιο ταβάνι 40 χαρακτήρων με το
+  // `Expense.space` (P34) και το `Receipt.space` (φάση 1).
+  space: z.string().max(40).default(''),
   // Household cost-split (P73): the form serializes the SplitEntry[] as JSON into one
   // FormData field (the rest of this schema is flat strings). Malformed/absent JSON
   // degrades to no split rather than a validation error.
@@ -114,6 +117,7 @@ export async function createSubscription(formData: FormData) {
     await Subscription.create({
       ...parsed,
       ...money,
+      space: parsed.space.trim(),
       split: cleanSplit(parsed.split),
       startDate,
       trialEndsAt: parsed.trialEndsAt ? new Date(parsed.trialEndsAt) : null,
@@ -135,6 +139,7 @@ export async function updateSubscription(id: string, formData: FormData) {
     await Subscription.findByIdAndUpdate(id, {
       ...parsed,
       ...money,
+      space: parsed.space.trim(),
       split: cleanSplit(parsed.split),
       startDate,
       trialEndsAt: parsed.trialEndsAt ? new Date(parsed.trialEndsAt) : null,

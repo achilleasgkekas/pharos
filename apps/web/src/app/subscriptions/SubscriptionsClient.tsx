@@ -78,6 +78,7 @@ export function SubscriptionsClient({
   subscriptions,
   cards,
   categoryList = [],
+  spaces = [],
   candidates = [],
   baseCurrency = 'EUR',
   multiCurrency = false,
@@ -85,6 +86,8 @@ export function SubscriptionsClient({
   subscriptions: SerializedSubscription[];
   cards: SerializedCard[];
   categoryList?: string[];
+  /** P68: per-property ledger tags (AppConfig.spaces), the same list the Expenses form uses. */
+  spaces?: string[];
   candidates?: RecurringCandidate[];
   baseCurrency?: string;
   multiCurrency?: boolean;
@@ -149,7 +152,8 @@ export function SubscriptionsClient({
       if (statusFilter === 'active' && !s.active) return false;
       if (statusFilter === 'cancelled' && s.active) return false;
       if (categoryFilter && s.category !== categoryFilter) return false;
-      if (q && !`${s.name} ${s.provider} ${s.notes}`.toLowerCase().includes(q)) return false;
+      // P68: "Kalamos" finds every subscription charged to the summer house.
+      if (q && !`${s.name} ${s.provider} ${s.notes} ${s.space || ''}`.toLowerCase().includes(q)) return false;
       return true;
     });
     return [...out].sort((a, b) => {
@@ -379,13 +383,13 @@ export function SubscriptionsClient({
 
       {/* Create */}
       <Modal open={showCreate} onClose={() => setShowCreate(false)} title={t('sub.newSubscription')} size="xl">
-        <SubForm cards={cards} fx={fx} onSuccess={() => setShowCreate(false)} />
+        <SubForm cards={cards} spaces={spaces} fx={fx} onSuccess={() => setShowCreate(false)} />
       </Modal>
 
       {/* Edit */}
       {editing && (
         <Modal open onClose={() => setEditing(null)} title={editing.name} size="xl">
-          <SubForm cards={cards} fx={fx} sub={editing} onSuccess={() => setEditing(null)} onDeleted={() => setEditing(null)} />
+          <SubForm cards={cards} spaces={spaces} fx={fx} sub={editing} onSuccess={() => setEditing(null)} onDeleted={() => setEditing(null)} />
         </Modal>
       )}
     </main>
@@ -529,7 +533,7 @@ function SubCard({ sub, base, onEdit }: { sub: SerializedSubscription; base: str
 
 // ─── Sub Form ──────────────────────────────────────────────────────────────
 
-function SubForm({ sub, cards, fx, onSuccess, onDeleted }: { sub?: SerializedSubscription; cards: SerializedCard[]; fx: FxCtx; onSuccess: () => void; onDeleted?: () => void }) {
+function SubForm({ sub, cards, spaces = [], fx, onSuccess, onDeleted }: { sub?: SerializedSubscription; cards: SerializedCard[]; spaces?: string[]; fx: FxCtx; onSuccess: () => void; onDeleted?: () => void }) {
   const t = useT();
   const [pending, startTransition] = useTransition();
   const confirm = useConfirm();
@@ -552,6 +556,7 @@ function SubForm({ sub, cards, fx, onSuccess, onDeleted }: { sub?: SerializedSub
     paymentMethod: sub?.paymentMethod ?? '',
     url: sub?.url ?? '',
     notes: sub?.notes ?? '',
+    space: sub?.space ?? '', // P68: per-property ledger tag for the whole subscription
   });
   // Household cost-split (P73): kept outside `form` (which is flat strings mirrored 1:1
   // into FormData fields) and serialized as JSON into its own field on submit.
@@ -701,6 +706,14 @@ function SubForm({ sub, cards, fx, onSuccess, onDeleted }: { sub?: SerializedSub
       <Field label="URL">
         <Input value={form.url} onChange={set('url')} placeholder="https://..." />
       </Field>
+      {/* P68: which property this subscription is charged to. Hidden until a space is
+          actually named in Settings, exactly like the Expenses and Receipts forms — a
+          dormant feature must not add an empty picker to every form. */}
+      {spaces.length > 0 && (
+        <Field label={t('ex.fSpace')}>
+          <SearchableSelect value={form.space} onChange={(v) => setForm((p) => ({ ...p, space: v }))} options={spaces} placeholder={t('ex.spaceNone')} allowCustom clearable />
+        </Field>
+      )}
       <Field label={t('sub.fNotes')}>
         <textarea
           value={form.notes}

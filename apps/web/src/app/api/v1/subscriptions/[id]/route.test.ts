@@ -106,6 +106,28 @@ describe('PATCH partial-update', () => {
     expect(set.active).toBe(false);
   });
 
+  // P68 φάση 2: το per-property ledger tag είναι whitelisted πεδίο του PATCH, με το ίδιο
+  // trim + ταβάνι 40 χαρακτήρων που έχει ήδη το `Receipt.space` της φάσης 1.
+  it('sets space, trimmed and capped at 40 chars', async () => {
+    updateState.doc = { _id: OID, name: 'Netflix' };
+    await PATCH(makeReq({ body: { space: '  Kalamos  ' } }), ctx(OID));
+    expect(lastSet().space).toBe('Kalamos');
+    await PATCH(makeReq({ body: { space: 'K'.repeat(60) } }), ctx(OID));
+    expect(lastSet().space).toBe('K'.repeat(40));
+  });
+
+  it('clears space with an empty string (a subscription can lose its tag)', async () => {
+    updateState.doc = { _id: OID, name: 'Netflix' };
+    await PATCH(makeReq({ body: { space: '' } }), ctx(OID));
+    expect(lastSet().space).toBe('');
+  });
+
+  it('a space-only PATCH skips the money re-read entirely', async () => {
+    updateState.doc = { _id: OID, name: 'Netflix' };
+    await PATCH(makeReq({ body: { space: 'Kalamos' } }), ctx(OID));
+    expect(subFindById).not.toHaveBeenCalled();
+  });
+
   it('returns the SPEC { subscription } wrapper (not a bare ok/id)', async () => {
     updateState.doc = { _id: OID, name: 'Netflix', amount: 15, billingCycle: 'monthly', active: true, updatedAt: new Date('2026-07-04T00:00:00Z') };
     const res = await PATCH(makeReq({ body: { amount: 15 } }), ctx(OID));

@@ -118,6 +118,8 @@ type Data = {
   spendByStore: { name: string; total: number; count: number }[];
   spendByCategory: { name: string; value: number }[];
   subsByCategory: { name: string; value: number }[];
+  /** P68 φάση 2: μηνιαίο ισοδύναμο κόστος συνδρομών ανά χώρο· κενό όσο καμία δεν έχει tag. */
+  subsBySpace: { name: string; value: number }[];
   warrantiesExpiring: { title: string; until: string; days: number }[];
   biggestPurchases: { store: string; total: number; date: string }[];
   installmentPlans: InstallmentPlanRow[];
@@ -765,6 +767,24 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
             </ResponsiveContainer>
           )}
         </Card>
+
+        {/* Subscriptions monthly by space / property (P68 phase 2) — only once tagged */}
+        {data.subsBySpace.length > 0 && (
+          <Card title={t('reports.cSubsBySpace', { cur: cur() })}>
+            <ResponsiveContainer width="100%" height={Math.max(200, data.subsBySpace.length * 34)}>
+              <BarChart data={data.subsBySpace} layout="vertical" margin={{ left: 8, right: 16 }}>
+                <XAxis type="number" tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} />
+                <YAxis type="category" dataKey="name" width={90} tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} />
+                <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${cur()}${v}/mo`, 'cost']} cursor={{ fill: 'rgba(127,127,127,0.08)' }} />
+                <Bar dataKey="value" radius={[0, 5, 5, 0]}>
+                  {data.subsBySpace.map((_, i) => (
+                    <Cell key={i} fill={PALETTE[(i + 3) % PALETTE.length]} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </Card>
+        )}
 
         {/* Warranties expiring */}
         <Card title={t('reports.cWarranties')}>

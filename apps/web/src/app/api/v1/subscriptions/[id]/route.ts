@@ -14,7 +14,7 @@ export const dynamic = 'force-dynamic';
 
 const CYCLES: readonly string[] = BILLING_CYCLES;
 
-/** PATCH /api/v1/subscriptions/:id  { name?, amount?, billingCycle?, nextRenewal?, category?, active?, trialEndsAt?, firstChargeAmount?, currency?, fxRate? }
+/** PATCH /api/v1/subscriptions/:id  { name?, amount?, billingCycle?, nextRenewal?, category?, space?, active?, trialEndsAt?, firstChargeAmount?, currency?, fxRate? }
  *  trialEndsAt: an ISO date string sets it, `null` explicitly clears it (trial converted/cancelled).
  *  currency/fxRate (P9): sending any money field re-resolves the whole set against the base
  *  currency, so `amount` in the response is always base-denominated. */
@@ -28,6 +28,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (b.amount != null && Number.isFinite(Number(b.amount))) set.amount = Number(b.amount);
     if (typeof b.billingCycle === 'string' && CYCLES.includes(b.billingCycle)) set.billingCycle = b.billingCycle;
     if (typeof b.category === 'string') set.category = b.category;
+    if (typeof b.space === 'string') set.space = b.space.trim().slice(0, 40); // P68: per-property ledger tag
     if (typeof b.active === 'boolean') set.active = b.active;
     if (b.nextRenewal) { const d = new Date(String(b.nextRenewal)); if (!Number.isNaN(d.getTime())) set.nextRenewal = d; }
     if (b.trialEndsAt === null) set.trialEndsAt = null;

@@ -311,6 +311,8 @@ export type SerializedSubscription = {
   paymentMethod: string;
   notes: string;
   url: string;
+  /** P68: per-property ledger tag (same taxonomy as `AppConfig.spaces`); '' = unassigned. */
+  space: string;
   // Recurring cost-split among household members (P73): same shape as Expense.split.
   split: import('@/lib/split').SplitEntry[];
   createdAt: string;
