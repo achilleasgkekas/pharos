@@ -7,7 +7,9 @@ import { signupAllowed } from '@/lib/tenancy/signupGate';
 import { rateLimit, clientIp } from '@/lib/apiAuth';
 import { saasAuthGate, saasGuard, accountTenants } from '@/lib/tenancy/saasApi';
 import { setAccountCookie } from '@/lib/tenancy/accountSession';
-import { provisionTenant, compensate } from '@/lib/tenancy/provision';
+import { provisionTenant, compensate, slugify } from '@/lib/tenancy/provision';
+import { Tenant } from '@/models/Tenant';
+import { RESERVED_SLUGS } from '@/lib/tenancy/host';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -60,6 +62,20 @@ export async function POST(req: NextRequest) {
 
     await connectDB();
 
+    // If a workspace name was chosen, its slug becomes the PERMANENT subdomain (immutable after
+    // provisioning). Reject a taken/reserved address here — before creating the account — so the
+    // person picks another instead of silently landing on "<name>-2". Mirrors the live check the
+    // signup form does against /api/saas/auth/workspace-available; re-checked here to close the
+    // gap between that check and this submit. Left blank → the fallback name is auto-slugged and
+    // de-duplicated by provisionTenant as before (not a deliberate choice, so "-2" is fine there).
+    const chosenSlug = slugify(workspace);
+    if (workspace.trim() && chosenSlug && (RESERVED_SLUGS.has(chosenSlug) || (await Tenant.exists({ slug: chosenSlug })))) {
+      return NextResponse.json(
+        { error: 'That workspace address is taken — pick a different workspace name', code: 'slug_taken' },
+        { status: 409 }
+      );
+    }
+
     // Uniqueness pre-check + a race-safe fallback on the unique index (11000).
     if (await Account.exists({ email })) {
       return NextResponse.json({ error: 'An account with this email already exists' }, { status: 409 });
@@ -80,6 +96,9 @@ export async function POST(req: NextRequest) {
       await provisionTenant({
         accountId,
         workspaceName: workspace || name || email.split('@')[0],
+        // Pin the exact slug the person saw as available; provisionTenant still de-dupes as a
+        // race-safe fallback if it was taken in the gap above.
+        slugHint: workspace.trim() ? chosenSlug : undefined,
       });
     } catch (err) {
       // Signup is two writes (Account, then workspace) and used to be atomic in neither

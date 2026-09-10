@@ -26,6 +26,7 @@ const {
   saasAuthGateMock,
   connectDBMock,
   accountExistsMock,
+  tenantExistsMock,
   accountDeleteOneMock,
   accountCreateMock,
   hashPasswordMock,
@@ -37,6 +38,7 @@ const {
   saasAuthGateMock: vi.fn(() => null as NextResponse | null),
   connectDBMock: vi.fn(async () => {}),
   accountExistsMock: vi.fn(async () => false as unknown),
+  tenantExistsMock: vi.fn(async () => false as unknown),
   accountDeleteOneMock: vi.fn(async (_f: Record<string, unknown>) => ({ deletedCount: 1 })),
   accountCreateMock: vi.fn(async (doc: Record<string, unknown>) => ({
     _id: 'acc1',
@@ -78,10 +80,12 @@ vi.mock('@/models/Account', () => ({
   Account: { exists: accountExistsMock, create: accountCreateMock, deleteOne: accountDeleteOneMock },
 }));
 vi.mock('@/lib/auth', () => ({ hashPassword: hashPasswordMock, assertCanWrite: vi.fn(async () => {}) }));
-vi.mock('@/lib/tenancy/provision', () => ({
-  provisionTenant: provisionTenantMock,
-  compensate: compensateMock,
-}));
+vi.mock('@/lib/tenancy/provision', async () => {
+  // slugify is pure — keep the real one so the uniqueness pre-check derives the true slug.
+  const actual = await vi.importActual<typeof import('@/lib/tenancy/provision')>('@/lib/tenancy/provision');
+  return { ...actual, provisionTenant: provisionTenantMock, compensate: compensateMock };
+});
+vi.mock('@/models/Tenant', () => ({ Tenant: { exists: tenantExistsMock } }));
 vi.mock('@/lib/tenancy/saasApi', async () => {
   // saasGuard is pure (try/catch + NextResponse.json, no DB/env reads) — run it for real so
   // the mid-handler-throw test exercises the actual production error-shaping logic.
@@ -101,6 +105,7 @@ beforeEach(() => {
   saasAuthGateMock.mockReturnValue(null);
   connectDBMock.mockImplementation(async () => {});
   accountExistsMock.mockImplementation(async () => false);
+  tenantExistsMock.mockImplementation(async () => false);
   accountDeleteOneMock.mockImplementation(async () => ({ deletedCount: 1 }));
   compensateMock.mockImplementation(async (_what: string, undo: () => Promise<unknown>) => {
     try {
@@ -216,19 +221,21 @@ describe('duplicate email', () => {
 });
 
 describe('workspace-name fallback chain', () => {
-  it('explicit workspace field wins over name/email', async () => {
+  it('explicit workspace field wins over name/email, and pins its slug', async () => {
     await POST(makeReq({ ...VALID, workspace: 'My Company' }));
     expect(provisionTenantMock).toHaveBeenCalledWith({
       accountId: 'acc1',
       workspaceName: 'My Company',
+      slugHint: 'my-company',
     });
   });
 
-  it('falls back to the account name when workspace is absent', async () => {
+  it('falls back to the account name when workspace is absent (no pinned slug)', async () => {
     await POST(makeReq({ email: 'jo@example.com', password: 'secret123', name: 'Jo Doe' }));
     expect(provisionTenantMock).toHaveBeenCalledWith({
       accountId: 'acc1',
       workspaceName: 'Jo Doe',
+      slugHint: undefined,
     });
   });
 
@@ -237,6 +244,7 @@ describe('workspace-name fallback chain', () => {
     expect(provisionTenantMock).toHaveBeenCalledWith({
       accountId: 'acc1',
       workspaceName: 'jo',
+      slugHint: undefined,
     });
   });
 });
@@ -356,5 +364,36 @@ describe('rate limiting', () => {
     const key = rateLimitMock.mock.calls[0][0];
     expect(key).toContain('1.2.3.4');
     expect(key).toMatch(/^saas-signup:/);
+  });
+});
+
+describe('workspace address uniqueness', () => {
+  it('rejects a chosen workspace whose slug is already taken (409), creating no account', async () => {
+    tenantExistsMock.mockResolvedValueOnce(true); // "acme" is taken
+    const res = await POST(makeReq({ email: 'new@x.com', password: 'password123', workspace: 'Acme' }));
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as { code?: string }).code).toBe('slug_taken');
+    expect(accountCreateMock).not.toHaveBeenCalled();
+    expect(provisionTenantMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects a reserved workspace address (e.g. "www") without touching the DB for tenants', async () => {
+    const res = await POST(makeReq({ email: 'new@x.com', password: 'password123', workspace: 'www' }));
+    expect(res.status).toBe(409);
+    expect(tenantExistsMock).not.toHaveBeenCalled(); // reserved is caught before the existence query
+    expect(accountCreateMock).not.toHaveBeenCalled();
+  });
+
+  it('passes the exact chosen slug to provisionTenant when it is free', async () => {
+    const res = await POST(makeReq({ email: 'new@x.com', password: 'password123', workspace: 'My Bakery' }));
+    expect(res.status).toBe(201);
+    expect(provisionTenantMock).toHaveBeenCalledWith(expect.objectContaining({ slugHint: 'my-bakery' }));
+  });
+
+  it('does NOT block or pin a slug when no workspace was chosen (fallback is auto-deduped)', async () => {
+    tenantExistsMock.mockResolvedValue(true); // even if some slug is taken, blank choice is unaffected
+    const res = await POST(makeReq({ email: 'new@x.com', password: 'password123' }));
+    expect(res.status).toBe(201);
+    expect(provisionTenantMock).toHaveBeenCalledWith(expect.objectContaining({ slugHint: undefined }));
   });
 });

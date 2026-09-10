@@ -16,7 +16,7 @@
 // Validation reuses the pure helpers in authValidation.ts (in lockstep with the server policy).
 // The API re-validates authoritatively — these checks only shape the UX (disable the button,
 // surface the field error) before the round-trip.
-import { useState, type FormEvent } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import {
   isValidEmail,
   loginReady,
@@ -57,10 +57,39 @@ export function AuthForm({
   const [busy, setBusy] = useState(false);
   const [step, setStep] = useState<Step>('credentials');
   const [mfaCode, setMfaCode] = useState('');
+  // Live availability of the chosen workspace address (its subdomain is permanent, so we check
+  // before submit). Best-effort UX — the signup POST re-checks and 409s on a race.
+  const [wsCheck, setWsCheck] = useState<{ status: 'idle' | 'checking' | 'done'; host?: string; available?: boolean; reason?: string }>({ status: 'idle' });
 
   const isSignup = mode === 'signup';
   const ready = isSignup ? signupReady(email, password) : loginReady(email, password);
   const target = safeNextPath(next);
+  const wsBlocked = isSignup && workspace.trim().length > 0 && wsCheck.status === 'done' && !wsCheck.available;
+
+  // Debounced availability check against the resolved subdomain.
+  useEffect(() => {
+    if (!isSignup) return;
+    const q = workspace.trim();
+    if (!q) {
+      setWsCheck({ status: 'idle' });
+      return;
+    }
+    setWsCheck({ status: 'checking' });
+    let cancelled = false;
+    const id = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/saas/auth/workspace-available?name=${encodeURIComponent(q)}`);
+        const data = (await res.json()) as { host?: string; available?: boolean; reason?: string };
+        if (!cancelled) setWsCheck({ status: 'done', host: data.host, available: !!data.available, reason: data.reason });
+      } catch {
+        if (!cancelled) setWsCheck({ status: 'idle' }); // best-effort; the server still enforces
+      }
+    }, 500);
+    return () => {
+      cancelled = true;
+      clearTimeout(id);
+    };
+  }, [workspace, isSignup]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -74,6 +103,10 @@ export function AuthForm({
     }
     if (isSignup && password.length < MIN_PASSWORD) {
       setError(`Password must be at least ${MIN_PASSWORD} characters`);
+      return;
+    }
+    if (wsBlocked) {
+      setError('That workspace address is taken — pick a different workspace name');
       return;
     }
 
@@ -297,7 +330,7 @@ export function AuthForm({
         <div>
           <label className={LABEL_CLASS} htmlFor="auth-workspace">
             Workspace name{' '}
-            <span className="text-[color:var(--color-text-faint)]">(optional)</span>
+            <span className="text-[color:var(--color-text-faint)]">(optional — becomes your address)</span>
           </label>
           <input
             id="auth-workspace"
@@ -309,6 +342,32 @@ export function AuthForm({
             disabled={busy}
             placeholder="My Household"
           />
+          {workspace.trim() && (
+            <p className="mt-1 text-xs" role="status">
+              {wsCheck.status === 'checking' && (
+                <span className="text-[color:var(--color-text-faint)]">Checking availability…</span>
+              )}
+              {wsCheck.status === 'done' && wsCheck.reason === 'empty' && (
+                <span className="text-[color:var(--color-text-faint)]">Use letters or numbers for the address.</span>
+              )}
+              {wsCheck.status === 'done' && wsCheck.available && (
+                <span className="text-[color:var(--color-accent)]">
+                  <span className="font-mono">{wsCheck.host}</span> is available ✓
+                </span>
+              )}
+              {wsCheck.status === 'done' && !wsCheck.available && wsCheck.reason === 'taken' && (
+                <span className="text-[color:var(--color-red)]">
+                  <span className="font-mono">{wsCheck.host}</span> is taken — try another
+                </span>
+              )}
+              {wsCheck.status === 'done' && !wsCheck.available && wsCheck.reason === 'reserved' && (
+                <span className="text-[color:var(--color-red)]">That name is reserved — try another</span>
+              )}
+            </p>
+          )}
+          <p className="mt-1 text-[11px] text-[color:var(--color-text-faint)]">
+            This becomes your permanent workspace address and can’t be changed later.
+          </p>
         </div>
       )}
 
