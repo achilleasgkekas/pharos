@@ -132,7 +132,7 @@ beforeEach(() => {
   setAccountCookieMock.mockImplementation(async () => {});
 });
 
-const VALID = { email: 'jo@example.com', password: 'secret123', name: 'Jo' };
+const VALID = { email: 'jo@example.com', password: 'secret123', name: 'Jo', workspace: 'Jo Household' };
 
 describe('gate + validation', () => {
   it('saasAuthGate short-circuit (SAAS_MODE off / AUTH_SECRET missing) passes through untouched, zero DB', async () => {
@@ -174,7 +174,7 @@ describe('gate + validation', () => {
   });
 
   it('lowercases + trims the email before the uniqueness check and the create call', async () => {
-    await POST(makeReq({ email: '  Jo@Example.com  ', password: 'secret123' }));
+    await POST(makeReq({ email: '  Jo@Example.com  ', password: 'secret123', workspace: 'Trim Space' }));
     expect(accountExistsMock).toHaveBeenCalledWith({ email: 'jo@example.com' });
     expect(accountCreateMock).toHaveBeenCalledWith(
       expect.objectContaining({ email: 'jo@example.com' })
@@ -220,8 +220,8 @@ describe('duplicate email', () => {
   });
 });
 
-describe('workspace-name fallback chain', () => {
-  it('explicit workspace field wins over name/email, and pins its slug', async () => {
+describe('workspace name (required)', () => {
+  it('uses the chosen workspace name and pins its slug', async () => {
     await POST(makeReq({ ...VALID, workspace: 'My Company' }));
     expect(provisionTenantMock).toHaveBeenCalledWith({
       accountId: 'acc1',
@@ -230,22 +230,18 @@ describe('workspace-name fallback chain', () => {
     });
   });
 
-  it('falls back to the account name when workspace is absent (no pinned slug)', async () => {
-    await POST(makeReq({ email: 'jo@example.com', password: 'secret123', name: 'Jo Doe' }));
-    expect(provisionTenantMock).toHaveBeenCalledWith({
-      accountId: 'acc1',
-      workspaceName: 'Jo Doe',
-      slugHint: undefined,
-    });
+  it('rejects a signup with no workspace name → 400, before any DB work', async () => {
+    const res = await POST(makeReq({ email: 'jo@example.com', password: 'secret123', name: 'Jo Doe' }));
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { error: string }).error).toMatch(/workspace name is required/i);
+    expect(connectDBMock).not.toHaveBeenCalled();
+    expect(accountCreateMock).not.toHaveBeenCalled();
   });
 
-  it('falls back to the email local-part when both workspace and name are absent', async () => {
-    await POST(makeReq({ email: 'jo@example.com', password: 'secret123' }));
-    expect(provisionTenantMock).toHaveBeenCalledWith({
-      accountId: 'acc1',
-      workspaceName: 'jo',
-      slugHint: undefined,
-    });
+  it('rejects a workspace name that yields no usable slug (only symbols) → 400', async () => {
+    const res = await POST(makeReq({ ...VALID, workspace: '!!!' }));
+    expect(res.status).toBe(400);
+    expect(connectDBMock).not.toHaveBeenCalled();
   });
 });
 
@@ -263,7 +259,7 @@ describe('success path', () => {
       name: 'Jo',
       passwordHash: 'hashed:secret123',
     });
-    expect(provisionTenantMock).toHaveBeenCalledWith({ accountId: 'acc1', workspaceName: 'Jo' });
+    expect(provisionTenantMock).toHaveBeenCalledWith({ accountId: 'acc1', workspaceName: 'Jo Household', slugHint: 'jo-household' });
     expect(setAccountCookieMock).toHaveBeenCalledWith({ sub: 'acc1', email: 'jo@example.com' });
     expect(accountTenantsMock).toHaveBeenCalledWith('acc1');
 
@@ -275,8 +271,8 @@ describe('success path', () => {
     ]);
   });
 
-  it('falls back to an empty name in the response when no name was given', async () => {
-    const res = await POST(makeReq({ email: 'jo@example.com', password: 'secret123' }));
+  it('returns an empty name in the response when no name was given (workspace still required)', async () => {
+    const res = await POST(makeReq({ email: 'jo@example.com', password: 'secret123', workspace: 'Some Space' }));
     const json = (await res.json()) as { account: { name: string } };
     expect(json.account.name).toBe('');
   });
@@ -292,7 +288,7 @@ describe('signup is all-or-nothing', () => {
   it('rolls the Account back when provisioning fails, so a retry is actually possible', async () => {
     provisionTenantMock.mockRejectedValueOnce(new Error('E11000 duplicate key error: dbName'));
 
-    const res = await POST(makeReq({ email: 'new@x.com', password: 'password123' }));
+    const res = await POST(makeReq({ email: 'new@x.com', password: 'password123', workspace: 'New Space' }));
 
     expect(res.status).toBe(500);
     expect(accountDeleteOneMock).toHaveBeenCalledWith({ _id: 'acc1' });
@@ -303,7 +299,7 @@ describe('signup is all-or-nothing', () => {
   it('does not leak the internal failure to the caller, but does say nothing was saved', async () => {
     provisionTenantMock.mockRejectedValueOnce(new Error('mongod connection refused at 10.0.0.4'));
 
-    const res = await POST(makeReq({ email: 'new@x.com', password: 'password123' }));
+    const res = await POST(makeReq({ email: 'new@x.com', password: 'password123', workspace: 'New Space' }));
     const json = (await res.json()) as { error: string };
 
     expect(json.error).not.toContain('10.0.0.4');
@@ -316,13 +312,13 @@ describe('signup is all-or-nothing', () => {
     provisionTenantMock.mockRejectedValueOnce(new Error('boom'));
     accountDeleteOneMock.mockRejectedValueOnce(new Error('delete failed too'));
 
-    const res = await POST(makeReq({ email: 'new@x.com', password: 'password123' }));
+    const res = await POST(makeReq({ email: 'new@x.com', password: 'password123', workspace: 'New Space' }));
 
     expect(res.status).toBe(500);
   });
 
   it('does not delete anything on a successful signup', async () => {
-    const res = await POST(makeReq({ email: 'new@x.com', password: 'password123' }));
+    const res = await POST(makeReq({ email: 'new@x.com', password: 'password123', workspace: 'New Space' }));
 
     expect(res.status).toBe(201);
     expect(accountDeleteOneMock).not.toHaveBeenCalled();
@@ -334,7 +330,7 @@ describe('signup is all-or-nothing', () => {
     // somebody else's account by trying to sign up with their address.
     accountExistsMock.mockResolvedValueOnce(true);
 
-    const res = await POST(makeReq({ email: 'taken@x.com', password: 'password123' }));
+    const res = await POST(makeReq({ email: 'taken@x.com', password: 'password123', workspace: 'New Space' }));
 
     expect(res.status).toBe(409);
     expect(accountDeleteOneMock).not.toHaveBeenCalled();
@@ -348,7 +344,7 @@ describe('rate limiting', () => {
     const limited = NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 });
     rateLimitMock.mockReturnValueOnce(limited);
 
-    const res = await POST(makeReq({ email: 'new@x.com', password: 'password123' }));
+    const res = await POST(makeReq({ email: 'new@x.com', password: 'password123', workspace: 'New Space' }));
 
     expect(res.status).toBe(429);
     // Before the mode gate and before any DB work: a blocked request must not cost us a query,
@@ -358,7 +354,7 @@ describe('rate limiting', () => {
   });
 
   it('is keyed per client IP and per endpoint, so one endpoint cannot exhaust another', async () => {
-    await POST(makeReq({ email: 'new@x.com', password: 'password123' }));
+    await POST(makeReq({ email: 'new@x.com', password: 'password123', workspace: 'New Space' }));
 
     expect(rateLimitMock).toHaveBeenCalledTimes(1);
     const key = rateLimitMock.mock.calls[0][0];
@@ -388,12 +384,5 @@ describe('workspace address uniqueness', () => {
     const res = await POST(makeReq({ email: 'new@x.com', password: 'password123', workspace: 'My Bakery' }));
     expect(res.status).toBe(201);
     expect(provisionTenantMock).toHaveBeenCalledWith(expect.objectContaining({ slugHint: 'my-bakery' }));
-  });
-
-  it('does NOT block or pin a slug when no workspace was chosen (fallback is auto-deduped)', async () => {
-    tenantExistsMock.mockResolvedValue(true); // even if some slug is taken, blank choice is unaffected
-    const res = await POST(makeReq({ email: 'new@x.com', password: 'password123' }));
-    expect(res.status).toBe(201);
-    expect(provisionTenantMock).toHaveBeenCalledWith(expect.objectContaining({ slugHint: undefined }));
   });
 });

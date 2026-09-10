@@ -62,9 +62,13 @@ export function AuthForm({
   const [wsCheck, setWsCheck] = useState<{ status: 'idle' | 'checking' | 'done'; host?: string; available?: boolean; reason?: string }>({ status: 'idle' });
 
   const isSignup = mode === 'signup';
-  const ready = isSignup ? signupReady(email, password) : loginReady(email, password);
   const target = safeNextPath(next);
   const wsBlocked = isSignup && workspace.trim().length > 0 && wsCheck.status === 'done' && !wsCheck.available;
+  // Signup also requires a workspace name (its subdomain is permanent) that is not a known-taken
+  // address; a still-running or failed availability check does not hard-block (the server 409s).
+  const ready = isSignup
+    ? signupReady(email, password) && workspace.trim().length > 0 && !wsBlocked
+    : loginReady(email, password);
 
   // Debounced availability check against the resolved subdomain.
   useEffect(() => {
@@ -103,6 +107,10 @@ export function AuthForm({
     }
     if (isSignup && password.length < MIN_PASSWORD) {
       setError(`Password must be at least ${MIN_PASSWORD} characters`);
+      return;
+    }
+    if (isSignup && !workspace.trim()) {
+      setError('Choose a workspace name — it becomes your address');
       return;
     }
     if (wsBlocked) {
@@ -330,7 +338,7 @@ export function AuthForm({
         <div>
           <label className={LABEL_CLASS} htmlFor="auth-workspace">
             Workspace name{' '}
-            <span className="text-[color:var(--color-text-faint)]">(optional — becomes your address)</span>
+            <span className="text-[color:var(--color-text-faint)]">(becomes your address)</span>
           </label>
           <input
             id="auth-workspace"

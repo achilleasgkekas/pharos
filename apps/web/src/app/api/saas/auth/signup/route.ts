@@ -59,6 +59,12 @@ export async function POST(req: NextRequest) {
     if (password.length < MIN_PASSWORD) {
       return NextResponse.json({ error: `Password must be at least ${MIN_PASSWORD} characters` }, { status: 400 });
     }
+    // A workspace name is REQUIRED: it becomes the permanent subdomain, and letting it default
+    // to the account name silently produced surprise addresses (e.g. "achilleas"). It must also
+    // yield at least one usable slug character after slugify (a name of only symbols does not).
+    if (!workspace.trim() || !slugify(workspace)) {
+      return NextResponse.json({ error: 'A workspace name is required' }, { status: 400 });
+    }
 
     await connectDB();
 
@@ -95,10 +101,10 @@ export async function POST(req: NextRequest) {
     try {
       await provisionTenant({
         accountId,
-        workspaceName: workspace || name || email.split('@')[0],
+        workspaceName: workspace,
         // Pin the exact slug the person saw as available; provisionTenant still de-dupes as a
         // race-safe fallback if it was taken in the gap above.
-        slugHint: workspace.trim() ? chosenSlug : undefined,
+        slugHint: chosenSlug,
       });
     } catch (err) {
       // Signup is two writes (Account, then workspace) and used to be atomic in neither
