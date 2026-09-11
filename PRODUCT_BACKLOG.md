@@ -206,7 +206,7 @@
   σε ένα απλό collapsed/expand block· αν το repo δεν έχει δομημένα release notes, fallback στο ήδη-υπάρχον
   external link (καμία αλλαγή συμπεριφοράς, ίδιο idiom με τα υπόλοιπα best-effort optional features).
 
-### P87. Saved filter presets / «smart views» σε modules με sidebar filtering — S/M — OSS (κυρίως), dogfooding-heavy
+### P87. Saved filter presets / «smart views» σε modules με sidebar filtering — ✅ SHIPPED 2026-09-12 (interactive session, «ξεκίνα τα proposed»; reusable `SavedViews` primitive + Items & Subscriptions wired — other modules are cheap follow-on) — S/M — OSS (κυρίως), dogfooding-heavy
 - **Αξία:** live-verified `grep -rln "savedFilter|SmartView|savedView" apps/web/src` = 0 hits. Το e-shop-layout
   rollout (CLAUDE.md, πολλά sessions) έδωσε ίδιο πλούσιο sidebar filter idiom (search + status + category/store +
   sort, `SearchableSelect` σε 7+ αρχεία) σε Items/Shopping/Receipts/Expenses/Subscriptions/Vouchers, αλλά καμία

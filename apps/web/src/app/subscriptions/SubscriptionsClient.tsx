@@ -10,6 +10,7 @@ import { FxRateButton } from '@/components/FxRateButton';
 import { useState, useTransition, useMemo } from 'react';
 import { Plus, Pencil, Trash2, ExternalLink, Power, Sparkles, Loader2, Search, LayoutGrid, List as ListIcon, SlidersHorizontal, Radar, X, Split as SplitIcon, CheckCircle2, Copy } from 'lucide-react';
 import { SubscriptionDuplicatesModal } from './SubscriptionDuplicatesModal';
+import { SavedViews } from '@/components/ui/SavedViews';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -173,6 +174,16 @@ export function SubscriptionsClient({
 
   const anyF = !!(search || categoryFilter || statusFilter !== 'all' || sortBy !== 'name');
   const fLabel = 'text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-[0.12em] mb-1.5';
+
+  // P87: saved filter presets for Subscriptions (same reusable primitive as Items).
+  const currentView = { search, categoryFilter, statusFilter, sortBy };
+  type SubsView = typeof currentView;
+  const applyView = (v: SubsView) => {
+    setSearch(v.search ?? '');
+    setCategoryFilter(v.categoryFilter ?? '');
+    setStatusFilter((v.statusFilter as typeof statusFilter) ?? 'all');
+    setSortBy((v.sortBy as typeof sortBy) ?? 'name');
+  };
   const filterControls = (
     <div className="space-y-4">
       <Input icon={<Search size={14} />} placeholder={t('sub.searchPlaceholder')} value={search} onChange={(e) => setSearch(e.target.value)} />
@@ -208,15 +219,18 @@ export function SubscriptionsClient({
           <option value="renewal">{t('sub.sortRenewal')}</option>
         </select>
       </div>
-      {anyF && (
-        <button
-          onClick={() => { setSearch(''); setCategoryFilter(''); setStatusFilter('all'); setSortBy('name'); }}
-          className="text-[0.65rem] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] underline"
-          style={{ fontFamily: 'var(--font-mono)' }}
-        >
-          {t('common.resetFilters')}
-        </button>
-      )}
+      <div className="flex items-center gap-3 flex-wrap">
+        <SavedViews<SubsView> moduleKey="subscriptions" current={currentView} canSave={anyF} onApply={applyView} />
+        {anyF && (
+          <button
+            onClick={() => { setSearch(''); setCategoryFilter(''); setStatusFilter('all'); setSortBy('name'); }}
+            className="text-[0.65rem] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] underline"
+            style={{ fontFamily: 'var(--font-mono)' }}
+          >
+            {t('common.resetFilters')}
+          </button>
+        )}
+      </div>
     </div>
   );
 

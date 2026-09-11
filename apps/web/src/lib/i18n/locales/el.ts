@@ -907,6 +907,12 @@ export const el: Partial<Dict> = {
   'upd.toggle': 'Έλεγχος για ενημερώσεις',
   'upd.toggleHint': 'Ένα ανώνυμο αίτημα την ημέρα στο δημόσιο registry. Δεν στέλνεται τίποτα για αυτή την εγκατάσταση.',
   'upd.whatsNew': 'Τι νέο υπάρχει',
+  'views.label': 'Προβολές',
+  'views.empty': 'Καμία αποθηκευμένη προβολή ακόμη',
+  'views.saveCurrent': 'Αποθήκευση τρέχουσας προβολής…',
+  'views.namePrompt': 'Ονόμασε αυτή την προβολή',
+  'views.delete': 'Διαγραφή προβολής',
+  'views.saveDisabled': 'Βάλε πρώτα ένα φίλτρο',
 
   'set.tabGeneral': 'Γενικά',
   'set.tabMoney': 'Οικονομικά',

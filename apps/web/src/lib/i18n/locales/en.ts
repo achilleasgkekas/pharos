@@ -923,6 +923,12 @@ export const en = {
   'upd.toggle': 'Check for updates',
   'upd.toggleHint': 'One anonymous request a day to the public registry. Nothing about this instance is sent.',
   'upd.whatsNew': "What's new",
+  'views.label': 'Views',
+  'views.empty': 'No saved views yet',
+  'views.saveCurrent': 'Save current view…',
+  'views.namePrompt': 'Name this view',
+  'views.delete': 'Delete view',
+  'views.saveDisabled': 'Set a filter first',
 
   // Settings
   'set.tabGeneral': 'General',

@@ -84,6 +84,7 @@ import { createItem, updateItem, deleteItem, logSaleAsIncome, markItemArrived, m
 import { useJobs } from '@/components/JobsProvider';
 import { enqueueAiFillItems, getBulkAiGuard } from '@/app/jobActions';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
+import { SavedViews } from '@/components/ui/SavedViews';
 import { linkPlanToItem, unlinkPlanByKey } from '../statements/actions';
 import { ItemDuplicatesModal, MergeItemsPicker } from './ItemDuplicatesModal';
 import { PriceSearchPanel } from '@/components/PriceSearchPanel';
@@ -537,6 +538,20 @@ export function ItemsClient({
     setSortBy('default');
   };
 
+  // P87: named, saved filter presets. The full filter state as one JSON-serialisable
+  // snapshot (flags Set → array), restored via applyView.
+  const currentView = { filter, storeFilter, categoryFilter, locationFilter, sortBy, flags: [...flags], search };
+  type ItemsView = typeof currentView;
+  const applyView = (v: ItemsView) => {
+    setFilter(v.filter ?? '');
+    setStoreFilter(v.storeFilter ?? '');
+    setCategoryFilter(v.categoryFilter ?? '');
+    setLocationFilter(v.locationFilter ?? '');
+    setSortBy((v.sortBy as SortKey) ?? 'default');
+    setFlags(new Set(Array.isArray(v.flags) ? v.flags : []));
+    setSearch(v.search ?? '');
+  };
+
   // Shared filter controls — rendered in the left sidebar (desktop) and a drawer (mobile)
   const filterControls = (
     <div className="space-y-4">
@@ -613,15 +628,18 @@ export function ItemsClient({
           })}
         </div>
       </FilterGroup>
-      {anyFilterActive && (
-        <button
-          onClick={resetFilters}
-          className="text-[0.65rem] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] underline"
-          style={{ fontFamily: 'var(--font-mono)' }}
-        >
-          {t('common.resetFilters')}
-        </button>
-      )}
+      <div className="flex items-center gap-3 flex-wrap">
+        <SavedViews<ItemsView> moduleKey="items" current={currentView} canSave={anyFilterActive} onApply={applyView} />
+        {anyFilterActive && (
+          <button
+            onClick={resetFilters}
+            className="text-[0.65rem] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] underline"
+            style={{ fontFamily: 'var(--font-mono)' }}
+          >
+            {t('common.resetFilters')}
+          </button>
+        )}
+      </div>
     </div>
   );
 
