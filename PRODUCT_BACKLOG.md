@@ -193,7 +193,7 @@
   στα τελευταία ~100 events, χωρίς νέο dedicated model (αν βολεύει, reuse του ήδη-υπάρχοντος Notification-style
   pattern αντί για full `AuditEvent`, ώστε να μη χρειαστεί tenant-aware SaaS infra σε OSS-only deployment).
 
-### P88. In-app changelog / «τι άλλαξε» panel για το update-available banner — S — OSS (adoption/trust lever)
+### P88. In-app changelog / «τι άλλαξε» panel για το update-available banner — ✅ SHIPPED 2026-09-12 (interactive session, «ξεκίνα τα proposed») — S — OSS (adoption/trust lever)
 - **Αξία:** live-verified `grep -rn "changelog|CHANGELOG|whatsNew|release notes" apps/web/src` = μόνο το ίδιο το
   UI string («Update available: v{version} — see the release notes», `UpdateChecker.tsx`) που είναι ένα **έξω
   link** στα GitHub releases. Το ήδη-shipped **P40** λέει ότι υπάρχει νεότερη έκδοση αλλά ο self-hoster πρέπει

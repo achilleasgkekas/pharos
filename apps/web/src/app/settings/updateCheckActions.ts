@@ -12,6 +12,7 @@ import {
   updateCheckRepo,
   releasesUrl,
   fetchLatestVersion,
+  fetchReleaseNotes,
   isUpdateAvailable,
   checkIsDue,
 } from '@/lib/versionCheck';
@@ -35,12 +36,14 @@ export type UpdateStatus = {
   supported: boolean; // false on SaaS, where "update" is meaningless
   checkedAt: string; // ISO of the last attempt, '' when never
   releasesUrl: string;
+  notes: string; // release-notes body for `latest` (P88), '' when none / not fetched
 };
 
 type ConfigDoc = {
   updateCheckEnabled?: boolean;
   updateCheckAt?: Date | null;
   updateCheckLatest?: string;
+  updateCheckNotes?: string;
 };
 
 function idle(over: Partial<UpdateStatus> = {}): UpdateStatus {
@@ -52,6 +55,7 @@ function idle(over: Partial<UpdateStatus> = {}): UpdateStatus {
     supported: true,
     checkedAt: '',
     releasesUrl: releasesUrl(),
+    notes: '',
     ...over,
   };
 }
@@ -76,6 +80,7 @@ export async function getUpdateStatus(force = false): Promise<UpdateStatus> {
 
     let latest = String(cfg.updateCheckLatest ?? '');
     let checkedAt = cfg.updateCheckAt ?? null;
+    let notes = String(cfg.updateCheckNotes ?? '');
 
     if (force || checkIsDue(checkedAt)) {
       const found = await fetchLatestVersion();
@@ -84,10 +89,17 @@ export async function getUpdateStatus(force = false): Promise<UpdateStatus> {
       // A failed check still stamps the attempt (so a firewalled instance backs off for
       // a day instead of calling out on every settings load) but must NOT wipe the last
       // real answer it had.
-      if (found) set.updateCheckLatest = found;
+      if (found) {
+        set.updateCheckLatest = found;
+        latest = found;
+        // P88: refresh the "What's new" body for the resolved latest, on the same 24h
+        // cadence. Best-effort ('' on any failure) and cached, so a rate-limited GitHub
+        // API just leaves the banner's external link as the fallback.
+        notes = await fetchReleaseNotes(found);
+        set.updateCheckNotes = notes;
+      }
       await Config.updateOne({ key: 'singleton' }, { $set: set }, { upsert: true });
       checkedAt = now;
-      if (found) latest = found;
     }
 
     const version = appVersion();
@@ -99,6 +111,7 @@ export async function getUpdateStatus(force = false): Promise<UpdateStatus> {
       supported: true,
       checkedAt: checkedAt ? new Date(checkedAt).toISOString() : '',
       releasesUrl: releasesUrl(updateCheckRepo()),
+      notes,
     };
   } catch {
     // Best-effort by design: a broken check shows the version and stays quiet.
@@ -116,6 +129,7 @@ export async function setUpdateCheckEnabled(value: boolean): Promise<{ ok: boole
     if (!value) {
       set.updateCheckLatest = '';
       set.updateCheckAt = null;
+      set.updateCheckNotes = '';
     }
     await Config.updateOne({ key: 'singleton' }, { $set: set }, { upsert: true });
     revalidatePath('/settings');

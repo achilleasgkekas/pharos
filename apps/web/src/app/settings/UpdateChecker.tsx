@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState, useTransition } from 'react';
-import { Loader2, ArrowUpCircle, RefreshCw } from 'lucide-react';
+import { Loader2, ArrowUpCircle, RefreshCw, ChevronDown, ChevronRight } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import { useT } from '@/components/LocaleProvider';
 import { getUpdateStatus, setUpdateCheckEnabled, type UpdateStatus } from './updateCheckActions';
@@ -16,6 +16,7 @@ export function UpdateChecker({ canEdit }: { canEdit: boolean }) {
   const t = useT();
   const [status, setStatus] = useState<UpdateStatus | null>(null);
   const [checking, setChecking] = useState(false);
+  const [showNotes, setShowNotes] = useState(false); // P88 "What's new" expander
   const [, startTransition] = useTransition();
 
   useEffect(() => {
@@ -78,6 +79,28 @@ export function UpdateChecker({ canEdit }: { canEdit: boolean }) {
           <ArrowUpCircle size={14} className="shrink-0" />
           {t('upd.available', { version: status.latest })}
         </a>
+      )}
+
+      {/* P88: in-app "What's new" — the GitHub release body for the newer version, so a
+          self-hoster can read what changed before deciding to pull, without leaving the app. */}
+      {status?.updateAvailable && status.notes && (
+        <div className="rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)]">
+          <button
+            type="button"
+            onClick={() => setShowNotes((v) => !v)}
+            className="flex items-center gap-1.5 w-full px-3 py-2 text-xs text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] transition-colors"
+            style={{ fontFamily: 'var(--font-mono)' }}
+            aria-expanded={showNotes}
+          >
+            {showNotes ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+            {t('upd.whatsNew')} · v{status.latest}
+          </button>
+          {showNotes && (
+            <pre className="px-3 pb-3 text-[11px] leading-relaxed text-[color:var(--color-text-dim)] whitespace-pre-wrap break-words max-h-72 overflow-y-auto">
+              {status.notes}
+            </pre>
+          )}
+        </div>
       )}
 
       {status?.supported && !status.updateAvailable && status.enabled && status.latest && (

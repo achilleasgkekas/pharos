@@ -906,6 +906,7 @@ export const el: Partial<Dict> = {
   'upd.checkNow': 'Έλεγχος για ενημερώσεις τώρα',
   'upd.toggle': 'Έλεγχος για ενημερώσεις',
   'upd.toggleHint': 'Ένα ανώνυμο αίτημα την ημέρα στο δημόσιο registry. Δεν στέλνεται τίποτα για αυτή την εγκατάσταση.',
+  'upd.whatsNew': 'Τι νέο υπάρχει',
 
   'set.tabGeneral': 'Γενικά',
   'set.tabMoney': 'Οικονομικά',

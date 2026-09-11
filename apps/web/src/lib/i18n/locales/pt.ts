@@ -300,6 +300,7 @@ export const pt: Partial<Dict> = {
   'upd.checkNow': 'Procurar atualizações agora',
   'upd.toggle': 'Procurar atualizações',
   'upd.toggleHint': 'Um pedido anónimo por dia ao registo público. Nada sobre esta instância é enviado.',
+  'upd.whatsNew': 'Novidades',
   'set.tabSystem': 'Estado do sistema',
   'sys.title': 'Estado do sistema',
   'sys.desc': 'Uma verificação de estado só de leitura desta instalação. Nada aqui altera o que quer que seja.',

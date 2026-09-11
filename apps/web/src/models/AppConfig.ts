@@ -154,6 +154,9 @@ const AppConfigSchema = new Schema(
     updateCheckEnabled: { type: Boolean, default: true },
     updateCheckAt: { type: Date, default: null },
     updateCheckLatest: { type: String, default: '' },
+    // P88: cached GitHub release-notes body for `updateCheckLatest`, refreshed on the same
+    // 24h cadence and capped (lib/versionCheck.RELEASE_NOTES_CAP). '' = none / not fetched.
+    updateCheckNotes: { type: String, default: '' },
     // Outbound alert dedup (P82). The dedupeKeys (same scheme as the in-app bell, see
     // app/notifications/actions.ts) that were part of the last successfully-dispatched
     // ntfy/Discord/Slack/Telegram/webhook alert. Only touched by runAlertChecks' opt-in

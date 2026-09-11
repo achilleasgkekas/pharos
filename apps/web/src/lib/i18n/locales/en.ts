@@ -922,6 +922,7 @@ export const en = {
   'upd.checkNow': 'Check for updates now',
   'upd.toggle': 'Check for updates',
   'upd.toggleHint': 'One anonymous request a day to the public registry. Nothing about this instance is sent.',
+  'upd.whatsNew': "What's new",
 
   // Settings
   'set.tabGeneral': 'General',

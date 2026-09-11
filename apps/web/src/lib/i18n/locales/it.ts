@@ -300,6 +300,7 @@ export const it: Partial<Dict> = {
   'upd.checkNow': 'Cerca aggiornamenti ora',
   'upd.toggle': 'Cerca aggiornamenti',
   'upd.toggleHint': 'Una richiesta anonima al giorno al registro pubblico. Nulla di questa istanza viene inviato.',
+  'upd.whatsNew': 'Novità',
   'set.tabSystem': 'Stato del sistema',
   'sys.title': 'Stato del sistema',
   'sys.desc': 'Un controllo di sola lettura dello stato di questa installazione. Nulla qui modifica alcunché.',

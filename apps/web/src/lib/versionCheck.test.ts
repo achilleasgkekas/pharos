@@ -10,6 +10,9 @@ import {
   checkIsDue,
   fetchLatestVersion,
   UPDATE_CHECK_TTL_MS,
+  releaseNotesApiUrl,
+  normalizeReleaseNotes,
+  RELEASE_NOTES_CAP,
 } from './versionCheck';
 
 // P40 — the self-host "a newer image exists" check. What matters is everything this
@@ -194,5 +197,33 @@ describe('fetchLatestVersion', () => {
     );
     await fetchLatestVersion('owner/pkg');
     expect(fetchMock).toHaveBeenCalledTimes(1 + 5); // token + MAX_TAG_PAGES
+  });
+});
+
+// P88 — the "What's new" release-notes fetch. Pure parts only (the fetch itself is
+// best-effort like fetchLatestVersion): tag shaping and the length cap.
+describe('releaseNotesApiUrl', () => {
+  it('adds the v prefix for a bare version and keeps an existing one', () => {
+    expect(releaseNotesApiUrl('1.4.0', 'owner/pkg')).toBe('https://api.github.com/repos/owner/pkg/releases/tags/v1.4.0');
+    expect(releaseNotesApiUrl('v1.4.0', 'owner/pkg')).toBe('https://api.github.com/repos/owner/pkg/releases/tags/v1.4.0');
+  });
+});
+
+describe('normalizeReleaseNotes', () => {
+  it('returns "" for empty / non-string / whitespace', () => {
+    expect(normalizeReleaseNotes('')).toBe('');
+    expect(normalizeReleaseNotes('   \n ')).toBe('');
+    expect(normalizeReleaseNotes(null)).toBe('');
+    expect(normalizeReleaseNotes(undefined)).toBe('');
+    expect(normalizeReleaseNotes(42)).toBe('');
+  });
+  it('trims and keeps a short body verbatim', () => {
+    expect(normalizeReleaseNotes('  ## Fixes\n- thing\n ')).toBe('## Fixes\n- thing');
+  });
+  it('caps a runaway body and marks the truncation', () => {
+    const body = Array.from({ length: 500 }, (_, i) => `line ${i}`).join('\n');
+    const out = normalizeReleaseNotes(body);
+    expect(out.length).toBeLessThanOrEqual(RELEASE_NOTES_CAP + 2);
+    expect(out.endsWith('…')).toBe(true);
   });
 });

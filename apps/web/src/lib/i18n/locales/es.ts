@@ -300,6 +300,7 @@ export const es: Partial<Dict> = {
   'upd.checkNow': 'Buscar actualizaciones ahora',
   'upd.toggle': 'Buscar actualizaciones',
   'upd.toggleHint': 'Una petición anónima al día al registro público. No se envía nada sobre esta instancia.',
+  'upd.whatsNew': 'Novedades',
   'set.tabSystem': 'Estado del sistema',
   'sys.title': 'Estado del sistema',
   'sys.desc': 'Un chequeo de solo lectura del estado de esta instalación. Nada de aquí cambia nada.',

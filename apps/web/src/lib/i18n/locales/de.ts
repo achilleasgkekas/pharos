@@ -300,6 +300,7 @@ export const de: Partial<Dict> = {
   'upd.checkNow': 'Jetzt nach Updates suchen',
   'upd.toggle': 'Nach Updates suchen',
   'upd.toggleHint': 'Eine anonyme Anfrage pro Tag an das öffentliche Registry. Nichts über diese Instanz wird gesendet.',
+  'upd.whatsNew': 'Was ist neu',
   'set.tabSystem': 'Systemstatus',
   'sys.title': 'Systemstatus',
   'sys.desc': 'Ein schreibgeschützter Zustandscheck dieser Installation. Nichts hier ändert etwas.',

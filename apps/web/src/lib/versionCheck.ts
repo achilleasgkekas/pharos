@@ -30,6 +30,28 @@ export function releasesUrl(repo = updateCheckRepo()): string {
   return `https://github.com/${repo}/releases`;
 }
 
+/** GitHub Releases API URL for one exact tag (P88 "What's new"). Tags are published as
+ *  `vX.Y.Z`, so a bare `X.Y.Z` version gets the `v` back on. */
+export function releaseNotesApiUrl(version: string, repo = updateCheckRepo()): string {
+  const tag = /^v/.test(version) ? version : `v${version}`;
+  return `https://api.github.com/repos/${repo}/releases/tags/${encodeURIComponent(tag)}`;
+}
+
+/** Longest release body we keep — a runaway changelog must not bloat the AppConfig doc
+ *  or the settings payload. Cut on a line boundary when possible so markdown stays sane. */
+export const RELEASE_NOTES_CAP = 4000;
+
+/** Trim + length-cap a raw release body. '' (never null) when there is nothing usable, so
+ *  the caller can treat "no notes" and "notes cleared" identically. */
+export function normalizeReleaseNotes(body: unknown): string {
+  const s = typeof body === 'string' ? body.trim() : '';
+  if (!s) return '';
+  if (s.length <= RELEASE_NOTES_CAP) return s;
+  const cut = s.slice(0, RELEASE_NOTES_CAP);
+  const lastNl = cut.lastIndexOf('\n');
+  return (lastNl > RELEASE_NOTES_CAP * 0.6 ? cut.slice(0, lastNl) : cut).trimEnd() + '\n…';
+}
+
 /**
  * Strict `X.Y.Z` (with an optional leading `v`). Deliberately strict: the registry also
  * carries `latest`, `edge`, and the truncated `1` / `1.2` convenience tags the release
@@ -134,5 +156,24 @@ export async function fetchLatestVersion(repo = updateCheckRepo()): Promise<stri
     return pickLatestVersion(tags);
   } catch {
     return null; // offline / firewalled / DNS blocked — by design, say nothing
+  }
+}
+
+/**
+ * The release-notes body for one version, from the public GitHub Releases API (P88).
+ * '' for ANY reason it can't be had (no such release, rate-limited, offline, no body) —
+ * same best-effort contract as fetchLatestVersion: a missing changelog just falls back
+ * to the existing external "release notes" link, never an error. Version tags on GHCR
+ * mirror the GitHub release tags, so this reuses whatever fetchLatestVersion resolved.
+ */
+export async function fetchReleaseNotes(version: string, repo = updateCheckRepo()): Promise<string> {
+  if (!parseVersion(version)) return '';
+  try {
+    const body = (await getJson(releaseNotesApiUrl(version, repo), {
+      Accept: 'application/vnd.github+json',
+    })) as { body?: unknown } | null;
+    return normalizeReleaseNotes(body?.body);
+  } catch {
+    return '';
   }
 }

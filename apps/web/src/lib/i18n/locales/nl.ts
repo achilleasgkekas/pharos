@@ -300,6 +300,7 @@ export const nl: Partial<Dict> = {
   'upd.checkNow': 'Nu op updates controleren',
   'upd.toggle': 'Op updates controleren',
   'upd.toggleHint': 'Eén anonieme aanvraag per dag naar het openbare register. Er wordt niets over deze instantie verzonden.',
+  'upd.whatsNew': 'Wat is er nieuw',
   'set.tabSystem': 'Systeemstatus',
   'sys.title': 'Systeemstatus',
   'sys.desc': 'Een alleen-lezen gezondheidscontrole van deze installatie. Niets hier verandert iets.',
