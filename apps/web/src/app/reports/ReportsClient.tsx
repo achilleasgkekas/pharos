@@ -133,7 +133,7 @@ type Data = {
   } | null;
   expenseByCategory: { name: string; value: number }[];
   expenseBySpace: { name: string; value: number }[];
-  budgetVsActual: { name: string; budget: number; actual: number; carried?: number; effective?: number; leftover?: number }[];
+  budgetVsActual: { name: string; budget: number; actual: number; projected?: number; carried?: number; effective?: number; leftover?: number }[];
   budgetRollover?: boolean;
   /** P83 — "YYYY-MM" a sweep of this month's leftover is booked against. */
   budgetMonthKey?: string;
@@ -639,6 +639,22 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
                   <div className="h-2 rounded-full bg-[color:var(--color-surface-2)] overflow-hidden">
                     <div className="h-full rounded-full transition-all" style={{ width: `${Math.max(pct, b.actual > 0 ? 3 : 0)}%`, background: over ? 'var(--color-red)' : 'var(--color-accent)' }} />
                   </div>
+                  {/* P100 — month-end pace projection. Hidden on the last day / with no spend
+                      (b.projected is undefined then). "over pace" = the run rate blows the limit
+                      even if the actual has not yet. */}
+                  {b.projected != null && limit > 0 && (() => {
+                    const overPace = b.projected > limit;
+                    return (
+                      <div className="mt-1 flex items-center gap-1.5 text-[10px]" style={{ fontFamily: 'var(--font-mono)' }}>
+                        <span className="text-[color:var(--color-text-faint)]">
+                          {t('reports.pace', { x: `~${cur()}${b.projected.toLocaleString('en-GB')}` })}
+                        </span>
+                        <span className={`px-1.5 py-px rounded ${overPace ? 'text-[color:var(--color-red)] bg-[color:var(--color-red)]/10' : 'text-[color:var(--color-accent)] bg-[color:var(--color-accent)]/10'}`}>
+                          {overPace ? t('reports.overPace') : t('reports.onTrack')}
+                        </span>
+                      </div>
+                    );
+                  })()}
                   {/* P83 — the unspent part of the envelope, offered to a savings goal.
                       Hidden unless envelope mode is on, something is actually left, and
                       there is an open goal to receive it. */}

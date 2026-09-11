@@ -1696,4 +1696,7 @@ export const el: Partial<Dict> = {
   'set.aiProviderKey': 'Πάροχος & κλειδί AI',
   'set.aiManagedInWorkspace': 'Στο φιλοξενούμενο Pharos ο πάροχος AI και το API key ρυθμίζονται στο workspace σου. Ένα κλειδί εδώ αγνοείται — όρισέ το στις ρυθμίσεις του workspace.',
   'set.openWorkspaceAi': 'Άνοιγμα Workspace → AI',
+  'reports.pace': 'Με αυτόν τον ρυθμό: {x} έως τέλος μήνα',
+  'reports.onTrack': 'εντός στόχου',
+  'reports.overPace': 'εκτός ρυθμού',
 };

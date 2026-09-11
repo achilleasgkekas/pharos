@@ -1665,4 +1665,7 @@ export const nl: Partial<Dict> = {
   'set.aiProviderKey': 'AI-provider & sleutel',
   'set.aiManagedInWorkspace': 'In gehost Pharos worden de AI-provider en API-sleutel in je workspace beheerd. Een hier ingevoerde sleutel wordt genegeerd — stel deze in bij de workspace-instellingen.',
   'set.openWorkspaceAi': 'Open Workspace → AI',
+  'reports.pace': 'In dit tempo: {x} tegen maandeinde',
+  'reports.onTrack': 'op schema',
+  'reports.overPace': 'te snel',
 };

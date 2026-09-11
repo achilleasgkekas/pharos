@@ -1744,6 +1744,9 @@ export const en = {
   'set.aiProviderKey': 'AI provider & key',
   'set.aiManagedInWorkspace': 'In hosted Pharos your AI provider and API key are managed in your workspace. A key entered here is ignored — set it in Workspace settings instead.',
   'set.openWorkspaceAi': 'Open Workspace → AI',
+  'reports.pace': 'At this pace: {x} by month-end',
+  'reports.onTrack': 'on track',
+  'reports.overPace': 'over pace',
 } as const;
 
 export type Dict = Record<keyof typeof en, string>;

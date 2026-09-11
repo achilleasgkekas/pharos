@@ -13,6 +13,7 @@ import { computeInstallmentPlans } from '@/lib/installments';
 import { getAppSettings } from '@/lib/appSettings';
 import { estimatedItemValue } from '@/lib/depreciation';
 import { categoryRollover, ROLLOVER_WINDOW } from '@/lib/budgetRollover';
+import { projectMonthEnd, paceMeaningful } from '@/lib/budgetPace';
 import { sweepableLeftover, sweptForMonth } from '@/lib/budgetSweep';
 import { receiptCategorySpend } from '@/lib/receiptCategorySpend';
 import { receiptSpaceSpend } from '@/lib/receiptSpaceSpend';
@@ -226,17 +227,26 @@ async function getReports(monthsBack = 12) {
   // Flattened once here rather than per category (the list is tiny either way).
   const allContributions = (goalsRaw as unknown as { contributions?: { amount?: number; note?: string }[] }[])
     .flatMap((g) => g.contributions ?? []);
+  // P100 — month-end pace projection per category (linear from spend-so-far). Meaningful only
+  // mid-month once something is spent; undefined otherwise so the client hides the line.
+  const paceNow = new Date();
+  const paceDay = paceNow.getDate();
+  const paceDaysInMonth = new Date(paceNow.getFullYear(), paceNow.getMonth() + 1, 0).getDate();
+  const projectedFor = (actual: number): number | undefined =>
+    paceMeaningful(actual, paceDay, paceDaysInMonth) ? projectMonthEnd(actual, paceDay, paceDaysInMonth) : undefined;
+
   const budgetVsActual = Object.entries(appSettings.budgets)
     .map(([name, budget]) => {
       const base = Math.round(budget);
       const actual = Math.round(thisMonthCat.get(name) ?? 0);
-      if (!appSettings.budgetRollover) return { name, budget: base, actual };
+      const projected = projectedFor(actual);
+      if (!appSettings.budgetRollover) return { name, budget: base, actual, projected };
       const priorSpends = rolloverMonthKeys.map((mk) => catByMonth.get(mk)?.get(name) ?? 0);
       const { carried, effective } = categoryRollover(base, priorSpends);
       // Whole euro still unspent in the envelope, offered to a savings goal. Zero once
       // the category is on/over its limit, or once this month was already swept.
       const leftover = sweepableLeftover(effective, actual, sweptForMonth(allContributions, name, thisMonthKey));
-      return { name, budget: base, actual, carried, effective, leftover };
+      return { name, budget: base, actual, projected, carried, effective, leftover };
     })
     .sort((a, b) => b.budget - a.budget);
   const expenseByCategory = [...expCatMap.entries()]

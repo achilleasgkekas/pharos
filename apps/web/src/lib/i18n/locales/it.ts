@@ -1665,4 +1665,7 @@ export const it: Partial<Dict> = {
   'set.aiProviderKey': 'Provider e chiave IA',
   'set.aiManagedInWorkspace': 'Nel Pharos ospitato, il provider IA e la chiave API si gestiscono nel tuo workspace. Una chiave inserita qui viene ignorata — impostala nelle impostazioni del workspace.',
   'set.openWorkspaceAi': 'Apri Workspace → IA',
+  'reports.pace': 'A questo ritmo: {x} a fine mese',
+  'reports.onTrack': 'in linea',
+  'reports.overPace': 'oltre il ritmo',
 };

@@ -96,7 +96,7 @@
   π.χ. 5 ενεργά referral bonuses ταυτόχρονα)· self-host build = καμία αλλαγή/no-op (SaaS-only, ίδιο idiom με τα
   υπόλοιπα billing-only items).
 
-### P100. Budget «pace» / προβλεπόμενο μηνιαίο σύνολο ανά κατηγορία (Reports) — S — OSS (κυρίως), dogfooding-heavy
+### P100. Budget «pace» / προβλεπόμενο μηνιαίο σύνολο ανά κατηγορία (Reports) — ✅ SHIPPED 2026-09-11 (interactive session, «ξεκίνα τα proposed») — S — OSS (κυρίως), dogfooding-heavy
 - **Αξία:** live-verified `grep -rn "projected|pace|onTrack|daysLeft" apps/web/src/app/reports` = 0 hits. Το ήδη-
   shipped **P27** (suggest budgets) γεμίζει το όριο ανά κατηγορία και το ήδη-shipped **P25** (rollover) δείχνει το
   used/όριο ΤΩΡΑ, αλλά τίποτα δεν προβάλλει προς τα εμπρός: αν είναι 10 του μήνα και έχεις ήδη ξοδέψει το μισό

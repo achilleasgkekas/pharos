@@ -1665,4 +1665,7 @@ export const de: Partial<Dict> = {
   'set.aiProviderKey': 'KI-Anbieter & Schlüssel',
   'set.aiManagedInWorkspace': 'Im gehosteten Pharos werden KI-Anbieter und API-Schlüssel in deinem Workspace verwaltet. Ein hier eingegebener Schlüssel wird ignoriert — lege ihn stattdessen in den Workspace-Einstellungen fest.',
   'set.openWorkspaceAi': 'Workspace → KI öffnen',
+  'reports.pace': 'Bei diesem Tempo: {x} bis Monatsende',
+  'reports.onTrack': 'im Plan',
+  'reports.overPace': 'über dem Tempo',
 };
