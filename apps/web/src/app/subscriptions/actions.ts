@@ -15,6 +15,8 @@ import { resolveFx, convertToBase, normalizeCurrency } from '@/lib/fx';
 import { assertCanWrite } from '@/lib/auth';
 import { cleanSplit } from '@/lib/split';
 import { BILLING_CYCLE_VALUES, nextOccurrence } from '@/lib/billingCycle';
+import { groupSubscriptionDupes } from '@/lib/subscriptionDupes';
+import type { SubscriptionDupeGroup } from '@/lib/subscriptionDupes';
 
 export type SuggestResult =
   | { ok: true; data: ParsedSubscription }
@@ -238,5 +240,113 @@ export async function trackDiscoveredSubscription(candidate: {
       active: true,
     });
     revalidatePath('/subscriptions');
+  });
+}
+
+// ── Duplicate detection & merge (P85) ────────────────────────────────────────
+// The fifth module to get the review-before-merge flow (after Receipts/Stores/Items/
+// Expenses). The grouping rule lives in lib/subscriptionDupes.ts (pure, tested); these
+// two exports are only the database halves of it.
+
+/** Candidate duplicate subscriptions, most valuable cluster first. */
+export async function findDuplicateSubscriptions(): Promise<SubscriptionDupeGroup[]> {
+  return withRequestTenant(async () => {
+    await connectDB();
+    const Subscription = await currentModel(SubscriptionModel);
+    // amount > 0 mirrors the Expenses filter: a free/€0 subscription carries no cost
+    // signal and would otherwise collapse every €0 row into one bogus cluster.
+    const rows = await Subscription.find({ amount: { $gt: 0 } })
+      .select('name provider category amount currency billingCycle active paymentMethod notes url split fxRate')
+      .lean();
+
+    return groupSubscriptionDupes(
+      (rows as unknown as Array<Record<string, unknown>>).map((r) => {
+        const name = String(r.name ?? '');
+        // The provider is a strong extra signal, but the NAME is what the user typed and
+        // what they re-type on a re-signup, so it stays the grouping key (vendorKey idiom).
+        return {
+          _id: String(r._id),
+          name,
+          nameKey: vendorKey(name),
+          amount: Number(r.amount) || 0,
+          billingCycle: String(r.billingCycle ?? 'monthly'),
+          provider: String(r.provider ?? ''),
+          category: String(r.category ?? ''),
+          currency: String(r.currency ?? ''),
+          active: r.active !== false,
+          paymentMethod: String(r.paymentMethod ?? ''),
+          notes: String(r.notes ?? ''),
+          url: String(r.url ?? ''),
+          splitCount: Array.isArray(r.split) ? r.split.length : 0,
+          hasFx: Number(r.fxRate) > 0,
+        };
+      })
+    );
+  });
+}
+
+/**
+ * Merge duplicate subscriptions into one survivor: backfill every field the survivor is
+ * missing from the dropped records, union any cost-split, then soft-delete the drops to
+ * Trash (undoable for 30 days, same as a manual delete).
+ */
+export async function mergeSubscriptions(
+  keepId: string,
+  dropIds: string[]
+): Promise<{ ok: boolean; merged: number; error?: string }> {
+  await assertCanWrite();
+  return withRequestTenant(async () => {
+    try {
+      await connectDB();
+      const Subscription = await currentModel(SubscriptionModel);
+      const keep = await Subscription.findById(keepId);
+      if (!keep) return { ok: false, merged: 0, error: 'Record to keep not found' };
+
+      const targets = dropIds.filter((id) => id && id !== keepId);
+      if (targets.length === 0) return { ok: false, merged: 0, error: 'No records to merge' };
+      // Already-trashed records are excluded by the soft-delete plugin.
+      const drops = await Subscription.find({ _id: { $in: targets } });
+      if (drops.length === 0) return { ok: false, merged: 0, error: 'No records to merge' };
+
+      for (const d of drops) {
+        if (!keep.provider && d.provider) keep.provider = d.provider;
+        if ((!keep.category || keep.category === 'other') && d.category && d.category !== 'other') {
+          keep.category = d.category;
+        }
+        if (!keep.paymentMethod && d.paymentMethod) keep.paymentMethod = d.paymentMethod;
+        if (!keep.notes && d.notes) keep.notes = d.notes;
+        if (!keep.url && d.url) keep.url = d.url;
+        if (!keep.space && d.space) keep.space = d.space;
+        if (!keep.trialEndsAt && d.trialEndsAt) keep.trialEndsAt = d.trialEndsAt;
+        if (!keep.firstChargeAmount && d.firstChargeAmount) keep.firstChargeAmount = d.firstChargeAmount;
+        // Foreign-currency provenance (P9): amount is already base and equal across the
+        // group, but only one copy may carry what the invoice printed.
+        if (!keep.fxRate && d.fxRate) {
+          keep.currency = d.currency;
+          keep.origAmount = d.origAmount;
+          keep.fxRate = d.fxRate;
+        }
+        if ((!keep.split || keep.split.length === 0) && d.split?.length) {
+          keep.split = d.split;
+          keep.markModified('split');
+        }
+        // A dropped copy that is still active means the survivor should be live too
+        // (never let a merge silently cancel a running subscription).
+        if (!keep.active && d.active) {
+          keep.active = true;
+          keep.cancelledAt = null;
+        }
+      }
+      await keep.save();
+
+      const now = new Date();
+      await Subscription.updateMany({ _id: { $in: drops.map((d) => d._id) } }, { $set: { deletedAt: now } });
+
+      revalidatePath('/subscriptions');
+      revalidatePath('/reports');
+      return { ok: true, merged: drops.length };
+    } catch (err) {
+      return { ok: false, merged: 0, error: (err as Error).message };
+    }
   });
 }

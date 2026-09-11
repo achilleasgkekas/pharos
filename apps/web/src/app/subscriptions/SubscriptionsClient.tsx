@@ -8,7 +8,8 @@ import { isForeignCurrency, normalizeCurrency, convertToBase, deriveFxRate, form
 import { FxBadge } from '@/components/FxBadge';
 import { FxRateButton } from '@/components/FxRateButton';
 import { useState, useTransition, useMemo } from 'react';
-import { Plus, Pencil, Trash2, ExternalLink, Power, Sparkles, Loader2, Search, LayoutGrid, List as ListIcon, SlidersHorizontal, Radar, X, Split as SplitIcon, CheckCircle2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, ExternalLink, Power, Sparkles, Loader2, Search, LayoutGrid, List as ListIcon, SlidersHorizontal, Radar, X, Split as SplitIcon, CheckCircle2, Copy } from 'lucide-react';
+import { SubscriptionDuplicatesModal } from './SubscriptionDuplicatesModal';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -95,6 +96,7 @@ export function SubscriptionsClient({
   if (categoryList.length) _subCats = categoryList;
   const fx: FxCtx = { base: baseCurrency, enabled: multiCurrency };
   const [showCreate, setShowCreate] = useState(false);
+  const [findingDupes, setFindingDupes] = useState(false); // P85
   const [editing, setEditing] = useState<SerializedSubscription | null>(null);
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
@@ -262,12 +264,17 @@ export function SubscriptionsClient({
                 </button>
               ))}
             </div>
+            <Button variant="ghost" onClick={() => setFindingDupes(true)} title={t('subdup.title')}>
+              <Copy size={16} /> {t('subdup.find')}
+            </Button>
             <Button variant="primary" onClick={() => setShowCreate(true)}>
               <Plus size={16} strokeWidth={2.5} /> {t('common.new')}
             </Button>
           </div>
         </div>
       </div>
+
+      {findingDupes && <SubscriptionDuplicatesModal onClose={() => setFindingDupes(false)} />}
 
       {/* Upcoming renewals strip */}
       {upcoming.length > 0 && (

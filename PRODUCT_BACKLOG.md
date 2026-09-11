@@ -235,7 +235,7 @@
   server-local time (όχι per-channel timezone, self-host = ένα timezone συνήθως)· κενό/ρυθμισμένο = καμία αλλαγή
   συμπεριφοράς (ίδιο idiom με τα υπόλοιπα optional AppConfig πεδία).
 
-### P85. Duplicate subscription detection & merge (mirror P46/P22 pattern) — S — OSS (κυρίως), dogfooding-heavy
+### P85. Duplicate subscription detection & merge (mirror P46/P22 pattern) — ✅ SHIPPED 2026-09-11 (interactive session, «ξεκίνα τα proposed») — S — OSS (κυρίως), dogfooding-heavy
 - **Αξία:** live-verified `grep -n "export async function findDuplicate" apps/web/src` δείχνει ακριβώς 4 ήδη-
   shipped dedup μηχανισμούς (`findDuplicateReceipts`, `findDuplicateExpenses`, `findDuplicateItems`,
   `findDuplicateStores`) — **Subscriptions δεν έχει κανέναν**. Ένα κλασικό ατύχημα (ξανα-εγγραφή μετά από cancel+

@@ -892,6 +892,13 @@ export const el: Partial<Dict> = {
   'exdup.file': 'με αρχείο',
   'exdup.recurring': 'επαναλαμβανόμενο',
   'exdup.manual': 'χειροκίνητα',
+  'subdup.title': 'Εύρεση διπλών συνδρομών',
+  'subdup.find': 'Εύρεση διπλών',
+  'subdup.none': 'Δεν βρέθηκαν διπλές συνδρομές.',
+  'subdup.intro': '{groups} ομάδες · {dupes} διπλότυπα προς συγχώνευση. Διάλεξε ποιο κρατάς σε κάθε ομάδα (προεπιλογή: το ενεργό)· τα υπόλοιπα συγχωνεύονται σε αυτό και πάνε στον Κάδο.',
+  'subdup.meta': '{category} · {provider}',
+  'subdup.active': 'ενεργή',
+  'subdup.cancelled': 'ακυρωμένη',
 
   // Έλεγχος ενημερώσεων self-host (P40)
   'upd.available': 'Διαθέσιμη ενημέρωση: v{version} — δες τις σημειώσεις έκδοσης',

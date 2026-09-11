@@ -907,6 +907,14 @@ export const en = {
   'exdup.file': 'has file',
   'exdup.recurring': 'recurring',
   'exdup.manual': 'manual',
+  'subdup.title': 'Find duplicate subscriptions',
+  'subdup.find': 'Find duplicates',
+  'subdup.none': 'No duplicate subscriptions found.',
+  'subdup.intro':
+    '{groups} groups · {dupes} duplicates to merge. Pick the one to keep in each (defaults to the active one); the rest merge into it and move to the Trash.',
+  'subdup.meta': '{category} · {provider}',
+  'subdup.active': 'active',
+  'subdup.cancelled': 'cancelled',
 
   // Self-host update check (P40)
   'upd.available': 'Update available: v{version} — see the release notes',
