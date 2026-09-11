@@ -22,6 +22,7 @@ import {
   List as ListIcon,
   SlidersHorizontal,
   Merge,
+  Columns3,
   ImagePlus,
   Pencil,
   Truck,
@@ -295,6 +296,8 @@ export function ItemsClient({
   const [showMerge, setShowMerge] = useState(false); // manual merge of the selected items
   const [mergeKeep, setMergeKeep] = useState('');
   const [merging, startMerge] = useTransition();
+  // P90: read-only side-by-side compare of the selected items (client-side, no round-trip)
+  const [showCompare, setShowCompare] = useState(false);
   // P78: bulk field-edit (category/status/tags) over the selected items
   const [showBulkEdit, setShowBulkEdit] = useState(false);
   const [bulkCategory, setBulkCategory] = useState('');
@@ -466,6 +469,16 @@ export function ItemsClient({
     if (selectedIds.size < 2) return;
     setMergeKeep(mergeCandidates[0]?._id ?? '');
     setShowMerge(true);
+  }
+
+  // P90: the selected items, capped at 3 columns so the compare table stays readable.
+  const compareItems = useMemo(
+    () => items.filter((i) => selectedIds.has(i._id)).slice(0, 3),
+    [items, selectedIds]
+  );
+  function openCompare() {
+    if (selectedIds.size < 2) return;
+    setShowCompare(true);
   }
   function handleManualMerge() {
     const keep = mergeKeep || mergeCandidates[0]?._id;
@@ -681,6 +694,15 @@ export function ItemsClient({
                         <Merge size={14} /> {t('it.mergeN', { n: selectedIds.size })}
                       </button>
                     )}
+                    {selectedIds.size >= 2 && (
+                      <button
+                        onClick={openCompare}
+                        title={t('it.compareTitle')}
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap bg-[color:var(--color-surface-2)] border border-[color:var(--color-accent)] text-[color:var(--color-accent)] hover:opacity-80 transition-colors"
+                      >
+                        <Columns3 size={14} /> {t('it.compareN', { n: Math.min(selectedIds.size, 3) })}
+                      </button>
+                    )}
                     {selectedIds.size > 0 && (
                       <button
                         onClick={openBulkEdit}
@@ -894,7 +916,140 @@ export function ItemsClient({
           </div>
         </div>
       </Modal>
+
+      {/* P90: read-only side-by-side compare of the selected candidates */}
+      <Modal
+        open={showCompare}
+        onClose={() => setShowCompare(false)}
+        title={t('it.compareN', { n: compareItems.length })}
+        size="lg"
+      >
+        <CompareItemsTable items={compareItems} t={t} truncated={selectedIds.size > compareItems.length} />
+      </Modal>
     </main>
+  );
+}
+
+/** P90: read-only comparison grid — one column per selected item, one row per attribute.
+ *  Pure client-side over the already-loaded items; no schema change, no server call. */
+function CompareItemsTable({
+  items,
+  t,
+  truncated,
+}: {
+  items: SerializedItem[];
+  t: TFunc;
+  truncated: boolean;
+}) {
+  if (items.length === 0) return null;
+  const money = (n: number) => `${cur()}${n}`;
+  const statusLabel = (s: string) => (IT_STATUS_KEY[s] ? t(IT_STATUS_KEY[s]) : s);
+  const storeOf = (i: SerializedItem) => bestLinkPrice(i)?.store || i.purchasedFrom || '';
+  const cell = 'align-top p-2 border-b border-[color:var(--color-border)] text-xs';
+  const label = 'align-top p-2 border-b border-[color:var(--color-border)] text-[10px] uppercase tracking-[0.1em] text-[color:var(--color-text-faint)] whitespace-nowrap';
+
+  type Row = { key: string; label: string; render: (i: SerializedItem) => React.ReactNode };
+  const rows: Row[] = [
+    { key: 'num', label: '#', render: (i) => i.num || '—' },
+    { key: 'category', label: t('common.category'), render: (i) => i.category || '—' },
+    { key: 'status', label: t('common.status'), render: (i) => statusLabel(i.status) },
+    {
+      key: 'price',
+      label: t('it.currentPriceLabel'),
+      render: (i) => (i.currentPrice > 0 ? money(i.currentPrice) : '—'),
+    },
+    {
+      key: 'target',
+      label: t('it.cmpTarget'),
+      render: (i) => (i.targetPrice && i.targetPrice > 0 ? money(i.targetPrice) : '—'),
+    },
+    {
+      key: 'lowest',
+      label: t('it.cmpLowest'),
+      render: (i) => {
+        const lo = lowestKnown(i);
+        return lo != null ? money(lo) : '—';
+      },
+    },
+    { key: 'store', label: t('it.cmpStore'), render: (i) => storeOf(i) || '—' },
+    { key: 'location', label: t('it.fLocation'), render: (i) => i.location || '—' },
+    {
+      key: 'specs',
+      label: t('it.fSpecs'),
+      render: (i) => (i.specs ? <span className="whitespace-pre-wrap">{i.specs}</span> : '—'),
+    },
+    {
+      key: 'tags',
+      label: t('it.cmpTags'),
+      render: (i) =>
+        i.tags && i.tags.length > 0 ? (
+          <span className="flex flex-wrap gap-1">
+            {i.tags.map((tag) => (
+              <span
+                key={tag}
+                className="px-1.5 py-0.5 rounded bg-[color:var(--color-surface-2)] text-[10px] text-[color:var(--color-text-dim)]"
+              >
+                {tag}
+              </span>
+            ))}
+          </span>
+        ) : (
+          '—'
+        ),
+    },
+  ];
+
+  return (
+    <div className="space-y-3">
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse" style={{ fontFamily: 'var(--font-mono)' }}>
+          <thead>
+            <tr>
+              <th className={label} />
+              {items.map((i) => (
+                <th key={i._id} className="p-2 border-b border-[color:var(--color-border)] text-left align-bottom">
+                  <div className="w-full aspect-square max-w-[9rem] mx-auto mb-2 rounded-lg overflow-hidden bg-[color:var(--color-surface-2)] flex items-center justify-center">
+                    {i.photos[0] ? (
+                      <img
+                        src={fileUrl(i.photos[0])}
+                        alt={i.title}
+                        loading="lazy"
+                        className="w-full h-full object-contain"
+                      />
+                    ) : (
+                      <ImagePlus size={20} className="text-[color:var(--color-text-faint)]" />
+                    )}
+                  </div>
+                  <span
+                    className="font-semibold text-sm text-[color:var(--color-text)] block"
+                    style={{ fontFamily: 'var(--font-display)' }}
+                  >
+                    {i.title}
+                  </span>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.key}>
+                <td className={label}>{r.label}</td>
+                {items.map((i) => (
+                  <td key={i._id} className={cell}>
+                    {r.render(i)}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {truncated && (
+        <p className="text-[10px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
+          {t('it.compareCap')}
+        </p>
+      )}
+    </div>
   );
 }
 

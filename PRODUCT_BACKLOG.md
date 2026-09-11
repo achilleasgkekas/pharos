@@ -160,7 +160,7 @@
   λίστα «ενεργών συσκευών» (θα χρειαζόταν πραγματικό session store, μεγαλύτερη αλλαγή, follow-up μόνο αν
   ζητηθεί ρητά).
 
-### P90. Side-by-side compare view για items σε status «researching» — S — OSS, dogfooding-heavy
+### P90. Side-by-side compare view για items σε status «researching» — ✅ SHIPPED 2026-09-11 (interactive session, «ξεκίνα τα proposed») — S — OSS, dogfooding-heavy
 - **Αξία:** live-verified `grep -rln "CompareItems|compareMode|sideBySide" apps/web/src` = 0 hits. Το
   `Item.status` έχει ακόμα ενεργό το αρχικό `'researching'` state (`ITEM_STATUSES` στο `models/Item.ts`) — ο
   χρήστης βάζει εκεί υποψήφια προϊόντα πριν αποφασίσει (π.χ. δύο access points, δύο NAS options). Το ίδιο το
