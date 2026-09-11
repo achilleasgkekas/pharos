@@ -261,6 +261,7 @@ export function ItemsClient({
   const [filter, setFilter] = useState('');
   const [storeFilter, setStoreFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
+  const [locationFilter, setLocationFilter] = useState(''); // P92 — where the item physically lives
   const [sortBy, setSortBy] = useState<SortKey>('default');
   const [flags, setFlags] = useState<Set<string>>(new Set());
   const toggleFlag = (f: string) =>
@@ -311,6 +312,11 @@ export function ItemsClient({
     () => [...new Set(items.map((i) => i.category).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
     [items]
   );
+  // P92 — distinct physical locations (room / rack / shelf), for the browse-by-location filter.
+  const locations = useMemo(
+    () => [...new Set(items.map((i) => i.location).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
+    [items]
+  );
 
   // Installment plans grouped by each product they're linked to (a plan can list several)
   const plansByItem = useMemo(() => {
@@ -340,6 +346,7 @@ export function ItemsClient({
       if (filter && item.status !== filter) return false;
       if (storeFilter && item.purchasedFrom !== storeFilter) return false;
       if (categoryFilter && item.category !== categoryFilter) return false;
+      if (locationFilter && item.location !== locationFilter) return false;
       if (activeFlags.some((f) => !f.test(item))) return false;
       if (search) {
         const q = search.toLowerCase();
@@ -373,7 +380,7 @@ export function ItemsClient({
       }
     });
     return sorted;
-  }, [items, filter, storeFilter, categoryFilter, flags, search, sortBy]);
+  }, [items, filter, storeFilter, categoryFilter, locationFilter, flags, search, sortBy]);
 
   // Bulk "AI fill from web" over the current filtered view. Chunks of 5 (the server
   // action also caps at 5) run sequentially so we never hammer Ollama/SearXNG; one
@@ -506,11 +513,12 @@ export function ItemsClient({
     .reduce((s, i) => s + (i.currentPrice || 0), 0);
   const dealsCount = view === 'shopping' ? items.filter(isDeal).length : 0;
 
-  const anyFilterActive = !!(filter || storeFilter || categoryFilter || flags.size > 0 || search || sortBy !== 'default');
+  const anyFilterActive = !!(filter || storeFilter || categoryFilter || locationFilter || flags.size > 0 || search || sortBy !== 'default');
   const resetFilters = () => {
     setFilter('');
     setStoreFilter('');
     setCategoryFilter('');
+    setLocationFilter('');
     setFlags(new Set());
     setSearch('');
     setSortBy('default');
@@ -547,6 +555,13 @@ export function ItemsClient({
       {categories.length > 1 && (
         <FilterGroup label={t('common.category')}>
           <SearchableSelect value={categoryFilter} onChange={setCategoryFilter} options={categories} placeholder={t('sub.allCategories')} clearable size="sm" className="w-full" />
+        </FilterGroup>
+      )}
+      {/* P92 — browse by physical location (room / rack / shelf). Only shown once items
+          actually carry more than one distinct location. */}
+      {locations.length > 1 && (
+        <FilterGroup label={t('it.fLocation')}>
+          <SearchableSelect value={locationFilter} onChange={setLocationFilter} options={locations} placeholder={t('it.allLocations')} clearable size="sm" className="w-full" />
         </FilterGroup>
       )}
       <FilterGroup label={t('common.sort')}>

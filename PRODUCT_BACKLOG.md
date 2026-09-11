@@ -129,7 +129,7 @@
   πρώτο entry του array στο πρώτο read (ίδιο idiom με το ήδη-υπάρχον `notifiers` legacy-ntfy migrate-on-read)·
   sync παραμένει fire-and-forget/best-effort ανά destination (ένα αποτυχημένο δεν μπλοκάρει το άλλο).
 
-### P92. Location-based filter/browse view για Items (dogfooding: δύο σπίτια + rack layout) — S — OSS, dogfooding-heavy
+### P92. Location-based filter/browse view για Items (dogfooding: δύο σπίτια + rack layout) — ✅ SHIPPED 2026-09-11 (interactive) — S — OSS, dogfooding-heavy
 - **Αξία:** live-verified: το `Item.location` πεδίο υπάρχει ήδη (`models/Item.ts`: «where it physically lives
   (room / rack / shelf)», ήδη editable στη φόρμα, `app/items/ItemsClient.tsx`) αλλά είναι **χρήσιμο μόνο μέσα σε
   ένα item**, `grep -rln "byLocation|LocationView|groupByLocation" apps/web/src` = 0 hits, καμία σειρά φίλτρου/

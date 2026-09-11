@@ -1747,6 +1747,7 @@ export const en = {
   'reports.pace': 'At this pace: {x} by month-end',
   'reports.onTrack': 'on track',
   'reports.overPace': 'over pace',
+  'it.allLocations': 'All locations',
 } as const;
 
 export type Dict = Record<keyof typeof en, string>;

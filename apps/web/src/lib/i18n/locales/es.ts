@@ -1668,4 +1668,5 @@ export const es: Partial<Dict> = {
   'reports.pace': 'A este ritmo: {x} a fin de mes',
   'reports.onTrack': 'en objetivo',
   'reports.overPace': 'sobre ritmo',
+  'it.allLocations': 'Todas las ubicaciones',
 };

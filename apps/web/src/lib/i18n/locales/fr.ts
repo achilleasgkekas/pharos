@@ -1668,4 +1668,5 @@ export const fr: Partial<Dict> = {
   'reports.pace': 'À ce rythme : {x} en fin de mois',
   'reports.onTrack': 'dans les clous',
   'reports.overPace': 'trop rapide',
+  'it.allLocations': 'Tous les emplacements',
 };

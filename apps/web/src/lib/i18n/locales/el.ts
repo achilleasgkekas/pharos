@@ -1699,4 +1699,5 @@ export const el: Partial<Dict> = {
   'reports.pace': 'Με αυτόν τον ρυθμό: {x} έως τέλος μήνα',
   'reports.onTrack': 'εντός στόχου',
   'reports.overPace': 'εκτός ρυθμού',
+  'it.allLocations': 'Όλες οι τοποθεσίες',
 };

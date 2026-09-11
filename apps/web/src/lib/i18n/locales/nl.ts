@@ -1668,4 +1668,5 @@ export const nl: Partial<Dict> = {
   'reports.pace': 'In dit tempo: {x} tegen maandeinde',
   'reports.onTrack': 'op schema',
   'reports.overPace': 'te snel',
+  'it.allLocations': 'Alle locaties',
 };
