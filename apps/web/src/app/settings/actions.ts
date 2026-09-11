@@ -62,6 +62,7 @@ import { PROVIDER_RECOMMEND, priceForModel, looksVisionModel, type FetchedModel,
 import { startDeviceCode, pollDeviceToken, getOnedriveCreds, disconnectOnedrive, testOnedrive, uploadToOnedrive, type DeviceCode } from '@/lib/onedrive';
 import { runNtfyTest } from '@/lib/notify';
 import { ALERT_TYPE_KEYS, resolveNotifyTypes, type NotifyTypes } from '@/lib/alertTypes';
+import { isWithinQuietHours, normalizeQuietHours } from '@/lib/quietHours';
 import { BACKUP_MODELS, BACKUP_KEYS } from '@/lib/backupModels';
 import { verifyBackupJson, formatBackupCounts, type BackupVerifyResult } from '@/lib/backupVerify';
 import { detectSyncStaleness, formatSyncStaleness } from '@/lib/syncStaleness';
@@ -463,6 +464,12 @@ export async function getNotifyTypes(): Promise<NotifyTypes> {
   return (await getAppSettings()).notifyTypes;
 }
 
+/** Current quiet-hours / DND window for the alert cron (P86). */
+export async function getQuietHours(): Promise<{ start: string; end: string }> {
+  await requireAdmin();
+  return (await getAppSettings()).quietHours;
+}
+
 /** Replace the per-type outbound alert toggles. Unknown keys are dropped and every known
  *  key is written explicitly, so the stored map always matches the current registry. */
 export async function saveNotifyTypes(types: NotifyTypes): Promise<{ ok: boolean }> {
@@ -472,6 +479,22 @@ export async function saveNotifyTypes(types: NotifyTypes): Promise<{ ok: boolean
   await (await scoped(AppConfig)).updateOne(
     { key: 'singleton' },
     { $set: { notifyTypes: Object.fromEntries(ALERT_TYPE_KEYS.map((k) => [k, clean[k]])) } },
+    { upsert: true }
+  );
+  invalidateAppSettings();
+  revalidatePath('/settings');
+  return { ok: true };
+}
+
+/** Save the quiet-hours / do-not-disturb window for the alert cron (P86). Malformed times
+ *  are coerced to '' (off) by normalizeQuietHours, so a blank pair simply disables it. */
+export async function saveQuietHours(quietHours: { start: string; end: string }): Promise<{ ok: boolean }> {
+  await requireAdmin();
+  await connectDB();
+  const clean = normalizeQuietHours(quietHours);
+  await (await scoped(AppConfig)).updateOne(
+    { key: 'singleton' },
+    { $set: { quietHours: clean } },
     { upsert: true }
   );
   invalidateAppSettings();
@@ -883,8 +906,14 @@ export async function runAlertChecks(opts: { dedupe?: boolean } = {}): Promise<{
     : opts.dedupe && hadAnyLiveAlert
       ? 'No new alerts (already reported).'
       : 'All clear — nothing to report.';
+  // Quiet hours (P86): only the unattended cron (opts.dedupe) respects the DND window —
+  // the manual "Check & notify now" button is a deliberate human action and always sends.
+  // We defer by NOT dispatching AND NOT persisting the baseline, so the alerts stay "fresh"
+  // and go out on the first run past the window; the scan itself and the in-app bell above
+  // already ran, so nothing is lost, only the phone-buzzing delivery is held.
+  const quiet = opts.dedupe && isWithinQuietHours(new Date(now), s.quietHours);
   let sent = false;
-  if (lines.length) {
+  if (lines.length && !quiet) {
     const r = await dispatchAlert('Pharos alerts', summary);
     sent = r.sent > 0;
     // Persist the new baseline ONLY once a channel actually accepted the message — a
@@ -894,7 +923,8 @@ export async function runAlertChecks(opts: { dedupe?: boolean } = {}): Promise<{
       await (await scoped(AppConfig)).updateOne({ key: 'singleton' }, { $set: { alertDispatchKeys: liveDispatchKeys } }, { upsert: true });
     }
   }
-  return { ok: true, sent, summary };
+  const outSummary = quiet && lines.length ? `Quiet hours — ${lines.length} alert(s) held until the window ends.` : summary;
+  return { ok: true, sent, summary: outSummary };
 }
 
 /** Toggle the bulk-AI cost guard (confirm before a paid bulk job). */

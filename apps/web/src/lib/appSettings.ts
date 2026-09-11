@@ -20,6 +20,7 @@ import {
 import { resolveDepreciation, DEFAULT_DEPRECIATION, type DepreciationConfig } from './depreciation';
 import { resolveCategoryRules, type CategoryRule } from './categoryRules';
 import { resolveNotifyTypes, defaultNotifyTypes, type NotifyTypes } from './alertTypes';
+import { normalizeQuietHours, type QuietHours } from './quietHours';
 
 export type AppSettings = {
   defaultItemView: 'grid' | 'list';
@@ -50,6 +51,7 @@ export type AppSettings = {
   categoryRules: CategoryRule[]; // vendor→category auto-rules (P15), applied on create
   onboardingDismissed: boolean; // hides the homepage "getting started" checklist (P26)
   notifyTypes: NotifyTypes; // per-type outbound alert toggles (P103); all-on = pre-P103 behaviour
+  quietHours: QuietHours; // do-not-disturb window for the alert cron (P86); empty = off
 };
 
 /** Raw AppConfig singleton fields relevant to app settings (all optional). */
@@ -80,6 +82,7 @@ export type RawAppConfigDoc = {
   categoryRules?: unknown;
   onboardingDismissed?: boolean;
   notifyTypes?: unknown;
+  quietHours?: unknown;
 };
 
 /** Coerce a Mixed map to { key: positiveNumber }. */
@@ -123,6 +126,7 @@ const DEFAULTS: AppSettings = {
   categoryRules: [],
   onboardingDismissed: false,
   notifyTypes: defaultNotifyTypes(),
+  quietHours: { start: '', end: '' },
 };
 
 // Cache keyed by tenant. Default/self-hosted tenant uses the '' key so its behaviour and
@@ -176,6 +180,7 @@ export function normalizeSettings(doc: RawAppConfigDoc | null | undefined): AppS
     categoryRules: resolveCategoryRules(doc?.categoryRules),
     onboardingDismissed: !!doc?.onboardingDismissed,
     notifyTypes: resolveNotifyTypes(doc?.notifyTypes),
+    quietHours: normalizeQuietHours(doc?.quietHours),
   };
 }
 

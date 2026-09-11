@@ -219,7 +219,7 @@
   DB record) ώστε το πρώτο slice να μείνει S χωρίς νέο model· server-side sync (πολλαπλές συσκευές/household
   members) follow-up μόνο αν αποδειχτεί χρήσιμο. Κενό = καμία αλλαγή (ίδιο idiom με τα υπόλοιπα S items).
 
-### P86. Notification quiet hours / do-not-disturb window για το alert cron — S — OSS (κυρίως), βοηθά και SaaS
+### P86. Notification quiet hours / do-not-disturb window για το alert cron — ✅ SHIPPED 2026-09-12 (interactive session, «ξεκίνα τα proposed») — S — OSS (κυρίως), βοηθά και SaaS
 - **Αξία:** live-verified `grep -n "quietHours|doNotDisturb|silenceUntil" models/AppConfig.ts` = 0 hits. Το ήδη-
   shipped τρίπτυχο **P81** (auto cron trigger) + **P82** (dedup) + **P80** (retry + delivery log, shipped σήμερα)
   έκανε το alert engine πλήρως αυτόματο και αξιόπιστο, αλλά κανένα από τα τρία έθεσε ώρα ησυχίας — το cron μπορεί

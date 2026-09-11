@@ -345,3 +345,50 @@ describe('runAlertChecks · dedupe on, the bell and event webhooks are unaffecte
     expect(dispatchEventWebhooksMock).toHaveBeenCalledWith('price.drop', { items: [{ title: 'U7 Pro', target: 300 }] });
   });
 });
+
+describe('runAlertChecks · quiet hours (P86)', () => {
+  const toHHMM = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+  const curMin = () => {
+    const d = new Date();
+    return d.getHours() * 60 + d.getMinutes();
+  };
+  // Deterministic at any wall-clock time (wrap handled by isWithinQuietHours):
+  const windowCoveringNow = () => ({ start: toHHMM((curMin() + 1439) % 1440), end: toHHMM((curMin() + 2) % 1440) });
+  const windowNotCoveringNow = () => ({ start: toHHMM((curMin() + 5) % 1440), end: toHHMM((curMin() + 10) % 1440) });
+
+  function oneLiveDeal() {
+    itemFind.mockReset();
+    itemFind.mockReturnValue(chainSelectLean([]));
+    itemFind
+      .mockReturnValueOnce(chainSelectLean([{ _id: 'i1', title: 'U7 Pro', targetPrice: 300, currentPrice: 284 }]))
+      .mockReturnValueOnce(chainSelectLean([]));
+  }
+
+  it('cron in the window holds dispatch and does NOT advance the baseline', async () => {
+    getAppSettingsMock.mockImplementation(async () => ({ ...DEFAULT_SETTINGS, quietHours: windowCoveringNow() }));
+    oneLiveDeal();
+    const result = await runAlertChecks({ dedupe: true });
+    expect(dispatchAlertMock).not.toHaveBeenCalled();
+    expect(appConfigUpdateOneMock).not.toHaveBeenCalled();
+    expect(result.sent).toBe(false);
+    expect(result.summary).toContain('Quiet hours');
+    // The in-app bell still ran while quiet — nothing is lost, only outbound delivery held.
+    expect(generateNotificationsMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('cron outside the window dispatches normally', async () => {
+    getAppSettingsMock.mockImplementation(async () => ({ ...DEFAULT_SETTINGS, quietHours: windowNotCoveringNow() }));
+    oneLiveDeal();
+    const result = await runAlertChecks({ dedupe: true });
+    expect(dispatchAlertMock).toHaveBeenCalledTimes(1);
+    expect(result.sent).toBe(true);
+  });
+
+  it('the manual button (no dedupe) always sends, even inside the window', async () => {
+    getAppSettingsMock.mockImplementation(async () => ({ ...DEFAULT_SETTINGS, quietHours: windowCoveringNow() }));
+    oneLiveDeal();
+    const result = await runAlertChecks();
+    expect(dispatchAlertMock).toHaveBeenCalledTimes(1);
+    expect(result.summary).toContain('🎯 1 deal(s): U7 Pro');
+  });
+});

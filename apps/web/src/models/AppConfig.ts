@@ -166,6 +166,14 @@ const AppConfigSchema = new Schema(
     // and no existing install changes behaviour. Filters the outbound summary ONLY — the
     // in-app bell keeps showing the full picture. See lib/alertTypes.ts for the key list.
     notifyTypes: { type: Schema.Types.Mixed, default: {} },
+    // Quiet hours / do-not-disturb (P86): one daily window in which the alert cron holds
+    // outbound delivery (push/ntfy/Discord/Telegram/webhook). "HH:MM" server-local; empty
+    // start/end = off (every pre-P86 install), so no existing behaviour changes. The scan
+    // still runs and the in-app bell still updates while quiet — only dispatch is deferred.
+    quietHours: {
+      start: { type: String, default: '' },
+      end: { type: String, default: '' },
+    },
     // Outbound delivery history (P80). Map `notifier:<id>` / `webhook:<id>` → the last
     // DELIVERY_LOG_CAP attempts (newest last, {at, ok, status, error, attempts}), written
     // by lib/deliveryLog.ts on every dispatch and shown per channel in Settings →

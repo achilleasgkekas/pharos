@@ -16,7 +16,7 @@ import { YnabImportModal } from './YnabImportModal';
 import type { StoreLite } from '@/lib/storeService';
 import type { AppSettings } from '@/lib/appSettings';
 import { rateForCategory } from '@/lib/depreciation';
-import { saveDefaults, runAlertChecks, getNotifierChannels, saveNotifierChannels, getNotifyTypes, saveNotifyTypes, testNotifierChannel, getDeliveryLogs, getWebhookSubscriptions, saveWebhookSubscriptions, testWebhookSubscription, savePrompt, resetPrompt, saveScraperAi, saveStorageConfig, testRemoteConnection, syncToRemote, getSyncManifest, syncOnedriveBatch, saveList, saveSpaces, getTrash, restoreFromTrash, purgeFromTrash, emptyTrash, startOnedriveAuth, pollOnedriveAuth, disconnectOnedriveAccount, testOnedriveConnection, saveImapConfigAction, testImapConnectionAction, checkImapInboxNow, type PromptEditorEntry, type ScraperAiConfig, type StorageInfo, type ListEditorEntry, type TrashRow, type ImapInfo } from './actions';
+import { saveDefaults, runAlertChecks, getNotifierChannels, saveNotifierChannels, getNotifyTypes, saveNotifyTypes, getQuietHours, saveQuietHours, testNotifierChannel, getDeliveryLogs, getWebhookSubscriptions, saveWebhookSubscriptions, testWebhookSubscription, savePrompt, resetPrompt, saveScraperAi, saveStorageConfig, testRemoteConnection, syncToRemote, getSyncManifest, syncOnedriveBatch, saveList, saveSpaces, getTrash, restoreFromTrash, purgeFromTrash, emptyTrash, startOnedriveAuth, pollOnedriveAuth, disconnectOnedriveAccount, testOnedriveConnection, saveImapConfigAction, testImapConnectionAction, checkImapInboxNow, type PromptEditorEntry, type ScraperAiConfig, type StorageInfo, type ListEditorEntry, type TrashRow, type ImapInfo } from './actions';
 import { NOTIFIER_TYPES, type NotifierConfig, type NotifierType } from '@/lib/notifiers.shared';
 import { ALERT_TYPES, type AlertType, type NotifyTypes } from '@/lib/alertTypes';
 import { notifierLogKey, webhookLogKey, type DeliveryLogEntry } from '@/lib/deliveryLog.shared';
@@ -2320,12 +2320,14 @@ function NotificationsManager() {
   const [testMsgs, setTestMsgs] = useState<Record<string, string>>({});
   const [logs, setLogs] = useState<Record<string, DeliveryLogEntry[]>>({});
   const [types, setTypes] = useState<NotifyTypes | null>(null);
+  const [quiet, setQuiet] = useState<{ start: string; end: string } | null>(null); // P86 DND window
 
   useEffect(() => {
     startTransition(async () => {
       setChannels(await getNotifierChannels());
       setLogs(await getDeliveryLogs());
       setTypes(await getNotifyTypes());
+      setQuiet(await getQuietHours());
     });
   }, []);
 
@@ -2347,6 +2349,7 @@ function NotificationsManager() {
     startTransition(async () => {
       await saveNotifierChannels(channels ?? []);
       if (types) await saveNotifyTypes(types);
+      if (quiet) await saveQuietHours(quiet);
       setMsg('Saved ✓');
     });
   }
@@ -2425,6 +2428,43 @@ function NotificationsManager() {
             ))}
           </div>
         )}
+      </div>
+
+      {/* P86: quiet hours / DND window for the scheduled alert cron */}
+      <div className="pt-3 border-t border-[color:var(--color-border)]">
+        <p className="text-xs text-[color:var(--color-text-dim)] mb-2">
+          Quiet hours — the scheduled check holds outbound alerts during this window and sends them once it ends
+          (server time). Alerts still appear in the bell. Leave blank to disable. The manual button below always sends.
+        </p>
+        <div className="flex items-center gap-2 flex-wrap text-[11px] text-[color:var(--color-text-dim)]">
+          <label className="flex items-center gap-1.5">
+            From
+            <input
+              type="time"
+              value={quiet?.start ?? ''}
+              onChange={(e) => setQuiet((p) => ({ start: e.target.value, end: p?.end ?? '' }))}
+              className={cn(inputClass, 'w-auto')}
+            />
+          </label>
+          <label className="flex items-center gap-1.5">
+            to
+            <input
+              type="time"
+              value={quiet?.end ?? ''}
+              onChange={(e) => setQuiet((p) => ({ start: p?.start ?? '', end: e.target.value }))}
+              className={cn(inputClass, 'w-auto')}
+            />
+          </label>
+          {quiet?.start && quiet?.end && quiet.start !== quiet.end && (
+            <button
+              type="button"
+              onClick={() => setQuiet({ start: '', end: '' })}
+              className="text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)] underline"
+            >
+              clear
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="flex items-center gap-2 flex-wrap pt-3 border-t border-[color:var(--color-border)] mt-1">

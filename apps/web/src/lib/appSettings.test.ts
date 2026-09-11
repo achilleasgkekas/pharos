@@ -72,6 +72,7 @@ describe('normalizeSettings', () => {
       categoryRules: [],
       onboardingDismissed: false,
       notifyTypes: defaultNotifyTypes(),
+      quietHours: { start: '', end: '' },
     };
     expect(normalizeSettings(null)).toEqual(expected);
     expect(normalizeSettings(undefined)).toEqual(expected);
