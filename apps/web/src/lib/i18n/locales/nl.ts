@@ -1516,6 +1516,8 @@ export const nl: Partial<Dict> = {
   'set.emptyTrashBtn': 'Prullenbak legen',
   'set.backup': 'Back-up',
   'set.exportJson': 'JSON exporteren',
+  'set.exportEncrypted': 'Versleutelde export',
+  'set.exportEncryptedDesc': 'Met wachtwoordzin beveiligde back-up (AES-256). Veilig te kopiëren naar een USB-stick of cloud; je hebt de wachtwoordzin nodig om te herstellen.',
   'set.restoreDots': 'Herstellen…',
   'set.backupDownloaded': '✓ Back-up gedownload',
   'set.restoreTitle': 'Herstellen vanuit back-up?',

@@ -1516,6 +1516,8 @@ export const pt: Partial<Dict> = {
   'set.emptyTrashBtn': 'Esvaziar lixo',
   'set.backup': 'Cópia de segurança',
   'set.exportJson': 'Exportar JSON',
+  'set.exportEncrypted': 'Exportação cifrada',
+  'set.exportEncryptedDesc': 'Cópia protegida por frase-passe (AES-256). Segura para copiar para um USB ou a nuvem; precisas da frase-passe para restaurar.',
   'set.restoreDots': 'Restaurar…',
   'set.backupDownloaded': '✓ Cópia descarregada',
   'set.restoreTitle': 'Restaurar a partir de cópia?',

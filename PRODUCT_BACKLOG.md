@@ -974,7 +974,7 @@
   ή inline στη φόρμα, κενό = παλιά συμπεριφορά αμετάβλητη)· «log as income» = προαιρετικό κουμπί, ΟΧΙ αυτόματο
   (αποφυγή διπλο-καταγραφής αν ο χρήστης το καταγράψει ήδη χειροκίνητα αλλού).
 
-### P54. Encrypted local backup export (passphrase-protected JSON/ZIP) — S/M — OSS (self-host security lever)
+### P54. Encrypted local backup export (passphrase-protected JSON/ZIP) — ✅ SHIPPED 2026-09-12 (interactive session, «go on»; AES-256-GCM + scrypt envelope, opt-in, auto-detected on restore) — S/M — OSS (self-host security lever)
 - **Αξία:** το `exportData()` JSON backup + το nightly `backup.sh` (CLAUDE.md) γράφουν **plaintext** αρχεία με
   πλήρη οικονομικά δεδομένα (receipts/expenses/κάρτες/statements) — ένας self-host χρήστης που αντιγράφει αυτά
   τα backups σε λιγότερο έμπιστο μέσο (USB stick, κοινόχρηστος NAS φάκελος, cloud drive χωρίς δικιά του

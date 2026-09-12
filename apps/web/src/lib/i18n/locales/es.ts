@@ -1516,6 +1516,8 @@ export const es: Partial<Dict> = {
   'set.emptyTrashBtn': 'Vaciar papelera',
   'set.backup': 'Copia de seguridad',
   'set.exportJson': 'Exportar JSON',
+  'set.exportEncrypted': 'Exportación cifrada',
+  'set.exportEncryptedDesc': 'Copia protegida con contraseña (AES-256). Segura para copiar a un USB o la nube; necesitas la contraseña para restaurar.',
   'set.restoreDots': 'Restaurar…',
   'set.backupDownloaded': '✓ Copia descargada',
   'set.restoreTitle': '¿Restaurar desde copia?',

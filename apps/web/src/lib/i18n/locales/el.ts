@@ -1391,6 +1391,8 @@ export const el: Partial<Dict> = {
   'set.imapAppPasswordHint': 'Gmail/Outlook/iCloud συνήθως θέλουν κωδικό εφαρμογής (app password), όχι τον κανονικό κωδικό σύνδεσης.',
   'set.backup': 'Backup',
   'set.exportJson': 'Εξαγωγή JSON',
+  'set.exportEncrypted': 'Κρυπτογραφημένη εξαγωγή',
+  'set.exportEncryptedDesc': 'Αντίγραφο προστατευμένο με φράση-κλειδί (AES-256). Ασφαλές για αντιγραφή σε USB ή cloud· χρειάζεσαι τη φράση-κλειδί για επαναφορά.',
   'set.restoreDots': 'Επαναφορά…',
   'set.backupDownloaded': '✓ Το backup κατέβηκε',
   'set.restoreTitle': 'Επαναφορά από backup;',

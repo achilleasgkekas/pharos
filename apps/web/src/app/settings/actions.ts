@@ -67,6 +67,7 @@ import { ALERT_TYPE_KEYS, resolveNotifyTypes, type NotifyTypes } from '@/lib/ale
 import { isWithinQuietHours, normalizeQuietHours } from '@/lib/quietHours';
 import { BACKUP_MODELS, BACKUP_KEYS } from '@/lib/backupModels';
 import { verifyBackupJson, formatBackupCounts, type BackupVerifyResult } from '@/lib/backupVerify';
+import { encryptBackup, decryptBackup } from '@/lib/backupCrypto';
 import { detectSyncStaleness, formatSyncStaleness } from '@/lib/syncStaleness';
 import { markRemoteSync, getLastRemoteSync } from '@/lib/syncState';
 import { splitFreshAlerts } from '@/lib/alertDedup';
@@ -2049,6 +2050,35 @@ export async function importData(json: string): Promise<{ ok: boolean; restored:
   revalidatePath('/settings');
   revalidatePath('/');
   return { ok: true, restored, ...(warnings.length > 0 ? { warnings } : {}) };
+}
+
+// ─── Encrypted backup (P54) ──────────────────────────────────────────────────
+// The plain export above writes full financial data as plaintext; copied to a USB stick,
+// a shared NAS folder, or a cloud drive it has no protection. These two wrap the SAME
+// backup JSON in a passphrase-encrypted envelope (AES-256-GCM + scrypt, lib/backupCrypto).
+// Opt-in — the plaintext path is untouched, so existing backup.sh flows keep working. The
+// passphrase is only ever in memory (a server-action argument), never stored.
+
+/** Encrypted variant of exportData: the same backup JSON, wrapped under a passphrase. */
+export async function exportDataEncrypted(passphrase: string): Promise<string> {
+  const json = await exportData(); // requireAdmin + build (unchanged)
+  return encryptBackup(json, passphrase);
+}
+
+/** Restore from an encrypted backup: decrypt with the passphrase, then the normal import.
+ *  A wrong passphrase fails clearly here rather than looking like a corrupt restore. */
+export async function importDataEncrypted(
+  envelope: string,
+  passphrase: string
+): Promise<{ ok: boolean; restored: number; error?: string; warnings?: string[] }> {
+  await requireAdmin();
+  let json: string;
+  try {
+    json = decryptBackup(envelope, passphrase);
+  } catch (e) {
+    return { ok: false, restored: 0, error: (e as Error).message };
+  }
+  return importData(json);
 }
 
 // ─── Trash (soft-deleted records) ────────────────────────────────────────────

@@ -6,7 +6,7 @@ import { useTheme, type Theme } from '@/components/ThemeProvider';
 import { cur } from '@/lib/money';
 import { cn } from '@/components/ui/cn';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
-import { saveAiConfig, pullOllamaModel, testAnthropic, saveStore, deleteStore, setAiConfirmBulk, exportData, importData, verifyBackup, exportCSV, exportInsuranceBundle, exportTaxBundle, saveBudgets, saveBudgetRollover, suggestBudgets, saveAssetAccounts, saveDepreciation, saveCategoryRules, setAiEnabled, setAiFeature, fetchProviderModels } from './actions';
+import { saveAiConfig, pullOllamaModel, testAnthropic, saveStore, deleteStore, setAiConfirmBulk, exportData, exportDataEncrypted, importData, importDataEncrypted, verifyBackup, exportCSV, exportInsuranceBundle, exportTaxBundle, saveBudgets, saveBudgetRollover, suggestBudgets, saveAssetAccounts, saveDepreciation, saveCategoryRules, setAiEnabled, setAiFeature, fetchProviderModels } from './actions';
 import { applyCategoryRulesToExisting } from '@/app/expenses/actions';
 import type { CategoryRule } from '@/lib/categoryRules';
 import { AI_FEATURES } from '@/lib/aiFeatures';
@@ -3134,24 +3134,58 @@ function BackupRestore() {
   const nowYear = new Date().getFullYear();
   const [taxYear, setTaxYear] = useState(nowYear);
 
+  function download(text: string, name: string, mime: string) {
+    const blob = new Blob([text], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = name;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   function handleExport() {
     setMsg(null);
     startTransition(async () => {
       try {
         const json = await exportData();
-        const blob = new Blob([json], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        const stamp = new Date().toISOString().slice(0, 10);
-        a.href = url;
-        a.download = `pharos-backup-${stamp}.json`;
-        a.click();
-        URL.revokeObjectURL(url);
+        download(json, `pharos-backup-${new Date().toISOString().slice(0, 10)}.json`, 'application/json');
         setMsg(t('set.backupDownloaded'));
       } catch (e) {
         setMsg(`Export failed: ${(e as Error).message.slice(0, 80)}`);
       }
     });
+  }
+
+  // P54: passphrase-encrypted export. Passphrase is prompted, used once, never stored.
+  function handleExportEncrypted() {
+    setMsg(null);
+    const pass = window.prompt('Passphrase to encrypt this backup (min 8 chars). You will need it to restore — it is NOT stored anywhere.');
+    if (pass === null) return; // cancelled
+    if (pass.length < 8) { setMsg('Passphrase must be at least 8 characters.'); return; }
+    const confirmPass = window.prompt('Re-enter the passphrase to confirm.');
+    if (confirmPass === null) return;
+    if (confirmPass !== pass) { setMsg('Passphrases did not match.'); return; }
+    startTransition(async () => {
+      try {
+        const env = await exportDataEncrypted(pass);
+        download(env, `pharos-backup-${new Date().toISOString().slice(0, 10)}.enc.json`, 'application/json');
+        setMsg('Encrypted backup downloaded ✓');
+      } catch (e) {
+        setMsg(`Encrypted export failed: ${(e as Error).message.slice(0, 80)}`);
+      }
+    });
+  }
+
+  /** Structural check for a P54 envelope — inline so this client never imports the
+   *  node:crypto backup lib. Mirrors backupCrypto.isEncryptedBackup. */
+  function looksEncrypted(text: string): boolean {
+    try {
+      const o = JSON.parse(text);
+      return !!o && o.app === 'pharos-enc' && typeof o.data === 'string';
+    } catch {
+      return false;
+    }
   }
 
   async function handleFile(file: File) {
@@ -3163,11 +3197,18 @@ function BackupRestore() {
     });
     if (fileRef.current) fileRef.current.value = '';
     if (!ok) return;
+    const text = await file.text();
+    const encrypted = looksEncrypted(text);
+    let pass = '';
+    if (encrypted) {
+      const entered = window.prompt('This backup is encrypted. Enter its passphrase to restore.');
+      if (entered === null) { setMsg(null); return; } // cancelled
+      pass = entered;
+    }
     setMsg(t('set.restoring'));
     setReport(null);
-    const text = await file.text();
     startTransition(async () => {
-      const r = await importData(text);
+      const r = encrypted ? await importDataEncrypted(text, pass) : await importData(text);
       setMsg(r.ok ? t('set.restored', { n: r.restored }) : `${t('common.failed')}: ${r.error}`);
       // A restore that skipped collections or documents used to look identical to a
       // clean one; surface what was dropped instead of leaving it silent.
@@ -3275,6 +3316,9 @@ function BackupRestore() {
       <div className="flex items-center gap-2 flex-wrap">
         <button type="button" onClick={handleExport} disabled={pending} className={cn(btn, 'text-[color:var(--color-accent)]')}>
           {pending ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />} {t('set.exportJson')}
+        </button>
+        <button type="button" onClick={handleExportEncrypted} disabled={pending} className={cn(btn, 'text-[color:var(--color-accent)]')} title={t('set.exportEncryptedDesc')}>
+          <KeyRound size={13} /> {t('set.exportEncrypted')}
         </button>
         <button type="button" onClick={() => fileRef.current?.click()} disabled={pending} className={cn(btn, 'text-[color:var(--color-cyan)]')}>
           <Upload size={13} /> {t('set.restoreDots')}

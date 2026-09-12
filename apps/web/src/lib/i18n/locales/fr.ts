@@ -1516,6 +1516,8 @@ export const fr: Partial<Dict> = {
   'set.emptyTrashBtn': 'Vider la corbeille',
   'set.backup': 'Sauvegarde',
   'set.exportJson': 'Exporter JSON',
+  'set.exportEncrypted': 'Export chiffré',
+  'set.exportEncryptedDesc': 'Sauvegarde protégée par phrase secrète (AES-256). Copiable sans risque sur clé USB ou cloud ; la phrase secrète est requise pour restaurer.',
   'set.restoreDots': 'Restaurer…',
   'set.backupDownloaded': '✓ Sauvegarde téléchargée',
   'set.restoreTitle': 'Restaurer depuis une sauvegarde ?',

@@ -1418,6 +1418,8 @@ export const en = {
   'set.imapAppPasswordHint': 'Gmail/Outlook/iCloud usually need an app-specific password, not your normal login password.',
   'set.backup': 'Backup',
   'set.exportJson': 'Export JSON',
+  'set.exportEncrypted': 'Encrypted export',
+  'set.exportEncryptedDesc': 'Passphrase-protected backup (AES-256). Safe to copy to a USB stick or cloud drive; you need the passphrase to restore.',
   'set.restoreDots': 'Restore…',
   'set.backupDownloaded': '✓ Backup downloaded',
   'set.restoreTitle': 'Restore from backup?',

@@ -1516,6 +1516,8 @@ export const de: Partial<Dict> = {
   'set.emptyTrashBtn': 'Papierkorb leeren',
   'set.backup': 'Backup',
   'set.exportJson': 'JSON exportieren',
+  'set.exportEncrypted': 'Verschlüsselter Export',
+  'set.exportEncryptedDesc': 'Passwortgeschütztes Backup (AES-256). Sicher auf einen USB-Stick oder Cloud-Speicher zu kopieren; zum Wiederherstellen wird das Passwort benötigt.',
   'set.restoreDots': 'Wiederherstellen…',
   'set.backupDownloaded': '✓ Backup heruntergeladen',
   'set.restoreTitle': 'Aus Backup wiederherstellen?',

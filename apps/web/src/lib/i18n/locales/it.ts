@@ -1516,6 +1516,8 @@ export const it: Partial<Dict> = {
   'set.emptyTrashBtn': 'Svuota cestino',
   'set.backup': 'Backup',
   'set.exportJson': 'Esporta JSON',
+  'set.exportEncrypted': 'Esportazione cifrata',
+  'set.exportEncryptedDesc': 'Backup protetto da passphrase (AES-256). Sicuro da copiare su USB o cloud; serve la passphrase per ripristinare.',
   'set.restoreDots': 'Ripristina…',
   'set.backupDownloaded': '✓ Backup scaricato',
   'set.restoreTitle': 'Ripristinare da backup?',
