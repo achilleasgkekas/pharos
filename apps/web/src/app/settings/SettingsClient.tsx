@@ -41,6 +41,7 @@ import { QrCode } from '@/components/QrCode';
 import { McpManager } from './McpManager';
 import { CalendarFeedManager } from './CalendarFeedManager';
 import { UpdateChecker } from './UpdateChecker';
+import { WebPushToggle } from './WebPushToggle';
 import { BookmarkletManager } from './BookmarkletManager';
 import { SystemHealthPanel } from './SystemHealthPanel';
 import { RecomputePricesButton } from './RecomputePricesButton';
@@ -2409,6 +2410,9 @@ function NotificationsManager() {
       <button type="button" onClick={add} className={cn(ghostBtn, 'w-full justify-center')}>
         <Plus size={13} /> Add channel
       </button>
+
+      {/* P102: native browser push — no external account needed */}
+      <WebPushToggle />
 
       <div className="pt-3 border-t border-[color:var(--color-border)]">
         <p className="text-xs text-[color:var(--color-text-dim)] mb-2">

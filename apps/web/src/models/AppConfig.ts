@@ -157,6 +157,15 @@ const AppConfigSchema = new Schema(
     // P88: cached GitHub release-notes body for `updateCheckLatest`, refreshed on the same
     // 24h cadence and capped (lib/versionCheck.RELEASE_NOTES_CAP). '' = none / not fetched.
     updateCheckNotes: { type: String, default: '' },
+    // P102: Web Push VAPID keypair, generated once on first "Enable browser push" and kept
+    // like the other integration secrets. `privateKey` is server-only (never sent to the
+    // client); `publicKey` is handed to the browser as the applicationServerKey. Empty =
+    // web push not set up yet. See lib/webPush.ts.
+    webPush: {
+      publicKey: { type: String, default: '' },
+      privateKey: { type: String, default: '' },
+      subject: { type: String, default: '' }, // VAPID contact (mailto:/URL)
+    },
     // Outbound alert dedup (P82). The dedupeKeys (same scheme as the in-app bell, see
     // app/notifications/actions.ts) that were part of the last successfully-dispatched
     // ntfy/Discord/Slack/Telegram/webhook alert. Only touched by runAlertChecks' opt-in

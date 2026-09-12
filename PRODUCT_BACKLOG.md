@@ -54,7 +54,7 @@
 
 > Δεν χτίζονται μέχρι να μετακινηθούν στο «Approved» από τον Αχιλλέα.
 
-### P102. Native Web Push notifier channel (browser push, μηδέν εξωτερικός λογαριασμός) — S/M — OSS (κυρίως), βοηθά και SaaS
+### P102. Native Web Push notifier channel (browser push, μηδέν εξωτερικός λογαριασμός) — ✅ SHIPPED 2026-09-12 (interactive session, «ξεκίνα τα proposed»; adds `web-push` dep → prod needs a rebuild, VAPID keys self-generate on first enable) — S/M — OSS (κυρίως), βοηθά και SaaS
 - **Αξία:** live-verified `apps/web/src/lib/notifiers.shared.ts` → `NotifierType = 'ntfy' | 'discord' | 'slack' |
   'telegram' | 'webhook'` — **οι πέντε** notifier κανάλια που ήδη υπάρχουν (P3 session 2026-06-29) απαιτούν όλα
   έναν εξωτερικό λογαριασμό/service (ntfy.sh topic, Discord/Slack/Telegram bot, δικό σου webhook endpoint). Η

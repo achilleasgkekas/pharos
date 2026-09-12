@@ -7,6 +7,7 @@ import { NOTIFIER_TYPES, type NotifierConfig, type NotifierType } from './notifi
 import { deliverWithRetry, describeOutcome, type DeliveryOutcome } from './deliveryRetry';
 import { recordDeliveries } from './deliveryLog';
 import { notifierLogKey } from './deliveryLog.shared';
+import { dispatchWebPush } from './webPush';
 
 export { NOTIFIER_TYPES };
 export type { NotifierConfig, NotifierType };
@@ -126,13 +127,15 @@ export async function getNotifiers(): Promise<NotifierConfig[]> {
  */
 export async function dispatchAlert(title: string, message: string): Promise<{ sent: number; total: number }> {
   const channels = (await getNotifiers()).filter((c) => c.enabled);
-  if (channels.length === 0) return { sent: 0, total: 0 };
-  const results = await Promise.allSettled(
-    channels.map((c) => deliverWithRetry(() => attemptOne(c, title, message))),
-  );
+  // Web push (P102) is a built-in channel, not a NotifierConfig row: run it alongside the
+  // configured channels so someone whose ONLY channel is browser push still gets alerts.
+  const [results, webPush] = await Promise.all([
+    Promise.allSettled(channels.map((c) => deliverWithRetry(() => attemptOne(c, title, message)))),
+    dispatchWebPush(title, message),
+  ]);
   const at = new Date().toISOString();
   const rows: [string, { at: string; ok: boolean; status?: number; error?: string; attempts: number }][] = [];
-  let sent = 0;
+  let sent = webPush.sent;
   results.forEach((r, i) => {
     if (r.status !== 'fulfilled') return; // deliverWithRetry never rejects; defensive only
     const out = r.value;
@@ -143,5 +146,5 @@ export async function dispatchAlert(title: string, message: string): Promise<{ s
     ]);
   });
   await recordDeliveries(rows);
-  return { sent, total: channels.length };
+  return { sent, total: channels.length + webPush.total };
 }
