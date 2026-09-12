@@ -116,7 +116,9 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  // Gate everything EXCEPT: Next internals, the icon/manifest, the auth-action
+  // Gate everything EXCEPT: Next internals, the icon/manifest, the Web Push service
+  // worker (public/sw.js — the browser must fetch it unauthenticated to register, P102),
+  // the auth-action
   // routes (/api/auth/*), the MCP endpoint and the cron endpoints (both do their own
   // bearer auth — neither a connector nor a scheduler has a cookie), and robots.
   // /login and /setup ARE matched now (so the middleware can stamp x-pathname) but pass
@@ -129,6 +131,6 @@ export const config = {
   // middleware answers a correctly-signed cron request with a bare 401 before the handler ever
   // runs, which looks exactly like a wrong token.
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|icon.svg|manifest.webmanifest|api/auth|api/mcp|api/v1|api/cron|robots.txt).*)',
+    '/((?!_next/static|_next/image|favicon.ico|icon.svg|manifest.webmanifest|sw.js|api/auth|api/mcp|api/v1|api/cron|robots.txt).*)',
   ],
 };
