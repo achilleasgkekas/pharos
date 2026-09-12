@@ -143,7 +143,7 @@
   grouped/collapsed-by-location view follow-up μόνο αν το απλό φίλτρο αποδειχτεί ανεπαρκές· κενό `location` σε
   παλιά items = εμφανίζονται πάντα (καμία κρυφή απώλεια δεδομένων).
 
-### P91. «Αποσύνδεση παντού» / session invalidation μετά από ύποπτη πρόσβαση (follow-up στο μόλις-shipped P79) — S — OSS (κυρίως), βοηθά και SaaS self-host parity
+### P91. «Αποσύνδεση παντού» / session invalidation μετά από ύποπτη πρόσβαση (follow-up στο μόλις-shipped P79) — ✅ SHIPPED 2026-09-12 (interactive session, «ξεκίνα τα proposed») — S — OSS (κυρίως), βοηθά και SaaS self-host parity
 - **Αξία:** live-verified: το self-host login (`lib/session.ts`) είναι **εντελώς stateless JWT** (jose, HS256,
   μηδέν session store) και `grep -rn "sessionEpoch|logoutEverywhere|invalidateSessions|signOutAll|
   revokeAllSessions" apps/web/src` = 0 hits. Αν διαρρεύσει ένα password, ή ένα κοινόχρηστο/οικογενειακό tablet

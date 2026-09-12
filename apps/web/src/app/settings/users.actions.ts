@@ -3,7 +3,7 @@ import { revalidatePath } from 'next/cache';
 import { parseRole, type Role } from '@/lib/roles';
 import { connectDB } from '@/lib/db';
 import { User } from '@/models/User';
-import { hashPassword, verifyPassword, requireAdmin, requireUser } from '@/lib/auth';
+import { hashPassword, verifyPassword, requireAdmin, requireUser, bumpSessionEpoch, setSessionCookie } from '@/lib/auth';
 import {
   beginUserMfaEnrollment,
   confirmUserMfaEnrollment,
@@ -85,6 +85,9 @@ export async function changeUserPassword(id: string, password: string): Promise<
   await connectDB();
   const res = await User.updateOne({ _id: id }, { $set: { passwordHash: hashPassword(password) } });
   if (!res.matchedCount) return { ok: false, error: 'User not found.' };
+  // P91: a password reset must not leave the old sessions valid — bump the epoch so every
+  // token for this user is invalidated (the point of an admin reset is often a compromise).
+  await bumpSessionEpoch(id);
   return { ok: true };
 }
 
@@ -96,6 +99,19 @@ export async function changeOwnPassword(oldPassword: string, newPassword: string
   const user = await User.findById(me.id).lean();
   if (!user || !verifyPassword(oldPassword, user.passwordHash)) return { ok: false, error: 'Current password is wrong.' };
   await User.updateOne({ _id: me.id }, { $set: { passwordHash: hashPassword(newPassword) } });
+  // P91: changing your password signs out every OTHER session; keep THIS device signed in
+  // by re-minting its cookie with the new epoch.
+  const epoch = await bumpSessionEpoch(me.id);
+  await setSessionCookie({ sub: me.id, role: me.role, name: me.name, epoch });
+  return { ok: true };
+}
+
+/** P91: "Sign out of all other devices." Bumps the epoch (invalidating every existing
+ *  token) then re-mints THIS device's cookie so the person who clicked stays signed in. */
+export async function logoutOtherSessions(): Promise<{ ok: boolean }> {
+  const me = await requireUser();
+  const epoch = await bumpSessionEpoch(me.id);
+  await setSessionCookie({ sub: me.id, role: me.role, name: me.name, epoch });
   return { ok: true };
 }
 

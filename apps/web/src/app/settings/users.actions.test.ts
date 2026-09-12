@@ -52,6 +52,8 @@ const {
   verifyPasswordMock,
   requireAdminMock,
   requireUserMock,
+  bumpSessionEpochMock,
+  setSessionCookieMock,
   revalidatePathMock,
 } = vi.hoisted(() => ({
   connectDBMock: vi.fn(async () => {}),
@@ -66,6 +68,8 @@ const {
   verifyPasswordMock: vi.fn((_plain: string, _stored: string) => false),
   requireAdminMock: vi.fn(async () => ({ id: 'admin1', role: 'admin' as const, name: 'Achilleas' })),
   requireUserMock: vi.fn(async () => ({ id: 'user1', role: 'member' as const, name: 'Someone' })),
+  bumpSessionEpochMock: vi.fn(async (_id: string) => 1),
+  setSessionCookieMock: vi.fn(async (_claims: Record<string, unknown>) => {}),
   revalidatePathMock: vi.fn(),
 }));
 
@@ -86,10 +90,12 @@ vi.mock('@/lib/auth', () => ({
   verifyPassword: verifyPasswordMock,
   requireAdmin: requireAdminMock,
   requireUser: requireUserMock,
+  bumpSessionEpoch: bumpSessionEpochMock,
+  setSessionCookie: setSessionCookieMock,
 }));
 vi.mock('next/cache', () => ({ revalidatePath: (...args: unknown[]) => revalidatePathMock(...args) }));
 
-import { listUsers, createUser, deleteUser, setUserRole, changeUserPassword, changeOwnPassword } from './users.actions';
+import { listUsers, createUser, deleteUser, setUserRole, changeUserPassword, changeOwnPassword, logoutOtherSessions } from './users.actions';
 
 function fd(fields: Record<string, string>): FormData {
   const f = new FormData();
@@ -111,6 +117,8 @@ beforeEach(() => {
   verifyPasswordMock.mockImplementation(() => false);
   requireAdminMock.mockImplementation(async () => ({ id: 'admin1', role: 'admin' as const, name: 'Achilleas' }));
   requireUserMock.mockImplementation(async () => ({ id: 'user1', role: 'member' as const, name: 'Someone' }));
+  bumpSessionEpochMock.mockImplementation(async () => 1);
+  setSessionCookieMock.mockImplementation(async () => {});
 });
 
 describe('listUsers', () => {
@@ -369,5 +377,34 @@ describe('changeOwnPassword', () => {
     expect(r).toEqual({ ok: true });
     expect(userUpdateOne).toHaveBeenCalledWith({ _id: 'user1' }, { $set: { passwordHash: 'hashed:newpass12' } });
     expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+
+  // P91: a self password change signs out other sessions but keeps THIS device signed in.
+  it('bumps the session epoch and re-mints this device cookie with the new epoch', async () => {
+    userFindByIdLean.mockResolvedValue({ passwordHash: 'stored-hash' });
+    verifyPasswordMock.mockReturnValue(true);
+    bumpSessionEpochMock.mockResolvedValue(4);
+    await changeOwnPassword('correctold', 'newpass12');
+    expect(bumpSessionEpochMock).toHaveBeenCalledWith('user1');
+    expect(setSessionCookieMock).toHaveBeenCalledWith({ sub: 'user1', role: 'member', name: 'Someone', epoch: 4 });
+  });
+});
+
+describe('changeUserPassword · P91', () => {
+  it('bumps the target user epoch so an admin reset invalidates their sessions', async () => {
+    await changeUserPassword('u1', 'longenough1');
+    expect(bumpSessionEpochMock).toHaveBeenCalledWith('u1');
+    // The admin is not that user, so their own cookie is not re-minted here.
+    expect(setSessionCookieMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('logoutOtherSessions · P91', () => {
+  it('bumps the epoch and re-mints the current device cookie', async () => {
+    bumpSessionEpochMock.mockResolvedValue(9);
+    const r = await logoutOtherSessions();
+    expect(r).toEqual({ ok: true });
+    expect(bumpSessionEpochMock).toHaveBeenCalledWith('user1');
+    expect(setSessionCookieMock).toHaveBeenCalledWith({ sub: 'user1', role: 'member', name: 'Someone', epoch: 9 });
   });
 });

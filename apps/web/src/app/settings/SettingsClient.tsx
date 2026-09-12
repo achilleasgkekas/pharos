@@ -1,7 +1,7 @@
 'use client';
 import { useState, useTransition, useRef, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Activity, Sun, Moon, Sparkles, Database, CreditCard, ExternalLink, Server, Cloud, Download, Upload, Loader2, Check, Store as StoreIcon, Pencil, Trash2, Plus, X, Copy, ShieldCheck, SlidersHorizontal, Bell, MessageSquareCode, RotateCcw, ChevronDown, Globe, HardDrive, FolderTree, RefreshCw, Plug, Users, UserPlus, KeyRound, Star, Landmark, TrendingUp, TrendingDown, CalendarPlus, Tags, MapPin, FlaskConical, Webhook, Mail, Bookmark } from 'lucide-react';
+import { Activity, Sun, Moon, Sparkles, Database, CreditCard, ExternalLink, Server, Cloud, Download, Upload, Loader2, Check, Store as StoreIcon, Pencil, Trash2, Plus, X, Copy, ShieldCheck, SlidersHorizontal, Bell, MessageSquareCode, RotateCcw, ChevronDown, Globe, HardDrive, FolderTree, RefreshCw, Plug, Users, UserPlus, KeyRound, Star, Landmark, TrendingUp, TrendingDown, CalendarPlus, Tags, MapPin, FlaskConical, Webhook, Mail, Bookmark, LogOut } from 'lucide-react';
 import { useTheme, type Theme } from '@/components/ThemeProvider';
 import { cur } from '@/lib/money';
 import { cn } from '@/components/ui/cn';
@@ -29,6 +29,7 @@ import {
   setUserRole,
   changeUserPassword,
   changeOwnPassword,
+  logoutOtherSessions,
   getSelfMfaStatus,
   beginSelfMfaEnrollment,
   confirmSelfMfaEnrollment,
@@ -3621,6 +3622,16 @@ function SelfPasswordCard() {
     });
   }
 
+  // P91: invalidate every other session for this account (leaked password, a family
+  // tablet left logged in). This device stays signed in — the server re-mints its cookie.
+  function signOutOthers() {
+    setMsg(null);
+    startTransition(async () => {
+      const r = await logoutOtherSessions();
+      setMsg(r.ok ? { ok: true, text: t('set.signedOutOthers') } : { ok: false, text: t('common.failed') });
+    });
+  }
+
   return (
     <Section title={t('set.yourPassword')} icon={<KeyRound size={15} />}>
       {open ? (
@@ -3638,6 +3649,9 @@ function SelfPasswordCard() {
           <span className="text-xs text-[color:var(--color-text-dim)]">{t('set.changePasswordDesc')}</span>
           <div className="flex items-center gap-2">
             {msg && <span className={cn('text-[11px]', msg.ok ? 'text-[color:var(--color-accent)]' : 'text-[color:var(--color-red)]')}>{msg.text}</span>}
+            <button onClick={signOutOthers} disabled={pending} className={ghostBtn} title={t('set.signOutOthersDesc')}>
+              {pending ? <Loader2 size={13} className="animate-spin" /> : <LogOut size={13} />} {t('set.signOutOthers')}
+            </button>
             <button onClick={() => setOpen(true)} className={ghostBtn}><KeyRound size={13} /> {t('set.changePassword')}</button>
           </div>
         </div>

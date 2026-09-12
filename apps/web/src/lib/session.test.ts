@@ -125,6 +125,24 @@ describe('sign → verify roundtrip', () => {
     expect(out!.exp! - now).toBeGreaterThan(SESSION_MAX_AGE - 5);
     expect(out!.exp! - now).toBeLessThanOrEqual(SESSION_MAX_AGE + 1);
   });
+
+  // P91 — the "sign out everywhere" epoch. When present it round-trips; when absent (every
+  // pre-P91 token, or a bare signSession) it stays undefined so the server-side check skips it.
+  it('embeds and recovers the epoch when set', async () => {
+    const token = await signSession({ sub: 'u', role: 'member', name: 'M', epoch: 7 });
+    const out = await verifySession(token);
+    expect(out!.epoch).toBe(7);
+  });
+
+  it('embeds epoch 0 (a valid, distinct value) rather than dropping it', async () => {
+    const token = await signSession({ sub: 'u', role: 'member', name: 'M', epoch: 0 });
+    expect((await verifySession(token))!.epoch).toBe(0);
+  });
+
+  it('leaves epoch undefined when the caller does not set one', async () => {
+    const token = await signSession({ sub: 'u', role: 'member', name: 'M' });
+    expect((await verifySession(token))!.epoch).toBeUndefined();
+  });
 });
 
 describe('verifySession', () => {

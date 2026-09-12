@@ -29,6 +29,12 @@ const UserSchema = new Schema(
     mfaSecretEnc: { type: String, default: null },
     mfaPendingSecretEnc: { type: String, default: null },
     mfaRecoveryHashes: { type: [String], default: [] },
+    // "Sign out everywhere" epoch (P91). Embedded in every session JWT at mint time and
+    // compared on the server-side auth check; bumping it invalidates every existing token
+    // for this user at once (leaked password, a shared/family tablet left logged in). Same
+    // stateless idiom as apiToken/calendarToken invalidation — a single counter, no session
+    // store. Also bumped on password change. 0 = never bumped (every pre-P91 user).
+    sessionEpoch: { type: Number, default: 0 },
   },
   { timestamps: true }
 );

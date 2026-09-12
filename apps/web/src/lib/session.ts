@@ -7,7 +7,11 @@ import { SignJWT, jwtVerify } from 'jose';
 // module edge-safe). Re-exported because middleware and auth already import Role here.
 export type { Role } from './roles';
 import type { Role } from './roles';
-export type SessionClaims = { sub: string; role: Role; name: string; exp?: number };
+// `epoch` is the "sign out everywhere" counter (P91), embedded so the server-side auth
+// check can compare it to the user's current User.sessionEpoch. Optional: a token minted
+// before P91 (or by a caller that doesn't set it) carries none, and the check is skipped
+// for it — so nothing about the existing stateless flow changes until an epoch is present.
+export type SessionClaims = { sub: string; role: Role; name: string; exp?: number; epoch?: number };
 
 // Cookie shared by middleware (read/refresh) + auth.ts (set/clear).
 export const SESSION_COOKIE = 'pharos_session';
@@ -45,7 +49,11 @@ export function authConfigured(): boolean {
 export async function signSession(claims: SessionClaims): Promise<string> {
   const secret = getSecret();
   if (!secret) throw new Error('AUTH_SECRET is not set (min 16 chars)');
-  return await new SignJWT({ role: claims.role, name: claims.name })
+  const payload: Record<string, unknown> = { role: claims.role, name: claims.name };
+  // Only embed the epoch when the caller provides one (setSessionCookie does), so a bare
+  // signSession still produces a pre-P91-shaped token that the auth check leaves alone.
+  if (claims.epoch !== undefined) payload.epoch = claims.epoch;
+  return await new SignJWT(payload)
     .setProtectedHeader({ alg: 'HS256' })
     .setSubject(claims.sub)
     .setIssuedAt()
@@ -64,7 +72,13 @@ export async function verifySession(token: string | undefined | null): Promise<S
     if (!sub) return null;
     const role: Role = payload.role === 'admin' ? 'admin' : 'member';
     const name = typeof payload.name === 'string' ? payload.name : '';
-    return { sub, role, name, exp: typeof payload.exp === 'number' ? payload.exp : undefined };
+    return {
+      sub,
+      role,
+      name,
+      exp: typeof payload.exp === 'number' ? payload.exp : undefined,
+      epoch: typeof payload.epoch === 'number' ? payload.epoch : undefined,
+    };
   } catch {
     return null;
   }

@@ -1112,6 +1112,9 @@ export const en = {
   'set.update': 'Update',
   'set.changePasswordDesc': 'Change the password for your account.',
   'set.changePassword': 'Change password',
+  'set.signOutOthers': 'Sign out other devices',
+  'set.signOutOthersDesc': 'Invalidate every other signed-in session for your account. This device stays signed in.',
+  'set.signedOutOthers': 'Other devices signed out ✓',
   // Two-factor authentication (P79)
   'set.twoFactor': 'Two-factor authentication',
   'set.twoFactorEnabled': 'enabled',

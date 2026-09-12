@@ -52,11 +52,46 @@ export function verifyPassword(plain: string, stored: string): boolean {
   }
 }
 
-/** Read + verify the session cookie. Token-only (no DB hit). Null when logged out. */
+/** The user's current "sign out everywhere" epoch (P91). Lazily imports db/model so the
+ *  auth.ts import graph (and every test that imports it) is unchanged. */
+async function currentSessionEpoch(userId: string): Promise<number> {
+  const { connectDB } = await import('./db');
+  const { User } = await import('@/models/User');
+  await connectDB();
+  const doc = (await User.findById(userId).select('sessionEpoch').lean()) as { sessionEpoch?: number } | null;
+  return Number(doc?.sessionEpoch) || 0;
+}
+
+/** Bump a user's session epoch → invalidates every existing token for them (P91). Returns
+ *  the new epoch so the caller can re-mint the CURRENT device's cookie and stay signed in. */
+export async function bumpSessionEpoch(userId: string): Promise<number> {
+  const { connectDB } = await import('./db');
+  const { User } = await import('@/models/User');
+  await connectDB();
+  const doc = (await User.findByIdAndUpdate(
+    userId,
+    { $inc: { sessionEpoch: 1 } },
+    { new: true, projection: { sessionEpoch: 1 } }
+  ).lean()) as { sessionEpoch?: number } | null;
+  return Number(doc?.sessionEpoch) || 0;
+}
+
+/** Read + verify the session cookie. Null when logged out. Token-only EXCEPT when the token
+ *  carries a P91 epoch, in which case it is compared to the user's current sessionEpoch (one
+ *  indexed lookup) so a "sign out everywhere" takes effect. Fails OPEN on a DB error — a
+ *  transient outage must never lock out a validly-signed session — but a real mismatch (or a
+ *  deleted user) invalidates. Pre-P91 tokens carry no epoch and skip the check entirely. */
 export async function getCurrentUser(): Promise<SessionUser | null> {
   const store = await cookies();
   const claims = await verifySession(store.get(SESSION_COOKIE)?.value);
   if (!claims) return null;
+  if (claims.epoch !== undefined) {
+    try {
+      if ((await currentSessionEpoch(claims.sub)) !== claims.epoch) return null;
+    } catch {
+      /* DB hiccup → fail open; the signature + expiry were already checked */
+    }
+  }
   return { id: claims.sub, role: claims.role, name: claims.name };
 }
 
@@ -124,9 +159,21 @@ export async function requireAdmin(): Promise<SessionUser> {
   return u;
 }
 
-/** Mint a session JWT and set the httpOnly cookie. Call from a server action / route handler. */
+/** Mint a session JWT and set the httpOnly cookie. Call from a server action / route handler.
+ *  Enriches the claims with the user's current session epoch (P91) when the caller didn't set
+ *  one, so every freshly-minted self-host session is bound to the current epoch — callers keep
+ *  passing just { sub, role, name }. Fails open on a DB error (mints without an epoch rather
+ *  than refusing to log the user in). */
 export async function setSessionCookie(claims: SessionClaims): Promise<void> {
-  const token = await signSession(claims);
+  let epoch = claims.epoch;
+  if (epoch === undefined) {
+    try {
+      epoch = await currentSessionEpoch(claims.sub);
+    } catch {
+      /* DB hiccup → mint a pre-P91-shaped token; still a valid session */
+    }
+  }
+  const token = await signSession({ ...claims, epoch });
   const store = await cookies();
   store.set(SESSION_COOKIE, token, sessionCookieOptions());
 }
