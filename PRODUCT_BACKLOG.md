@@ -1016,7 +1016,7 @@
   MVP-first pattern με P28/P45)· κενό `repeatEveryDays` = σημερινή one-off συμπεριφορά αμετάβλητη· optional
   linked item παραμένει, δεν αφαιρείται.
 
-### P50. Special dates & gift reminders (γενέθλια/επέτειοι) — S — OSS, «Personal Hub» fit
+### P50. Special dates & gift reminders (γενέθλια/επέτειοι) — ✅ SHIPPED 2026-09-12 (interactive session, «go on»; standalone /special-dates module, recurring month/day + optional year for age, lead-time alert. Gift-tracking / P43 wishlist-link = follow-up) — S — OSS, «Personal Hub» fit
 - **Αξία:** το PHAROS backronym (CLAUDE.md) είναι ρητά «Personal Hub», αλλά κανένα module σήμερα δεν κρατά τις πιο
   βασικές επαναλαμβανόμενες προσωπικές ημερομηνίες — γενέθλια/επέτειοι φίλων/οικογένειας. Ένα μικρό `SpecialDate`
   (όνομα, τύπος free-form, ημ/μηνία **χωρίς υποχρεωτικό έτος** — οι γιορτές επαναλαμβάνονται ετησίως, όχι one-off)

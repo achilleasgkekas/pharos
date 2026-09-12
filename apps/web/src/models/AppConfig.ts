@@ -53,6 +53,7 @@ const AppConfigSchema = new Schema(
     giftCardAlertDays: { type: Number, default: 30 }, // "gift card expiring with balance" window (P32)
     billAlertDays: { type: Number, default: 5 }, // "bill due / overdue" lead time (P28)
     documentAlertDays: { type: Number, default: 30 }, // "document expiring / expired" lead time (P42)
+    specialDateAlertDays: { type: Number, default: 7 }, // "birthday / anniversary coming up" lead time (P50)
     maintenanceAlertDays: { type: Number, default: 7 }, // "maintenance due" lead time (P41)
     lendingAlertDays: { type: Number, default: 3 }, // "lent item due back" lead time (P47); tighter than maintenance on purpose
     staleClaimDays: { type: Number, default: 14 }, // silence before an open RMA counts as forgotten (P44 phase 2)

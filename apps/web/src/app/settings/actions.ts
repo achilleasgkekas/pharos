@@ -13,8 +13,10 @@ import { LoyaltyCard } from '@/models/LoyaltyCard';
 import { giftCardBalance, giftCardDaysLeft } from '@/lib/giftcard';
 import { Bill } from '@/models/Bill';
 import { Document as DocumentModel } from '@/models/Document';
+import { SpecialDate as SpecialDateModel } from '@/models/SpecialDate';
 import { billDaysUntilDue } from '@/lib/bill';
 import { collectExpiringDocuments } from '@/lib/documentExpiry';
+import { collectUpcomingDates } from '@/lib/specialDates';
 import { collectMaintenanceDue, MAINTENANCE_STATUSES, type MaintenanceRow } from '@/lib/maintenance';
 import { collectLendingOverdue, LENDING_STATUSES, type LendingRow } from '@/lib/lending';
 import { collectStaleClaims, CLAIM_STATUSES_APPLY_TO, DEFAULT_STALE_CLAIM_DAYS, type StaleClaimRow } from '@/lib/warrantyClaims';
@@ -710,6 +712,16 @@ export async function runAlertChecks(opts: { dedupe?: boolean } = {}): Promise<{
       : [];
   const documentsExpiring = collectExpiringDocuments(documentRows, s.documentAlertDays, now);
 
+  // Special dates (P50): birthdays / anniversaries within the lead window. Same collector
+  // the /special-dates page uses. Zero = off, query skipped.
+  const specialDateRows =
+    s.specialDateAlertDays > 0
+      ? ((await (await scoped(SpecialDateModel)).find({ archived: { $ne: true } })
+          .select('name type month day year')
+          .lean()) as Array<{ _id: unknown; name: string; type?: string; month: number; day: number; year?: number }>)
+      : [];
+  const specialDatesUpcoming = collectUpcomingDates(specialDateRows, s.specialDateAlertDays, now);
+
   // Maintenance due (P41): the only alert here about a chore rather than about money.
   // Same helper the in-app bell uses (lib/maintenance.ts), so the phone push and the bell
   // can never disagree about which printer is overdue. Mongo filters on the stored
@@ -785,6 +797,10 @@ export async function runAlertChecks(opts: { dedupe?: boolean } = {}): Promise<{
   const giftsSplit = splitFreshAlerts(nt.giftCards ? giftsExpiring : [], (g) => `giftcard:${String(g._id)}:${g.iso}`, previouslySent);
   const billsSplit = splitFreshAlerts(nt.bills ? billsDue : [], (b) => `bill:${String(b._id)}:${b.iso}`, previouslySent);
   const documentsSplit = splitFreshAlerts(nt.documents ? documentsExpiring : [], (d) => `document:${String(d._id)}:${d.iso}`, previouslySent);
+  // Stable per-record key: fires once when the date enters the lead window and stays quiet
+  // while it's in-window; after the day passes it leaves the live set (dropped from the
+  // baseline), so next year it counts as fresh again and re-fires — same mechanic as warranty.
+  const specialDatesSplit = splitFreshAlerts(nt.specialDates ? specialDatesUpcoming : [], (d) => `specialdate:${String(d._id)}`, previouslySent);
   const maintenanceSplit = splitFreshAlerts(nt.maintenance ? maintenanceDue : [], (m) => `maintenance:${String(m._id)}:${m.iso}`, previouslySent);
   const lendingSplit = splitFreshAlerts(nt.lending ? lendingDue : [], (l) => `lending:${String(l._id)}:${l.iso}`, previouslySent);
   const claimsSplit = splitFreshAlerts(nt.warrantyClaims ? staleClaims : [], (c) => `claim:${String(c._id)}:${c.iso}`, previouslySent);
@@ -806,6 +822,7 @@ export async function runAlertChecks(opts: { dedupe?: boolean } = {}): Promise<{
     ...giftsSplit.keys,
     ...billsSplit.keys,
     ...documentsSplit.keys,
+    ...specialDatesSplit.keys,
     ...maintenanceSplit.keys,
     ...lendingSplit.keys,
     ...claimsSplit.keys,
@@ -823,6 +840,7 @@ export async function runAlertChecks(opts: { dedupe?: boolean } = {}): Promise<{
   const freshGiftsExpiring = giftsSplit.fresh;
   const freshBillsDue = billsSplit.fresh;
   const freshDocumentsExpiring = documentsSplit.fresh;
+  const freshSpecialDates = specialDatesSplit.fresh;
   const freshMaintenanceDue = maintenanceSplit.fresh;
   const freshLendingDue = lendingSplit.fresh;
   const freshStaleClaims = claimsSplit.fresh;
@@ -875,6 +893,13 @@ export async function runAlertChecks(opts: { dedupe?: boolean } = {}): Promise<{
       `🪪 ${freshDocumentsExpiring.length} document(s) expiring: ${freshDocumentsExpiring
         .slice(0, 5)
         .map((d) => `${d.title}${d.holder ? ` (${d.holder})` : ''} (${d.days < 0 ? `${-d.days}d ago` : `${d.days}d`})`)
+        .join(', ')}`
+    );
+  if (freshSpecialDates.length)
+    lines.push(
+      `🎂 ${freshSpecialDates.length} date(s) coming up: ${freshSpecialDates
+        .slice(0, 5)
+        .map((d) => `${d.name}${d.type ? ` (${d.type})` : ''} (${d.days === 0 ? 'today' : `${d.days}d`}${d.years !== null ? `, turns ${d.years}` : ''})`)
         .join(', ')}`
     );
   if (freshMaintenanceDue.length)

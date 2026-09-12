@@ -666,6 +666,7 @@ export const pt: Partial<Dict> = {
   'nav.calendar': 'Calendário',
   'nav.tasks': 'Tarefas',
   'nav.documents': 'Documentos',
+  'nav.specialDates': 'Datas especiais',
   'nav.reports': 'Relatórios',
   'nav.jobs': 'Processos',
   'nav.history': 'Histórico de IA',

@@ -5,7 +5,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Package, ShoppingCart, ShoppingBasket, CheckSquare, Receipt as ReceiptIcon, CalendarClock, CreditCard,
   Menu, X, Sun, Moon, Settings, BarChart3, Ticket, Wallet, Banknote, ChevronDown, CalendarDays, PiggyBank,
-  LogOut, UserRound, Activity, MessageSquare, Trash2, FileText, Building2, ShieldCheck, IdCard,
+  LogOut, UserRound, Activity, MessageSquare, Trash2, FileText, Building2, ShieldCheck, IdCard, Cake,
 } from 'lucide-react';
 import { cn } from './ui/cn';
 import { useTheme } from './ThemeProvider';
@@ -41,6 +41,7 @@ const MONEY: NavLink[] = [
 const PLAN: NavLink[] = [
   { href: '/tasks', key: 'nav.tasks', icon: CheckSquare },
   { href: '/documents', key: 'nav.documents', icon: IdCard },
+  { href: '/special-dates', key: 'nav.specialDates', icon: Cake },
   { href: '/savings', key: 'nav.savings', icon: PiggyBank },
   { href: '/reports', key: 'nav.reports', icon: BarChart3 },
 ];

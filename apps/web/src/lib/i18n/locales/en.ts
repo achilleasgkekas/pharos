@@ -18,6 +18,7 @@ export const en = {
   'nav.calendar': 'Calendar',
   'nav.tasks': 'Tasks',
   'nav.documents': 'Documents',
+  'nav.specialDates': 'Special dates',
   'nav.reports': 'Reports',
   'nav.savings': 'Save',
   'nav.jobs': 'Jobs',

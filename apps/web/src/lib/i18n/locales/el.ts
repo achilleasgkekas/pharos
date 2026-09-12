@@ -17,6 +17,7 @@ export const el: Partial<Dict> = {
   'nav.calendar': 'Ημερολόγιο',
   'nav.tasks': 'Εργασίες',
   'nav.documents': 'Έγγραφα',
+  'nav.specialDates': 'Ειδικές ημερομηνίες',
   'nav.reports': 'Αναφορές',
   'nav.savings': 'Αποταμίευση',
   'nav.jobs': 'Διεργασίες',

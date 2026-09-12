@@ -16,6 +16,7 @@ export const ALERT_TYPES = [
   { key: 'giftCards', label: 'Gift cards expiring with balance' },
   { key: 'bills', label: 'Bills due / overdue' },
   { key: 'documents', label: 'Documents expiring (passport, ID, licence…)' },
+  { key: 'specialDates', label: 'Birthdays & anniversaries coming up' },
   { key: 'maintenance', label: 'Maintenance due on owned items' },
   { key: 'lending', label: 'Lent items due back' },
   { key: 'warrantyClaims', label: 'Warranty claims with no movement' },

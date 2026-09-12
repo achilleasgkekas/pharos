@@ -51,6 +51,7 @@ describe('normalizeSettings', () => {
       giftCardAlertDays: 30,
       billAlertDays: 5,
       documentAlertDays: 30,
+      specialDateAlertDays: 7,
       maintenanceAlertDays: 7,
   lendingAlertDays: 3,
   staleClaimDays: 14,

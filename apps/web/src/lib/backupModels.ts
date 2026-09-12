@@ -9,6 +9,7 @@ import { Store } from '@/models/Store';
 import { Expense } from '@/models/Expense';
 import { Bill } from '@/models/Bill';
 import { Document } from '@/models/Document';
+import { SpecialDate } from '@/models/SpecialDate';
 import { Goal } from '@/models/Goal';
 import { GiftCard } from '@/models/GiftCard';
 import { LoyaltyCard } from '@/models/LoyaltyCard';
@@ -45,6 +46,7 @@ export const BACKUP_MODELS = {
   expenses: Expense,
   bills: Bill,
   documents: Document,
+  specialDates: SpecialDate,
   goals: Goal,
   giftCards: GiftCard,
   loyaltyCards: LoyaltyCard,

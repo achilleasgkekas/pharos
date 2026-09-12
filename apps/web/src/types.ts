@@ -275,6 +275,20 @@ export type SerializedBill = {
   updatedAt: string;
 };
 
+// P50: recurring personal dates (birthdays / anniversaries).
+export type SerializedSpecialDate = {
+  _id: string;
+  name: string;
+  type: string;
+  month: number;
+  day: number;
+  year: number; // 0 = unknown
+  notes: string;
+  archived: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
 // P42: personal document expiry tracker.
 export type SerializedDocument = {
   _id: string;

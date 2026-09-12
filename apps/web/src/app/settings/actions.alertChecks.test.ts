@@ -76,6 +76,7 @@ const {
   giftCardFind,
   billFind,
   documentFind,
+  specialDateFind,
   getStoresMock,
   effectiveReturnWindowMock,
   returnDaysLeftMock,
@@ -101,6 +102,7 @@ const {
   giftCardFind: vi.fn(),
   billFind: vi.fn(),
   documentFind: vi.fn(),
+  specialDateFind: vi.fn(),
   getStoresMock: vi.fn(async () => [] as unknown[]),
   effectiveReturnWindowMock: vi.fn(() => 14),
   returnDaysLeftMock: vi.fn(() => null as number | null),
@@ -131,6 +133,7 @@ vi.mock('@/models/LoyaltyCard', () => ({ LoyaltyCard: {} }));
 vi.mock('@/lib/giftcard', () => ({ giftCardBalance: giftCardBalanceMock, giftCardDaysLeft: giftCardDaysLeftMock }));
 vi.mock('@/models/Bill', () => ({ Bill: { find: billFind } }));
 vi.mock('@/models/Document', () => ({ Document: { find: documentFind } }));
+vi.mock('@/models/SpecialDate', () => ({ SpecialDate: { find: specialDateFind } }));
 vi.mock('@/lib/bill', () => ({ billDaysUntilDue: billDaysUntilDueMock }));
 vi.mock('@/models/Card', () => ({ Card: {} }));
 vi.mock('@/models/Task', () => ({ Task: {} }));
@@ -242,6 +245,7 @@ const DEFAULT_SETTINGS = {
   giftCardAlertDays: 30,
   billAlertDays: 5,
   documentAlertDays: 30,
+  specialDateAlertDays: 7,
   maintenanceAlertDays: 7,
   lendingAlertDays: 3,
   syncStaleDays: 7,
@@ -264,6 +268,7 @@ beforeEach(() => {
   giftCardFind.mockReturnValue(chainSelectLean([]));
   billFind.mockReturnValue(chainSelectLean([]));
   documentFind.mockReturnValue(chainSelectLean([]));
+  specialDateFind.mockReturnValue(chainSelectLean([]));
   getStoresMock.mockImplementation(async () => []);
   effectiveReturnWindowMock.mockImplementation(() => 14);
   returnDaysLeftMock.mockImplementation(() => null);
