@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Pharos quick-capture browser extension (MV3). Packaging metadata only; the extension itself has no dependencies and no build step.",
   "scripts": {
-    "test": "node --test 'src/**/*.test.js'",
+    "test": "node --test src/*.test.js",
     "pack": "zip -r -X pharos-extension.zip manifest.json src icons -x \"*.test.js\" -x \"*.DS_Store\""
   }
 }
