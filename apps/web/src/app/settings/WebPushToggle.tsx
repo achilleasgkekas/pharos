@@ -6,7 +6,7 @@ import { getWebPushKey, savePushSubscription, deletePushSubscription, testWebPus
 
 /**
  * P102: "Enable browser push" — the one notifier channel that needs no external account.
- * Registers the minimal service worker (public/sw.js), asks for notification permission,
+ * Registers the minimal service worker (served by app/sw.js/route.ts), asks for permission,
  * subscribes via the tenant's VAPID public key, and stores the subscription server-side.
  *
  * English-only strings, matching the rest of the Notifications section (which does not go
