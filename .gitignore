@@ -44,7 +44,10 @@ tracker-export.json
 .email-import/
 
 # personal working docs + setup notes (kept locally, never uploaded)
+# CLAUDE.md / AGENTS.md are the AI agents' shared context: internal hostnames, IPs and the
+# deploy layout. They must stay local — this repo is heading to AGPL open-source.
 CLAUDE.md
+AGENTS.md
 BACKLOG.md
 PLANNING.md
 10G_Products_List_v3.md

@@ -4,6 +4,15 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Lets a human (or `gh workflow run CI`) re-run the gate on demand — e.g. to confirm
+  # the pipeline is alive after it has been disabled, without pushing a dummy commit.
+  workflow_dispatch:
+
+# One run per branch/PR: a new push cancels the stale run instead of queueing behind it.
+# `main` is excluded from cancellation so a deploy-triggering run always finishes.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   build:
