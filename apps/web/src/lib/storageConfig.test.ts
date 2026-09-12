@@ -20,6 +20,8 @@ describe('normalizeStorageConfig', () => {
         secure: false,
       },
       hasPass: false,
+      mirror2: null,
+      hasPass2: false,
     };
     expect(normalizeStorageConfig(null)).toEqual(expected);
     expect(normalizeStorageConfig(undefined)).toEqual(expected);
@@ -99,5 +101,35 @@ describe('normalizeStorageConfig', () => {
     expect(normalizeStorageConfig({}).hasPass).toBe(false);
     // pass still lives in remote (server-only consumers need it), hasPass mirrors its presence
     expect(normalizeStorageConfig({ remotePass: 'pw' }).remote.pass).toBe('pw');
+  });
+});
+
+// P99 — the optional second remote mirror.
+describe('normalizeMirror2 / second destination', () => {
+  it('is null when not configured', () => {
+    expect(normalizeStorageConfig({}).mirror2).toBeNull();
+    expect(normalizeStorageConfig({ storageMirror2: { backend: '' } }).mirror2).toBeNull();
+  });
+
+  it('is null when a backend is set but no host', () => {
+    expect(normalizeStorageConfig({ storageMirror2: { backend: 'smb', host: '' } }).mirror2).toBeNull();
+  });
+
+  it('parses a valid SMB second destination into a RemoteConfig', () => {
+    const s = normalizeStorageConfig({
+      storageBackend: 'onedrive',
+      storageMirror2: { backend: 'smb', host: 'nas.local', port: 445, user: 'me', pass: 'pw', share: 'backup', basePath: 'Pharos', secure: false },
+    });
+    expect(s.backend).toBe('onedrive'); // primary untouched
+    expect(s.mirror2).toEqual({ backend: 'smb', host: 'nas.local', port: 445, user: 'me', pass: 'pw', share: 'backup', basePath: 'Pharos', secure: false });
+    expect(s.hasPass2).toBe(true);
+  });
+
+  it('ignores an invalid backend value', () => {
+    expect(normalizeStorageConfig({ storageMirror2: { backend: 'onedrive', host: 'x' } as never }).mirror2).toBeNull();
+  });
+
+  it('hasPass2 is false when no password is stored', () => {
+    expect(normalizeStorageConfig({ storageMirror2: { backend: 'ftp', host: 'h' } }).hasPass2).toBe(false);
   });
 });

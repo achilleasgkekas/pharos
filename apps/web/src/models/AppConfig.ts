@@ -199,6 +199,21 @@ const AppConfigSchema = new Schema(
     remoteShare: { type: String, default: '' }, // SMB share name
     remoteBasePath: { type: String, default: '' }, // prefix dir on the remote
     remoteSecure: { type: Boolean, default: false }, // FTPS (explicit TLS)
+    // P99: a SECOND, simultaneous remote mirror for real 3-2-1 (local + two offsite copies).
+    // Additive and independent of the primary above — the primary path is unchanged. FTP/SMB
+    // only (a OneDrive secondary would need the whole OAuth flow duplicated); backend '' =
+    // no second mirror, which is every pre-P99 install. Auto-mirror-on-verify and "Sync now"
+    // push to both, best-effort per destination (one failing never blocks the other).
+    storageMirror2: {
+      backend: { type: String, enum: ['', 'ftp', 'smb'], default: '' },
+      host: { type: String, default: '' },
+      port: { type: Number, default: 0 },
+      user: { type: String, default: '' },
+      pass: { type: String, default: '' }, // server-only, never sent to the client
+      share: { type: String, default: '' },
+      basePath: { type: String, default: '' },
+      secure: { type: Boolean, default: false },
+    },
     // ── Naming / folder templates (tokens: {kind} {store} {year} {month} {day} {date} {total} {id} {original} {ext}) ──
     folderTemplate: { type: String, default: '{kind}/{year}/{month}' },
     fileNameTemplate: { type: String, default: '{date}_{store}_{id}' },

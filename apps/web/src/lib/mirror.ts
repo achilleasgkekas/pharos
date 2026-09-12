@@ -70,6 +70,16 @@ export async function mirrorFileToRemote(meta: MirrorMeta, filePath: string): Pr
     // A successful auto-mirror IS a successful sync. Without this the staleness alert
     // (P48) would nag a user whose mirror is working perfectly, just silently.
     else await markRemoteSync();
+    // P99: fan the same file out to the optional SECOND remote, independently. Its own
+    // try/catch so a failing (or offline) secondary never disturbs the primary result.
+    if (s.mirror2) {
+      try {
+        const r2 = await pushToRemote(s.mirror2, data, rel);
+        if (!r2.ok) console.warn(`[mirror] secondary push failed for ${filePath}: ${r2.error}`);
+      } catch (err2) {
+        console.warn(`[mirror] secondary ${filePath}: ${(err2 as Error).message}`);
+      }
+    }
   } catch (err) {
     console.warn(`[mirror] ${filePath}: ${(err as Error).message}`);
   }

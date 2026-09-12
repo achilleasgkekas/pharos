@@ -15,6 +15,22 @@ export type StorageConfig = {
   fileNameTemplate: string;
   remote: RemoteConfig; // valid when backend is ftp/smb
   hasPass: boolean;
+  // P99: optional SECOND remote mirror (FTP/SMB), for 3-2-1. null when not configured — the
+  // common case. Pushed alongside the primary, best-effort and independent of it.
+  mirror2: RemoteConfig | null;
+  hasPass2: boolean;
+};
+
+/** Shape of the persisted secondary-mirror sub-doc (P99). */
+export type RawMirror2 = {
+  backend?: string; // '' | 'ftp' | 'smb'
+  host?: string;
+  port?: number;
+  user?: string;
+  pass?: string;
+  share?: string;
+  basePath?: string;
+  secure?: boolean;
 };
 
 /** Shape of the persisted AppConfig singleton fields consumed here (all optional). */
@@ -30,7 +46,25 @@ export type RawStorageConfigDoc = {
   remoteShare?: string;
   remoteBasePath?: string;
   remoteSecure?: boolean;
+  storageMirror2?: RawMirror2;
 } | null | undefined;
+
+/** Parse the secondary-mirror sub-doc into a RemoteConfig, or null when it isn't a usable
+ *  FTP/SMB destination (no backend, or no host). Pure — shared by config + tests. */
+export function normalizeMirror2(m: RawMirror2 | undefined | null): RemoteConfig | null {
+  const backend = m?.backend === 'smb' || m?.backend === 'ftp' ? m.backend : null;
+  if (!backend || !m?.host) return null;
+  return {
+    backend,
+    host: m.host,
+    port: m.port || 0,
+    user: m.user || '',
+    pass: m.pass || '',
+    share: m.share || '',
+    basePath: m.basePath || '',
+    secure: !!m.secure,
+  };
+}
 
 /**
  * Pure, DB-free coercion of a persisted AppConfig doc into a StorageConfig.
@@ -57,6 +91,8 @@ export function normalizeStorageConfig(doc: RawStorageConfigDoc): StorageConfig 
       secure: !!doc?.remoteSecure,
     },
     hasPass: !!doc?.remotePass,
+    mirror2: normalizeMirror2(doc?.storageMirror2),
+    hasPass2: !!doc?.storageMirror2?.pass,
   };
 }
 

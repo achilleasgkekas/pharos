@@ -16,7 +16,7 @@ import { YnabImportModal } from './YnabImportModal';
 import type { StoreLite } from '@/lib/storeService';
 import type { AppSettings } from '@/lib/appSettings';
 import { rateForCategory } from '@/lib/depreciation';
-import { saveDefaults, runAlertChecks, getNotifierChannels, saveNotifierChannels, getNotifyTypes, saveNotifyTypes, getQuietHours, saveQuietHours, testNotifierChannel, getDeliveryLogs, getWebhookSubscriptions, saveWebhookSubscriptions, testWebhookSubscription, savePrompt, resetPrompt, saveScraperAi, saveStorageConfig, testRemoteConnection, syncToRemote, getSyncManifest, syncOnedriveBatch, saveList, saveSpaces, getTrash, restoreFromTrash, purgeFromTrash, emptyTrash, startOnedriveAuth, pollOnedriveAuth, disconnectOnedriveAccount, testOnedriveConnection, saveImapConfigAction, testImapConnectionAction, checkImapInboxNow, type PromptEditorEntry, type ScraperAiConfig, type StorageInfo, type ListEditorEntry, type TrashRow, type ImapInfo } from './actions';
+import { saveDefaults, runAlertChecks, getNotifierChannels, saveNotifierChannels, getNotifyTypes, saveNotifyTypes, getQuietHours, saveQuietHours, testNotifierChannel, getDeliveryLogs, getWebhookSubscriptions, saveWebhookSubscriptions, testWebhookSubscription, savePrompt, resetPrompt, saveScraperAi, saveStorageConfig, testRemoteConnection, testSecondaryRemote, syncToRemote, getSyncManifest, syncOnedriveBatch, saveList, saveSpaces, getTrash, restoreFromTrash, purgeFromTrash, emptyTrash, startOnedriveAuth, pollOnedriveAuth, disconnectOnedriveAccount, testOnedriveConnection, saveImapConfigAction, testImapConnectionAction, checkImapInboxNow, type PromptEditorEntry, type ScraperAiConfig, type StorageInfo, type ListEditorEntry, type TrashRow, type ImapInfo } from './actions';
 import { NOTIFIER_TYPES, type NotifierConfig, type NotifierType } from '@/lib/notifiers.shared';
 import { ALERT_TYPES, type AlertType, type NotifyTypes } from '@/lib/alertTypes';
 import { notifierLogKey, webhookLogKey, type DeliveryLogEntry } from '@/lib/deliveryLog.shared';
@@ -1422,6 +1422,16 @@ function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Inf
   // The panel is server-rendered, so a sync that just succeeded would still show the
   // OLD "last synced" date until a reload. Flip it locally instead of forcing a refetch.
   const [syncedNow, setSyncedNow] = useState(false);
+  // P99: the optional second remote mirror (FTP/SMB only).
+  const [m2Backend, setM2Backend] = useState<'' | 'ftp' | 'smb'>(storage.mirror2Backend);
+  const [m2Host, setM2Host] = useState(storage.mirror2Host);
+  const [m2Port, setM2Port] = useState(storage.mirror2Port ? String(storage.mirror2Port) : '');
+  const [m2User, setM2User] = useState(storage.mirror2User);
+  const [m2Pass, setM2Pass] = useState('');
+  const [m2Share, setM2Share] = useState(storage.mirror2Share);
+  const [m2BasePath, setM2BasePath] = useState(storage.mirror2BasePath);
+  const [m2Secure, setM2Secure] = useState(storage.mirror2Secure);
+  const [test2, setTest2] = useState<string | null>(null);
 
   const preview = (() => {
     try {
@@ -1452,11 +1462,22 @@ function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Inf
     fd.set('remoteShare', share.trim());
     fd.set('remoteBasePath', basePath.trim());
     fd.set('remoteSecure', String(secure));
+    // P99 second destination
+    fd.set('mirror2Backend', m2Backend);
+    fd.set('mirror2Host', m2Host.trim());
+    fd.set('mirror2Port', m2Port.trim());
+    fd.set('mirror2User', m2User.trim());
+    if (m2Pass) fd.set('mirror2Pass', m2Pass);
+    fd.set('mirror2Share', m2Share.trim());
+    fd.set('mirror2BasePath', m2BasePath.trim());
+    fd.set('mirror2Secure', String(m2Secure));
     setMsg(null);
     setTest(null);
+    setTest2(null);
     startTransition(async () => {
       await saveStorageConfig(fd);
       setPass('');
+      setM2Pass('');
       setMsg('Saved ✓');
       setTimeout(() => setMsg(null), 2500);
     });
@@ -1467,6 +1488,14 @@ function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Inf
     startTransition(async () => {
       const r = backend === 'onedrive' ? await testOnedriveConnection() : await testRemoteConnection();
       setTest(r.ok ? 'Connection OK ✓' : `Failed: ${r.error}`);
+    });
+  }
+
+  function doTest2() {
+    setTest2('testing…');
+    startTransition(async () => {
+      const r = await testSecondaryRemote();
+      setTest2(r.ok ? 'Connection OK ✓' : `Failed: ${r.error}`);
     });
   }
 
@@ -1600,6 +1629,84 @@ function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Inf
             <p className="text-[10px] text-[color:var(--color-text-faint)] mt-0.5">{t('set.autoMirrorDesc')}</p>
           </div>
           <Switch checked={mirror} onChange={setMirror} />
+        </div>
+      )}
+
+      {/* P99: optional SECOND remote mirror, for real 3-2-1 (local + two offsite copies).
+          FTP/SMB only; only offered once a primary remote is set. */}
+      {backend !== 'local' && (
+        <div className="pt-2 border-t border-[color:var(--color-border)] mt-1 space-y-3">
+          <div className="flex items-center gap-2 text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider" style={{ fontFamily: 'var(--font-mono)' }}>
+            <Server size={12} /> Second destination (3-2-1 backup)
+          </div>
+          <p className="text-[10px] text-[color:var(--color-text-faint)] -mt-1">
+            A second, independent offsite copy. Files are pushed here alongside the primary, best-effort — a failure here never affects the primary.
+          </p>
+          <Row label="Backend">
+            <div className="flex gap-1.5 flex-wrap">
+              {([
+                { v: '' as const, label: 'None' },
+                { v: 'smb' as const, label: 'SMB / NAS' },
+                { v: 'ftp' as const, label: 'FTP' },
+              ]).map((b) => (
+                <button
+                  key={b.v || 'none'}
+                  onClick={() => setM2Backend(b.v)}
+                  className={cn(
+                    'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all',
+                    m2Backend === b.v
+                      ? 'bg-[color:var(--color-accent)] text-black'
+                      : 'bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]'
+                  )}
+                >
+                  {b.label}
+                </button>
+              ))}
+            </div>
+          </Row>
+          {(m2Backend === 'smb' || m2Backend === 'ftp') && (
+            <div className="grid sm:grid-cols-2 gap-3">
+              <Field label={t('set.hostIp')}>
+                <input value={m2Host} onChange={(e) => setM2Host(e.target.value)} placeholder="192.168.10.30" className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} />
+              </Field>
+              <Field label={t('set.portBlank', { default: m2Backend === 'smb' ? '445' : '21' })}>
+                <input value={m2Port} onChange={(e) => setM2Port(e.target.value)} placeholder={m2Backend === 'smb' ? '445' : '21'} className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} />
+              </Field>
+              {m2Backend === 'smb' && (
+                <Field label={t('set.shareName')}>
+                  <input value={m2Share} onChange={(e) => setM2Share(e.target.value)} placeholder="backup" className={inputClass} />
+                </Field>
+              )}
+              <Field label={t('set.username')}>
+                <input value={m2User} onChange={(e) => setM2User(e.target.value)} className={inputClass} autoComplete="new-password" data-1p-ignore data-lpignore="true" />
+              </Field>
+              <Field label={storage.hasPass2 ? t('set.passwordSaved') : t('set.password')}>
+                <input type="password" value={m2Pass} onChange={(e) => setM2Pass(e.target.value)} placeholder={storage.hasPass2 ? '••••••••' : ''} className={inputClass} autoComplete="new-password" data-1p-ignore data-lpignore="true" />
+              </Field>
+              <Field label={t('set.baseFolder')}>
+                <input value={m2BasePath} onChange={(e) => setM2BasePath(e.target.value)} placeholder="Pharos" className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} />
+              </Field>
+              {m2Backend === 'ftp' && (
+                <div className="flex items-center justify-between sm:col-span-2">
+                  <span className="text-xs text-[color:var(--color-text-dim)]">{t('set.ftpsTls')}</span>
+                  <Switch checked={m2Secure} onChange={setM2Secure} />
+                </div>
+              )}
+              <div className="sm:col-span-2 flex items-center gap-2 flex-wrap">
+                <button type="button" onClick={doTest2} disabled={pending} className={ghostBtn}>
+                  <Plug size={13} /> {t('set.testConnection')}
+                </button>
+                {test2 && (
+                  <span
+                    className={cn('text-[11px]', test2.startsWith('Connection OK') ? 'text-[color:var(--color-accent)]' : test2 === 'testing…' ? 'text-[color:var(--color-text-dim)]' : 'text-[color:var(--color-red)]')}
+                    style={{ fontFamily: 'var(--font-mono)' }}
+                  >
+                    {test2}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

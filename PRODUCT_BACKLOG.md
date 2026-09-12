@@ -113,7 +113,7 @@
   simple-first idiom με το P27 median)· εμφανίζεται μόνο για κατηγορίες με ρυθμισμένο budget>0 (ίδιο guard με το
   ήδη-υπάρχον card)· καμία νέα notification/alert σε αυτό το slice (μόνο in-page badge, follow-up αν ζητηθεί).
 
-### P99. Δεύτερος (ταυτόχρονος) remote backup destination — πραγματικό 3-2-1, όχι ένα backend τη φορά — S/M — OSS (κυρίως), self-host trust lever
+### P99. Δεύτερος (ταυτόχρονος) remote backup destination — πραγματικό 3-2-1, όχι ένα backend τη φορά — ✅ SHIPPED 2026-09-12 (interactive session, «ξεκίνα τα proposed»; ADDITIVE secondary-mirror design — primary path untouched, no storageBackend→array migration, so zero risk to the working backup path. FTP/SMB secondary only; OneDrive-as-secondary is a follow-up) — S/M — OSS (κυρίως), self-host trust lever
 - **Αξία:** live-verified `models/AppConfig.ts:118` `storageBackend: enum ['local','ftp','smb','onedrive']` — **ένα
   και μόνο** backend ενεργό κάθε φορά. Το ίδιο το `CLAUDE.md` έχει ρητό locked design principle «3-2-1 backups: από
   την αρχή», αλλά η σημερινή αρχιτεκτονική δεν επιτρέπει καν 2 αντίγραφα εκτός τοπικού δίσκου ταυτόχρονα — αλλαγή

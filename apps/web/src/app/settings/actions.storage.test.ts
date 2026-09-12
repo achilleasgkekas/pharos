@@ -44,6 +44,8 @@ function makeStorageConfig(overrides: Record<string, unknown> = {}) {
     fileNameTemplate: '{date}_{store}_{id}',
     remote: { backend: 'ftp', host: '', port: 0, user: '', pass: '', share: '', basePath: '', secure: false },
     hasPass: false,
+    mirror2: null,
+    hasPass2: false,
     ...overrides,
   };
 }
@@ -281,7 +283,33 @@ describe('getStorageInfo', () => {
       lastSyncAt: '',
       syncStaleDays: 7,
       syncIsStale: false, // local backend can never be stale
+      mirror2Backend: '',
+      mirror2Host: '',
+      mirror2Port: 0,
+      mirror2User: '',
+      mirror2Share: '',
+      mirror2BasePath: '',
+      mirror2Secure: false,
+      hasPass2: false,
     });
+  });
+
+  it('maps a configured second destination (P99)', async () => {
+    getStorageConfigMock.mockResolvedValueOnce(
+      makeStorageConfig({
+        backend: 'onedrive',
+        mirror: true,
+        mirror2: { backend: 'smb', host: 'nas2.local', port: 445, user: 'bob', pass: 'x', share: 'backup', basePath: 'Pharos', secure: false },
+        hasPass2: true,
+      })
+    );
+    const info = await getStorageInfo();
+    expect(info.mirror2Backend).toBe('smb');
+    expect(info.mirror2Host).toBe('nas2.local');
+    expect(info.mirror2Port).toBe(445);
+    expect(info.mirror2User).toBe('bob');
+    expect(info.mirror2Share).toBe('backup');
+    expect(info.hasPass2).toBe(true);
   });
 
   it('maps a configured remote backend', async () => {
@@ -362,6 +390,22 @@ describe('saveStorageConfig', () => {
     appConfigUpdateOne.mockClear();
     await saveStorageConfig(fd({ storageMirror: 'yes' }));
     expect((appConfigUpdateOne.mock.calls[0][1] as any).$set.storageMirror).toBe(false);
+  });
+
+  it('P99: persists a valid second destination and only sets the password when given', async () => {
+    await saveStorageConfig(fd({ mirror2Backend: 'smb', mirror2Host: ' nas2 ', mirror2Share: 'backup', mirror2Pass: 'sekret' }));
+    const set = (appConfigUpdateOne.mock.calls[0][1] as any).$set;
+    expect(set['storageMirror2.backend']).toBe('smb');
+    expect(set['storageMirror2.host']).toBe('nas2'); // trimmed
+    expect(set['storageMirror2.share']).toBe('backup');
+    expect(set['storageMirror2.pass']).toBe('sekret');
+  });
+
+  it('P99: a bad/blank second backend is stored as "" and a blank password is left untouched', async () => {
+    await saveStorageConfig(fd({ mirror2Backend: 'dropbox' }));
+    const set = (appConfigUpdateOne.mock.calls[0][1] as any).$set;
+    expect(set['storageMirror2.backend']).toBe('');
+    expect('storageMirror2.pass' in set).toBe(false); // blank → keep existing
   });
 
   it('trims folder/file templates and keeps a non-blank value', async () => {

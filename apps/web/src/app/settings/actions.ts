@@ -1065,6 +1065,15 @@ export type StorageInfo = {
   lastSyncAt: string; // ISO of the last successful remote push; '' = never (P48)
   syncStaleDays: number; // alert threshold in days; 0 = the staleness check is off
   syncIsStale: boolean; // true when the alert sweep would warn about this right now
+  // P99: the optional second remote mirror (FTP/SMB). backend '' = not configured.
+  mirror2Backend: '' | 'ftp' | 'smb';
+  mirror2Host: string;
+  mirror2Port: number;
+  mirror2User: string;
+  mirror2Share: string;
+  mirror2BasePath: string;
+  mirror2Secure: boolean;
+  hasPass2: boolean;
 };
 
 /** Storage config for the Settings editor — never includes the password. */
@@ -1093,6 +1102,14 @@ export async function getStorageInfo(): Promise<StorageInfo> {
     lastSyncAt: lastSync ? lastSync.toISOString() : '',
     syncStaleDays: settings.syncStaleDays,
     syncIsStale: !!stale,
+    mirror2Backend: s.mirror2 ? (s.mirror2.backend as 'ftp' | 'smb') : '',
+    mirror2Host: s.mirror2?.host || '',
+    mirror2Port: s.mirror2?.port ?? 0,
+    mirror2User: s.mirror2?.user || '',
+    mirror2Share: s.mirror2?.share || '',
+    mirror2BasePath: s.mirror2?.basePath || '',
+    mirror2Secure: !!s.mirror2?.secure,
+    hasPass2: s.hasPass2,
   };
 }
 
@@ -1114,6 +1131,21 @@ export async function saveStorageConfig(formData: FormData): Promise<{ ok: boole
   };
   const pass = String(formData.get('remotePass') || '');
   if (pass) update.remotePass = pass; // blank → keep the existing one
+
+  // P99: second remote mirror (FTP/SMB only). Written under a nested doc so the primary
+  // fields above are untouched. Blank backend clears it; a blank password keeps the
+  // existing one (same idiom as the primary).
+  const m2Backend = String(formData.get('mirror2Backend') || '');
+  update['storageMirror2.backend'] = ['ftp', 'smb'].includes(m2Backend) ? m2Backend : '';
+  update['storageMirror2.host'] = String(formData.get('mirror2Host') || '').trim();
+  update['storageMirror2.port'] = Math.max(0, Math.min(65535, Number(formData.get('mirror2Port')) || 0));
+  update['storageMirror2.user'] = String(formData.get('mirror2User') || '').trim();
+  update['storageMirror2.share'] = String(formData.get('mirror2Share') || '').trim();
+  update['storageMirror2.basePath'] = String(formData.get('mirror2BasePath') || '').trim();
+  update['storageMirror2.secure'] = formData.get('mirror2Secure') === 'true';
+  const pass2 = String(formData.get('mirror2Pass') || '');
+  if (pass2) update['storageMirror2.pass'] = pass2;
+
   await (await scoped(AppConfig)).updateOne({ key: 'singleton' }, { $set: update }, { upsert: true });
   invalidateStorageConfig();
   revalidatePath('/settings');
@@ -1125,6 +1157,13 @@ export async function testRemoteConnection(): Promise<{ ok: boolean; error?: str
   const s = await getStorageConfig();
   if (s.backend === 'local') return { ok: false, error: 'Backend is Local — nothing to test' };
   return testRemote(s.remote);
+}
+
+/** Verify the SAVED second-mirror config (P99). */
+export async function testSecondaryRemote(): Promise<{ ok: boolean; error?: string }> {
+  const s = await getStorageConfig();
+  if (!s.mirror2) return { ok: false, error: 'No second destination configured' };
+  return testRemote(s.mirror2);
 }
 
 function shortId(id: unknown): string {
@@ -1220,7 +1259,18 @@ export async function syncToRemote(): Promise<SyncResult> {
   }
   const res = await pushBatchToRemote(s.remote, files);
   if (res.pushed > 0) await markRemoteSync(); // see syncOnedriveBatch for why pushed > 0
-  return { ok: res.failed === 0, pushed: res.pushed, failed: res.failed, skipped, errors: res.errors };
+  // P99: mirror the same batch to the optional second destination, best-effort. Its
+  // failures are surfaced (prefixed) but never flip the overall ok for the primary sync.
+  const errors = [...res.errors];
+  if (s.mirror2) {
+    try {
+      const res2 = await pushBatchToRemote(s.mirror2, files);
+      for (const e of res2.errors) errors.push(`[2nd] ${e}`);
+    } catch (err) {
+      errors.push(`[2nd] ${(err as Error).message}`);
+    }
+  }
+  return { ok: res.failed === 0, pushed: res.pushed, failed: res.failed, skipped, errors };
 }
 
 // ─── Email-in (IMAP) auto-import (P11) ─────────────────────────────────────────
