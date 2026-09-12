@@ -275,6 +275,21 @@ export type SerializedBill = {
   updatedAt: string;
 };
 
+// P42: personal document expiry tracker.
+export type SerializedDocument = {
+  _id: string;
+  title: string;
+  type: string;
+  holder: string;
+  number: string;
+  issuedAt: string | null;
+  expiryDate: string | null;
+  notes: string;
+  archived: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type SerializedCard = {
   _id: string;
   name: string;

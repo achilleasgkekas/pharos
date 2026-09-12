@@ -17,6 +17,7 @@ export const en = {
   'nav.vouchers': 'Vouchers',
   'nav.calendar': 'Calendar',
   'nav.tasks': 'Tasks',
+  'nav.documents': 'Documents',
   'nav.reports': 'Reports',
   'nav.savings': 'Save',
   'nav.jobs': 'Jobs',

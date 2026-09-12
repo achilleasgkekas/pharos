@@ -16,6 +16,7 @@ export const el: Partial<Dict> = {
   'nav.vouchers': 'Κουπόνια',
   'nav.calendar': 'Ημερολόγιο',
   'nav.tasks': 'Εργασίες',
+  'nav.documents': 'Έγγραφα',
   'nav.reports': 'Αναφορές',
   'nav.savings': 'Αποταμίευση',
   'nav.jobs': 'Διεργασίες',

@@ -12,7 +12,9 @@ import { GiftCard } from '@/models/GiftCard';
 import { LoyaltyCard } from '@/models/LoyaltyCard';
 import { giftCardBalance, giftCardDaysLeft } from '@/lib/giftcard';
 import { Bill } from '@/models/Bill';
+import { Document as DocumentModel } from '@/models/Document';
 import { billDaysUntilDue } from '@/lib/bill';
+import { collectExpiringDocuments } from '@/lib/documentExpiry';
 import { collectMaintenanceDue, MAINTENANCE_STATUSES, type MaintenanceRow } from '@/lib/maintenance';
 import { collectLendingOverdue, LENDING_STATUSES, type LendingRow } from '@/lib/lending';
 import { collectStaleClaims, CLAIM_STATUSES_APPLY_TO, DEFAULT_STALE_CLAIM_DAYS, type StaleClaimRow } from '@/lib/warrantyClaims';
@@ -696,6 +698,17 @@ export async function runAlertChecks(opts: { dedupe?: boolean } = {}): Promise<{
     .filter((b) => b.days !== null && (b.days as number) <= s.billAlertDays)
     .sort((a, b) => (a.days ?? 0) - (b.days ?? 0));
 
+  // Personal documents expiring / expired (P42): passport, ID, licence, vehicle reg.
+  // Same collector the Documents page uses (lib/documentExpiry.ts), so the list and the
+  // alert agree. Zero = off, and then the query is skipped rather than run and thrown away.
+  const documentRows =
+    s.documentAlertDays > 0
+      ? ((await (await scoped(DocumentModel)).find({ archived: { $ne: true }, expiryDate: { $ne: null } })
+          .select('title type holder expiryDate')
+          .lean()) as Array<{ _id: unknown; title: string; type?: string; holder?: string; expiryDate?: string | Date | null }>)
+      : [];
+  const documentsExpiring = collectExpiringDocuments(documentRows, s.documentAlertDays, now);
+
   // Maintenance due (P41): the only alert here about a chore rather than about money.
   // Same helper the in-app bell uses (lib/maintenance.ts), so the phone push and the bell
   // can never disagree about which printer is overdue. Mongo filters on the stored
@@ -770,6 +783,7 @@ export async function runAlertChecks(opts: { dedupe?: boolean } = {}): Promise<{
   const trialsSplit = splitFreshAlerts(nt.trials ? trialsEnding : [], (tr) => `trialend:${String(tr._id)}:${tr.iso}`, previouslySent);
   const giftsSplit = splitFreshAlerts(nt.giftCards ? giftsExpiring : [], (g) => `giftcard:${String(g._id)}:${g.iso}`, previouslySent);
   const billsSplit = splitFreshAlerts(nt.bills ? billsDue : [], (b) => `bill:${String(b._id)}:${b.iso}`, previouslySent);
+  const documentsSplit = splitFreshAlerts(nt.documents ? documentsExpiring : [], (d) => `document:${String(d._id)}:${d.iso}`, previouslySent);
   const maintenanceSplit = splitFreshAlerts(nt.maintenance ? maintenanceDue : [], (m) => `maintenance:${String(m._id)}:${m.iso}`, previouslySent);
   const lendingSplit = splitFreshAlerts(nt.lending ? lendingDue : [], (l) => `lending:${String(l._id)}:${l.iso}`, previouslySent);
   const claimsSplit = splitFreshAlerts(nt.warrantyClaims ? staleClaims : [], (c) => `claim:${String(c._id)}:${c.iso}`, previouslySent);
@@ -790,6 +804,7 @@ export async function runAlertChecks(opts: { dedupe?: boolean } = {}): Promise<{
     ...trialsSplit.keys,
     ...giftsSplit.keys,
     ...billsSplit.keys,
+    ...documentsSplit.keys,
     ...maintenanceSplit.keys,
     ...lendingSplit.keys,
     ...claimsSplit.keys,
@@ -806,6 +821,7 @@ export async function runAlertChecks(opts: { dedupe?: boolean } = {}): Promise<{
   const freshTrialsEnding = trialsSplit.fresh;
   const freshGiftsExpiring = giftsSplit.fresh;
   const freshBillsDue = billsSplit.fresh;
+  const freshDocumentsExpiring = documentsSplit.fresh;
   const freshMaintenanceDue = maintenanceSplit.fresh;
   const freshLendingDue = lendingSplit.fresh;
   const freshStaleClaims = claimsSplit.fresh;
@@ -851,6 +867,13 @@ export async function runAlertChecks(opts: { dedupe?: boolean } = {}): Promise<{
       `🧾 ${freshBillsDue.length} bill(s) due/overdue: ${freshBillsDue
         .slice(0, 5)
         .map((b) => `${b.title}${b.amount > 0 ? ` ${cur()}${b.amount.toFixed(0)}` : ''} (${(b.days ?? 0) < 0 ? `${-(b.days ?? 0)}d overdue` : `${b.days}d`})`)
+        .join(', ')}`
+    );
+  if (freshDocumentsExpiring.length)
+    lines.push(
+      `🪪 ${freshDocumentsExpiring.length} document(s) expiring: ${freshDocumentsExpiring
+        .slice(0, 5)
+        .map((d) => `${d.title}${d.holder ? ` (${d.holder})` : ''} (${d.days < 0 ? `${-d.days}d ago` : `${d.days}d`})`)
         .join(', ')}`
     );
   if (freshMaintenanceDue.length)

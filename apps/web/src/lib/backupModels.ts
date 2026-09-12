@@ -8,6 +8,7 @@ import { Task } from '@/models/Task';
 import { Store } from '@/models/Store';
 import { Expense } from '@/models/Expense';
 import { Bill } from '@/models/Bill';
+import { Document } from '@/models/Document';
 import { Goal } from '@/models/Goal';
 import { GiftCard } from '@/models/GiftCard';
 import { LoyaltyCard } from '@/models/LoyaltyCard';
@@ -43,6 +44,7 @@ export const BACKUP_MODELS = {
   // Added 2026-07-26 — all seven were user-owned data that the backup silently skipped.
   expenses: Expense,
   bills: Bill,
+  documents: Document,
   goals: Goal,
   giftCards: GiftCard,
   loyaltyCards: LoyaltyCard,

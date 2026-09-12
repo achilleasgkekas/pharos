@@ -647,7 +647,7 @@
   αμετάβλητη)· carrier ως free string με λίγα auto-suggest chips (Cosmote/ELTA/ACS/Speedex/DHL/UPS τα πιο κοινά GR)
   ώστε το tracking-URL template να δουλεύει χωρίς fixed enum· καμία live API polling σε αυτό το MVP.
 
-### P71. Personal secrets vault (WiFi/router/NAS admin logins, license keys, recovery codes) — S/M — OSS (κυρίως), «Personal Hub» fit
+### P71. Personal secrets vault (WiFi/router/NAS admin logins, license keys, recovery codes) — ⛔ REJECTED 2026-09-12 (interactive session — ο Αχιλλέας το απέρριψε ρητά· ένα self-hosted secrets vault επικαλύπτεται με dedicated password managers και ανεβάζει το security-surface χωρίς αρκετό όφελος) — S/M — OSS (κυρίως), «Personal Hub» fit
 - **Αξία:** live-verified `grep -rn "vault\|SecretNote" apps/web/src/models` = μόνο το P21 document/manual vault
   (`AttachmentSchema` στο `models/Item.ts`, αρχεία όπως manuals/warranty certs) — **κανένα μέρος για μικρά
   text-secrets**. Το CLAUDE.md δείχνει έναν χρήστη με σοβαρό δικτυακό/hardware setup (UniFi controller admin,
@@ -1106,7 +1106,7 @@
   off — ρητή επιλογή τι μοιράζεσαι)· η δημόσια σελίδα δείχνει ΜΟΝΟ τίτλο/φωτο/τιμή/store-link, ΠΟΤΕ οικονομικά
   aggregates ή owned inventory.
 
-### P42. Personal document expiry tracker (διαβατήριο, ταυτότητα, δίπλωμα, άδεια κυκλοφορίας) — S/M — OSS (κυρίως), «Personal Hub» fit
+### P42. Personal document expiry tracker (διαβατήριο, ταυτότητα, δίπλωμα, άδεια κυκλοφορίας) — ✅ SHIPPED 2026-09-12 (interactive session, «go on»; standalone /documents module + expiry alert. Attachments/scans = follow-up) — S/M — OSS (κυρίως), «Personal Hub» fit
 - **Αξία:** το PHAROS backronym είναι ρητά «Personal Hub» (CLAUDE.md), αλλά κανένα module σήμερα δεν κρατά τα πιο
   βασικά **προσωπικά έγγραφα με ημερομηνία λήξης** (διαβατήριο, ταυτότητα, δίπλωμα οδήγησης, κάρτα διαμονής, άδεια
   κυκλοφορίας οχήματος/ΚΤΕΟ) — μόνο αντικείμενα (Items) και ασφαλιστικά συμβόλαια (P38) έχουν αυτή τη δομή.

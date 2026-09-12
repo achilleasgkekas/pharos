@@ -15,6 +15,7 @@ export const ALERT_TYPES = [
   { key: 'trials', label: 'Free trials ending' },
   { key: 'giftCards', label: 'Gift cards expiring with balance' },
   { key: 'bills', label: 'Bills due / overdue' },
+  { key: 'documents', label: 'Documents expiring (passport, ID, licence…)' },
   { key: 'maintenance', label: 'Maintenance due on owned items' },
   { key: 'lending', label: 'Lent items due back' },
   { key: 'warrantyClaims', label: 'Warranty claims with no movement' },

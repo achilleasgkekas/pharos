@@ -29,6 +29,7 @@ export type AppSettings = {
   trialAlertDays: number; // lead time (days) for free-trial "cancel before charge" alert (P33)
   giftCardAlertDays: number; // window (days) for "gift card expiring with balance" alert (P32); 0 = off
   billAlertDays: number; // lead-time (days) for "bill due / overdue" alert (P28); 0 = off
+  documentAlertDays: number; // lead-time (days) for "document expiring / expired" alert (P42); 0 = off
   maintenanceAlertDays: number; // lead-time (days) for the "maintenance due" alert (P41); overdue nags regardless
   lendingAlertDays: number; // lead-time (days) for the "lent item due back" alert (P47); overdue nags regardless
   staleClaimDays: number; // days of silence before an open warranty claim counts as forgotten (P44); 0 = off
@@ -62,6 +63,7 @@ export type RawAppConfigDoc = {
   trialAlertDays?: number;
   giftCardAlertDays?: number;
   billAlertDays?: number;
+  documentAlertDays?: number;
   maintenanceAlertDays?: number;
   lendingAlertDays?: number;
   staleClaimDays?: number;
@@ -104,6 +106,7 @@ const DEFAULTS: AppSettings = {
   trialAlertDays: 2,
   giftCardAlertDays: 30,
   billAlertDays: 5,
+  documentAlertDays: 30,
   maintenanceAlertDays: 7,
   lendingAlertDays: 3,
   staleClaimDays: DEFAULT_STALE_CLAIM_DAYS,
@@ -154,6 +157,7 @@ export function normalizeSettings(doc: RawAppConfigDoc | null | undefined): AppS
     trialAlertDays: typeof doc?.trialAlertDays === 'number' ? doc.trialAlertDays : DEFAULTS.trialAlertDays,
     giftCardAlertDays: typeof doc?.giftCardAlertDays === 'number' ? doc.giftCardAlertDays : DEFAULTS.giftCardAlertDays,
     billAlertDays: typeof doc?.billAlertDays === 'number' ? doc.billAlertDays : DEFAULTS.billAlertDays,
+    documentAlertDays: typeof doc?.documentAlertDays === 'number' ? doc.documentAlertDays : DEFAULTS.documentAlertDays,
     maintenanceAlertDays:
       typeof doc?.maintenanceAlertDays === 'number' ? doc.maintenanceAlertDays : DEFAULTS.maintenanceAlertDays,
     lendingAlertDays: typeof doc?.lendingAlertDays === 'number' ? doc.lendingAlertDays : DEFAULTS.lendingAlertDays,
@@ -200,7 +204,7 @@ export async function getAppSettings(): Promise<AppSettings> {
     await connectDB();
     const Config = tenantModel(await tenantDb(ctx), AppConfig);
     doc = await Config.findOne({ key: 'singleton' })
-      .select('defaultItemView defaultWarrantyMonths warrantyAlertDays trialAlertDays giftCardAlertDays billAlertDays maintenanceAlertDays lendingAlertDays staleClaimDays syncStaleDays autoAddStores ntfyUrl ntfyEnabled currency multiCurrency defaultVatRate defaultReturnWindowDays lists spaces budgets budgetRollover assetAccounts depreciation categoryRules onboardingDismissed notifyTypes')
+      .select('defaultItemView defaultWarrantyMonths warrantyAlertDays trialAlertDays giftCardAlertDays billAlertDays documentAlertDays maintenanceAlertDays lendingAlertDays staleClaimDays syncStaleDays autoAddStores ntfyUrl ntfyEnabled currency multiCurrency defaultVatRate defaultReturnWindowDays lists spaces budgets budgetRollover assetAccounts depreciation categoryRules onboardingDismissed notifyTypes quietHours')
       .lean();
   } catch {
     /* DB down → hard defaults */
