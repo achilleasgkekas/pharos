@@ -32,7 +32,9 @@ export interface ScrubbableEvent {
 
 type Env = Record<string, string | undefined>;
 
-const SENSITIVE_HEADERS = ['cookie', 'authorization', 'x-api-key', 'x-forwarded-for', 'x-real-ip', 'cf-connecting-ip'];
+// Request headers are ALLOW-listed, not deny-listed: Referer, custom x-* headers and proxies can
+// all carry full URLs, tokens or IPs, and a deny list only covers the ones someone thought of.
+const ALLOWED_HEADERS = new Set(['user-agent', 'accept-language', 'content-type']);
 
 export function sentryDsn(env: Env = process.env): string | null {
   const dsn = (env.SENTRY_DSN || '').trim();
@@ -69,6 +71,17 @@ const REDACTIONS: Array<[RegExp, string]> = [
   [/\b\d(?:[\s-]?\d){7,}\b/g, '[number]'], // cards, phones, tax/ids
 ];
 
+/** Query/hash dropped; id-like path segments and anything redactText catches replaced. */
+export function redactUrl(url: string): string {
+  const [base] = url.split(/[?#]/);
+  let decoded = base;
+  // decodeURIComponent per segment: decodeURI leaves reserved escapes like %40 (@) encoded.
+  try { decoded = base.split('/').map((seg) => decodeURIComponent(seg)).join('/'); } catch { /* keep raw */ }
+  return redactText(
+    decoded.replace(/\/(?:[0-9a-f]{24}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|\d{4,})(?=\/|$)/gi, '/:id'),
+  );
+}
+
 export function redactText(text: string): string {
   let out = text;
   for (const [re, repl] of REDACTIONS) out = out.replace(re, repl);
@@ -79,14 +92,22 @@ export function redactText(text: string): string {
 // debugging (browser/os versions look like "numbers").
 const SAFE_CONTEXTS = new Set(['os', 'browser', 'runtime', 'device', 'trace', 'app', 'culture', 'cloud_resource', 'nextjs']);
 
+// Depth cap protects against pathological/cyclic payloads. Anything deeper is DROPPED, never passed
+// through unredacted. 12 comfortably covers exception.values[].stacktrace.frames[].* (depth 7).
+const MAX_DEPTH = 12;
+
 function redactDeep(value: unknown, depth = 0): unknown {
   if (typeof value === 'string') return redactText(value);
-  if (depth > 6 || value === null || typeof value !== 'object') return value;
+  if (value === null || typeof value !== 'object') return value;
+  if (depth >= MAX_DEPTH) return '[truncated]';
   if (Array.isArray(value)) return value.map((v) => redactDeep(v, depth + 1));
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(value)) out[k] = redactDeep(v, depth + 1);
   return out;
 }
+
+// Top-level fields the SDK fills with non-personal metadata; everything else is deep-redacted.
+const SAFE_TOP = new Set(['event_id', 'timestamp', 'start_timestamp', 'platform', 'level', 'sdk', 'debug_meta', 'environment', 'release', 'dist', 'fingerprint']);
 
 /** Strip identifying data. Mutates and returns the event (Sentry's beforeSend contract). */
 export function scrubEvent<T extends ScrubbableEvent>(event: T): T {
@@ -101,30 +122,29 @@ export function scrubEvent<T extends ScrubbableEvent>(event: T): T {
     delete event.request.query_string;
     if (event.request.headers) {
       for (const h of Object.keys(event.request.headers)) {
-        if (SENSITIVE_HEADERS.includes(h.toLowerCase())) delete event.request.headers[h];
+        if (!ALLOWED_HEADERS.has(h.toLowerCase())) delete event.request.headers[h];
       }
     }
-    if (event.request.url) event.request.url = event.request.url.split('?')[0];
+    if (typeof event.request.url === 'string') event.request.url = redactUrl(event.request.url);
   }
-  if (event.breadcrumbs) {
-    for (const b of event.breadcrumbs) {
-      // fetch/xhr breadcrumbs carry full URLs with query strings (search terms, ids).
-      if (b.data && typeof b.data.url === 'string') b.data.url = b.data.url.split('?')[0];
+  for (const b of event.breadcrumbs ?? []) {
+    // navigation/fetch/xhr breadcrumbs carry URLs (from/to/url) with ids and search terms.
+    for (const k of ['url', 'from', 'to']) {
+      if (b.data && typeof b.data[k] === 'string') b.data[k] = redactUrl(b.data[k] as string);
     }
   }
-  // Free text: messages, exception values, breadcrumb messages/data, extras, tags, custom contexts.
-  if (typeof event.message === 'string') event.message = redactText(event.message);
-  const exc = event.exception as { values?: Array<{ value?: string }> } | undefined;
-  for (const v of exc?.values ?? []) if (typeof v.value === 'string') v.value = redactText(v.value);
-  for (const b of event.breadcrumbs ?? []) {
-    if (typeof b.message === 'string') b.message = redactText(b.message);
-    if (b.data) b.data = redactDeep(b.data) as Record<string, unknown>;
-  }
-  if (event.extra) event.extra = redactDeep(event.extra);
-  if (event.tags) event.tags = redactDeep(event.tags);
-  if (event.contexts && typeof event.contexts === 'object') {
-    const ctx = event.contexts as Record<string, unknown>;
-    for (const k of Object.keys(ctx)) if (!SAFE_CONTEXTS.has(k)) ctx[k] = redactDeep(ctx[k]);
+  // Then EVERY remaining string in the event goes through redactText — messages, exception values,
+  // breadcrumbs, extra, tags, transaction names, custom contexts — except SDK-generated
+  // environment descriptors, which hold no user content and are needed for debugging.
+  const e = event as Record<string, unknown>;
+  for (const key of Object.keys(e)) {
+    if (SAFE_TOP.has(key) || key === 'user' || key === 'request') continue;
+    if (key === 'contexts' && e.contexts && typeof e.contexts === 'object') {
+      const ctx = e.contexts as Record<string, unknown>;
+      for (const k of Object.keys(ctx)) if (!SAFE_CONTEXTS.has(k)) ctx[k] = redactDeep(ctx[k], 1);
+      continue;
+    }
+    e[key] = redactDeep(e[key]);
   }
   return event;
 }

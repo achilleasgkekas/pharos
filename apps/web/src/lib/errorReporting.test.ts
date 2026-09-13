@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { sentryDsn, sentryEnvironment, baseSentryOptions, scrubEvent, redactText } from './errorReporting';
+import { sentryDsn, sentryEnvironment, baseSentryOptions, scrubEvent, redactText, redactUrl } from './errorReporting';
 
 describe('errorReporting · off by default', () => {
   it('returns no DSN when unset or malformed, so the SDK is never loaded', () => {
@@ -83,5 +83,38 @@ describe('errorReporting · free-text redaction', () => {
     expect(json).not.toContain('a@b.co');
     expect(json).not.toContain('12,50');
     expect((e.contexts as Record<string, { version?: string }>).browser.version).toBe('128.0.6613.84');
+  });
+});
+
+describe('errorReporting · real event shapes (review round 2)', () => {
+  it('redacts ids, emails and query/hash in URL paths', () => {
+    expect(redactUrl('https://w.ph-aros.com/documents/64f1a2b3c4d5e6f708192a3b/share?x=1#y')).toBe('https://w.ph-aros.com/documents/:id/share');
+    expect(redactUrl('https://w.ph-aros.com/u/maria%40example.gr/bills')).not.toContain('maria');
+    expect(redactUrl('/items/1234567/edit')).toBe('/items/:id/edit');
+  });
+
+  it('allow-lists headers, so Referer and custom headers never leave', () => {
+    const e = scrubEvent({ request: { headers: { Referer: 'https://w/expenses?q=secret', 'X-Custom': 'tok', 'Accept-Language': 'el', 'User-Agent': 'ua' } } });
+    expect(e.request?.headers).toEqual({ 'Accept-Language': 'el', 'User-Agent': 'ua' });
+  });
+
+  it('never passes deep strings through unredacted — deep payloads are truncated instead', () => {
+    let nested: Record<string, unknown> = { leak: 'deep a@b.co' };
+    for (let i = 0; i < 20; i++) nested = { n: nested };
+    const json = JSON.stringify(scrubEvent({ extra: nested }));
+    expect(json).not.toContain('a@b.co');
+    expect(json).toContain('[truncated]');
+  });
+
+  it('keeps stack frames usable while redacting the exception text', () => {
+    const e = scrubEvent({
+      exception: { values: [{ type: 'TypeError', value: 'bad total €12,00', stacktrace: { frames: [{ filename: 'app:///_next/static/chunks/app/bills/page-3f2a.js', function: 'BillRow', lineno: 42 }] } }] },
+      transaction: '/bills/64f1a2b3c4d5e6f708192a3b',
+      breadcrumbs: [{ category: 'navigation', data: { from: '/u/a@b.co', to: '/bills/64f1a2b3c4d5e6f708192a3b?tab=1' } }],
+    });
+    const v = (e.exception as { values: Array<{ value: string; stacktrace: { frames: Array<{ filename: string; lineno: number }> } }> }).values[0];
+    expect(v.value).toBe('bad total [amount]');
+    expect(v.stacktrace.frames[0]).toMatchObject({ filename: 'app:///_next/static/chunks/app/bills/page-3f2a.js', lineno: 42 });
+    expect(JSON.stringify(e.breadcrumbs)).not.toMatch(/a@b\.co|tab=1|64f1a2/);
   });
 });

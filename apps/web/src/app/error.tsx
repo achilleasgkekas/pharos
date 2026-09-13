@@ -1,6 +1,7 @@
 'use client';
 import { useEffect } from 'react';
 import { RotateCw, RefreshCw } from 'lucide-react';
+import { reportClientError } from '@/lib/clientErrorReporting';
 
 // Root error boundary — catches render/data errors AND uncaught Server Action
 // failures in any route segment.
@@ -17,6 +18,8 @@ export default function Error({ error, reset }: { error: Error & { digest?: stri
 
   useEffect(() => {
     console.error('[route error]', error);
+    // Stale-deploy errors are expected after every release and self-heal by reloading: not a bug.
+    if (!isStaleDeploy) reportClientError(error);
     // Auto-recover stale-deploy errors: silently reload to fetch the new bundle so the
     // user never sees an "application error". Guard against a reload loop with a
     // short-lived flag (if the error recurs within 15s we stop and show the button).

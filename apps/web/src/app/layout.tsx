@@ -16,7 +16,6 @@ import { FirstRunTour } from '@/components/FirstRunTour';
 import { getServerT } from '@/lib/i18n/server';
 import { LocaleProvider } from '@/components/LocaleProvider';
 import { headers } from 'next/headers';
-import { SentryInit } from '@/components/SentryInit';
 import { sentryDsn, sentryEnvironment } from '@/lib/errorReporting';
 import { saasMode } from '@/lib/tenancy/saasMode';
 
@@ -127,6 +126,16 @@ export default async function RootLayout({
     <html lang={locale} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        {/* Error reporting config for instrumentation-client.ts — rendered ONLY when the operator set
+            SENTRY_DSN, so self-hosted installs ship no reporting at all. Inline so it exists before
+            any bundle runs (startup/hydration errors). JSON is escaped against </script> injection. */}
+        {sentryDsn() && (
+          <script
+            dangerouslySetInnerHTML={{
+              __html: `window.__PHAROS_SENTRY__=${JSON.stringify({ dsn: sentryDsn(), environment: sentryEnvironment(saasMode()) }).replace(/</g, '\\u003c')};`,
+            }}
+          />
+        )}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
@@ -135,8 +144,6 @@ export default async function RootLayout({
         />
       </head>
       <body>
-        {/* Error reporting: only when the operator configured SENTRY_DSN (off for self-hosters by default). */}
-        {sentryDsn() && <SentryInit dsn={sentryDsn()!} environment={sentryEnvironment(saasMode())} />}
         <CurrencyInit symbol={symbol} />
         <LocaleProvider locale={locale} dict={dict}>
         <Providers>
