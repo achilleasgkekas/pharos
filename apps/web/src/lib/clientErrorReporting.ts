@@ -40,6 +40,6 @@ export function ensureClientSentry(): Promise<typeof import('@sentry/nextjs') | 
  * React error boundaries (app/error.tsx, app/global-error.tsx) swallow render errors, so the SDK's
  * global handlers never see them — report explicitly.
  */
-export function reportClientError(error: unknown): void {
-  void ensureClientSentry().then((Sentry) => { Sentry?.captureException(error); });
+export function reportClientError(error: unknown, tags?: Record<string, string>): void {
+  void ensureClientSentry().then((Sentry) => { Sentry?.captureException(error, tags ? { tags } : undefined); });
 }

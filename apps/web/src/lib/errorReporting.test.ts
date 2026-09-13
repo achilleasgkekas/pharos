@@ -118,3 +118,19 @@ describe('errorReporting · real event shapes (review round 2)', () => {
     expect(JSON.stringify(e.breadcrumbs)).not.toMatch(/a@b\.co|tab=1|64f1a2/);
   });
 });
+
+describe('errorReporting · request allow-list (review round 3)', () => {
+  it('drops env, fragment and any unknown request field; redacts allowed header values', () => {
+    const e = scrubEvent({
+      request: {
+        method: 'POST',
+        url: 'https://w.ph-aros.com/bills#iban=GR1601101250000000012300695',
+        headers: { 'User-Agent': 'agent for a@b.co' },
+        env: { REMOTE_ADDR: '84.205.1.2', SERVER_NAME: 'pharos-web' },
+        fragment: 'iban=GR1601101250000000012300695',
+        future_field: 'a@b.co',
+      } as never,
+    });
+    expect(e.request).toEqual({ method: 'POST', url: 'https://w.ph-aros.com/bills', headers: { 'User-Agent': 'agent for [email]' } });
+  });
+});

@@ -117,15 +117,19 @@ export function scrubEvent<T extends ScrubbableEvent>(event: T): T {
     event.user = id !== undefined ? { id } : null;
   }
   if (event.request) {
-    delete event.request.cookies;
-    delete event.request.data; // form bodies: amounts, names, notes
-    delete event.request.query_string;
+    // Request fields are ALLOW-listed too: env (client/proxy metadata, IPs), fragment, cookies,
+    // data (form bodies), query_string and anything a future SDK adds are removed wholesale.
+    const req = event.request as Record<string, unknown>;
+    for (const k of Object.keys(req)) if (!['method', 'url', 'headers'].includes(k)) delete req[k];
     if (event.request.headers) {
       for (const h of Object.keys(event.request.headers)) {
         if (!ALLOWED_HEADERS.has(h.toLowerCase())) delete event.request.headers[h];
       }
     }
     if (typeof event.request.url === 'string') event.request.url = redactUrl(event.request.url);
+    if (typeof req.method !== 'string') delete req.method;
+    // Header VALUES of the allowed names still go through redaction (a user-agent can be anything).
+    if (event.request.headers) event.request.headers = redactDeep(event.request.headers) as Record<string, string>;
   }
   for (const b of event.breadcrumbs ?? []) {
     // navigation/fetch/xhr breadcrumbs carry URLs (from/to/url) with ids and search terms.
