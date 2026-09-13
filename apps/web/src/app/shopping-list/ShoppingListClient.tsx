@@ -1,6 +1,6 @@
 'use client';
 import { useState, useRef, useTransition, useMemo } from 'react';
-import { Camera, Plus, Check, Loader2, Trash2, Sparkles, ShoppingBasket, LayoutGrid, List as ListIcon, Search, SlidersHorizontal, CheckSquare } from 'lucide-react';
+import { Camera, Plus, Check, Loader2, Trash2, Sparkles, ShoppingBasket, LayoutGrid, List as ListIcon, Search, SlidersHorizontal, CheckSquare, Repeat2 } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
@@ -14,15 +14,16 @@ import {
   clearChecked,
   scanProductPhoto,
   getListItems,
+  updateListItem,
   type SerializedListItem,
 } from './actions';
 
-type Draft = { name: string; quantity: string; category: string; brand: string };
+type Draft = { name: string; quantity: string; category: string; brand: string; restockIntervalDays: string };
 type StatusFilter = 'all' | 'todo' | 'bought';
 type SortKey = 'recent' | 'name' | 'category';
 const mono = { fontFamily: 'var(--font-mono)' };
 const display = { fontFamily: 'var(--font-display)' }; // titles match every other page's cards
-const emptyDraft: Draft = { name: '', quantity: '', category: '', brand: '' };
+const emptyDraft: Draft = { name: '', quantity: '', category: '', brand: '', restockIntervalDays: '' };
 
 // Deterministic category accent — gives each category a stable colour (like the product cards' eyebrows).
 const PALETTE = ['var(--color-accent)', 'var(--color-cyan)', 'var(--color-purple)', 'var(--color-gold)', 'var(--color-red)'];
@@ -48,6 +49,8 @@ export function ShoppingListClient({ initialItems }: { initialItems: SerializedL
   // Add modal (matches the "+ New" → modal pattern of the other pages)
   const [showAdd, setShowAdd] = useState(false);
   const [addForm, setAddForm] = useState<Draft>(emptyDraft);
+  const [restockItem, setRestockItem] = useState<SerializedListItem | null>(null);
+  const [restockDays, setRestockDays] = useState('');
 
   // E-shop layout state
   const [layout, setLayout] = useState<'grid' | 'list'>('grid');
@@ -95,7 +98,7 @@ export function ShoppingListClient({ initialItems }: { initialItems: SerializedL
   function addItem(d: Draft, aiScanned = false) {
     const n = d.name.trim();
     if (!n) return;
-    const clean = { name: n, quantity: d.quantity.trim(), category: d.category.trim(), brand: d.brand.trim(), aiScanned };
+    const clean = { name: n, quantity: d.quantity.trim(), category: d.category.trim(), brand: d.brand.trim(), aiScanned, restockIntervalDays: d.restockIntervalDays ? Number(d.restockIntervalDays) : undefined };
     // Make sure the new row is actually visible (a stale status/category filter would
     // otherwise hide it → it looks like "I added it but it disappeared").
     setStatusFilter('all');
@@ -103,7 +106,8 @@ export function ShoppingListClient({ initialItems }: { initialItems: SerializedL
     setScanErr(null);
     const tmpId = 'tmp-' + Date.now() + '-' + idSeq.current++;
     const tmp: SerializedListItem = {
-      _id: tmpId, ...clean, note: '', checked: false, createdAt: new Date().toISOString(),
+      _id: tmpId, ...clean, restockIntervalDays: clean.restockIntervalDays ?? null, note: '', checked: false, createdAt: new Date().toISOString(),
+      lastRestockedAt: null,
     };
     setItems((p) => [tmp, ...p]);
     start(async () => {
@@ -139,6 +143,16 @@ export function ShoppingListClient({ initialItems }: { initialItems: SerializedL
   function clearBought() {
     setItems((p) => p.filter((x) => !x.checked));
     start(() => void clearChecked());
+  }
+
+  function saveRestock() {
+    if (!restockItem) return;
+    const value = restockDays ? Number(restockDays) : null;
+    if (value !== null && (!Number.isInteger(value) || value < 1 || value > 3650)) return;
+    const id = restockItem._id;
+    setItems((p) => p.map((x) => x._id === id ? { ...x, restockIntervalDays: value } : x));
+    setRestockItem(null);
+    start(() => void updateListItem(id, { restockIntervalDays: value }));
   }
 
   // Bulk select
@@ -184,7 +198,7 @@ export function ShoppingListClient({ initialItems }: { initialItems: SerializedL
       const fd = new FormData();
       fd.set('file', small);
       const r = await scanProductPhoto(fd);
-      if (r.ok) setDraft({ name: r.data.name, quantity: r.data.quantity, category: r.data.category, brand: r.data.brand });
+      if (r.ok) setDraft({ name: r.data.name, quantity: r.data.quantity, category: r.data.category, brand: r.data.brand, restockIntervalDays: '' });
       else setScanErr(r.error);
     } catch (e) {
       setScanErr((e as Error).message.slice(0, 120));
@@ -342,9 +356,9 @@ export function ShoppingListClient({ initialItems }: { initialItems: SerializedL
             <div className={cn(layout === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3' : 'flex flex-col gap-2')}>
               {visible.map((it) =>
                 layout === 'grid' ? (
-                  <Card key={it._id} it={it} color={catColor(it.category)} selectMode={selectMode} selected={selectedIds.has(it._id)} onSelect={() => toggleSelect(it._id)} onToggle={() => toggle(it)} onRemove={() => remove(it)} />
+                  <Card key={it._id} it={it} color={catColor(it.category)} selectMode={selectMode} selected={selectedIds.has(it._id)} onSelect={() => toggleSelect(it._id)} onToggle={() => toggle(it)} onRemove={() => remove(it)} onRestock={() => { setRestockItem(it); setRestockDays(it.restockIntervalDays?.toString() ?? ''); }} />
                 ) : (
-                  <Row key={it._id} it={it} color={catColor(it.category)} selectMode={selectMode} selected={selectedIds.has(it._id)} onSelect={() => toggleSelect(it._id)} onToggle={() => toggle(it)} onRemove={() => remove(it)} />
+                  <Row key={it._id} it={it} color={catColor(it.category)} selectMode={selectMode} selected={selectedIds.has(it._id)} onSelect={() => toggleSelect(it._id)} onToggle={() => toggle(it)} onRemove={() => remove(it)} onRestock={() => { setRestockItem(it); setRestockDays(it.restockIntervalDays?.toString() ?? ''); }} />
                 )
               )}
             </div>
@@ -378,12 +392,27 @@ export function ShoppingListClient({ initialItems }: { initialItems: SerializedL
             <Field label={t('sl.brand')}>
               <input value={addForm.brand} onChange={(e) => setAddForm({ ...addForm, brand: e.target.value })} onKeyDown={(e) => { if (e.key === 'Enter') submitAdd(); }} className={inputCls} />
             </Field>
+            <Field label={t('sl.restockDays')}>
+              <input type="number" min="1" max="3650" step="1" placeholder={t('sl.restockPlaceholder')} value={addForm.restockIntervalDays} onChange={(e) => setAddForm({ ...addForm, restockIntervalDays: e.target.value })} className={inputCls} />
+            </Field>
             <div className="flex items-center gap-2 pt-1">
               <Button variant="primary" onClick={submitAdd} disabled={!addForm.name.trim()}>
                 <Plus size={15} /> {t('common.add')}
               </Button>
               <Button variant="ghost" onClick={() => setShowAdd(false)}>{t('common.cancel')}</Button>
             </div>
+          </div>
+        </Modal>
+      )}
+
+      {restockItem && (
+        <Modal open onClose={() => setRestockItem(null)} title={t('sl.restockTitle')} size="sm">
+          <div className="space-y-3">
+            <p className="text-xs text-[color:var(--color-text-dim)]">{t('sl.restockHint')}</p>
+            <Field label={t('sl.restockDays')}>
+              <input autoFocus type="number" min="1" max="3650" step="1" placeholder={t('sl.restockPlaceholder')} value={restockDays} onChange={(e) => setRestockDays(e.target.value)} className={inputCls} />
+            </Field>
+            <div className="flex gap-2"><Button variant="primary" onClick={saveRestock}>{t('common.save')}</Button><Button variant="ghost" onClick={() => setRestockItem(null)}>{t('common.cancel')}</Button></div>
           </div>
         </Modal>
       )}
@@ -460,11 +489,12 @@ function Eyebrow({ category, color }: { category: string; color: string | null }
 }
 
 function Meta({ it }: { it: SerializedListItem }) {
-  if (!it.quantity && !it.aiScanned) return null;
+  if (!it.quantity && !it.aiScanned && !it.restockIntervalDays) return null;
   return (
     <div className="flex flex-wrap items-center gap-1.5 mt-2">
       {it.quantity && <span className="text-[10px] px-1.5 py-0.5 rounded bg-[color:var(--color-surface-2)] text-[color:var(--color-text-dim)]" style={mono}>{it.quantity}</span>}
       {it.aiScanned && <span className="text-[10px] text-[color:var(--color-accent)] flex items-center gap-0.5" style={mono}><Sparkles size={9} /> AI</span>}
+      {it.restockIntervalDays && <span className="text-[10px] text-[color:var(--color-text-faint)]" style={mono}>↻ {it.restockIntervalDays}d</span>}
     </div>
   );
 }
@@ -477,10 +507,11 @@ type CardProps = {
   onSelect: () => void;
   onToggle: () => void;
   onRemove: () => void;
+  onRestock?: () => void;
 };
 
 /** Grid card — colour-coded by category, mirroring the product-card surface used across the app. */
-function Card({ it, color, selectMode, selected, onSelect, onToggle, onRemove }: CardProps) {
+function Card({ it, color, selectMode, selected, onSelect, onToggle, onRemove, onRestock }: CardProps) {
   const struck = it.checked && !selectMode;
   return (
     <div
@@ -501,16 +532,14 @@ function Card({ it, color, selectMode, selected, onSelect, onToggle, onRemove }:
         <Meta it={it} />
       </div>
       {!selectMode && (
-        <button onClick={(e) => { e.stopPropagation(); onRemove(); }} className="shrink-0 p-1.5 text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 focus:opacity-100 transition-opacity" aria-label="remove">
-          <Trash2 size={14} />
-        </button>
+        <div className="flex flex-col"><button onClick={(e) => { e.stopPropagation(); onRestock?.(); }} className="p-1.5 text-[color:var(--color-text-faint)] hover:text-[color:var(--color-accent)] opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 focus:opacity-100" aria-label="restock"><Repeat2 size={14} /></button><button onClick={(e) => { e.stopPropagation(); onRemove(); }} className="p-1.5 text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 focus:opacity-100" aria-label="remove"><Trash2 size={14} /></button></div>
       )}
     </div>
   );
 }
 
 /** List row — compact full-width line, same behaviour as the card. */
-function Row({ it, color, selectMode, selected, onSelect, onToggle, onRemove }: CardProps) {
+function Row({ it, color, selectMode, selected, onSelect, onToggle, onRemove, onRestock }: CardProps) {
   const struck = it.checked && !selectMode;
   return (
     <div
@@ -537,9 +566,7 @@ function Row({ it, color, selectMode, selected, onSelect, onToggle, onRemove }: 
         )}
       </div>
       {!selectMode && (
-        <button onClick={(e) => { e.stopPropagation(); onRemove(); }} className="shrink-0 p-1.5 text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 focus:opacity-100 transition-opacity" aria-label="remove">
-          <Trash2 size={15} />
-        </button>
+        <div className="flex"><button onClick={(e) => { e.stopPropagation(); onRestock?.(); }} className="p-1.5 text-[color:var(--color-text-faint)] hover:text-[color:var(--color-accent)] opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 focus:opacity-100" aria-label="restock"><Repeat2 size={15} /></button><button onClick={(e) => { e.stopPropagation(); onRemove(); }} className="p-1.5 text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 focus:opacity-100" aria-label="remove"><Trash2 size={15} /></button></div>
       )}
     </div>
   );

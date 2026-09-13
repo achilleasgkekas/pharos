@@ -15,7 +15,8 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   return withAuth(req, async () => {
     const b = await readBody(req);
-    const r = await addListItem({ name: strField(b, 'name'), quantity: strField(b, 'quantity'), category: strField(b, 'category'), brand: strField(b, 'brand'), note: strField(b, 'note') });
+    const restockIntervalDays = typeof b.restockIntervalDays === 'number' ? b.restockIntervalDays : undefined;
+    const r = await addListItem({ name: strField(b, 'name'), quantity: strField(b, 'quantity'), category: strField(b, 'category'), brand: strField(b, 'brand'), note: strField(b, 'note'), restockIntervalDays });
     if (!r.ok) return apiError(r.error || 'Bad request');
     return NextResponse.json({ ok: true, items: await getListItems() }, { status: 201 });
   });
