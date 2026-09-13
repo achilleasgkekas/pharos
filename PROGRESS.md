@@ -13419,3 +13419,31 @@ skipped, ΜΗΔΕΝ fail** (9 νέα tests: 6 για τον helper, 3 για τ�
 κοινό card όπως οι αποδείξεις) και μετά ο global space-filter στα money views. Εναλλακτικά, ίδιο
 μέγεθος, το **P57** («το χρησιμοποιείς ακόμα;» nudge για συνδρομές) που καβαλάει το υπάρχον alert
 sweep χωρίς νέα cron.
+
+## 2026-09-13 07:47
+
+**Prod health**: OK. `ph-aros.com` 200 με περιεχόμενο landing, `app.ph-aros.com/account/login` 200,
+`POST /api/cron/saas/trials-sweep` χωρίς token 401 JSON.
+
+**Triage**: #4 είχε ήδη p1 + agent-ready, έφυγε το `needs-triage`. #1 (push σε κινητό) πήρε `p2`,
+χωρίς `agent-ready`: θέλει δοκιμή σε πραγματική συσκευή, δεν γίνεται από agent. #3 μένει σε
+`needs-triage`, περιμένει απάντηση στην ήδη ανοιχτή ερώτηση (πού είδε την ανάποδη ημερομηνία).
+
+**PR #2 (`needs-changes`)**: τίποτα να διορθωθεί. Το κόκκινο CI ήταν τα extension tests που δεν
+έτρεχαν σε Node 20, διορθωμένο στο main (`3bdd326`). Ο κλάδος έχει ήδη πάρει το main και το CI στο
+`2353870` είναι πράσινο, ο reviewer θα το ξαναδεί μόνος του.
+
+**Η μία δουλειά**: issue #4 (p1), το encrypted restore path δεν είχε κανένα test.
+PR **#27** https://github.com/achilleasgkekas/pharos/pull/27. Εννέα tests στο
+`actions.backup.test.ts` με το ΠΡΑΓΜΑΤΙΚΟ `backupCrypto` (όχι mock): round-trip επαναφέρει τα ίδια
+έγγραφα, το αρχείο δεν περιέχει αναγνώσιμα δεδομένα, κοντή passphrase απορρίπτεται, admin gate και
+στα δύο, και λάθος passphrase / αλλοιωμένο ciphertext / κομμένο αρχείο / plaintext backup δίνουν
+καθαρό error ΠΡΙΝ το `connectDB`, χωρίς καμία εγγραφή. **Negative control**: αν το αποτυχημένο
+decrypt περάσει στο `importData`, τα τέσσερα failure tests γίνονται κόκκινα. Μόνο test, κανένας
+κώδικας παραγωγής. `tsc` καθαρό, **448 αρχεία, 7111 passed, 4 skipped**.
+
+**Unshipped**: 58 commits μετά το `1b88ca34` (τελευταίο deploy στο DEPLOY_LOG), τα 44 με κώδικα.
+**Ανοιχτά PR μου**: #2 (ξανά σε review), #26 (χωρίς review), #27 (νέο).
+
+**Επόμενο task**: issue #5 (p2), οι ημερομηνίες είναι hardcoded `en-GB` σε 20 σημεία, κοινός
+`formatDate()` που ακολουθεί το locale της εφαρμογής.
