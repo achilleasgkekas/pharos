@@ -38,19 +38,30 @@ export async function suggestSubscriptionInfo(name: string): Promise<SuggestResu
   }
 }
 
-const CATEGORIES = ['streaming', 'cloud', 'software', 'gaming', 'news', 'fitness', 'other'] as const;
 const CYCLES = BILLING_CYCLE_VALUES;
 
 const SubFormSchema = z.object({
   name: z.string().min(1, 'Name required'),
   provider: z.string().default(''),
-  category: z.enum(CATEGORIES).default('other'),
+  // #29: a free string, not the old fixed enum. The model was relaxed long ago so Settings → Lists
+  // can add custom categories and the form offers them; an enum here rejected every custom one at
+  // save time. 30 chars is the same cap `normalizeTaxonomy` (lib/taxonomies.ts) puts on list entries.
+  category: z
+    .string()
+    .trim()
+    .max(30)
+    .transform((v) => v || 'other')
+    .default('other'),
   amount: z.coerce.number().min(0),
   currency: z.string().default('EUR'),
   // P9: base units per 1 unit of `currency`; 0/absent = single-currency form (or rate unknown).
   fxRate: z.coerce.number().min(0).default(0),
   billingCycle: z.enum(CYCLES).default('monthly'),
-  startDate: z.string(),
+  // #30: the date input is clearable, and new Date('') is Invalid Date, which then reached the
+  // write as both startDate and nextRenewal. Reject it here, before any DB work.
+  startDate: z
+    .string()
+    .refine((v) => v.trim() !== '' && !Number.isNaN(new Date(v).getTime()), 'Valid start date required'),
   trialEndsAt: z.string().optional().default(''), // '' = no trial
   firstChargeAmount: z.coerce.number().min(0).default(0),
   paymentMethod: z.string().default(''),

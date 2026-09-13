@@ -212,6 +212,36 @@ describe('createSubscription', () => {
   });
 });
 
+describe('createSubscription / updateSubscription — schema edges (#29, #30)', () => {
+  // #29: the Subscription model relaxed `category` to a free string so Settings → Lists can
+  // add custom ones, and the form offers them, but the action schema still held the old enum.
+  it('accepts a custom category configured in Settings (#29)', async () => {
+    await createSubscription(fd({ name: 'Power', amount: '40', startDate: '2020-01-01', category: 'utilities' }));
+    expect(subCreate).toHaveBeenCalledTimes(1);
+    expect(subCreate.mock.calls[0][0].category).toBe('utilities');
+  });
+
+  it('updateSubscription keeps a custom category too (#29)', async () => {
+    await updateSubscription('sub1', fd({ name: 'Power', amount: '40', startDate: '2020-01-01', category: 'utilities' }));
+    expect(subFindByIdAndUpdate.mock.calls[0][1].category).toBe('utilities');
+  });
+
+  it('a blank category falls back to "other" instead of storing an empty string', async () => {
+    await createSubscription(fd({ name: 'Power', amount: '40', startDate: '2020-01-01', category: '  ' }));
+    expect(subCreate.mock.calls[0][0].category).toBe('other');
+  });
+
+  // #30: a cleared date input submits '' and new Date('') is Invalid Date, which reached the
+  // write as both startDate and nextRenewal.
+  it.each(['', 'not-a-date'])('rejects startDate %j before touching the DB (#30)', async (startDate) => {
+    await expect(createSubscription(fd({ name: 'Netflix', amount: '15', startDate }))).rejects.toThrow();
+    await expect(updateSubscription('sub1', fd({ name: 'Netflix', amount: '15', startDate }))).rejects.toThrow();
+    expect(connectDBMock).not.toHaveBeenCalled();
+    expect(subCreate).not.toHaveBeenCalled();
+    expect(subFindByIdAndUpdate).not.toHaveBeenCalled();
+  });
+});
+
 describe('updateSubscription', () => {
   it('updates by id without forcing `active`', async () => {
     await updateSubscription('sub1', fd({ name: 'Netflix HD', amount: '18', startDate: '2020-01-01' }));

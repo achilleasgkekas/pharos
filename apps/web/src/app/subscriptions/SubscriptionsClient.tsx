@@ -704,7 +704,7 @@ function SubForm({ sub, cards, spaces = [], fx, onSuccess, onDeleted }: { sub?: 
       {foreign && <SubFxFields form={form} setRate={(v) => setForm((p) => ({ ...p, fxRate: v }))} base={fx.base} />}
       <div className="grid grid-cols-2 gap-3">
         <Field label={t('sub.fStartDate')}>
-          <Input type="date" value={form.startDate} onChange={set('startDate')} />
+          <Input type="date" required value={form.startDate} onChange={set('startDate')} />
         </Field>
         <Field label={t('sub.fPayment')}>
           <CardSelect cards={cards} value={form.paymentMethod} onChange={(v) => setForm((p) => ({ ...p, paymentMethod: v }))} />
