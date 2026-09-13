@@ -4,8 +4,9 @@ import { RECURRING_CYCLE_VALUES } from '@/lib/billingCycle';
 import { Bill as BillModel } from '@/models/Bill';
 import { withRequestTenant } from '@/lib/tenancy/request';
 import { currentModel } from '@/lib/tenancy/connection';
-import { nextBillDue, billIsSettledByPayments, billPaidAmount, billRemaining } from '@/lib/bill';
+import { billIsSettledByPayments, billPaidAmount, billRemaining } from '@/lib/bill';
 import { safeDateOrNull } from '@/lib/dates';
+import { spawnNextBillOnce } from '@/lib/billRecurrence';
 import { addExpense } from '@/app/expenses/actions';
 import { getAppSettings } from '@/lib/appSettings';
 import { resolveFx } from '@/lib/fx';
@@ -166,28 +167,9 @@ export async function markBillPaid(
 
   await Bill.findByIdAndUpdate(id, { paidAt, linkedExpenseId });
 
-  // Roll the recurring series forward exactly once (on the first payment).
-  if (!wasPaid && bill.cycle && bill.dueDate) {
-    await Bill.create({
-      title: bill.title,
-      vendor: bill.vendor,
-      amount: bill.amount,
-      // P9: the next instance inherits the currency AND the last known rate, deliberately.
-      // The spawned bill is a projection of a charge that has not arrived yet, so carrying
-      // the rate keeps `amount` base-denominated (an estimate the totals can sum) instead of
-      // dropping a rate-less foreign row into every "needs an exchange rate" audit each cycle.
-      // The user corrects both figures when the real bill lands.
-      currency: bill.currency,
-      origAmount: bill.origAmount,
-      fxRate: bill.fxRate,
-      dueDate: nextBillDue(bill.dueDate, bill.cycle),
-      paidAt: null,
-      category: bill.category,
-      cycle: bill.cycle,
-      notes: bill.notes,
-      archived: false,
-    });
-  }
+  // Roll the recurring series forward exactly once. `wasPaid` alone is not enough: Undo
+  // clears paidAt, so the helper also refuses when this bill already has a live successor (#33).
+  if (!wasPaid) await spawnNextBillOnce(Bill, bill);
 
   revalidatePath('/bills');
   return { ok: true };

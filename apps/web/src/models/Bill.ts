@@ -43,6 +43,10 @@ const BillSchema = new Schema(
     // pending instance one cycle ahead (see markBillPaid).
     // Kept in sync with RECURRING_CYCLES in lib/billingCycle.ts.
     cycle: { type: String, enum: ['', 'weekly', 'monthly', 'quarterly', 'yearly', 'biennial'], default: '' },
+    // #33: on a spawned instance, the _id of the bill whose payment created it. Lets a
+    // re-payment after Undo find the existing successor instead of spawning a second one
+    // (see lib/billRecurrence.ts). '' on hand-entered bills and on pre-#33 successors.
+    recurrenceParentId: { type: String, default: '', index: true },
     notes: { type: String, default: '' },
     archived: { type: Boolean, default: false, index: true },
     linkedExpenseId: { type: String, default: '' }, // set when "mark paid" also logged an expense

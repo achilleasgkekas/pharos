@@ -32,6 +32,8 @@ function makeBillModel(tag: string) {
     findById: (id: string) => ({
       lean: async () => seeded.get(tag) ?? { _id: id, title: `${tag} bill`, amount: 10, tenantTag: tag },
     }),
+    // #33 successor lookup before a recurring spawn: no live successor in any db here.
+    findOne: () => ({ lean: async () => null }),
     findByIdAndUpdate: async (id: string, update: Record<string, any>) => {
       log(tag, 'findByIdAndUpdate', { id, ...update });
       return update;

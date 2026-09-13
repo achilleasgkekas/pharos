@@ -13,7 +13,7 @@ import type { NextRequest } from 'next/server';
 //   - `paid: false` clears paidAt without touching anything else,
 //   - DELETE is a soft delete, a missing row 404s.
 
-const { connectDBMock, userFindOne, userState, billUpdate, billFindById, billCreate, updateState, findByIdState, settingsState, getAppSettingsMock } =
+const { connectDBMock, userFindOne, userState, billUpdate, billFindById, billFindOne, findOneState, billCreate, updateState, findByIdState, settingsState, getAppSettingsMock } =
   vi.hoisted(() => {
     const userState: { doc: unknown } = { doc: { _id: 'u1', name: 'Achilleas', username: 'ach', role: 'admin' } };
     const userFindOne = vi.fn(() => ({ select: () => ({ lean: async () => userState.doc }) }));
@@ -24,17 +24,20 @@ const { connectDBMock, userFindOne, userState, billUpdate, billFindById, billCre
     });
     const findByIdState: { doc: unknown } = { doc: null };
     const billFindById = vi.fn(() => ({ lean: async () => findByIdState.doc }));
+    // #33: the spawn first looks for a live successor of this bill; null = none yet.
+    const findOneState: { doc: unknown } = { doc: null };
+    const billFindOne = vi.fn((_filter: unknown) => ({ lean: async () => findOneState.doc }));
     const billCreate = vi.fn(async (arg: Record<string, unknown>) => ({ toObject: () => arg }));
     // P9: a money-touching PATCH re-resolves against the deployment's base currency.
     const settingsState = { currency: 'EUR' };
     const getAppSettingsMock = vi.fn(async () => settingsState);
-    return { connectDBMock: vi.fn(async () => {}), userFindOne, userState, billUpdate, billFindById, billCreate, updateState, findByIdState, settingsState, getAppSettingsMock };
+    return { connectDBMock: vi.fn(async () => {}), userFindOne, userState, billUpdate, billFindById, billFindOne, findOneState, billCreate, updateState, findByIdState, settingsState, getAppSettingsMock };
   });
 
 vi.mock('@/lib/db', () => ({ connectDB: connectDBMock }));
 vi.mock('@/lib/appSettings', () => ({ getAppSettings: getAppSettingsMock }));
 vi.mock('@/models/User', () => ({ User: { findOne: userFindOne } }));
-vi.mock('@/models/Bill', () => ({ Bill: { findByIdAndUpdate: billUpdate, findById: billFindById, create: billCreate } }));
+vi.mock('@/models/Bill', () => ({ Bill: { findByIdAndUpdate: billUpdate, findById: billFindById, findOne: billFindOne, create: billCreate } }));
 
 // withAuth now resolves models through currentModel(). SAAS_MODE is off in tests, so the real
 // helper would hand back the same model anyway; this keeps the DB seam mocked without a connection.
@@ -63,6 +66,7 @@ function lastSet(): Record<string, unknown> {
 
 beforeEach(() => {
   updateState.doc = null;
+  findOneState.doc = null;
   updateState.calls = [];
   findByIdState.doc = null;
   userState.doc = { _id: 'u1', name: 'Achilleas', username: 'ach', role: 'admin' };
@@ -162,6 +166,19 @@ describe('PATCH paid transition', () => {
     const res = await PATCH(makeReq({ body: { paid: true, paidDate: '2026-07-06' } }), ctx(OID));
     expect(res.status).toBe(200);
     expect(billCreate).not.toHaveBeenCalled();
+    const json = (await res.json()) as { spawnedNext: boolean };
+    expect(json.spawnedNext).toBe(false);
+  });
+
+  it('#33: paid:true after a paid:false undo does not spawn a second next instance', async () => {
+    // Undo cleared paidAt, so the bill reads as unpaid again, but its successor is still live.
+    findByIdState.doc = { _id: OID, title: 'ΔΕΗ ρεύμα', vendor: 'ΔΕΗ', amount: 60, dueDate: new Date('2026-07-01'), paidAt: null, category: 'utilities', cycle: 'monthly', notes: '' };
+    findOneState.doc = { _id: 'next', title: 'ΔΕΗ ρεύμα', cycle: 'monthly', dueDate: new Date('2026-08-01'), recurrenceParentId: OID };
+    updateState.doc = { _id: OID, title: 'ΔΕΗ ρεύμα', dueDate: new Date('2026-07-01'), paidAt: new Date('2026-07-20') };
+    const res = await PATCH(makeReq({ body: { paid: true } }), ctx(OID));
+    expect(res.status).toBe(200);
+    expect(billCreate).not.toHaveBeenCalled();
+    expect(((billFindOne.mock.calls[0][0] as { $or: Array<Record<string, unknown>> }).$or)[0]).toEqual({ recurrenceParentId: OID });
     const json = (await res.json()) as { spawnedNext: boolean };
     expect(json.spawnedNext).toBe(false);
   });
