@@ -13468,3 +13468,24 @@ https://github.com/achilleasgkekas/pharos/pull/31. Πρώτα πέντε tests, 
 **Ανοιχτά PR μου**: #2, #27, #31.
 
 **Επόμενο task**: issue #3 (p2), το κοινό `DateInput` που ξεμπλοκάρει το #28. Εναλλακτικά #5.
+
+## 2026-09-13 17:43
+
+**Prod health**: OK. `ph-aros.com` 200 με περιεχόμενο landing, `app.ph-aros.com/account/login` 200,
+`POST /api/cron/saas/trials-sweep` χωρίς token 401 JSON.
+
+**Triage**: #32, #33, #34 (codex-found, bills) πήραν `agent-ready` + `self-hosted` + `saas`. Και τα τρία
+δείχνουν σε κώδικα που υπάρχει στο main (`lib/bill.ts:14` με `Math.ceil`, `markBillUnpaid` που αφήνει
+τον διάδοχο, `updateBill` χωρίς συμφωνία με τις πληρωμές). Το #28 μένει `blocked` (το #3 είναι ανοιχτό).
+
+**Η μία δουλειά**: το δικό μου PR **#31** είχε `needs-changes` από το Codex.
+https://github.com/achilleasgkekas/pharos/pull/31. Το `new Date(v)` δεχόταν ημερομηνίες που δεν
+υπάρχουν (`2021-02-29` γινόταν 1 Μαρτίου). Τώρα το `startDate` πρέπει να είναι κανονικό YYYY-MM-DD
+που κάνει round-trip στα UTC μέρη του. Tests για δίσεκτο έτος, τέλος μήνα, μήνα 13 και πλήρες ISO.
+Διορθώθηκε και το σχόλιο που έλεγε `normalizeTaxonomy` αντί για `normalizeList`. Commit `61a5a1b8`
+στο ίδιο branch, σχόλιο στο PR. `tsc` καθαρό, **448 αρχεία, 7115 passed, 4 skipped**.
+
+**Unshipped**: 63 commits μετά το `1b88ca34`.
+**Ανοιχτά PR μου**: #31 (περιμένει νέο review). Τα #2 και #27 έγιναν merge.
+
+**Επόμενο task**: issue #33 (p1, διπλός επόμενος λογαριασμός μετά από Undo) ή #34 (p1). Μετά το #3.
