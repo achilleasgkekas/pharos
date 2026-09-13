@@ -62,6 +62,10 @@ export function baseSentryOptions(dsn: string, environment: string) {
 // every string that reaches Sentry also goes through these patterns. Deliberately greedy: a
 // redacted digit run in a stack message costs nothing, a leaked IBAN costs a lot.
 const REDACTIONS: Array<[RegExp, string]> = [
+  // Query strings and fragments inside ANY text ("Failed to fetch /api/search?q=oncology"): search
+  // terms and ids live there. Kept first so later patterns see the stripped text.
+  [/([\w/.\-%])\?[^\s"'<>)\]]+/g, '$1?[query]'],
+  [/(https?:\/\/[^\s#"'<>]+)#[^\s"'<>)\]]+/g, '$1#[fragment]'],
   [/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, '[email]'],
   [/\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/g, '[jwt]'],
   [/\b(?:Bearer|Basic)\s+[A-Za-z0-9._~+/=-]{8,}/gi, '[auth]'],

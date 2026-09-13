@@ -134,3 +134,12 @@ describe('errorReporting · request allow-list (review round 3)', () => {
     expect(e.request).toEqual({ method: 'POST', url: 'https://w.ph-aros.com/bills', headers: { 'User-Agent': 'agent for [email]' } });
   });
 });
+
+describe('errorReporting · URLs inside free text (review round 4)', () => {
+  it('strips query strings and fragments embedded in messages', () => {
+    expect(redactText('Failed to fetch /api/search?q=oncology')).toBe('Failed to fetch /api/search?[query]');
+    expect(redactText('GET https://w.ph-aros.com/documents?name=blood-test.pdf&x=1 500')).toBe('GET https://w.ph-aros.com/documents?[query] 500');
+    expect(redactText('see https://w.ph-aros.com/bills#note=rent')).toBe('see https://w.ph-aros.com/bills#[fragment]');
+    expect(redactText('Is this ok? yes')).toBe('Is this ok? yes');
+  });
+});
