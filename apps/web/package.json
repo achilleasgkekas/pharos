@@ -28,7 +28,7 @@
     "mailparser": "^3.9.14",
     "mongoose": "^8.8.0",
     "next": "15.5.24",
-    "nodemailer": "^9.0.4",
+    "nodemailer": "^9.1.1",
     "ollama": "^0.5.10",
     "pdfjs-dist": "^4.10.38",
     "qrcode": "^1.5.4",
