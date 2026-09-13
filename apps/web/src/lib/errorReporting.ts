@@ -22,6 +22,11 @@ export interface ScrubbableEvent {
     url?: string;
   } | null;
   breadcrumbs?: Array<{ category?: string; data?: Record<string, unknown> | null; message?: string }> | null;
+  message?: unknown;
+  exception?: unknown;
+  extra?: unknown;
+  tags?: unknown;
+  contexts?: unknown;
   [key: string]: unknown;
 }
 
@@ -50,6 +55,39 @@ export function baseSentryOptions(dsn: string, environment: string) {
   };
 }
 
+// Free text is where personal data actually leaks: `throw new Error(\`no bill for ${email}\`)`,
+// a breadcrumb logging a form value, an `extra` blob. Structural scrubbing alone cannot see that, so
+// every string that reaches Sentry also goes through these patterns. Deliberately greedy: a
+// redacted digit run in a stack message costs nothing, a leaked IBAN costs a lot.
+const REDACTIONS: Array<[RegExp, string]> = [
+  [/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, '[email]'],
+  [/\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/g, '[jwt]'],
+  [/\b(?:Bearer|Basic)\s+[A-Za-z0-9._~+/=-]{8,}/gi, '[auth]'],
+  [/\b(?:sk|pk|rk|whsec|sntry[a-z]?|ghp|gho|xox[abp])_[A-Za-z0-9_-]{10,}\b/g, '[secret]'],
+  [/\b[A-Z]{2}\d{2}(?:\s?[A-Z0-9]{4}){2,7}(?:\s?[A-Z0-9]{1,4})?\b/g, '[iban]'],
+  [/(?:€|\$|£|EUR|USD|GBP)\s?-?\d[\d.,\s]*\d|\b-?\d[\d.,]*\s?(?:€|EUR|USD|GBP)/g, '[amount]'],
+  [/\b\d(?:[\s-]?\d){7,}\b/g, '[number]'], // cards, phones, tax/ids
+];
+
+export function redactText(text: string): string {
+  let out = text;
+  for (const [re, repl] of REDACTIONS) out = out.replace(re, repl);
+  return out;
+}
+
+// SDK-generated environment descriptors: no user content, and redacting them would only blur
+// debugging (browser/os versions look like "numbers").
+const SAFE_CONTEXTS = new Set(['os', 'browser', 'runtime', 'device', 'trace', 'app', 'culture', 'cloud_resource', 'nextjs']);
+
+function redactDeep(value: unknown, depth = 0): unknown {
+  if (typeof value === 'string') return redactText(value);
+  if (depth > 6 || value === null || typeof value !== 'object') return value;
+  if (Array.isArray(value)) return value.map((v) => redactDeep(v, depth + 1));
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(value)) out[k] = redactDeep(v, depth + 1);
+  return out;
+}
+
 /** Strip identifying data. Mutates and returns the event (Sentry's beforeSend contract). */
 export function scrubEvent<T extends ScrubbableEvent>(event: T): T {
   if (event.user) {
@@ -73,6 +111,20 @@ export function scrubEvent<T extends ScrubbableEvent>(event: T): T {
       // fetch/xhr breadcrumbs carry full URLs with query strings (search terms, ids).
       if (b.data && typeof b.data.url === 'string') b.data.url = b.data.url.split('?')[0];
     }
+  }
+  // Free text: messages, exception values, breadcrumb messages/data, extras, tags, custom contexts.
+  if (typeof event.message === 'string') event.message = redactText(event.message);
+  const exc = event.exception as { values?: Array<{ value?: string }> } | undefined;
+  for (const v of exc?.values ?? []) if (typeof v.value === 'string') v.value = redactText(v.value);
+  for (const b of event.breadcrumbs ?? []) {
+    if (typeof b.message === 'string') b.message = redactText(b.message);
+    if (b.data) b.data = redactDeep(b.data) as Record<string, unknown>;
+  }
+  if (event.extra) event.extra = redactDeep(event.extra);
+  if (event.tags) event.tags = redactDeep(event.tags);
+  if (event.contexts && typeof event.contexts === 'object') {
+    const ctx = event.contexts as Record<string, unknown>;
+    for (const k of Object.keys(ctx)) if (!SAFE_CONTEXTS.has(k)) ctx[k] = redactDeep(ctx[k]);
   }
   return event;
 }
