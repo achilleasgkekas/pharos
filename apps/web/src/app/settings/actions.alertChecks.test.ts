@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { defaultNotifyTypes } from '@/lib/alertTypes';
 
 // app/settings/actions.ts is the largest module in the repo (1810 lines, ~20 concerns),
@@ -527,6 +527,21 @@ describe('runAlertChecks · recurring price hikes', () => {
 });
 
 describe('runAlertChecks · remote mirror staleness (P48)', () => {
+  // Freeze the clock for this block. runAlertChecks captures `now = Date.now()` at its very
+  // start, but the mocks below evaluate `daysAgo(n)` LAZILY — later, inside the awaited
+  // getLastRemoteSync() call. On a real clock that later read is ≥1ms ahead, so the elapsed
+  // time comes out as "21 days minus a millisecond" and Math.floor reports 20. A fast machine
+  // finishes inside one millisecond and passes; a loaded CI runner does not. That is why this
+  // test failed in CI and in a busy full-suite run but passed when run alone.
+  // Faking only `Date` keeps timers and promises real, so nothing else in the flow changes.
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-09-13T00:47:25.000Z'));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   const daysAgo = (n: number) => new Date(Date.now() - n * 86400000);
 
   it('says nothing when the backend is local, and does not even read the timestamp', async () => {
