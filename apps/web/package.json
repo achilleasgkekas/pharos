@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.2",
+    "@sentry/nextjs": "10.74.0",
     "@types/jsbarcode": "^3.11.4",
     "@types/qrcode": "^1.5.6",
     "basic-ftp": "^5.0.5",

@@ -16,6 +16,9 @@ import { FirstRunTour } from '@/components/FirstRunTour';
 import { getServerT } from '@/lib/i18n/server';
 import { LocaleProvider } from '@/components/LocaleProvider';
 import { headers } from 'next/headers';
+import { SentryInit } from '@/components/SentryInit';
+import { sentryDsn, sentryEnvironment } from '@/lib/errorReporting';
+import { saasMode } from '@/lib/tenancy/saasMode';
 
 export const metadata: Metadata = {
   title: 'PHAROS · Personal Hub',
@@ -132,6 +135,8 @@ export default async function RootLayout({
         />
       </head>
       <body>
+        {/* Error reporting: only when the operator configured SENTRY_DSN (off for self-hosters by default). */}
+        {sentryDsn() && <SentryInit dsn={sentryDsn()!} environment={sentryEnvironment(saasMode())} />}
         <CurrencyInit symbol={symbol} />
         <LocaleProvider locale={locale} dict={dict}>
         <Providers>
