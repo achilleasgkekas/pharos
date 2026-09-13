@@ -40,12 +40,25 @@ export async function suggestSubscriptionInfo(name: string): Promise<SuggestResu
 
 const CYCLES = BILLING_CYCLE_VALUES;
 
+/**
+ * A real YYYY-MM-DD calendar day, which is all the native date input ever sends. `new Date(v)`
+ * alone is not enough: it silently rolls `2021-02-29` over to 1 March and would save a renewal
+ * date the user never typed, so the parsed UTC parts must round-trip to the same day.
+ */
+function isCalendarDate(v: string): boolean {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v);
+  if (!m) return false;
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const dt = new Date(Date.UTC(y, mo - 1, d));
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() === mo - 1 && dt.getUTCDate() === d;
+}
+
 const SubFormSchema = z.object({
   name: z.string().min(1, 'Name required'),
   provider: z.string().default(''),
   // #29: a free string, not the old fixed enum. The model was relaxed long ago so Settings → Lists
   // can add custom categories and the form offers them; an enum here rejected every custom one at
-  // save time. 30 chars is the same cap `normalizeTaxonomy` (lib/taxonomies.ts) puts on list entries.
+  // save time. 30 chars is the same cap `normalizeList` (lib/taxonomies.ts) puts on list entries.
   category: z
     .string()
     .trim()
@@ -59,9 +72,7 @@ const SubFormSchema = z.object({
   billingCycle: z.enum(CYCLES).default('monthly'),
   // #30: the date input is clearable, and new Date('') is Invalid Date, which then reached the
   // write as both startDate and nextRenewal. Reject it here, before any DB work.
-  startDate: z
-    .string()
-    .refine((v) => v.trim() !== '' && !Number.isNaN(new Date(v).getTime()), 'Valid start date required'),
+  startDate: z.string().refine(isCalendarDate, 'Valid start date required'),
   trialEndsAt: z.string().optional().default(''), // '' = no trial
   firstChargeAmount: z.coerce.number().min(0).default(0),
   paymentMethod: z.string().default(''),

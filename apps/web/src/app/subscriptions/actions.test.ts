@@ -233,12 +233,23 @@ describe('createSubscription / updateSubscription — schema edges (#29, #30)', 
 
   // #30: a cleared date input submits '' and new Date('') is Invalid Date, which reached the
   // write as both startDate and nextRenewal.
-  it.each(['', 'not-a-date'])('rejects startDate %j before touching the DB (#30)', async (startDate) => {
-    await expect(createSubscription(fd({ name: 'Netflix', amount: '15', startDate }))).rejects.toThrow();
-    await expect(updateSubscription('sub1', fd({ name: 'Netflix', amount: '15', startDate }))).rejects.toThrow();
-    expect(connectDBMock).not.toHaveBeenCalled();
-    expect(subCreate).not.toHaveBeenCalled();
-    expect(subFindByIdAndUpdate).not.toHaveBeenCalled();
+  // `2021-02-29` / `2020-02-30` / `2026-04-31` are the rollover cases: new Date() quietly turns them
+  // into a March/May day, so they must be rejected, not saved as a date the user never typed.
+  it.each(['', 'not-a-date', '2021-02-29', '2020-02-30', '2026-04-31', '2026-13-01', '2026-01-01T00:00:00Z'])(
+    'rejects startDate %j before touching the DB (#30)',
+    async (startDate) => {
+      await expect(createSubscription(fd({ name: 'Netflix', amount: '15', startDate }))).rejects.toThrow();
+      await expect(updateSubscription('sub1', fd({ name: 'Netflix', amount: '15', startDate }))).rejects.toThrow();
+      expect(connectDBMock).not.toHaveBeenCalled();
+      expect(subCreate).not.toHaveBeenCalled();
+      expect(subFindByIdAndUpdate).not.toHaveBeenCalled();
+    },
+  );
+
+  // Leap day in a leap year and month-end days are real dates and must still save.
+  it.each(['2024-02-29', '2026-01-31', '2026-04-30'])('accepts the real calendar day %j', async (startDate) => {
+    await createSubscription(fd({ name: 'Netflix', amount: '15', startDate }));
+    expect(subCreate.mock.calls[0][0].startDate).toEqual(new Date(startDate));
   });
 });
 
