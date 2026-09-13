@@ -58,6 +58,11 @@ import JSZip from 'jszip';
 //    than reporting a successful empty restore, and returns `warnings` naming whatever
 //    it skipped (previously silent). The verdict rules themselves live in
 //    lib/backupVerify.test.ts; this file pins how importData ACTS on them.
+//  - exportDataEncrypted / importDataEncrypted (P54, issue #4): the cipher itself has its
+//    own tests (lib/backupCrypto.test.ts), so backupCrypto is deliberately NOT mocked here.
+//    What these pin is the WIRING: an encrypted export restores the same documents, and a
+//    wrong passphrase, a tampered file or a plaintext backup all fail with a clear error
+//    BEFORE connectDB, so a failed decrypt can never write half a restore.
 
 const {
   connectDBMock,
@@ -224,7 +229,16 @@ vi.mock('@/lib/tenancy/connection', () => ({
   tenantModel: (_conn: unknown, model: unknown) => model,
 }));
 
-import { exportData, exportCSV, exportInsuranceBundle, exportTaxBundle, importData, verifyBackup } from './actions';
+import {
+  exportData,
+  exportDataEncrypted,
+  exportCSV,
+  exportInsuranceBundle,
+  exportTaxBundle,
+  importData,
+  importDataEncrypted,
+  verifyBackup,
+} from './actions';
 
 function chainData(data: unknown[]) {
   const obj: { select: () => typeof obj; sort: () => typeof obj; lean: () => Promise<unknown[]> } = {
@@ -706,5 +720,110 @@ describe('importData', () => {
     expect(invalidateStoreCacheMock).toHaveBeenCalledTimes(1);
     expect(revalidatePathMock).toHaveBeenCalledWith('/settings');
     expect(revalidatePathMock).toHaveBeenCalledWith('/');
+  });
+});
+
+describe('exportDataEncrypted / importDataEncrypted (P54)', () => {
+  const PASS = 'correct horse battery';
+  const itemDoc = { _id: 'i1', title: 'Mouse', filePath: 'items/i1.jpg' };
+  const receiptDoc = { _id: 'r1', store: 'Skroutz', total: 12.5 };
+
+  // A real encrypted export of two documents, produced through the action itself, so the
+  // round-trip below proves export and import agree on the format end to end.
+  async function encryptedBackup(passphrase = PASS) {
+    itemFindMock.mockReturnValueOnce(chainData([itemDoc]));
+    receiptFindMock.mockReturnValueOnce(chainData([receiptDoc]));
+    const envelope = await exportDataEncrypted(passphrase);
+    vi.clearAllMocks(); // the export's own connectDB call must not satisfy the import assertions
+    return envelope;
+  }
+
+  function expectNothingWritten() {
+    expect(connectDBMock).not.toHaveBeenCalled();
+    expect(itemUpdateOneMock).not.toHaveBeenCalled();
+    expect(itemCreateMock).not.toHaveBeenCalled();
+    expect(receiptUpdateOneMock).not.toHaveBeenCalled();
+    expect(receiptCreateMock).not.toHaveBeenCalled();
+  }
+
+  it('the export is an envelope, not the plaintext backup', async () => {
+    const envelope = await encryptedBackup();
+    const parsed = JSON.parse(envelope);
+    expect(parsed.app).toBe('pharos-enc');
+    expect(parsed.collections).toBeUndefined();
+    // Financial data must not survive in the file in readable form.
+    expect(envelope).not.toContain('Skroutz');
+    expect(envelope).not.toContain('Mouse');
+  });
+
+  it('export refuses a passphrase under 8 characters instead of writing a weakly keyed file', async () => {
+    await expect(exportDataEncrypted('short')).rejects.toThrow(/at least 8 characters/);
+  });
+
+  it('export is admin-gated (it wraps exportData)', async () => {
+    requireAdminMock.mockRejectedValueOnce(new Error('not admin'));
+    await expect(exportDataEncrypted(PASS)).rejects.toThrow('not admin');
+    expect(connectDBMock).not.toHaveBeenCalled();
+  });
+
+  it('round-trip: an encrypted export restores the same documents in every collection', async () => {
+    const envelope = await encryptedBackup();
+
+    const result = await importDataEncrypted(envelope, PASS);
+
+    expect(result).toEqual({ ok: true, restored: 2 });
+    const { _id: itemId, ...itemRest } = itemDoc;
+    const { _id: receiptId, ...receiptRest } = receiptDoc;
+    expect(itemUpdateOneMock).toHaveBeenCalledWith({ _id: itemId }, { $set: itemRest }, { upsert: true });
+    expect(receiptUpdateOneMock).toHaveBeenCalledWith({ _id: receiptId }, { $set: receiptRest }, { upsert: true });
+    expect(itemCreateMock).not.toHaveBeenCalled();
+    expect(receiptCreateMock).not.toHaveBeenCalled();
+  });
+
+  it('import is admin-gated before any decrypt or DB work', async () => {
+    const envelope = await encryptedBackup();
+    requireAdminMock.mockRejectedValueOnce(new Error('not admin'));
+    await expect(importDataEncrypted(envelope, PASS)).rejects.toThrow('not admin');
+    expectNothingWritten();
+  });
+
+  it('wrong passphrase → clear error, nothing written', async () => {
+    const envelope = await encryptedBackup();
+
+    const result = await importDataEncrypted(envelope, 'not the passphrase');
+
+    expect(result).toEqual({ ok: false, restored: 0, error: 'Wrong passphrase, or the backup file is corrupt' });
+    expectNothingWritten();
+  });
+
+  it('tampered ciphertext → the same clear error, nothing written (GCM auth, not garbage JSON)', async () => {
+    const envelope = await encryptedBackup();
+    const env = JSON.parse(envelope);
+    const bytes = Buffer.from(env.data, 'base64');
+    bytes[0] ^= 0xff; // flip one byte of the ciphertext
+    env.data = bytes.toString('base64');
+
+    const result = await importDataEncrypted(JSON.stringify(env), PASS);
+
+    expect(result).toEqual({ ok: false, restored: 0, error: 'Wrong passphrase, or the backup file is corrupt' });
+    expectNothingWritten();
+  });
+
+  it('truncated / non-JSON file → "not a valid encrypted backup", nothing written', async () => {
+    const envelope = await encryptedBackup();
+
+    const result = await importDataEncrypted(envelope.slice(0, envelope.length / 2), PASS);
+
+    expect(result).toEqual({ ok: false, restored: 0, error: 'Not a valid encrypted backup file' });
+    expectNothingWritten();
+  });
+
+  it('a PLAINTEXT backup passed to the encrypted restore → a sensible error, not a crash and not a restore', async () => {
+    const plaintext = JSON.stringify({ app: 'homepage', version: 1, collections: { items: [itemDoc], receipts: [receiptDoc] } });
+
+    const result = await importDataEncrypted(plaintext, PASS);
+
+    expect(result).toEqual({ ok: false, restored: 0, error: 'Not a valid encrypted backup file' });
+    expectNothingWritten();
   });
 });
