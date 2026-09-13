@@ -1,5 +1,16 @@
 # WEB_DEBT — Pharos web code-quality queue
 
+> ## 📦 ΑΡΧΕΙΟ — δεν υπάρχει ανοιχτό debt εδώ (επαλήθευση 2026-09-13)
+>
+> Κάθε item χωρίς σήμανση `DONE` ελέγχθηκε **στον κώδικα** και βρέθηκε ήδη διορθωμένο
+> (tenant-scoping σε moneyAgenda/Jobs/getBulkAiGuard/searchAll/sampleData, rate-limit σε SaaS
+> login+MFA, `requireAdmin` στις ρυθμίσεις ειδοποιήσεων, re-auth στο MFA re-enroll, seat-cap με
+> pending invites, constant-time CRON_SECRET, επιβολή suspended/canceled στο `requestGate.ts`,
+> το i18n gap που πλέον το πιάνει το `locales.test.ts`). Οι routines τα έκλειναν χωρίς να
+> ενημερώνουν πάντα αυτή τη λίστα.
+> **Νέα bugs → GitHub Issues με label `bug`.** Τα audit logs παρακάτω μένουν ως ιστορικό.
+
+
 > Παράγεται από τον web code-quality auditor (read-only). Ο builder routine καταναλώνει το «## Web Debt Queue» (μικρότερο + υψηλότερη προτεραιότητα πρώτα). Λεπτομέρειες ανά run στο `PROGRESS.md`.
 > Σύμβολα status: TODO · DOING · DONE.
 
