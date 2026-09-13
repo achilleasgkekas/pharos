@@ -25,12 +25,16 @@
 ### Πύλες ποιότητας
 
 - **GitHub Actions CI** — ξανά ενεργό από 2026-09-12 (ήταν `disabled_manually`).
-  Τρέχει `type-check` → `vitest` (~7.100 tests) → `build` σε κάθε push και PR.
+  Τρέχει `type-check` → `vitest` (~7.100 tests) → `build` σε **κάθε pull request** και σε
+  **κάθε push στο `main`**. Ένα push σε branch **χωρίς** ανοιχτό PR δεν τρέχει το gate —
+  γι' αυτό τα `brain/*` branches ανοίγουν PR πάντα.
   Στο πρώτο κιόλας run βρήκε ότι τα 21 tests του browser extension δεν έτρεχαν ποτέ.
-- **Codex (OpenAI) ως δεύτερο μάτι** — `/codex:adversarial-review` πριν το merge.
+- **Codex (OpenAI) ως δεύτερο μάτι** — αυτόματο adversarial review σε κάθε PR του brain.
   Διαφορετικό μοντέλο, πιάνει διαφορετικά πράγματα.
-- **CLAUDE.md** — η αυθεντική πηγή για υποδομή και συμβάσεις. Είχε χαθεί τελείως και
-  ξαναγράφτηκε 2026-09-12· γι' αυτό οι agents έχαναν συνεχώς την εικόνα.
+- **`CLAUDE.md` / `AGENTS.md`** — η αυθεντική πηγή για υποδομή και συμβάσεις.
+  ⚠️ **Δεν υπάρχουν στο repo:** είναι σκόπιμα gitignored (περιέχουν εσωτερικά hostnames/IP
+  και το repo πάει AGPL). Ζουν μόνο στο τοπικό checkout του owner. Ένα φρέσκο clone ή ένα
+  git worktree **δεν** τα έχει. Είχαν χαθεί τελείως και ξαναγράφτηκαν 2026-09-12.
 
 ### Ροή
 
