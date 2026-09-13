@@ -13447,3 +13447,24 @@ decrypt περάσει στο `importData`, τα τέσσερα failure tests γ
 
 **Επόμενο task**: issue #5 (p2), οι ημερομηνίες είναι hardcoded `en-GB` σε 20 σημεία, κοινός
 `formatDate()` που ακολουθεί το locale της εφαρμογής.
+
+## 2026-09-13 12:43
+
+**Prod health**: OK. `ph-aros.com` 200 με περιεχόμενο landing, `app.ph-aros.com/account/login` 200,
+`POST /api/cron/saas/trials-sweep` χωρίς token 401 JSON.
+
+**Triage**: #29 και #30 (codex-found, subscriptions) πήραν `agent-ready` + `self-hosted` + `saas`,
+και οι δύο δείχνουν σε γραμμές που υπάρχουν στο main. Το #28 μένει `blocked`, το #3 είναι ακόμα ανοιχτό.
+
+**Η μία δουλειά**: #29 + #30, και τα δύο στο ίδιο `SubFormSchema`. PR **#31**
+https://github.com/achilleasgkekas/pharos/pull/31. Πρώτα πέντε tests, όλα κόκκινα στο main για τον
+λόγο που λένε τα issues (ZodError σε custom κατηγορία, κενή ή άκυρη ημερομηνία περνούσε ως Invalid Date).
+Μετά η διόρθωση: `category` ελεύθερο string έως 30 χαρακτήρες (κενό γίνεται `other`), `startDate`
+απορρίπτεται πριν το `connectDB` αν είναι κενό ή άκυρο, και το input έγινε `required`.
+`tsc` καθαρό, **448 αρχεία, 7107 passed, 4 skipped**. Όριο: η φόρμα δεν πιάνει το error του save,
+οπότε η απόρριψη φαίνεται ως unhandled error και όχι ως μήνυμα πεδίου (υπήρχε ήδη πριν).
+
+**Unshipped**: 59 commits μετά το `1b88ca34`.
+**Ανοιχτά PR μου**: #2, #27, #31.
+
+**Επόμενο task**: issue #3 (p2), το κοινό `DateInput` που ξεμπλοκάρει το #28. Εναλλακτικά #5.
