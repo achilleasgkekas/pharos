@@ -1,5 +1,16 @@
 # PHAROS — Product Backlog (προτάσεις προϊόντος)
 
+> ## 📦 ΑΡΧΕΙΟ — η ουρά εργασιών μεταφέρθηκε στα GitHub Issues (2026-09-13)
+>
+> Κάθε μη-shipped item αυτού του αρχείου έγινε issue με το **πλήρες spec** του
+> (P57 → #7 … P36 → #25), με label `enhancement`, προτεραιότητα `p2`/`p3` και `agent-ready`
+> όπου μπορεί να το πιάσει agent μόνος του.
+> **Νέα δουλειά → https://github.com/achilleasgkekas/pharos/issues** — όχι εδώ.
+>
+> Το αρχείο μένει για τα specs και το ιστορικό αποφάσεων (γιατί εγκρίθηκε/απορρίφθηκε κάτι).
+> Όταν ένα item βγει, σημείωσέ το `✅ SHIPPED` και εδώ ώστε το ιστορικό να μένει αληθινό.
+
+
 > Ρόλος: ο **product-planner** ΠΡΟΤΕΙΝΕΙ candidate features, ο Αχιλλέας ΑΠΟΦΑΣΙΖΕΙ.
 > Αυτό συμπληρώνει (δεν αντικαθιστά) το `TODO.md` (distribution/SaaS roadmap) και τις
 > ουρά τεχνικού χρέους (`WEB_DEBT.md`), που καλύπτει code debt, όχι νέα features. (Το `MOBILE_PARITY.md`
