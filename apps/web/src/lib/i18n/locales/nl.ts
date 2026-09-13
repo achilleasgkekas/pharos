@@ -1697,4 +1697,7 @@ export const nl: Partial<Dict> = {
   'reports.onTrack': 'op schema',
   'reports.overPace': 'te snel',
   'it.allLocations': 'Alle locaties',
+  'sub.stillUsing': 'Nog in gebruik ✓',
+  'set.subscriptionReviewAlert': 'Controle-interval abonnementen · dagen (0 = uit)',
+  'notif.subscriptionReviewSub': 'Laatst bevestigd {days} dagen geleden · nog in gebruik?',
 };

@@ -1777,6 +1777,9 @@ export const en = {
   'reports.onTrack': 'on track',
   'reports.overPace': 'over pace',
   'it.allLocations': 'All locations',
+  'sub.stillUsing': 'Still using it ✓',
+  'set.subscriptionReviewAlert': 'Subscription usage review interval · days (0 = off)',
+  'notif.subscriptionReviewSub': 'Last confirmed {days}d ago · still using it?',
 } as const;
 
 export type Dict = Record<keyof typeof en, string>;

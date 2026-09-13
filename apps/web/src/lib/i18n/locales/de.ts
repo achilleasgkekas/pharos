@@ -1697,4 +1697,7 @@ export const de: Partial<Dict> = {
   'reports.onTrack': 'im Plan',
   'reports.overPace': 'über dem Tempo',
   'it.allLocations': 'Alle Orte',
+  'sub.stillUsing': 'Noch in Nutzung ✓',
+  'set.subscriptionReviewAlert': 'Prüfintervall für Abonnements · Tage (0 = aus)',
+  'notif.subscriptionReviewSub': 'Zuletzt vor {days} Tagen bestätigt · noch in Nutzung?',
 };

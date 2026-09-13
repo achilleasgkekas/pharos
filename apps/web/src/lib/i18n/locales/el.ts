@@ -1728,4 +1728,7 @@ export const el: Partial<Dict> = {
   'reports.onTrack': 'εντός στόχου',
   'reports.overPace': 'εκτός ρυθμού',
   'it.allLocations': 'Όλες οι τοποθεσίες',
+  'sub.stillUsing': 'Το χρησιμοποιώ ακόμα ✓',
+  'set.subscriptionReviewAlert': 'Διάστημα ελέγχου συνδρομών · ημέρες (0 = ανενεργό)',
+  'notif.subscriptionReviewSub': 'Τελευταία επιβεβαίωση πριν {days} ημέρες · το χρησιμοποιείς ακόμα;',
 };

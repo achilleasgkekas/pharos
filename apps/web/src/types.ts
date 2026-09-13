@@ -336,6 +336,7 @@ export type SerializedSubscription = {
   trialEndsAt: string | null;
   firstChargeAmount: number;
   cancelledAt: string | null;
+  lastReviewedAt: string | null;
   active: boolean;
   paymentMethod: string;
   notes: string;

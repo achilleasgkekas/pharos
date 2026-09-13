@@ -1697,4 +1697,7 @@ export const it: Partial<Dict> = {
   'reports.onTrack': 'in linea',
   'reports.overPace': 'oltre il ritmo',
   'it.allLocations': 'Tutte le posizioni',
+  'sub.stillUsing': 'Lo uso ancora ✓',
+  'set.subscriptionReviewAlert': 'Intervallo revisione abbonamenti · giorni (0 = disattivato)',
+  'notif.subscriptionReviewSub': 'Ultima conferma {days} giorni fa · lo usi ancora?',
 };

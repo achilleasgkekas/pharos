@@ -1697,4 +1697,7 @@ export const pt: Partial<Dict> = {
   'reports.onTrack': 'no bom caminho',
   'reports.overPace': 'acima do ritmo',
   'it.allLocations': 'Todas as localizações',
+  'sub.stillUsing': 'Ainda uso ✓',
+  'set.subscriptionReviewAlert': 'Intervalo de revisão de subscrições · dias (0 = desligado)',
+  'notif.subscriptionReviewSub': 'Última confirmação há {days} dias · ainda usa?',
 };
