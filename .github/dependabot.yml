@@ -1,0 +1,94 @@
+# Dependabot version updates. Security updates are enabled separately in the repo settings and
+# open their own PRs as soon as an advisory lands; this file only schedules routine bumps.
+#
+# Grouped + capped on purpose: every PR costs a CI run and a Codex review, so a flood of
+# one-line bumps would eat the weekly AI quota.
+#
+# Majors of the platform pieces are IGNORED here (2026-09-14): the first run proposed Node 26
+# (not LTS yet) and TypeScript 7 (compiler rewrite). Those are planned migrations with their own
+# issue, deploy of both stacks and a human OK — not something to auto-merge on a green CI.
+# Security updates are a separate repo setting and are NOT silenced by these ignore rules.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /apps/web
+    schedule: { interval: weekly, day: monday, time: "06:00", timezone: Europe/Athens }
+    open-pull-requests-limit: 2
+    ignore:
+      - dependency-name: "next"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "eslint-config-next"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-dom"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "mongoose"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "tailwindcss"
+        update-types: ["version-update:semver-major"]
+    groups:
+      web-minor-patch:
+        update-types: [minor, patch]
+    labels: [dependencies]
+
+  - package-ecosystem: npm
+    directory: /apps/landing
+    schedule: { interval: weekly, day: monday, time: "06:00", timezone: Europe/Athens }
+    open-pull-requests-limit: 1
+    ignore:
+      - dependency-name: "next"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "eslint-config-next"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-dom"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "mongoose"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "tailwindcss"
+        update-types: ["version-update:semver-major"]
+    groups:
+      landing-minor-patch:
+        update-types: [minor, patch]
+    labels: [dependencies]
+
+  - package-ecosystem: npm
+    directory: /services/scraper
+    schedule: { interval: monthly }
+    open-pull-requests-limit: 1
+    ignore:
+      - dependency-name: "mongoose"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+    groups:
+      scraper-all:
+        patterns: ["*"]
+    labels: [dependencies]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: monthly }
+    groups:
+      actions:
+        patterns: ["*"]
+    labels: [dependencies]
+
+  - package-ecosystem: docker
+    directories: [/apps/web, /apps/landing, /services/scraper]
+    schedule: { interval: monthly }
+    ignore:
+      # Node base image majors follow the LTS plan (issue "Node 20 → 24 LTS"), never auto.
+      - dependency-name: "node"
+        update-types: ["version-update:semver-major"]
+    labels: [dependencies]

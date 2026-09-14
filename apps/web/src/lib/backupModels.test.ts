@@ -89,6 +89,7 @@ describe('backup registry contents', () => {
     expect(BACKUP_MODELS.giftCards.modelName).toBe('GiftCard');
     expect(BACKUP_MODELS.netWorthSnapshots.modelName).toBe('NetWorthSnapshot');
     expect(BACKUP_MODELS.shoppingList.modelName).toBe('ShoppingListItem');
+    expect(BACKUP_MODELS.meterReadings.modelName).toBe('MeterReading');
   });
 
   it('uses a distinct model for every key', () => {
