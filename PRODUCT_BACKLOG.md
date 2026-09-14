@@ -999,7 +999,7 @@
   scripted `backup.sh` flows απροειδοποίητα)· passphrase ζητείται only-in-memory (ποτέ αποθηκευμένο)· αποτυχημένο
   decrypt (λάθος passphrase) = ξεκάθαρο error, όχι silent corruption.
 
-### P53. Pantry / consumables restock reminder (πάνω στο ήδη-υπάρχον to-buy list) — S — OSS (dogfooding-heavy)
+### P53. ✅ SHIPPED 2026-09-13 — Pantry / consumables restock reminder (πάνω στο ήδη-υπάρχον to-buy list) — S — OSS (dogfooding-heavy)
 - **Αξία:** το `ShoppingListItem` (`/shopping-list`) είναι ήδη ένα ελαφρύ «to-buy» checklist (name/quantity/
   category, tick όταν αγοράστηκε) αλλά **δεν ξέρει να επαναλαμβάνεται** — καταναλώσιμα σπιτιού που τελειώνουν
   περιοδικά (καφές, φίλτρα νερού, χαρτί υγείας, σακούλες σκούπας) σήμερα είτε ξαναγράφονται χειροκίνητα κάθε
