@@ -3,7 +3,7 @@
 # this stays much smaller than apps/web: just build the standalone server and
 # copy it into a clean runner.
 
-FROM node:20-alpine AS base
+FROM node:24-alpine AS base
 RUN apk add --no-cache libc6-compat
 
 # ─── Dependencies ──────────────────────────────────────────────────────────
