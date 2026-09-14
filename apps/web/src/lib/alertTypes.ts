@@ -13,6 +13,7 @@ export const ALERT_TYPES = [
   { key: 'returns', label: 'Return windows closing' },
   { key: 'priceHikes', label: 'Recurring price changes' },
   { key: 'trials', label: 'Free trials ending' },
+  { key: 'subscriptionReviews', label: 'Subscriptions needing a usage review' },
   { key: 'giftCards', label: 'Gift cards expiring with balance' },
   { key: 'bills', label: 'Bills due / overdue' },
   { key: 'documents', label: 'Documents expiring (passport, ID, licence…)' },

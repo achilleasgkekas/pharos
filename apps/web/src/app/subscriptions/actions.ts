@@ -186,6 +186,17 @@ export async function toggleSubscriptionActive(id: string, active: boolean) {
   });
 }
 
+/** Confirm continued use without changing billing, renewal, pause, or active state. */
+export async function reviewSubscription(id: string) {
+  await assertCanWrite();
+  return withRequestTenant(async () => {
+    await connectDB();
+    const Subscription = await currentModel(SubscriptionModel);
+    await Subscription.findByIdAndUpdate(id, { lastReviewedAt: new Date() });
+    revalidatePath('/subscriptions');
+  });
+}
+
 export async function deleteSubscription(id: string) {
   await assertCanWrite();
   return withRequestTenant(async () => {

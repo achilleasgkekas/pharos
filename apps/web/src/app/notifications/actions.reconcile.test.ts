@@ -63,6 +63,7 @@ const {
       trialAlertDays: 2,
       giftCardAlertDays: 30,
       billAlertDays: 5,
+      subscriptionReviewIntervalDays: 0,
     })),
     itemFind: vi.fn(() => leanQuery(() => state.items)),
     statementFind: vi.fn(() => leanQuery(() => state.statements)),
@@ -123,6 +124,7 @@ beforeEach(() => {
     trialAlertDays: 2,
     giftCardAlertDays: 30,
     billAlertDays: 5,
+    subscriptionReviewIntervalDays: 0,
   }));
   vi.useFakeTimers();
   vi.setSystemTime(NOW);
@@ -246,6 +248,17 @@ describe('generateNotifications — trialend alert kind', () => {
   });
 });
 
+describe('generateNotifications — subscription review alert kind', () => {
+  it('uses the confirmation anchor in the dedupe key so acknowledging retires the alert', async () => {
+    getAppSettingsMock.mockResolvedValue({ warrantyAlertDays: 90, trialAlertDays: 2, giftCardAlertDays: 30, billAlertDays: 5, subscriptionReviewIntervalDays: 180 });
+    state.subscriptions = [{ _id: 's1', name: 'Forgotten TV', createdAt: '2026-01-01' }];
+    await generateNotifications();
+    expect(notificationInsertMany).toHaveBeenCalledWith([
+      expect.objectContaining({ dedupeKey: 'subreview:s1:2026-01-01', kind: 'subreview', title: 'Forgotten TV', body: '200' }),
+    ]);
+  });
+});
+
 describe('generateNotifications — giftcard alert kind', () => {
   it('fires for a card with a positive balance expiring within the window', async () => {
     state.giftCards = [
@@ -316,7 +329,7 @@ describe('generateNotifications — reconcile shape (insert / refresh / auto-exp
     state.existingNotifications = [{ dedupeKey: 'deal:i1' }];
     await generateNotifications();
     expect(notificationUpdateMany).toHaveBeenCalledWith(
-      { kind: { $in: ['deal', 'installment', 'warranty', 'pricehike', 'trialend', 'giftcard', 'bill', 'maintenance', 'lending', 'claim'] }, dedupeKey: { $nin: [] } },
+      { kind: { $in: ['deal', 'installment', 'warranty', 'pricehike', 'trialend', 'subreview', 'giftcard', 'bill', 'maintenance', 'lending', 'claim'] }, dedupeKey: { $nin: [] } },
       { $set: { deletedAt: expect.any(Date) } }
     );
   });

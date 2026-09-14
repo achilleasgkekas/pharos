@@ -93,6 +93,7 @@ import {
   createSubscription,
   updateSubscription,
   toggleSubscriptionActive,
+  reviewSubscription,
   deleteSubscription,
   discoverUntrackedRecurring,
   trackDiscoveredSubscription,
@@ -277,6 +278,17 @@ describe('toggleSubscriptionActive', () => {
     expect(id).toBe('sub1');
     expect(update.active).toBe(false);
     expect(update.cancelledAt).toBeInstanceOf(Date);
+  });
+});
+
+describe('reviewSubscription', () => {
+  it('only bumps lastReviewedAt and refreshes the subscriptions page', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-13T12:00:00Z'));
+    await reviewSubscription('sub1');
+    expect(subFindByIdAndUpdate).toHaveBeenCalledWith('sub1', { lastReviewedAt: new Date('2026-09-13T12:00:00Z') });
+    expect(revalidatePathMock).toHaveBeenCalledWith('/subscriptions');
+    vi.useRealTimers();
   });
 });
 

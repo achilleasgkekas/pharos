@@ -2171,6 +2171,7 @@ function DefaultsManager({ settings }: { settings: AppSettings }) {
   const [lendDays, setLendDays] = useState(String(settings.lendingAlertDays));
   const [claimStaleDays, setClaimStaleDays] = useState(String(settings.staleClaimDays));
   const [syncStaleDays, setSyncStaleDays] = useState(String(settings.syncStaleDays));
+  const [subscriptionReviewDays, setSubscriptionReviewDays] = useState(String(settings.subscriptionReviewIntervalDays));
   const [autoAdd, setAutoAdd] = useState(settings.autoAddStores);
   const [currency, setCurrency] = useState(settings.currency);
   const [multiCurrency, setMultiCurrency] = useState(settings.multiCurrency);
@@ -2190,6 +2191,7 @@ function DefaultsManager({ settings }: { settings: AppSettings }) {
     fd.set('lendingAlertDays', lendDays);
     fd.set('staleClaimDays', claimStaleDays);
     fd.set('syncStaleDays', syncStaleDays);
+    fd.set('subscriptionReviewIntervalDays', subscriptionReviewDays);
     fd.set('autoAddStores', String(autoAdd));
     fd.set('currency', currency);
     fd.set('multiCurrency', String(multiCurrency));
@@ -2267,6 +2269,10 @@ function DefaultsManager({ settings }: { settings: AppSettings }) {
         <label className="block">
           <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.syncStaleAlert')}</span>
           <input type="number" min="0" max="365" value={syncStaleDays} onChange={(e) => setSyncStaleDays(e.target.value)} className={inputClass} />
+        </label>
+        <label className="block">
+          <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.subscriptionReviewAlert')}</span>
+          <input type="number" min="0" max="730" value={subscriptionReviewDays} onChange={(e) => setSubscriptionReviewDays(e.target.value)} className={inputClass} />
         </label>
         <div className="flex items-center justify-between gap-3 self-end pb-1">
           <span className="min-w-0">

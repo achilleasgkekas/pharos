@@ -29,6 +29,7 @@ import {
   updateSubscription,
   deleteSubscription,
   toggleSubscriptionActive,
+  reviewSubscription,
   suggestSubscriptionInfo,
   trackDiscoveredSubscription,
 } from './actions';
@@ -508,6 +509,15 @@ function SubCard({ sub, base, onEdit }: { sub: SerializedSubscription; base: str
       )}
 
       <div className="flex items-center gap-1 pt-2 border-t border-[color:var(--color-border)]">
+        {sub.active && (
+          <button
+            onClick={() => startTransition(() => reviewSubscription(sub._id))}
+            disabled={pending}
+            className="mr-1 px-2 py-1 rounded-md text-[10px] font-semibold text-[color:var(--color-accent)] hover:bg-[color:var(--color-surface-2)] transition-colors"
+          >
+            <CheckCircle2 size={12} className="inline mr-1" />{t('sub.stillUsing')}
+          </button>
+        )}
         <button
           onClick={onEdit}
           className="p-1.5 rounded-md text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface-2)] transition-colors"
