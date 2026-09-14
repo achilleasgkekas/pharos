@@ -6,7 +6,13 @@ import { nextBillDue } from '@/lib/bill';
 type BillStore = {
   findOne(filter: Record<string, unknown>): { lean(): PromiseLike<unknown> };
   create(doc: Record<string, unknown>): Promise<unknown>;
+  findOneAndUpdate(filter: Record<string, unknown>, update: Record<string, unknown>): PromiseLike<unknown>;
 };
+
+// How long a spawn claim holds before another request may take it over. A claim is released in
+// `finally`, so this only matters when a process dies mid-spawn; it must comfortably outlast one
+// findOne + create round trip, and be short enough that a crashed claim never blocks the user.
+const SPAWN_CLAIM_MS = 60_000;
 
 type SpawnSource = {
   _id: unknown;
@@ -43,6 +49,15 @@ type SpawnSource = {
  * Trashed successors are invisible to `findOne` (softDeletePlugin), so deleting next month's
  * row and paying again spawns a fresh one, as it should.
  *
+ * Concurrency: the lookup and the create are two round trips, so two payments arriving together
+ * (double click, web + API) could both see "no successor". The check-then-create therefore runs
+ * under a claim taken atomically on the PARENT bill (`recurrenceSpawnClaimAt`, one conditional
+ * findOneAndUpdate). The loser of that race reports "not spawned", which is true: the winner is
+ * creating the row. Why a claim on the parent rather than a unique index on
+ * `recurrenceParentId`: the index would also have to exempt trashed successors (so a re-pay can
+ * respawn) and cannot see legacy unlinked successors at all, while the claim serialises the
+ * whole decision including both of those lookups.
+ *
  * Returns whether a new instance was created.
  */
 export async function spawnNextBillOnce(Bill: BillStore, bill: SpawnSource): Promise<boolean> {
@@ -50,6 +65,31 @@ export async function spawnNextBillOnce(Bill: BillStore, bill: SpawnSource): Pro
   const parentId = String(bill._id);
   const dueDate = nextBillDue(bill.dueDate, bill.cycle);
 
+  const claimedAt = new Date();
+  const claimed = await Bill.findOneAndUpdate(
+    {
+      _id: bill._id,
+      $or: [
+        { recurrenceSpawnClaimAt: null },
+        { recurrenceSpawnClaimAt: { $lt: new Date(claimedAt.getTime() - SPAWN_CLAIM_MS) } },
+      ],
+    },
+    { $set: { recurrenceSpawnClaimAt: claimedAt } },
+  );
+  if (!claimed) return false;
+
+  try {
+    return await spawnUnderClaim(Bill, bill, parentId, dueDate);
+  } finally {
+    // Release only OUR claim: if it went stale and another request took over, leave theirs.
+    await Bill.findOneAndUpdate(
+      { _id: bill._id, recurrenceSpawnClaimAt: claimedAt },
+      { $set: { recurrenceSpawnClaimAt: null } },
+    );
+  }
+}
+
+async function spawnUnderClaim(Bill: BillStore, bill: SpawnSource, parentId: string, dueDate: Date): Promise<boolean> {
   const existing = await Bill.findOne({
     $or: [
       { recurrenceParentId: parentId },

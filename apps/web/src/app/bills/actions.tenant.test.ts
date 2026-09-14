@@ -34,6 +34,8 @@ function makeBillModel(tag: string) {
     }),
     // #33 successor lookup before a recurring spawn: no live successor in any db here.
     findOne: () => ({ lean: async () => null }),
+    // #33 spawn claim/release on the parent: always granted, and not a user-data write to log.
+    findOneAndUpdate: async () => ({}),
     findByIdAndUpdate: async (id: string, update: Record<string, any>) => {
       log(tag, 'findByIdAndUpdate', { id, ...update });
       return update;

@@ -37,7 +37,7 @@ const { connectDBMock, userFindOne, userState, billUpdate, billFindById, billFin
 vi.mock('@/lib/db', () => ({ connectDB: connectDBMock }));
 vi.mock('@/lib/appSettings', () => ({ getAppSettings: getAppSettingsMock }));
 vi.mock('@/models/User', () => ({ User: { findOne: userFindOne } }));
-vi.mock('@/models/Bill', () => ({ Bill: { findByIdAndUpdate: billUpdate, findById: billFindById, findOne: billFindOne, create: billCreate } }));
+vi.mock('@/models/Bill', () => ({ Bill: { findByIdAndUpdate: billUpdate, findById: billFindById, findOne: billFindOne, findOneAndUpdate: vi.fn(async () => ({})), create: billCreate } }));
 
 // withAuth now resolves models through currentModel(). SAAS_MODE is off in tests, so the real
 // helper would hand back the same model anyway; this keeps the DB seam mocked without a connection.

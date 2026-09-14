@@ -32,6 +32,7 @@ const {
   billCreate,
   billFindById,
   billFindOne,
+  billFindOneAndUpdate,
   billFindByIdAndUpdate,
   billUpdateOne,
   addExpenseMock,
@@ -42,6 +43,8 @@ const {
   billCreate: vi.fn(async (_doc: Record<string, unknown>) => ({})),
   billFindById: vi.fn(async (_id: string) => null as Record<string, any> | null),
   billFindOne: vi.fn(async (_filter: Record<string, any>) => null as Record<string, any> | null),
+  // #33 spawn claim on the parent bill: non-null = the claim was taken.
+  billFindOneAndUpdate: vi.fn(async (_filter: Record<string, any>, _update: Record<string, any>) => ({}) as Record<string, any> | null),
   billFindByIdAndUpdate: vi.fn(async (_id: string, _update: Record<string, any>) => ({})),
   billUpdateOne: vi.fn(async (_filter: Record<string, unknown>, _update: Record<string, any>) => ({})),
   addExpenseMock: vi.fn(async (_data: Record<string, unknown>) => ({ ok: true, id: 'exp1' } as { ok: boolean; id?: string; error?: string })),
@@ -58,6 +61,7 @@ const billModel = {
   create: billCreate,
   findById: (id: string) => ({ lean: () => billFindById(id) }),
   findOne: (filter: Record<string, any>) => ({ lean: () => billFindOne(filter) }),
+  findOneAndUpdate: billFindOneAndUpdate,
   findByIdAndUpdate: billFindByIdAndUpdate,
   updateOne: billUpdateOne,
 };
@@ -94,6 +98,7 @@ beforeEach(() => {
   billCreate.mockImplementation(async () => ({}));
   billFindById.mockImplementation(async () => null);
   billFindOne.mockImplementation(async () => null);
+  billFindOneAndUpdate.mockImplementation(async () => ({}));
   billFindByIdAndUpdate.mockImplementation(async () => ({}));
   billUpdateOne.mockImplementation(async () => ({}));
   addExpenseMock.mockImplementation(async () => ({ ok: true, id: 'exp1' }));
@@ -357,11 +362,13 @@ describe('recurring spawn survives Undo (#33)', () => {
   type Doc = Record<string, any>;
   let store: Map<string, Doc>;
   // Just enough of Mongo's matcher for the lookups the action makes: equality (Dates by
-  // value), $in, and a top-level $or.
+  // value), null, $lt, $in, and a top-level $or.
   const matches = (doc: Doc, filter: Doc): boolean =>
     Object.entries(filter).every(([k, v]) => {
       if (k === '$or') return (v as Doc[]).some((f) => matches(doc, f));
       const actual = doc[k];
+      if (v === null) return actual == null;
+      if (v && typeof v === 'object' && '$lt' in v) return actual instanceof Date && actual.getTime() < (v.$lt as Date).getTime();
       if (v && typeof v === 'object' && '$in' in v) return (v.$in as unknown[]).some((x) => (x == null ? actual == null : actual === x));
       if (v instanceof Date) return actual instanceof Date && actual.getTime() === v.getTime();
       return actual === v;
@@ -374,7 +381,19 @@ describe('recurring spawn survives Undo (#33)', () => {
     }]]);
     let seq = 0;
     billFindById.mockImplementation(async (id) => (store.has(id) ? { ...store.get(id)! } : null));
-    billFindOne.mockImplementation(async (filter) => [...store.values()].find((d) => matches(d, filter)) ?? null);
+    // Yield before answering, like a real round trip, so concurrent callers can interleave.
+    billFindOne.mockImplementation(async (filter) => {
+      await new Promise((r) => setTimeout(r, 0));
+      return [...store.values()].find((d) => matches(d, filter)) ?? null;
+    });
+    // Match + $set in one synchronous step: that atomicity is exactly what Mongo guarantees.
+    billFindOneAndUpdate.mockImplementation(async (filter, update) => {
+      const doc = [...store.values()].find((d) => matches(d, filter));
+      if (!doc) return null;
+      const before = { ...doc };
+      Object.assign(doc, update.$set);
+      return before;
+    });
     billFindByIdAndUpdate.mockImplementation(async (id, update) => { Object.assign(store.get(id)!, update); return {}; });
     billCreate.mockImplementation(async (doc) => { const _id = `spawn${++seq}`; store.set(_id, { ...doc, _id }); return { _id }; });
   });
@@ -393,6 +412,26 @@ describe('recurring spawn survives Undo (#33)', () => {
     store.set('legacy', {
       _id: 'legacy', title: 'Ενοίκιο', cycle: 'monthly', paidAt: null, dueDate: new Date(2026, 6, 15),
     });
+    await markBillPaid('b1');
+    expect(billCreate).not.toHaveBeenCalled();
+  });
+
+  it('two payments landing at the same moment create only one next instance', async () => {
+    await Promise.all([markBillPaid('b1'), markBillPaid('b1')]);
+    const july = [...store.values()].filter((d) => d._id !== 'b1');
+    expect(july).toHaveLength(1);
+    // The claim is released afterwards, so a later Undo + pay is not locked out.
+    expect(store.get('b1')!.recurrenceSpawnClaimAt).toBeNull();
+  });
+
+  it('takes over a claim left stale by a crashed request', async () => {
+    store.get('b1')!.recurrenceSpawnClaimAt = new Date(Date.now() - 5 * 60_000);
+    await markBillPaid('b1');
+    expect(billCreate).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not spawn while another request holds a fresh claim', async () => {
+    store.get('b1')!.recurrenceSpawnClaimAt = new Date();
     await markBillPaid('b1');
     expect(billCreate).not.toHaveBeenCalled();
   });

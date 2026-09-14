@@ -47,6 +47,9 @@ const BillSchema = new Schema(
     // re-payment after Undo find the existing successor instead of spawning a second one
     // (see lib/billRecurrence.ts). '' on hand-entered bills and on pre-#33 successors.
     recurrenceParentId: { type: String, default: '', index: true },
+    // #33: set while a payment of THIS bill is deciding whether to spawn its successor, so two
+    // concurrent payments cannot both create one. Cleared right after; see lib/billRecurrence.ts.
+    recurrenceSpawnClaimAt: { type: Date, default: null },
     notes: { type: String, default: '' },
     archived: { type: Boolean, default: false, index: true },
     linkedExpenseId: { type: String, default: '' }, // set when "mark paid" also logged an expense
