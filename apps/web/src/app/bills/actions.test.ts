@@ -362,11 +362,17 @@ describe('recurring spawn survives Undo (#33)', () => {
   type Doc = Record<string, any>;
   let store: Map<string, Doc>;
   // Just enough of Mongo's matcher for the lookups the action makes: equality (Dates by
-  // value), null, $ne, $in.
+  // value), null, $ne, $in, $gt/$lt on Dates, and a top-level $or.
   const matches = (doc: Doc, filter: Doc): boolean =>
     Object.entries(filter).every(([k, v]) => {
+      if (k === '$or') return (v as Doc[]).some((f) => matches(doc, f));
       const actual = doc[k];
       if (v === null) return actual == null;
+      if (v && typeof v === 'object' && ('$gt' in v || '$lt' in v)) {
+        const t = actual instanceof Date ? actual.getTime() : NaN;
+        const { $gt, $lt } = v as { $gt?: Date; $lt?: Date };
+        return (!$gt || t > $gt.getTime()) && (!$lt || t < $lt.getTime());
+      }
       if (v && typeof v === 'object' && '$ne' in v) return v.$ne === null ? actual != null : actual !== v.$ne;
       if (v && typeof v === 'object' && '$in' in v) return (v.$in as unknown[]).some((x) => (x == null ? actual == null : actual === x));
       if (v instanceof Date) return actual instanceof Date && actual.getTime() === v.getTime();
@@ -418,6 +424,42 @@ describe('recurring spawn survives Undo (#33)', () => {
     });
     await markBillPaid('b1');
     expect(billCreate).not.toHaveBeenCalled();
+  });
+
+  // Codex review of ddca036: users correct the projected row when the real bill arrives, so a
+  // legacy successor must still be recognised after its due date or its title was edited.
+  it('recognises a legacy successor whose due date was moved within the next cycle', async () => {
+    store.set('legacy', {
+      _id: 'legacy', title: 'Ενοίκιο', cycle: 'monthly', paidAt: null, dueDate: new Date(2026, 6, 20),
+    });
+    await markBillPaid('b1');
+    expect(billCreate).not.toHaveBeenCalled();
+  });
+
+  it('recognises a legacy successor whose title was corrected but every copied field kept', async () => {
+    store.set('legacy', {
+      _id: 'legacy', title: 'Ενοίκιο Ιουλίου', vendor: '', amount: 100, category: 'housing', cycle: 'monthly',
+      notes: '', paidAt: null, dueDate: new Date(2026, 6, 15),
+    });
+    await markBillPaid('b1');
+    expect(billCreate).not.toHaveBeenCalled();
+  });
+
+  it('an unrelated manually entered bill on the same next due date does not suppress the successor', async () => {
+    store.set('internet', {
+      _id: 'internet', title: 'Internet', vendor: 'Cosmote', amount: 30, category: 'utilities', cycle: 'monthly',
+      notes: '', paidAt: null, dueDate: new Date(2026, 6, 15),
+    });
+    await markBillPaid('b1');
+    expect(successors().filter((d) => d.recurrenceParentId === 'b1')).toHaveLength(1);
+  });
+
+  it('a same-title bill two cycles ahead does not count as the next instance', async () => {
+    store.set('august', {
+      _id: 'august', title: 'Ενοίκιο', cycle: 'monthly', paidAt: null, dueDate: new Date(2026, 7, 15),
+    });
+    await markBillPaid('b1');
+    expect(successors().filter((d) => d.recurrenceParentId === 'b1')).toHaveLength(1);
   });
 
   it('two payments landing at the same moment create only one next instance', async () => {

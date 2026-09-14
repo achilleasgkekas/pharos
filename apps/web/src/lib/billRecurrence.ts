@@ -63,10 +63,11 @@ const isDuplicateKey = (err: unknown): boolean => (err as { code?: number } | nu
  * replaces the trashed document with a fresh pending one (atomically, only while it is still
  * trashed). That keeps the pre-#33 behaviour of "delete next month, pay again, get it back".
  *
- * Successors spawned before #33 have random ids, so an unlinked row of the same series (title
- * + cycle) on the exact next due date also counts. The limit of that fallback: two separately
- * entered bills with identical title, cycle and due date would share one successor. That is a
- * duplicate the user entered, not one we create, and such legacy rows never race with new ones.
+ * Successors spawned before #33 have random ids and no link, and no migration can recover a
+ * link that was never written, so they are recognised heuristically (legacySuccessorFilter).
+ * The remaining limit is a legacy successor whose title AND due date were both edited: re-paying
+ * its pre-#33 parent after an Undo still adds one visible extra row. That window only closes
+ * for series paid before this shipped; every successor spawned since is linked by its _id.
  *
  * Returns whether a new instance was created.
  */
@@ -75,9 +76,7 @@ export async function spawnNextBillOnce(Bill: BillStore, bill: SpawnSource): Pro
   const parentId = String(bill._id);
   const dueDate = nextBillDue(bill.dueDate, bill.cycle);
 
-  const legacy = await Bill.findOne({
-    recurrenceParentId: { $in: ['', null] }, title: bill.title, cycle: bill.cycle, dueDate,
-  }).lean();
+  const legacy = await Bill.findOne(legacySuccessorFilter(bill, dueDate)).lean();
   if (legacy) return false;
 
   const _id = successorBillId(parentId);
@@ -113,4 +112,31 @@ export async function spawnNextBillOnce(Bill: BillStore, bill: SpawnSource): Pro
   // The id is taken: either a live successor (done, nothing to create) or a trashed one.
   const res = await Bill.replaceOne({ _id, deletedAt: { $ne: null } }, doc).setOptions({ withDeleted: true });
   return (res.modifiedCount ?? 0) > 0;
+}
+
+/**
+ * Matches a pre-#33 (unlinked) successor of `bill` even after the user edited it, by what they
+ * are unlikely to change all at once. Either the title survived and the due date moved anywhere
+ * inside the next cycle, or the exact next due date survived along with every other field the
+ * spawn copied, so only the title was corrected.
+ *
+ * Both branches stay inside one cycle on purpose. A manually entered bill is also unlinked, so a
+ * wider net (say "same vendor, any date") would let an unrelated bill silently suppress a real
+ * successor on every ordinary payment, and a missing bill is worse than a visible duplicate.
+ */
+export function legacySuccessorFilter(bill: SpawnSource, nextDue: Date): Record<string, unknown> {
+  const copied: Record<string, unknown> = { dueDate: nextDue, amount: bill.amount };
+  // Only fields the parent actually has: an undefined value in a Mongoose filter is dropped,
+  // which would turn "same vendor" into "any vendor".
+  for (const k of ['vendor', 'currency', 'category', 'notes'] as const) {
+    if (bill[k] != null) copied[k] = bill[k];
+  }
+  return {
+    recurrenceParentId: { $in: ['', null] },
+    cycle: bill.cycle,
+    $or: [
+      { title: bill.title, dueDate: { $gt: new Date(bill.dueDate as Date | string), $lt: nextBillDue(nextDue, bill.cycle as string) } },
+      copied,
+    ],
+  };
 }
