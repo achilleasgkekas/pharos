@@ -1697,4 +1697,8 @@ export const it: Partial<Dict> = {
   'reports.onTrack': 'in linea',
   'reports.overPace': 'oltre il ritmo',
   'it.allLocations': 'Tutte le posizioni',
+  'nav.utilities': 'Utenze',
+  'util.title': 'Utenze', 'util.subtitle': 'Tieni traccia delle letture cumulative e dei consumi dietro ogni bolletta.',
+  'util.add': 'Aggiungi lettura', 'util.trend': 'Andamento letture', 'util.needTwo': 'Aggiungi almeno due letture per vedere andamento e consumo.', 'util.empty': 'Nessuna lettura ancora.',
+  'util.meter': 'Contatore', 'util.meterHint': 'Contatore elettrico principale', 'util.type': 'Tipo di utenza', 'util.typeHint': 'Elettricità, acqua, gas…', 'util.unit': 'Unità', 'util.date': 'Data lettura', 'util.reading': 'Lettura', 'util.consumption': 'Consumo', 'util.period': 'Consumo del periodo', 'util.space': 'Spazio (opzionale)', 'util.notes': 'Note',
 };

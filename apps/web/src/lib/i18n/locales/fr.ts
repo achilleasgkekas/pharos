@@ -1697,4 +1697,8 @@ export const fr: Partial<Dict> = {
   'reports.onTrack': 'dans les clous',
   'reports.overPace': 'trop rapide',
   'it.allLocations': 'Tous les emplacements',
+  'nav.utilities': 'Services publics',
+  'util.title': 'Services publics', 'util.subtitle': 'Suivez les relevés cumulés et la consommation derrière chaque facture.',
+  'util.add': 'Ajouter un relevé', 'util.trend': 'Tendance des relevés', 'util.needTwo': 'Ajoutez au moins deux relevés pour voir la tendance et la consommation.', 'util.empty': 'Aucun relevé pour le moment.',
+  'util.meter': 'Compteur', 'util.meterHint': 'Compteur électrique principal', 'util.type': 'Type de service', 'util.typeHint': 'Électricité, eau, gaz…', 'util.unit': 'Unité', 'util.date': 'Date du relevé', 'util.reading': 'Relevé', 'util.consumption': 'Consommation', 'util.period': 'Consommation de la période', 'util.space': 'Espace (facultatif)', 'util.notes': 'Notes',
 };

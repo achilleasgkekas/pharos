@@ -1041,7 +1041,7 @@
   δείχνει ηλικία/χρόνια γάμου — προαιρετικό `yearOfBirth`/`sinceYear` field)· ένα ενιαίο lead-time setting (ίδιο
   με warranty/trial/bill patterns)· κανένα linked-item/gift-tracking αρχικά (MVP = ημερομηνία + υπενθύμιση μόνο).
 
-### P49. Utility meter reading / consumption tracker (kWh/m³, όχι μόνο το ποσό λογαριασμού) — S/M — OSS (dogfooding-heavy)
+### P49. ✅ SHIPPED 2026-09-14 — Utility meter reading / consumption tracker (kWh/m³, όχι μόνο το ποσό λογαριασμού) — S/M — OSS (dogfooding-heavy)
 - **Αξία:** τα Expenses παρακολουθούν ήδη το **ποσό** των λογαριασμών (ΔΕΗ/ΟΤΕ/νερό, βλ. CLAUDE.md ιστορικό expense
   recovery) αλλά όχι την **κατανάλωση** (kWh/m³) πίσω από εκείνο το ποσό — δύο σπίτια (κεντρικό + εξοχικό Kalamos,
   βλ. P34 spaces) με διαφορετικά προφίλ χρήσης θα μπορούσαν να δείξουν αν μια αύξηση οφείλεται σε τιμή/tariff ή σε

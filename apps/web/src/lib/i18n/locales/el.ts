@@ -1728,4 +1728,8 @@ export const el: Partial<Dict> = {
   'reports.onTrack': 'εντός στόχου',
   'reports.overPace': 'εκτός ρυθμού',
   'it.allLocations': 'Όλες οι τοποθεσίες',
+  'nav.utilities': 'Παροχές',
+  'util.title': 'Παροχές', 'util.subtitle': 'Παρακολούθησε τις ενδείξεις μετρητών και την κατανάλωση πίσω από κάθε λογαριασμό.',
+  'util.add': 'Νέα ένδειξη', 'util.trend': 'Τάση ενδείξεων', 'util.needTwo': 'Πρόσθεσε τουλάχιστον δύο ενδείξεις για τάση και κατανάλωση περιόδου.', 'util.empty': 'Δεν υπάρχουν ενδείξεις ακόμη.',
+  'util.meter': 'Μετρητής', 'util.meterHint': 'Κεντρικός μετρητής ρεύματος', 'util.type': 'Τύπος παροχής', 'util.typeHint': 'Ρεύμα, νερό, αέριο…', 'util.unit': 'Μονάδα', 'util.date': 'Ημερομηνία ένδειξης', 'util.reading': 'Ένδειξη', 'util.consumption': 'Κατανάλωση', 'util.period': 'Κατανάλωση περιόδου', 'util.space': 'Χώρος (προαιρετικό)', 'util.notes': 'Σημειώσεις',
 };
