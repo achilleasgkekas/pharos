@@ -13512,3 +13512,27 @@ in-memory store έβγαζε δύο λογαριασμούς Ιουλίου στ
 **Ανοιχτά PR μου**: #65 (Sentry), #66. Το #31 έγινε merge.
 
 **Επόμενο task**: issue #34 (p1, λογαριασμός με μηδενικό υπόλοιπο φαίνεται απλήρωτος μετά από edit). Μετά #32 ή #3.
+
+## 2026-09-14 07:43
+
+**Prod health**: OK. `ph-aros.com` 200 με περιεχόμενο landing, `app.ph-aros.com/account/login` 200,
+`POST /api/cron/saas/trials-sweep` χωρίς token 401 JSON.
+
+**Triage**: #67, #68, #69 (codex-found, p2) πήραν `self-hosted` + `saas` + `agent-ready`, βγήκε το
+`needs-triage`. Οι γραμμές που αναφέρουν υπάρχουν στο main (`expenses/actions.ts` 162/244/393/446/675,
+`ExpensesClient.tsx` 797). Το #28 μένει `blocked` (το #3 είναι ανοιχτό).
+
+**Η μία δουλειά**: διορθώσεις review στο δικό μου PR **#66** (needs-changes)
+https://github.com/achilleasgkekas/pharos/pull/66, commit `c44f5815`. Το Codex βρήκε race στο
+`spawnNextBillOnce`: `findOne` και μετά `create`, άρα δύο ταυτόχρονες πληρωμές έφτιαχναν δύο διαδόχους.
+Τώρα η απόφαση τρέχει κάτω από claim στον ΓΟΝΙΚΟ λογαριασμό (`recurrenceSpawnClaimAt`, ένα conditional
+`findOneAndUpdate`, takeover μετά από 60s, απελευθέρωση στο `finally` μόνο αν είναι ακόμα δικό μας).
+Claim αντί για unique index γιατί το index θα έπρεπε να εξαιρεί τους διαδόχους στον κάδο και δεν βλέπει
+τους legacy διαδόχους χωρίς σύνδεση. Νέο test: δύο ταυτόχρονα `markBillPaid` σε in-memory store δίνουν
+έναν διάδοχο (αποτυγχάνει στο `afd2d3a`, περνά τώρα), συν stale/fresh claim. `tsc` καθαρό,
+**448 αρχεία, 7131 passed, 4 skipped**. Όριο: δεν δοκιμάστηκε σε πραγματική Mongo.
+
+**Unshipped**: δεν ελέγχθηκε ο server, δες την προηγούμενη εγγραφή (67+ commits).
+**Ανοιχτά PR μου**: #66 (περιμένει νέο review), #65 (needs-human).
+
+**Επόμενο task**: issue #34 (p1, λογαριασμός με μηδενικό υπόλοιπο φαίνεται απλήρωτος μετά από edit). Μετά #67 (p2, codex-found).
