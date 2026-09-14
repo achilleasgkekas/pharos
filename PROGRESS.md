@@ -13536,3 +13536,28 @@ Claim αντί για unique index γιατί το index θα έπρεπε να 
 **Ανοιχτά PR μου**: #66 (περιμένει νέο review), #65 (needs-human).
 
 **Επόμενο task**: issue #34 (p1, λογαριασμός με μηδενικό υπόλοιπο φαίνεται απλήρωτος μετά από edit). Μετά #67 (p2, codex-found).
+
+## 2026-09-14 12:50
+
+**Prod health**: OK. `ph-aros.com` 200 με περιεχόμενο landing, `app.ph-aros.com/account/login` 200,
+`POST /api/cron/saas/trials-sweep` χωρίς token 401 JSON.
+
+**Triage**: #80 (μορφοποίηση ποσών, `self-hosted` + `saas`), #81 (tab strip workspace σε κινητό, `saas`),
+#82 (μακριοί τίτλοι στις κάρτες Items, `self-hosted` + `saas`) πήραν `agent-ready`, βγήκε το `needs-triage`.
+Οι πηγές υπάρχουν στο main (`components/saas/format.ts` με `en-US`, `WorkspaceShell.tsx` με `overflow-x-auto`,
+`ItemCard` στο `ItemsClient.tsx`). Το #80 είναι μεγάλο (πολλά αρχεία), ίσως θέλει σπάσιμο πριν το πιάσει κάποιος.
+Το #28 μένει `blocked` (το #3 είναι ανοιχτό).
+
+**Η μία δουλειά**: δεύτερος γύρος review στο δικό μου PR **#66** (needs-changes)
+https://github.com/achilleasgkekas/pharos/pull/66, commit `ddca0362`. Το Codex βρήκε δύο τρύπες στο claim:
+ορφανό claim άφηνε πληρωμένο λογαριασμό χωρίς διάδοχο για πάντα, και claimant που ξεπερνούσε τα 60s
+άφηνε δύο διαδόχους. Έβγαλα το claim εντελώς. Το `_id` του διαδόχου παράγεται πλέον από το `_id` του γονικού
+(sha256, 24 hex), άρα το μοναδικό index του `_id` απορρίπτει δεύτερο create (E11000). Διάδοχος στον κάδο
+αντικαθίσταται ατομικά μόνο όσο είναι ακόμα στον κάδο. Το `markBillPaid` κάνει spawn ΠΡΙΝ το expense και
+το `paidAt`, οπότε αποτυχία πιο κάτω αφήνει τον λογαριασμό απλήρωτο και ξαναδοκιμάσιμο. Βγήκε το πεδίο
+`recurrenceSpawnClaimAt`. `tsc` καθαρό, **448 αρχεία, 7131 passed, 4 skipped**. Όριο: όχι σε πραγματική Mongo.
+
+**Unshipped**: 4 commits στο `origin/main` μετά το `523b1ab` που είναι το source του server (το running image δεν ελέγχθηκε).
+**Ανοιχτά PR μου**: #66 (περιμένει νέο review), #65 (needs-human).
+
+**Επόμενο task**: issue #34 (p1, λογαριασμός με μηδενικό υπόλοιπο φαίνεται απλήρωτος μετά από edit). Μετά #42 (p1, ui).
