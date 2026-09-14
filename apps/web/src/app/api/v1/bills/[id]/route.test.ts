@@ -13,7 +13,7 @@ import type { NextRequest } from 'next/server';
 //   - `paid: false` clears paidAt without touching anything else,
 //   - DELETE is a soft delete, a missing row 404s.
 
-const { connectDBMock, userFindOne, userState, billUpdate, billFindById, billFindOne, findOneState, billCreate, updateState, findByIdState, settingsState, getAppSettingsMock } =
+const { connectDBMock, userFindOne, userState, billUpdate, billFindById, billFindOne, findOneState, billCreate, updateState, findByIdState, settingsState, getAppSettingsMock, billReplaceOne } =
   vi.hoisted(() => {
     const userState: { doc: unknown } = { doc: { _id: 'u1', name: 'Achilleas', username: 'ach', role: 'admin' } };
     const userFindOne = vi.fn(() => ({ select: () => ({ lean: async () => userState.doc }) }));
@@ -24,26 +24,29 @@ const { connectDBMock, userFindOne, userState, billUpdate, billFindById, billFin
     });
     const findByIdState: { doc: unknown } = { doc: null };
     const billFindById = vi.fn(() => ({ lean: async () => findByIdState.doc }));
-    // #33: the spawn first looks for a live successor of this bill; null = none yet.
+    // #33: the spawn first looks for a pre-#33 (unlinked) successor; null = none.
     const findOneState: { doc: unknown } = { doc: null };
     const billFindOne = vi.fn((_filter: unknown) => ({ lean: async () => findOneState.doc }));
     const billCreate = vi.fn(async (arg: Record<string, unknown>) => ({ toObject: () => arg }));
+    // #33: respawn over a trashed successor; 0 = the id belongs to a live successor.
+    const billReplaceOne = vi.fn((_filter: unknown, _doc: unknown) => ({ setOptions: async () => ({ modifiedCount: 0 }) }));
     // P9: a money-touching PATCH re-resolves against the deployment's base currency.
     const settingsState = { currency: 'EUR' };
     const getAppSettingsMock = vi.fn(async () => settingsState);
-    return { connectDBMock: vi.fn(async () => {}), userFindOne, userState, billUpdate, billFindById, billFindOne, findOneState, billCreate, updateState, findByIdState, settingsState, getAppSettingsMock };
+    return { connectDBMock: vi.fn(async () => {}), userFindOne, userState, billUpdate, billFindById, billFindOne, findOneState, billCreate, updateState, findByIdState, settingsState, getAppSettingsMock, billReplaceOne };
   });
 
 vi.mock('@/lib/db', () => ({ connectDB: connectDBMock }));
 vi.mock('@/lib/appSettings', () => ({ getAppSettings: getAppSettingsMock }));
 vi.mock('@/models/User', () => ({ User: { findOne: userFindOne } }));
-vi.mock('@/models/Bill', () => ({ Bill: { findByIdAndUpdate: billUpdate, findById: billFindById, findOne: billFindOne, findOneAndUpdate: vi.fn(async () => ({})), create: billCreate } }));
+vi.mock('@/models/Bill', () => ({ Bill: { findByIdAndUpdate: billUpdate, findById: billFindById, findOne: billFindOne, replaceOne: billReplaceOne, create: billCreate } }));
 
 // withAuth now resolves models through currentModel(). SAAS_MODE is off in tests, so the real
 // helper would hand back the same model anyway; this keeps the DB seam mocked without a connection.
 vi.mock('@/lib/tenancy/connection', () => ({ currentModel: async (m: unknown) => m }));
 
 import { PATCH, DELETE } from './route';
+import { successorBillId } from '@/lib/billRecurrence';
 
 const OID = 'a1b2c3d4e5f6a1b2c3d4e5f6';
 const BASE = 'http://pharos.local/api/v1/bills';
@@ -173,12 +176,14 @@ describe('PATCH paid transition', () => {
   it('#33: paid:true after a paid:false undo does not spawn a second next instance', async () => {
     // Undo cleared paidAt, so the bill reads as unpaid again, but its successor is still live.
     findByIdState.doc = { _id: OID, title: 'ΔΕΗ ρεύμα', vendor: 'ΔΕΗ', amount: 60, dueDate: new Date('2026-07-01'), paidAt: null, category: 'utilities', cycle: 'monthly', notes: '' };
-    findOneState.doc = { _id: 'next', title: 'ΔΕΗ ρεύμα', cycle: 'monthly', dueDate: new Date('2026-08-01'), recurrenceParentId: OID };
+    // The successor already owns the derived _id, so Mongo rejects the create as a duplicate key.
+    billCreate.mockRejectedValueOnce(Object.assign(new Error('E11000 duplicate key'), { code: 11000 }));
     updateState.doc = { _id: OID, title: 'ΔΕΗ ρεύμα', dueDate: new Date('2026-07-01'), paidAt: new Date('2026-07-20') };
     const res = await PATCH(makeReq({ body: { paid: true } }), ctx(OID));
     expect(res.status).toBe(200);
-    expect(billCreate).not.toHaveBeenCalled();
-    expect(((billFindOne.mock.calls[0][0] as { $or: Array<Record<string, unknown>> }).$or)[0]).toEqual({ recurrenceParentId: OID });
+    expect((billCreate.mock.calls[0][0] as { _id: string })._id).toBe(successorBillId(OID));
+    // Only a TRASHED holder of that id may be replaced; a live one is left alone.
+    expect(billReplaceOne.mock.calls[0][0]).toEqual({ _id: successorBillId(OID), deletedAt: { $ne: null } });
     const json = (await res.json()) as { spawnedNext: boolean };
     expect(json.spawnedNext).toBe(false);
   });

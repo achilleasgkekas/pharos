@@ -126,6 +126,13 @@ export async function markBillPaid(
   const wasPaid = !!bill.paidAt;
   const paidAt = safeDateOrNull(opts?.paidDate || '') ?? new Date();
 
+  // Roll the recurring series forward exactly once. `wasPaid` alone is not enough: Undo
+  // clears paidAt, so the helper also refuses when this bill already has a successor (#33).
+  // It runs BEFORE the expense and the paidAt write on purpose: the spawn is idempotent, so a
+  // failure further down is safely retried, whereas a bill persisted as paid first would never
+  // get another chance to spawn (see lib/billRecurrence.ts).
+  if (!wasPaid) await spawnNextBillOnce(Bill, bill);
+
   // P61: when instalments were already logged, "mark paid" settles what is LEFT, so an
   // opt-in expense books the remaining balance rather than the full amount a second time.
   // Such a bill is base-denominated by definition (see logBillPayment), hence no fx here.
@@ -166,10 +173,6 @@ export async function markBillPaid(
   }
 
   await Bill.findByIdAndUpdate(id, { paidAt, linkedExpenseId });
-
-  // Roll the recurring series forward exactly once. `wasPaid` alone is not enough: Undo
-  // clears paidAt, so the helper also refuses when this bill already has a live successor (#33).
-  if (!wasPaid) await spawnNextBillOnce(Bill, bill);
 
   revalidatePath('/bills');
   return { ok: true };

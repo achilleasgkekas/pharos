@@ -32,7 +32,7 @@ const {
   billCreate,
   billFindById,
   billFindOne,
-  billFindOneAndUpdate,
+  billReplaceOne,
   billFindByIdAndUpdate,
   billUpdateOne,
   addExpenseMock,
@@ -43,8 +43,8 @@ const {
   billCreate: vi.fn(async (_doc: Record<string, unknown>) => ({})),
   billFindById: vi.fn(async (_id: string) => null as Record<string, any> | null),
   billFindOne: vi.fn(async (_filter: Record<string, any>) => null as Record<string, any> | null),
-  // #33 spawn claim on the parent bill: non-null = the claim was taken.
-  billFindOneAndUpdate: vi.fn(async (_filter: Record<string, any>, _update: Record<string, any>) => ({}) as Record<string, any> | null),
+  // #33 respawn over a trashed successor (chained .setOptions({ withDeleted: true })).
+  billReplaceOne: vi.fn(async (_filter: Record<string, any>, _doc: Record<string, any>) => ({ modifiedCount: 0 })),
   billFindByIdAndUpdate: vi.fn(async (_id: string, _update: Record<string, any>) => ({})),
   billUpdateOne: vi.fn(async (_filter: Record<string, unknown>, _update: Record<string, any>) => ({})),
   addExpenseMock: vi.fn(async (_data: Record<string, unknown>) => ({ ok: true, id: 'exp1' } as { ok: boolean; id?: string; error?: string })),
@@ -61,7 +61,7 @@ const billModel = {
   create: billCreate,
   findById: (id: string) => ({ lean: () => billFindById(id) }),
   findOne: (filter: Record<string, any>) => ({ lean: () => billFindOne(filter) }),
-  findOneAndUpdate: billFindOneAndUpdate,
+  replaceOne: (filter: Record<string, any>, doc: Record<string, any>) => ({ setOptions: () => billReplaceOne(filter, doc) }),
   findByIdAndUpdate: billFindByIdAndUpdate,
   updateOne: billUpdateOne,
 };
@@ -98,7 +98,7 @@ beforeEach(() => {
   billCreate.mockImplementation(async () => ({}));
   billFindById.mockImplementation(async () => null);
   billFindOne.mockImplementation(async () => null);
-  billFindOneAndUpdate.mockImplementation(async () => ({}));
+  billReplaceOne.mockImplementation(async () => ({ modifiedCount: 0 }));
   billFindByIdAndUpdate.mockImplementation(async () => ({}));
   billUpdateOne.mockImplementation(async () => ({}));
   addExpenseMock.mockImplementation(async () => ({ ok: true, id: 'exp1' }));
@@ -362,49 +362,53 @@ describe('recurring spawn survives Undo (#33)', () => {
   type Doc = Record<string, any>;
   let store: Map<string, Doc>;
   // Just enough of Mongo's matcher for the lookups the action makes: equality (Dates by
-  // value), null, $lt, $in, and a top-level $or.
+  // value), null, $ne, $in.
   const matches = (doc: Doc, filter: Doc): boolean =>
     Object.entries(filter).every(([k, v]) => {
-      if (k === '$or') return (v as Doc[]).some((f) => matches(doc, f));
       const actual = doc[k];
       if (v === null) return actual == null;
-      if (v && typeof v === 'object' && '$lt' in v) return actual instanceof Date && actual.getTime() < (v.$lt as Date).getTime();
+      if (v && typeof v === 'object' && '$ne' in v) return v.$ne === null ? actual != null : actual !== v.$ne;
       if (v && typeof v === 'object' && '$in' in v) return (v.$in as unknown[]).some((x) => (x == null ? actual == null : actual === x));
       if (v instanceof Date) return actual instanceof Date && actual.getTime() === v.getTime();
       return actual === v;
     });
+  const successors = () => [...store.values()].filter((d) => d._id !== 'b1');
 
   beforeEach(() => {
     store = new Map([['b1', {
       _id: 'b1', title: 'Ενοίκιο', vendor: '', amount: 100, category: 'housing', cycle: 'monthly',
       notes: '', paidAt: null, linkedExpenseId: '', dueDate: new Date(2026, 5, 15),
     }]]);
-    let seq = 0;
     billFindById.mockImplementation(async (id) => (store.has(id) ? { ...store.get(id)! } : null));
     // Yield before answering, like a real round trip, so concurrent callers can interleave.
+    // Trashed rows are hidden, as the soft-delete plugin does.
     billFindOne.mockImplementation(async (filter) => {
       await new Promise((r) => setTimeout(r, 0));
-      return [...store.values()].find((d) => matches(d, filter)) ?? null;
-    });
-    // Match + $set in one synchronous step: that atomicity is exactly what Mongo guarantees.
-    billFindOneAndUpdate.mockImplementation(async (filter, update) => {
-      const doc = [...store.values()].find((d) => matches(d, filter));
-      if (!doc) return null;
-      const before = { ...doc };
-      Object.assign(doc, update.$set);
-      return before;
+      return [...store.values()].find((d) => d.deletedAt == null && matches(d, filter)) ?? null;
     });
     billFindByIdAndUpdate.mockImplementation(async (id, update) => { Object.assign(store.get(id)!, update); return {}; });
-    billCreate.mockImplementation(async (doc) => { const _id = `spawn${++seq}`; store.set(_id, { ...doc, _id }); return { _id }; });
+    // The unique _id index: a second insert with the same id fails whether or not the holder is trashed.
+    billCreate.mockImplementation(async (doc) => {
+      await new Promise((r) => setTimeout(r, 0));
+      if (store.has(doc._id as string)) throw Object.assign(new Error('E11000 duplicate key'), { code: 11000 });
+      store.set(doc._id as string, { ...doc });
+      return { _id: doc._id };
+    });
+    billReplaceOne.mockImplementation(async (filter, doc) => {
+      const hit = [...store.values()].find((d) => matches(d, filter));
+      if (!hit) return { modifiedCount: 0 };
+      store.set(hit._id, { ...doc });
+      return { modifiedCount: 1 };
+    });
   });
 
   it('paying again after Undo does not create a second next instance', async () => {
     await markBillPaid('b1');
     await markBillUnpaid('b1');
     await markBillPaid('b1');
-    const july = [...store.values()].filter((d) => d._id !== 'b1');
-    expect(july).toHaveLength(1);
-    expect(localYmd(july[0].dueDate)).toBe('2026-07-15');
+    expect(successors()).toHaveLength(1);
+    expect(localYmd(successors()[0].dueDate)).toBe('2026-07-15');
+    expect(successors()[0].recurrenceParentId).toBe('b1');
   });
 
   it('recognises a successor spawned before the parent link existed (legacy row)', async () => {
@@ -418,30 +422,36 @@ describe('recurring spawn survives Undo (#33)', () => {
 
   it('two payments landing at the same moment create only one next instance', async () => {
     await Promise.all([markBillPaid('b1'), markBillPaid('b1')]);
-    const july = [...store.values()].filter((d) => d._id !== 'b1');
-    expect(july).toHaveLength(1);
-    // The claim is released afterwards, so a later Undo + pay is not locked out.
-    expect(store.get('b1')!.recurrenceSpawnClaimAt).toBeNull();
+    expect(successors()).toHaveLength(1);
   });
 
-  it('takes over a claim left stale by a crashed request', async () => {
-    store.get('b1')!.recurrenceSpawnClaimAt = new Date(Date.now() - 5 * 60_000);
+  it('a payment whose paidAt write fails can be retried without losing or duplicating the successor', async () => {
+    // The spawn runs first, so the failed attempt leaves the bill UNPAID (retryable) rather than
+    // paid with no successor and a wasPaid guard that would never let it spawn again.
+    billFindByIdAndUpdate.mockRejectedValueOnce(new Error('connection reset'));
+    await expect(markBillPaid('b1')).rejects.toThrow('connection reset');
+    expect(store.get('b1')!.paidAt).toBeNull();
     await markBillPaid('b1');
-    expect(billCreate).toHaveBeenCalledTimes(1);
+    expect(store.get('b1')!.paidAt).toBeInstanceOf(Date);
+    expect(successors()).toHaveLength(1);
   });
 
-  it('does not spawn while another request holds a fresh claim', async () => {
-    store.get('b1')!.recurrenceSpawnClaimAt = new Date();
-    await markBillPaid('b1');
-    expect(billCreate).not.toHaveBeenCalled();
+  it('a failed spawn does not mark the bill paid', async () => {
+    billCreate.mockRejectedValueOnce(new Error('write concern timeout'));
+    await expect(markBillPaid('b1')).rejects.toThrow('write concern timeout');
+    expect(store.get('b1')!.paidAt).toBeNull();
   });
 
-  it('still spawns when the earlier successor was trashed (soft-deleted rows are invisible)', async () => {
+  it('still spawns when the earlier successor was trashed, replacing it rather than adding a second row', async () => {
     await markBillPaid('b1');
-    store.delete('spawn1'); // what the soft-delete plugin's hidden `deletedAt` filter amounts to
+    const [july] = successors();
+    july.deletedAt = new Date();
+    july.amount = 999; // edited before trashing: the respawn is a fresh projection, not a restore
     await markBillUnpaid('b1');
     await markBillPaid('b1');
-    expect(billCreate).toHaveBeenCalledTimes(2);
+    expect(successors()).toHaveLength(1);
+    expect(successors()[0].deletedAt).toBeNull();
+    expect(successors()[0].amount).toBe(100);
   });
 });
 

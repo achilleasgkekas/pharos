@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { nextBillDue } from '@/lib/bill';
 
 // Deliberately structural rather than `Model<BillDoc>` from '@/models/Bill': this helper never
@@ -6,13 +7,11 @@ import { nextBillDue } from '@/lib/bill';
 type BillStore = {
   findOne(filter: Record<string, unknown>): { lean(): PromiseLike<unknown> };
   create(doc: Record<string, unknown>): Promise<unknown>;
-  findOneAndUpdate(filter: Record<string, unknown>, update: Record<string, unknown>): PromiseLike<unknown>;
+  replaceOne(
+    filter: Record<string, unknown>,
+    doc: Record<string, unknown>,
+  ): { setOptions(opts: Record<string, unknown>): PromiseLike<{ modifiedCount?: number }> };
 };
-
-// How long a spawn claim holds before another request may take it over. A claim is released in
-// `finally`, so this only matters when a process dies mid-spawn; it must comfortably outlast one
-// findOne + create round trip, and be short enough that a crashed claim never blocks the user.
-const SPAWN_CLAIM_MS = 60_000;
 
 type SpawnSource = {
   _id: unknown;
@@ -29,34 +28,45 @@ type SpawnSource = {
 };
 
 /**
+ * The one _id a bill's successor may ever have: 24 hex chars derived from the parent's _id.
+ * Two ids per bill are impossible by construction, so Mongo's always-present unique `_id`
+ * index is what enforces "at most one successor", not a lookup we could race past.
+ */
+export function successorBillId(parentId: unknown): string {
+  return createHash('sha256').update(`bill-successor:${String(parentId)}`).digest('hex').slice(0, 24);
+}
+
+const isDuplicateKey = (err: unknown): boolean => (err as { code?: number } | null)?.code === 11000;
+
+/**
  * #33 — roll a recurring bill forward to its next pending instance, at most ONCE per bill.
  *
  * Both callers (the web `markBillPaid` action and PATCH /api/v1/bills/:id) used to guard the
  * spawn with "was this bill unpaid before?" alone. Undo only clears paidAt, so "pay → Undo →
  * pay" looked like a first payment twice and left the user with two copies of next month's
- * bill to pay. The successor now records the bill that spawned it (`recurrenceParentId`),
- * and a live successor blocks another spawn.
+ * bill to pay.
+ *
+ * Why a deterministic _id rather than a lookup, a claim or a unique index on a link field: a
+ * lookup then create races (double click, web + API); a claim on the parent needs a lease, and
+ * an orphaned or overrun lease either skips the spawn for good or lets two through (both were
+ * found in review of the claim version). The `_id` index needs no lease, covers every process
+ * and survives crashes: a second create simply fails with a duplicate key.
+ *
+ * Callers must spawn BEFORE persisting paidAt. The spawn is idempotent, so if the payment write
+ * then fails the retry finds the successor already there; the reverse order could leave a paid
+ * bill whose "wasPaid" guard blocks the spawn forever.
  *
  * Why skip rather than have Undo delete the successor: the user may already have edited or
- * paid next month's row, and an Undo that silently removes it would lose that work. A skipped
- * spawn loses nothing, since the row it would have created is already there.
+ * paid next month's row, and an Undo that silently removes it would lose that work.
  *
- * Successors spawned before this link existed have no `recurrenceParentId`, so the lookup also
- * accepts an unlinked row of the same series (title + cycle) on the exact next due date. The
- * limit of that fallback: two separately entered bills with identical title, cycle and due date
- * would share one successor. That is a duplicate the user entered, not one we create.
+ * A trashed successor still owns its _id, so re-paying after trashing next month's row
+ * replaces the trashed document with a fresh pending one (atomically, only while it is still
+ * trashed). That keeps the pre-#33 behaviour of "delete next month, pay again, get it back".
  *
- * Trashed successors are invisible to `findOne` (softDeletePlugin), so deleting next month's
- * row and paying again spawns a fresh one, as it should.
- *
- * Concurrency: the lookup and the create are two round trips, so two payments arriving together
- * (double click, web + API) could both see "no successor". The check-then-create therefore runs
- * under a claim taken atomically on the PARENT bill (`recurrenceSpawnClaimAt`, one conditional
- * findOneAndUpdate). The loser of that race reports "not spawned", which is true: the winner is
- * creating the row. Why a claim on the parent rather than a unique index on
- * `recurrenceParentId`: the index would also have to exempt trashed successors (so a re-pay can
- * respawn) and cannot see legacy unlinked successors at all, while the claim serialises the
- * whole decision including both of those lookups.
+ * Successors spawned before #33 have random ids, so an unlinked row of the same series (title
+ * + cycle) on the exact next due date also counts. The limit of that fallback: two separately
+ * entered bills with identical title, cycle and due date would share one successor. That is a
+ * duplicate the user entered, not one we create, and such legacy rows never race with new ones.
  *
  * Returns whether a new instance was created.
  */
@@ -65,40 +75,14 @@ export async function spawnNextBillOnce(Bill: BillStore, bill: SpawnSource): Pro
   const parentId = String(bill._id);
   const dueDate = nextBillDue(bill.dueDate, bill.cycle);
 
-  const claimedAt = new Date();
-  const claimed = await Bill.findOneAndUpdate(
-    {
-      _id: bill._id,
-      $or: [
-        { recurrenceSpawnClaimAt: null },
-        { recurrenceSpawnClaimAt: { $lt: new Date(claimedAt.getTime() - SPAWN_CLAIM_MS) } },
-      ],
-    },
-    { $set: { recurrenceSpawnClaimAt: claimedAt } },
-  );
-  if (!claimed) return false;
-
-  try {
-    return await spawnUnderClaim(Bill, bill, parentId, dueDate);
-  } finally {
-    // Release only OUR claim: if it went stale and another request took over, leave theirs.
-    await Bill.findOneAndUpdate(
-      { _id: bill._id, recurrenceSpawnClaimAt: claimedAt },
-      { $set: { recurrenceSpawnClaimAt: null } },
-    );
-  }
-}
-
-async function spawnUnderClaim(Bill: BillStore, bill: SpawnSource, parentId: string, dueDate: Date): Promise<boolean> {
-  const existing = await Bill.findOne({
-    $or: [
-      { recurrenceParentId: parentId },
-      { recurrenceParentId: { $in: ['', null] }, title: bill.title, cycle: bill.cycle, dueDate },
-    ],
+  const legacy = await Bill.findOne({
+    recurrenceParentId: { $in: ['', null] }, title: bill.title, cycle: bill.cycle, dueDate,
   }).lean();
-  if (existing) return false;
+  if (legacy) return false;
 
-  await Bill.create({
+  const _id = successorBillId(parentId);
+  const doc = {
+    _id,
     title: bill.title,
     vendor: bill.vendor,
     amount: bill.amount,
@@ -117,6 +101,16 @@ async function spawnUnderClaim(Bill: BillStore, bill: SpawnSource, parentId: str
     notes: bill.notes,
     archived: false,
     recurrenceParentId: parentId,
-  });
-  return true;
+    deletedAt: null,
+  };
+
+  try {
+    await Bill.create(doc);
+    return true;
+  } catch (err) {
+    if (!isDuplicateKey(err)) throw err;
+  }
+  // The id is taken: either a live successor (done, nothing to create) or a trashed one.
+  const res = await Bill.replaceOne({ _id, deletedAt: { $ne: null } }, doc).setOptions({ withDeleted: true });
+  return (res.modifiedCount ?? 0) > 0;
 }
