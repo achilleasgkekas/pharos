@@ -1697,4 +1697,8 @@ export const de: Partial<Dict> = {
   'reports.onTrack': 'im Plan',
   'reports.overPace': 'über dem Tempo',
   'it.allLocations': 'Alle Orte',
+  'nav.utilities': 'Versorgung',
+  'util.title': 'Versorgung', 'util.subtitle': 'Zählerstände und den Verbrauch hinter Rechnungen verfolgen.',
+  'util.add': 'Zählerstand hinzufügen', 'util.trend': 'Zählerverlauf', 'util.needTwo': 'Für Verlauf und Verbrauch mindestens zwei Zählerstände hinzufügen.', 'util.empty': 'Noch keine Zählerstände.',
+  'util.meter': 'Zähler', 'util.meterHint': 'Hauptstromzähler', 'util.type': 'Versorgungsart', 'util.typeHint': 'Strom, Wasser, Gas…', 'util.unit': 'Einheit', 'util.date': 'Ablesedatum', 'util.reading': 'Zählerstand', 'util.consumption': 'Verbrauch', 'util.period': 'Zeitraumverbrauch', 'util.space': 'Ort (optional)', 'util.notes': 'Notizen',
 };

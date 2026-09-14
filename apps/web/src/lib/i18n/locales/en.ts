@@ -11,6 +11,7 @@ export const en = {
   'nav.receipts': 'Receipts',
   'nav.expenses': 'Expenses',
   'nav.bills': 'Bills',
+  'nav.utilities': 'Utilities',
   'nav.income': 'Income',
   'nav.statements': 'Statements',
   'nav.subscriptions': 'Subscriptions',
@@ -81,6 +82,25 @@ export const en = {
   'common.category': 'Category',
   'common.sort': 'Sort',
   'common.resetFilters': 'reset filters',
+
+  // ── Utility meter readings (P49) ────────────────────────────────────────
+  'util.title': 'Utilities',
+  'util.subtitle': 'Track cumulative meter readings and the consumption behind each bill.',
+  'util.add': 'Add reading',
+  'util.trend': 'Reading trend',
+  'util.needTwo': 'Add at least two readings to see a trend and period consumption.',
+  'util.empty': 'No meter readings yet.',
+  'util.meter': 'Meter',
+  'util.meterHint': 'Main electricity meter',
+  'util.type': 'Utility type',
+  'util.typeHint': 'Electricity, water, gas…',
+  'util.unit': 'Unit',
+  'util.date': 'Reading date',
+  'util.reading': 'Reading',
+  'util.consumption': 'Consumption',
+  'util.period': 'Period consumption',
+  'util.space': 'Space (optional)',
+  'util.notes': 'Notes',
 
   // ── Home page ────────────────────────────────────────────────────────────
   'home.heroA': 'One light over',

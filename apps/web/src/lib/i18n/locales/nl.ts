@@ -1697,4 +1697,8 @@ export const nl: Partial<Dict> = {
   'reports.onTrack': 'op schema',
   'reports.overPace': 'te snel',
   'it.allLocations': 'Alle locaties',
+  'nav.utilities': 'Nutsvoorzieningen',
+  'util.title': 'Nutsvoorzieningen', 'util.subtitle': 'Volg cumulatieve meterstanden en het verbruik achter elke rekening.',
+  'util.add': 'Meterstand toevoegen', 'util.trend': 'Meterverloop', 'util.needTwo': 'Voeg minstens twee standen toe voor verloop en verbruik.', 'util.empty': 'Nog geen meterstanden.',
+  'util.meter': 'Meter', 'util.meterHint': 'Hoofdelektriciteitsmeter', 'util.type': 'Type voorziening', 'util.typeHint': 'Elektriciteit, water, gas…', 'util.unit': 'Eenheid', 'util.date': 'Opnamedatum', 'util.reading': 'Meterstand', 'util.consumption': 'Verbruik', 'util.period': 'Periodeverbruik', 'util.space': 'Ruimte (optioneel)', 'util.notes': 'Notities',
 };

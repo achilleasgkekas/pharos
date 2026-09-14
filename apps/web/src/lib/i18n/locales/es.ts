@@ -1697,4 +1697,8 @@ export const es: Partial<Dict> = {
   'reports.onTrack': 'en objetivo',
   'reports.overPace': 'sobre ritmo',
   'it.allLocations': 'Todas las ubicaciones',
+  'nav.utilities': 'Suministros',
+  'util.title': 'Suministros', 'util.subtitle': 'Registra lecturas acumuladas y el consumo detrás de cada factura.',
+  'util.add': 'Añadir lectura', 'util.trend': 'Tendencia de lecturas', 'util.needTwo': 'Añade al menos dos lecturas para ver la tendencia y el consumo.', 'util.empty': 'Aún no hay lecturas.',
+  'util.meter': 'Contador', 'util.meterHint': 'Contador eléctrico principal', 'util.type': 'Tipo de suministro', 'util.typeHint': 'Electricidad, agua, gas…', 'util.unit': 'Unidad', 'util.date': 'Fecha de lectura', 'util.reading': 'Lectura', 'util.consumption': 'Consumo', 'util.period': 'Consumo del periodo', 'util.space': 'Espacio (opcional)', 'util.notes': 'Notas',
 };
