@@ -249,9 +249,9 @@ export function SubscriptionsClient({
               {t('v.activeCount', { n: active.length })}
             </span>
           </h1>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
             <div
-              className="flex gap-4 text-xs text-[color:var(--color-text-dim)]"
+              className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-[color:var(--color-text-dim)]"
               style={{ fontFamily: 'var(--font-mono)' }}
             >
               <span>
