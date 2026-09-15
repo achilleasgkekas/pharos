@@ -652,6 +652,9 @@ function toForm(e: SerializedExpense, base: string): FormState {
 function FormFields({ form, set, cards, giftCards, vendors, categories, spaces, fx }: { form: FormState; set: (p: Partial<FormState>) => void; cards: SerializedCard[]; giftCards: GiftCardOption[]; vendors: string[]; categories: string[]; spaces: string[]; fx: FxCtx }) {
   const t = useT();
   const foreign = fx.enabled && isForeignCurrency(form.currency, fx.base);
+  const printedAmount = Number(form.amount) || 0;
+  const rate = Number(form.fxRate) || 0;
+  const baseAmount = foreign && rate > 0 ? convertToBase(printedAmount, rate) : printedAmount;
   // The base code always appears first, even if it isn't one of the 13 built-ins.
   const codes = [...new Set([normalizeCurrency(fx.base) || 'EUR', ...CURRENCIES.map((c) => c.code)])];
   return (
@@ -723,7 +726,7 @@ function FormFields({ form, set, cards, giftCards, vendors, categories, spaces, 
         </div>
       )}
       {form.kind !== 'income' && (
-        <SplitEditor split={form.split} amount={Number(form.amount) || 0} onChange={(split) => set({ split })} />
+        <SplitEditor split={form.split} amount={baseAmount} baseCurrency={fx.base} onChange={(split) => set({ split })} />
       )}
       {form.kind !== 'income' && (
         <PaymentSplitEditor splits={form.paymentSplits} amount={Number(form.amount) || 0} giftCards={giftCards} onChange={(paymentSplits) => set({ paymentSplits })} />
@@ -785,7 +788,7 @@ function FxFields({ form, set, base }: { form: FormState; set: (p: Partial<FormS
 /** Expense splitting (P35): list the people who owe you a share of this expense.
  *  You paid the total; each row is another person and what they owe. "Split equally"
  *  divides the amount among the named people (optionally counting yourself). */
-function SplitEditor({ split, amount, onChange }: { split: SplitEntry[]; amount: number; onChange: (s: SplitEntry[]) => void }) {
+function SplitEditor({ split, amount, baseCurrency, onChange }: { split: SplitEntry[]; amount: number; baseCurrency?: string; onChange: (s: SplitEntry[]) => void }) {
   const t = useT();
   const money = useMoney();
   const [includeSelf, setIncludeSelf] = useState(true);
@@ -808,7 +811,7 @@ function SplitEditor({ split, amount, onChange }: { split: SplitEntry[]; amount:
   return (
     <div className="rounded-lg border border-[color:var(--color-border)] p-3">
       <div className="flex items-center justify-between mb-2">
-        <span className="text-xs font-medium flex items-center gap-1.5"><SplitIcon size={13} className="text-[color:var(--color-cyan)]" /> {t('ex.splitTitle')}</span>
+        <span className="text-xs font-medium flex items-center gap-1.5"><SplitIcon size={13} className="text-[color:var(--color-cyan)]" /> {t('ex.splitTitle')}{baseCurrency ? ` (${currencySymbol(baseCurrency).trim()})` : ''}</span>
         {split.length > 0 && (
           <span className="text-[10px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
             {t('ex.splitOwedYou', { amt: money(totals.owed) })}{totals.settled > 0 ? ` · ${t('ex.splitSettled', { amt: money(totals.settled) })}` : ''}
