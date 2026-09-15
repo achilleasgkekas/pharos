@@ -77,6 +77,19 @@ export async function updateBill(id: string, formData: FormData): Promise<{ ok: 
     // The form always shows the PRINTED amount (see BillsClient), so re-saving an unchanged
     // foreign bill re-resolves to the same stored figure instead of converting it twice.
     await Bill.findByIdAndUpdate(id, { ...raw, ...(await resolveBillFx(raw)), dueDate: due });
+
+    // #34: status is derived from paidAt alone, so lowering the total below what the P61
+    // instalments already cover would show "remaining €0" on a bill still listed as open or
+    // overdue. Settle it exactly as logBillPayment does when the last instalment lands: via
+    // markBillPaid (recurring spawn + paidAt), no expense (each instalment booked its own),
+    // dated on the latest instalment, since that is when the money actually covered it.
+    // Deliberately one-way: RAISING the amount never reopens a paid bill, because a bill
+    // settled with "mark paid" on top of instalments looks identical here and must stay paid.
+    const after = await Bill.findById(id).lean();
+    if (after && !after.paidAt && billIsSettledByPayments(after.amount, after.payments)) {
+      const lastPaid = Math.max(...(after.payments ?? []).map((p) => new Date(p.date ?? 0).getTime() || 0));
+      await markBillPaid(id, { logExpense: false, paidDate: lastPaid > 0 ? new Date(lastPaid).toISOString() : '' });
+    }
     revalidatePath('/bills');
     return { ok: true };
   });

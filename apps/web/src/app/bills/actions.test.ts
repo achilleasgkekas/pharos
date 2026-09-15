@@ -194,6 +194,38 @@ describe('updateBill', () => {
     await updateBill('bill1', formData({ title: 'X', dueDate: '01/01/2027' }));
     expect(revalidatePathMock).toHaveBeenCalledWith('/bills');
   });
+
+  // #34: lowering the total below what the instalments already cover used to leave paidAt
+  // null, so the bill showed remaining €0 yet stayed Open/Overdue with "Pay the rest (€0.00)".
+  it('settles a part-paid bill when the edited amount is now covered by its instalments', async () => {
+    const payments = [{ amount: 50, date: new Date(2026, 6, 1) }, { amount: 30, date: new Date(2026, 6, 5) }];
+    billFindById
+      // updateBill's re-read after saving the new amount
+      .mockResolvedValueOnce({ _id: 'b1', title: 'ΔΕΗ', amount: 70, paidAt: null, payments })
+      // markBillPaid's own lookup
+      .mockResolvedValueOnce({ _id: 'b1', title: 'ΔΕΗ', amount: 70, paidAt: null, cycle: '', linkedExpenseId: '', payments });
+    const res = await updateBill('b1', formData({ title: 'ΔΕΗ', dueDate: '01/07/2026', amount: '70' }));
+    expect(res).toEqual({ ok: true });
+    const stamp = billFindByIdAndUpdate.mock.calls.find(([, u]) => 'paidAt' in u);
+    expect(stamp).toBeDefined();
+    // Settled on the day the last instalment was handed over, not on the day of the edit.
+    expect(localYmd(stamp![1].paidAt)).toBe('2026-07-05');
+    // Each instalment already logged its own expense (if asked), so settling books nothing.
+    expect(addExpenseMock).not.toHaveBeenCalled();
+  });
+
+  it('leaves a bill that still owes money unpaid after an amount edit', async () => {
+    billFindById.mockResolvedValueOnce({ _id: 'b1', title: 'ΔΕΗ', amount: 90, paidAt: null, payments: [{ amount: 80, date: new Date() }] });
+    await updateBill('b1', formData({ title: 'ΔΕΗ', dueDate: '01/07/2026', amount: '90' }));
+    expect(billFindByIdAndUpdate.mock.calls.some(([, u]) => 'paidAt' in u)).toBe(false);
+  });
+
+  it('does not re-settle an already paid bill (no second recurring spawn)', async () => {
+    billFindById.mockResolvedValueOnce({ _id: 'b1', title: 'ΔΕΗ', amount: 70, paidAt: new Date(), cycle: 'monthly', payments: [{ amount: 80, date: new Date() }] });
+    await updateBill('b1', formData({ title: 'ΔΕΗ', dueDate: '01/07/2026', amount: '70' }));
+    expect(billCreate).not.toHaveBeenCalled();
+    expect(billFindByIdAndUpdate.mock.calls.some(([, u]) => 'paidAt' in u)).toBe(false);
+  });
 });
 
 describe('setBillArchived', () => {
