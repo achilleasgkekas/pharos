@@ -131,6 +131,6 @@ export const config = {
   // middleware answers a correctly-signed cron request with a bare 401 before the handler ever
   // runs, which looks exactly like a wrong token.
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|icon.svg|manifest.webmanifest|sw.js|api/auth|api/mcp|api/v1|api/cron|robots.txt).*)',
+    '/((?!_next/static|_next/image|favicon.ico|icon.svg|pharos-icon-(?:32|192|512)\\.png$|pharos-apple-touch-icon\\.png$|manifest.webmanifest|sw.js|api/auth|api/mcp|api/v1|api/cron|robots.txt).*)',
   ],
 };
