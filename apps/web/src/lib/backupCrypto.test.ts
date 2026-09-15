@@ -39,6 +39,12 @@ describe('decrypt failures are clear, never silent', () => {
     expect(() => decryptBackup(JSON.stringify(o), PASS)).toThrow(/wrong passphrase|corrupt/i);
   });
 
+  it('rejects a non-standard GCM authentication tag', () => {
+    const o = JSON.parse(encryptBackup(PLAIN, PASS));
+    o.tag = Buffer.from(o.tag, 'base64').subarray(0, 12).toString('base64');
+    expect(() => decryptBackup(JSON.stringify(o), PASS)).toThrow(/not a valid encrypted backup/i);
+  });
+
   it('throws on a non-envelope file', () => {
     expect(() => decryptBackup('{"app":"homepage"}', PASS)).toThrow(/not a valid encrypted backup/i);
     expect(() => decryptBackup('not json', PASS)).toThrow(/not a valid encrypted backup/i);
