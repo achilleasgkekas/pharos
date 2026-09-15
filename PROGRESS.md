@@ -13583,3 +13583,26 @@ https://github.com/achilleasgkekas/pharos/pull/66, commit `2ba0a34b`. Το Codex
 **Ανοιχτά PR μου**: #66 (περιμένει νέο review).
 
 **Επόμενο task**: issue #34 (p1, λογαριασμός με μηδενικό υπόλοιπο φαίνεται απλήρωτος μετά από edit). Αν το #66 γυρίσει ξανά, να κριθεί αν πάει σε needs-human.
+
+## 2026-09-15 07:45
+
+**Prod health**: OK. `ph-aros.com` 200 με περιεχόμενο landing, `app.ph-aros.com/account/login` 200,
+`POST /api/cron/saas/trials-sweep` χωρίς token 401 JSON.
+
+**Triage**: τα #91 και #92 (codex-found, receipts merge: διαγραφή αρχείου του μοναδικού scan, και διαγραφή αρχείων πριν το
+`deleteMany`) επαληθεύτηκαν ότι ο κώδικας υπάρχει στο main (`receipts/actions.ts` ~733-772). Πήραν `agent-ready`,
+`self-hosted`, `saas`, βγήκε το `needs-triage`. Το lane το βάζει ο dispatcher. Το #87 περιμένει ακόμα απάντηση, το #28 μένει `blocked`.
+Το #66 είναι πλέον `needs-human`, δεν το αγγίζω.
+
+**Η μία δουλειά**: issue #34 (p1). Πρώτα failing test στο `updateBill` (απέτυχε όπως λέει το issue: κανένα paidAt),
+μετά fix: μετά την αποθήκευση ξαναδιαβάζει τον λογαριασμό και, αν οι δόσεις καλύπτουν το νέο ποσό, τον κλείνει μέσω
+`markBillPaid` (χωρίς expense, με ημερομηνία της τελευταίας δόσης). Επίτηδες μονόδρομο: αύξηση ποσού δεν ξανανοίγει πληρωμένο.
+**PR #93** https://github.com/achilleasgkekas/pharos/pull/93. **455 αρχεία, 7163 passed, 4 skipped**.
+
+**Προσοχή**: το `tsc` τοπικά βγάζει λάθη μόνο για `@sentry/nextjs`, που λείπει από το κοινό `apps/web/node_modules`
+(μπήκε με το #65). Χρειάζεται `npm ci` στο main checkout. Δεν το έτρεξα για να μη σπάσει άλλη ρουτίνα που τρέχει.
+
+**Unshipped**: 12 commits στο `origin/main` μετά το `523b1ab` (τελευταίο γνωστό source του server, το image δεν ελέγχθηκε).
+**Ανοιχτά PR μου**: #93 (χωρίς review), #66 (`needs-human`).
+
+**Επόμενο task**: issue #5 ή #3 (p2, ημερομηνίες/locale) αν δεν έχουν πάρει lane:claude τα #91/#92.
