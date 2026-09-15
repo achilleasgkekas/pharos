@@ -1,16 +1,15 @@
 'use client';
-import { cur } from '@/lib/money';
 import { useMemo, useRef, useState } from 'react';
 import { FileSpreadsheet, Loader2, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/components/ui/cn';
-import { useT } from '@/components/LocaleProvider';
+import { useT, useMoney } from '@/components/LocaleProvider';
 import {
   parseCsv, guessMapping, looksLikeHeader, mapCsvRow,
   type CsvField, type CsvMapping, type CsvParsedRow,
 } from '@/lib/csvImport';
-import { isForeignCurrency, normalizeCurrency, convertToBase, formatMoney } from '@/lib/fx';
+import { isForeignCurrency, normalizeCurrency, convertToBase } from '@/lib/fx';
 import { importExpensesCsv } from './actions';
 
 const labelCls = 'text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider mb-1.5';
@@ -36,6 +35,7 @@ type Props = {
 
 export function CsvImportModal({ kind, fx, onClose, onImported }: Props) {
   const t = useT();
+  const money = useMoney();
   const fileRef = useRef<HTMLInputElement>(null);
   const [rows, setRows] = useState<string[][] | null>(null);
   const [fileName, setFileName] = useState('');
@@ -264,12 +264,12 @@ export function CsvImportModal({ kind, fx, onClose, onImported }: Props) {
                           <td className={cn('px-3 py-1.5 text-right whitespace-nowrap', r.amount < 0 ? 'text-[color:var(--color-red)]' : 'text-[color:var(--color-accent)]')} style={{ fontFamily: 'var(--font-mono)' }}>
                             {r.amount < 0 ? '-' : ''}
                             {isForeignCurrency(r.currency, fx.base)
-                              ? formatMoney(Math.abs(r.amount), normalizeCurrency(r.currency))
-                              : `${cur()}${Math.abs(r.amount).toFixed(2)}`}
+                              ? money(Math.abs(r.amount), normalizeCurrency(r.currency))
+                              : `${money(Math.abs(r.amount))}`}
                             {(() => {
                               const b = rowBase(r);
                               return b === null ? null : (
-                                <span className="ml-1 text-[color:var(--color-text-faint)]">→ {formatMoney(b, fx.base)}</span>
+                                <span className="ml-1 text-[color:var(--color-text-faint)]">→ {money(b, fx.base)}</span>
                               );
                             })()}
                           </td>

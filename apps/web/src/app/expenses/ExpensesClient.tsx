@@ -1,6 +1,6 @@
 'use client';
 import { cur, currencySymbol, CURRENCIES } from '@/lib/money';
-import { isForeignCurrency, normalizeCurrency, convertToBase, deriveFxRate, formatMoney } from '@/lib/fx';
+import { isForeignCurrency, normalizeCurrency, convertToBase, deriveFxRate } from '@/lib/fx';
 import { FxBadge } from '@/components/FxBadge';
 import { FxRateButton } from '@/components/FxRateButton';
 import { useState, useTransition, useRef, useMemo } from 'react';
@@ -27,7 +27,7 @@ import { TAX_CATEGORY_PRESETS } from '@/lib/taxonomies';
 import { CsvImportModal } from './CsvImportModal';
 import { ExpenseDuplicatesModal } from './ExpenseDuplicatesModal';
 import { OpenInOneDriveButton } from '@/components/OpenInOneDriveButton';
-import { useT } from '@/components/LocaleProvider';
+import { useT, useMoney } from '@/components/LocaleProvider';
 import type { TKey } from '@/lib/i18n';
 
 const CYCLES = RECURRING_CYCLES;
@@ -37,7 +37,6 @@ const NO_SPACE = '\x00none';
 function fileUrl(p: string) {
   return `/api/files/${p.split('/').map(encodeURIComponent).join('/')}`;
 }
-const money = (n: number) => `${cur()}${(n || 0).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const fmtDate = (s: string) => {
   const d = new Date(s);
   return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-GB');
@@ -63,6 +62,7 @@ export function ExpensesClient({ kind, expenses, cards, giftCards, vendors, olla
   const router = useRouter();
   const confirm = useConfirm();
   const t = useT();
+  const money = useMoney();
   const isIncome = kind === 'income';
   const label = isIncome ? t('nav.income') : t('nav.expenses');
 
@@ -427,6 +427,7 @@ function BalancesModal({ balances, onClose, onChanged, confirm }: {
   balances: ReturnType<typeof computeBalances>; onClose: () => void; onChanged: () => void; confirm: ReturnType<typeof useConfirm>;
 }) {
   const t = useT();
+  const money = useMoney();
   const [pending, startTransition] = useTransition();
   const owing = balances.filter((b) => b.owed > 0.009);
   const settledUp = balances.filter((b) => b.owed <= 0.009);
@@ -515,6 +516,7 @@ function SelectCheckbox({ selectMode, selected, onToggleSelect }: SelectProps) {
 
 function ExpenseRow({ expense, isIncome, series, fx, onClick, selectMode, selected, onToggleSelect }: { expense: SerializedExpense; isIncome: boolean; series: number; fx: FxCtx; onClick: () => void } & SelectProps) {
   const t = useT();
+  const money = useMoney();
   const mainClick = selectMode ? onToggleSelect : onClick;
   return (
     <div className={cn('group flex items-center gap-3 bg-[color:var(--color-surface)] border rounded-xl px-3 py-2.5 transition-all', selected ? 'border-[color:var(--color-accent)] ring-1 ring-[color:var(--color-accent)]' : 'border-[color:var(--color-border)] hover:border-[color:var(--color-border-light)]')}>
@@ -543,6 +545,7 @@ function ExpenseRow({ expense, isIncome, series, fx, onClick, selectMode, select
 
 function ExpenseCard({ expense, isIncome, series, fx, onClick, selectMode, selected, onToggleSelect }: { expense: SerializedExpense; isIncome: boolean; series: number; fx: FxCtx; onClick: () => void } & SelectProps) {
   const t = useT();
+  const money = useMoney();
   const mainClick = selectMode ? onToggleSelect : onClick;
   return (
     <div className={cn('rounded-2xl border p-4 transition-colors', selected ? 'border-[color:var(--color-accent)] ring-1 ring-[color:var(--color-accent)]' : 'border-[color:var(--color-border)] hover:border-[color:var(--color-accent)]', 'bg-[color:var(--color-surface)]')}>
@@ -584,6 +587,7 @@ function ExpenseCard({ expense, isIncome, series, fx, onClick, selectMode, selec
 
 /** Cyan chip: this expense is split — shows what's still owed to you (or ✓ when settled). */
 function SplitBadge({ split }: { split?: SplitEntry[] }) {
+  const money = useMoney();
   if (!split || split.length === 0) return null;
   const { owed } = splitTotals(split);
   const settledUp = owed <= 0.009;
@@ -734,6 +738,7 @@ function FormFields({ form, set, cards, giftCards, vendors, categories, spaces, 
  *  deriveFxRate() back the rate out. The preview is the number that will be stored. */
 function FxFields({ form, set, base }: { form: FormState; set: (p: Partial<FormState>) => void; base: string }) {
   const t = useT();
+  const money = useMoney();
   const [charged, setCharged] = useState('');
   const printed = Number(form.amount) || 0;
   const rate = Number(form.fxRate) || 0;
@@ -768,7 +773,7 @@ function FxFields({ form, set, base }: { form: FormState; set: (p: Partial<FormS
       </Field>
       <p className="text-[11px] pb-2" style={{ fontFamily: 'var(--font-mono)' }}>
         {rate > 0 ? (
-          <span className="text-[color:var(--color-purple)]">= {formatMoney(convertToBase(printed, rate), base)}</span>
+          <span className="text-[color:var(--color-purple)]">= {money(convertToBase(printed, rate), base)}</span>
         ) : (
           <span className="text-[color:var(--color-gold)]">⚠ {t('ex.fxNoRate', { base })}</span>
         )}
@@ -782,6 +787,7 @@ function FxFields({ form, set, base }: { form: FormState; set: (p: Partial<FormS
  *  divides the amount among the named people (optionally counting yourself). */
 function SplitEditor({ split, amount, onChange }: { split: SplitEntry[]; amount: number; onChange: (s: SplitEntry[]) => void }) {
   const t = useT();
+  const money = useMoney();
   const [includeSelf, setIncludeSelf] = useState(true);
   const totals = splitTotals(split);
   const yourShare = Math.round((amount - split.reduce((s, e) => s + (e.share || 0), 0)) * 100) / 100;
@@ -854,6 +860,7 @@ function SplitEditor({ split, amount, onChange }: { split: SplitEntry[]; amount:
  */
 function PaymentSplitEditor({ splits, amount, giftCards, onChange }: { splits: PaymentSplitEntry[]; amount: number; giftCards: GiftCardOption[]; onChange: (s: PaymentSplitEntry[]) => void }) {
   const t = useT();
+  const money = useMoney();
   const allocated = paymentSplitTotal(splits);
   const rest = paymentSplitRemainder(amount, splits);
   const balanced = paymentSplitsBalance(amount, splits);

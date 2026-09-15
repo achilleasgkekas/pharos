@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { relTime } from './format';
+import { relTime, formatCurrency } from './format';
 import { makeT, resolveDict, type TFunc, type TKey } from '@/lib/i18n';
 
 // A fixed "now" so every relative-time bucket is deterministic. All test isos are
@@ -113,5 +113,28 @@ describe('relTime — end-to-end with the real English dictionary', () => {
     expect(relTime(ago(5 * 3600), en)).toBe('5h ago');
     expect(relTime(ago(86400), en)).toBe('yesterday');
     expect(relTime(ago(3 * 86400), en)).toBe('3d ago');
+  });
+});
+
+// Currency layout must follow the reader, including whitespace and symbol placement.
+describe('formatCurrency', () => {
+  it('renders Greek decimals, grouping and a trailing euro symbol', () => {
+    expect(formatCurrency(1234.5, 'EUR', 'el')).toBe('1.234,50\u00a0€');
+    expect(formatCurrency(-12.5, 'EUR', 'el')).toBe('-12,50\u00a0€');
+  });
+
+  it('keeps currency identity independent from locale', () => {
+    expect(formatCurrency(1234.5, 'USD', 'en')).toBe('$1,234.50');
+    expect(formatCurrency(1234.5, 'USD', 'el')).toBe('1.234,50\u00a0$');
+    expect(formatCurrency(0, 'EUR', 'el')).toBe('0,00\u00a0€');
+    expect(formatCurrency(NaN, 'EUR', 'el')).toBe('0,00\u00a0€');
+  });
+
+  it('supports every app locale without changing the amount', () => {
+    for (const locale of ['en', 'de', 'es', 'fr', 'it', 'nl', 'pt', 'el']) {
+      expect(formatCurrency(42.5, 'EUR', locale)).toBe(
+        new Intl.NumberFormat(locale, { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(42.5),
+      );
+    }
   });
 });

@@ -5,8 +5,7 @@ import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/components/ui/cn';
 import { useRouter } from 'next/navigation';
-import { cur } from '@/lib/money';
-import { useT } from '@/components/LocaleProvider';
+import { useT, useMoney } from '@/components/LocaleProvider';
 import { findDuplicateExpenses, mergeExpenses } from './actions';
 import type { ExpenseDupeGroup } from '@/lib/expenseDupes';
 
@@ -18,6 +17,7 @@ import type { ExpenseDupeGroup } from '@/lib/expenseDupes';
 export function ExpenseDuplicatesModal({ kind, onClose }: { kind: 'income' | 'expense'; onClose: () => void }) {
   const router = useRouter();
   const t = useT();
+  const money = useMoney();
   const [loading, setLoading] = useState(true);
   const [groups, setGroups] = useState<ExpenseDupeGroup[]>([]);
   const [keepBy, setKeepBy] = useState<Record<string, string>>({});
@@ -58,7 +58,6 @@ export function ExpenseDuplicatesModal({ kind, onClose }: { kind: 'income' | 'ex
 
   const pending = groups.filter((g) => !done[g.key]);
   const totalDupes = groups.reduce((s, g) => s + (g.entries.length - 1), 0);
-  const money = (n: number) => `${cur()}${n.toFixed(2)}`;
   const fmtDate = (s: string) => {
     const d = new Date(s);
     return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' });

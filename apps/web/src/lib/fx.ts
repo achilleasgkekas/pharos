@@ -18,7 +18,7 @@
 // Pure and client-safe (imported by the Expenses form for the live preview): no node
 // imports, no DB, no fetch. FX rates are entered by the user; an automatic rate feed is
 // a later phase.
-import { currencySymbol } from './money';
+import { formatCurrency } from './i18n/format';
 
 export type FxInput = {
   /** The number the user typed / the AI parsed. Printed-currency amount when foreign. */
@@ -301,13 +301,9 @@ export function resolveReceiptAmounts(input: ReceiptAmountsInput, base: string):
   };
 }
 
-/** `$88.00` — symbol + 2dp, for showing the printed amount next to the base one. */
-export function formatMoney(amount: number, code: string): string {
-  const n = Number(amount);
-  return `${currencySymbol(code)}${(Number.isFinite(n) ? n : 0).toLocaleString('en-GB', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
+/** Format a printed amount using its ISO currency and the reader's locale. */
+export function formatMoney(amount: number, code: string, locale = 'en'): string {
+  return formatCurrency(Number(amount), normalizeCurrency(code) || 'EUR', locale);
 }
 
 /**
@@ -317,13 +313,14 @@ export function formatMoney(amount: number, code: string): string {
  */
 export function fxBadgeLabel(
   e: { currency?: string | null; origAmount?: number | null; fxRate?: number | null },
-  base: string
+  base: string,
+  locale = 'en',
 ): string {
   if (!isForeignCurrency(e.currency, base)) return '';
   const orig = Number(e.origAmount) || 0;
   if (orig <= 0) return '';
-  const printed = formatMoney(orig, normalizeCurrency(e.currency));
+  const printed = formatMoney(orig, normalizeCurrency(e.currency), locale);
   const rate = Number(e.fxRate) || 0;
   // Trim trailing zeros so 0.920000 reads as 0.92 but 0.008512 keeps its precision.
-  return rate > 0 ? `${printed} @ ${String(Number(rate.toFixed(6)))}` : printed;
+  return rate > 0 ? `${printed} @ ${new Intl.NumberFormat(locale, { maximumFractionDigits: 6 }).format(rate)}` : printed;
 }

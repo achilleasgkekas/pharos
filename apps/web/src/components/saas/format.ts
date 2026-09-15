@@ -1,3 +1,4 @@
+import { formatCurrency } from '@/lib/i18n/format';
 // Display formatting helpers for the SaaS superadmin console. PURE + client-safe (no DB, no
 // next/*, no node builtins) so they can be unit-tested and used from either server or client
 // components. All defensive: non-finite / negative inputs render a sane zero rather than
@@ -34,21 +35,19 @@ export function formatBytes(bytes: unknown): string {
  * Non-finite or negative → 0. Rendered with the given ISO currency (default USD). Small
  * amounts keep more precision so sub-cent AI costs don't collapse to "$0.00".
  */
-export function formatCostMicros(micros: unknown, currency = 'USD'): string {
+export function formatCostMicros(micros: unknown, currency = 'USD', locale = 'en'): string {
   let v = Number(micros);
   if (!Number.isFinite(v) || v < 0) v = 0;
   const amount = v / 1_000_000;
   const fractionDigits = amount > 0 && amount < 1 ? 4 : 2;
   try {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency,
+    return formatCurrency(amount, currency, locale, {
       minimumFractionDigits: 2,
       maximumFractionDigits: fractionDigits,
-    }).format(amount);
+    });
   } catch {
     // Unknown currency code → fall back to a plain number so we never throw in render.
-    return amount.toFixed(2);
+    return new Intl.NumberFormat(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount);
   }
 }
 

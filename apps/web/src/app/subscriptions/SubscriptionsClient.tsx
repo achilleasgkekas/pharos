@@ -4,7 +4,7 @@ import { BILLING_CYCLES, monthlyEquivalent, isBillingCycle } from '@/lib/billing
 // The countdown lives with the roll-forward that keeps `nextRenewal` from going stale, so
 // the badge and the derived date can never disagree about the day a renewal stops being today.
 import { renewalDaysUntil } from '@/lib/subscriptionRenewal';
-import { isForeignCurrency, normalizeCurrency, convertToBase, deriveFxRate, formatMoney, toPrinted } from '@/lib/fx';
+import { isForeignCurrency, normalizeCurrency, convertToBase, deriveFxRate, toPrinted } from '@/lib/fx';
 import { FxBadge } from '@/components/FxBadge';
 import { FxRateButton } from '@/components/FxRateButton';
 import { useState, useTransition, useMemo } from 'react';
@@ -20,7 +20,7 @@ import { cn } from '@/components/ui/cn';
 import { CardSelect } from '@/components/CardSelect';
 import { useOpenParam } from '@/components/useOpenParam';
 import type { SerializedSubscription, SerializedCard } from '@/types';
-import { useT } from '@/components/LocaleProvider';
+import { useT, useMoney } from '@/components/LocaleProvider';
 import type { TKey } from '@/lib/i18n';
 import type { RecurringCandidate } from '@/lib/recurringDiscovery';
 import { equalSplit, splitTotals, type SplitEntry } from '@/lib/split';
@@ -69,7 +69,6 @@ function currencyCodes(base: string): string[] {
 }
 
 
-const money = (n: number) => `${cur()}${(n || 0).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 /** Multi-currency context (P9): the deployment's base currency code + whether the per-entry
  *  currency/FX controls are switched on at all. One object, so prop lists grow by one entry. */
@@ -103,6 +102,7 @@ export function SubscriptionsClient({
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const t = useT();
+  const money = useMoney();
   // Discovered untracked recurring charges (P7). Ephemeral hide list — "dismiss" is
   // per-session only (no persisted ignore list yet); "track" removes it via the
   // vendorKey now existing as a real Subscription on next page load too.
@@ -257,13 +257,13 @@ export function SubscriptionsClient({
               <span>
                 {t('sub.monthly')}{' '}
                 <span className="text-[color:var(--color-accent)] font-semibold">
-                  {cur()}{monthlyTotal.toFixed(2)}
+                  {money(monthlyTotal)}
                 </span>
               </span>
               <span>
                 {t('sub.yearly')}{' '}
                 <span className="text-[color:var(--color-gold)] font-semibold">
-                  {cur()}{yearlyTotal.toFixed(0)}
+                  {money(yearlyTotal)}
                 </span>
               </span>
             </div>
@@ -317,7 +317,7 @@ export function SubscriptionsClient({
                     )}
                     style={{ fontFamily: 'var(--font-mono)' }}
                   >
-                    {d === 0 ? 'today' : d === 1 ? 'tomorrow' : `in ${d} days`} · {cur()}{s.amount}
+                    {d === 0 ? 'today' : d === 1 ? 'tomorrow' : `in ${d} days`} · {money(s.amount)}
                   </span>
                 </button>
               );
@@ -343,7 +343,7 @@ export function SubscriptionsClient({
               >
                 <span className="text-sm font-semibold flex-1 min-w-[100px] truncate">{c.vendor || c.vendorKey}</span>
                 <span className="text-xs text-[color:var(--color-text-dim)]" style={{ fontFamily: 'var(--font-mono)' }}>
-                  ~{cur()}{c.avgAmount.toFixed(2)} · {t(`sub.${c.cycle}` as TKey)} · {t('sub.discoveredOccurrences', { n: c.occurrences })}
+                  ~{money(c.avgAmount)} · {t(`sub.${c.cycle}` as TKey)} · {t('sub.discoveredOccurrences', { n: c.occurrences })}
                 </span>
                 <div className="flex items-center gap-1.5 ml-auto">
                   <Button
@@ -421,6 +421,7 @@ export function SubscriptionsClient({
 /** Cyan chip: this subscription is split with household members — shows what's still
  *  owed to you (or ✓ when settled). Same idiom as Expenses' SplitBadge (P35/P73). */
 function SplitBadge({ split }: { split?: SplitEntry[] }) {
+  const money = useMoney();
   if (!split || split.length === 0) return null;
   const { owed } = splitTotals(split);
   const settledUp = owed <= 0.009;
@@ -444,6 +445,7 @@ function SplitBadge({ split }: { split?: SplitEntry[] }) {
 
 function SubCard({ sub, base, onEdit }: { sub: SerializedSubscription; base: string; onEdit: () => void }) {
   const t = useT();
+  const money = useMoney();
   const [pending, startTransition] = useTransition();
   const confirm = useConfirm();
   const meta = categoryMeta(sub.category);
@@ -486,7 +488,7 @@ function SubCard({ sub, base, onEdit }: { sub: SerializedSubscription; base: str
 
       <div className="flex items-baseline gap-1.5 mb-2">
         <span className="text-2xl font-bold text-[color:var(--color-accent)]" style={{ fontFamily: 'var(--font-display)' }}>
-          {cur()}{sub.amount}
+          {money(sub.amount)}
         </span>
         <span className="text-xs text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
           / {cycleLabel.toLowerCase()}
@@ -782,6 +784,7 @@ function SubFxFields({
   base: string;
 }) {
   const t = useT();
+  const money = useMoney();
   const [charged, setCharged] = useState('');
   const printed = Number(form.amount) || 0;
   const rate = Number(form.fxRate) || 0;
@@ -820,7 +823,7 @@ function SubFxFields({
       </Field>
       <p className="text-[11px] pb-2" style={{ fontFamily: 'var(--font-mono)' }}>
         {rate > 0 ? (
-          <span className="text-[color:var(--color-purple)]">= {formatMoney(convertToBase(printed, rate), base)}</span>
+          <span className="text-[color:var(--color-purple)]">= {money(convertToBase(printed, rate), base)}</span>
         ) : (
           <span className="text-[color:var(--color-gold)]">⚠ {t('ex.fxNoRate', { base })}</span>
         )}
@@ -836,6 +839,7 @@ function SubFxFields({
  *  shared because the two forms don't share a form-state shape. */
 function SplitEditor({ split, amount, onChange }: { split: SplitEntry[]; amount: number; onChange: (s: SplitEntry[]) => void }) {
   const t = useT();
+  const money = useMoney();
   const [includeSelf, setIncludeSelf] = useState(false);
   const totals = splitTotals(split);
   const yourShare = Math.round((amount - split.reduce((s, e) => s + (e.share || 0), 0)) * 100) / 100;
