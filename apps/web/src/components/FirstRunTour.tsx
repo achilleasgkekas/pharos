@@ -75,7 +75,7 @@ export function FirstRunTour() {
           type="button"
           onClick={close}
           aria-label={t('tour.skip')}
-          className="absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface-2)] transition-colors"
+          className="absolute top-2 right-2 w-11 h-11 min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface-2)] transition-colors"
         >
           <X size={16} />
         </button>
@@ -94,15 +94,19 @@ export function FirstRunTour() {
         </div>
 
         {/* Progress dots */}
-        <div className="flex items-center justify-center gap-1.5 pb-4">
+        <div className="flex items-center justify-center pb-2">
           {steps.map((_, n) => (
             <button
               key={n}
               type="button"
               aria-label={`${n + 1}`}
               onClick={() => setI(n)}
-              className={`h-1.5 rounded-full transition-all ${n === i ? 'w-5 bg-[color:var(--color-accent)]' : 'w-1.5 bg-[color:var(--color-border-light)] hover:bg-[color:var(--color-text-faint)]'}`}
-            />
+              className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center group"
+            >
+              <span
+                className={`h-1.5 rounded-full transition-all ${n === i ? 'w-5 bg-[color:var(--color-accent)]' : 'w-1.5 bg-[color:var(--color-border-light)] group-hover:bg-[color:var(--color-text-faint)]'}`}
+              />
+            </button>
           ))}
         </div>
 
@@ -111,14 +115,14 @@ export function FirstRunTour() {
           <button
             type="button"
             onClick={() => (i === 0 ? close() : setI((n) => n - 1))}
-            className="flex items-center gap-1.5 text-sm px-3 py-2 rounded-lg text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] transition-colors"
+            className="flex items-center gap-1.5 text-sm min-h-[44px] min-w-[44px] px-3 py-2 rounded-lg text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] transition-colors"
           >
             {i === 0 ? t('tour.skip') : (<><ArrowLeft size={15} /> {t('tour.back')}</>)}
           </button>
           <button
             type="button"
             onClick={() => (last ? close() : setI((n) => n + 1))}
-            className="flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-lg bg-[color:var(--color-accent)] text-[color:var(--color-bg)] hover:opacity-90 transition-opacity"
+            className="flex items-center gap-1.5 text-sm font-semibold min-h-[44px] min-w-[44px] px-4 py-2 rounded-lg bg-[color:var(--color-accent)] text-[color:var(--color-bg)] hover:opacity-90 transition-opacity"
           >
             {last ? t('tour.done') : (<>{t('tour.next')} <ArrowRight size={15} /></>)}
           </button>
