@@ -66,3 +66,7 @@ describe('formatWhen', () => {
     expect(formatWhen(123)).toBe('—');
   });
 });
+
+it('formats small AI costs in the active Greek locale', () => {
+  expect(formatCostMicros(1234, 'EUR', 'el')).toBe('0,0012\u00a0€');
+});

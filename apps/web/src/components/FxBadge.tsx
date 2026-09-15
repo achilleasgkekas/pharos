@@ -1,5 +1,6 @@
 'use client';
 import { fxBadgeLabel, needsFxRate, normalizeCurrency } from '@/lib/fx';
+import { useLocale } from '@/components/LocaleProvider';
 import { cn } from '@/components/ui/cn';
 
 /**
@@ -16,7 +17,8 @@ export function FxBadge({
   doc: { currency?: string | null; origAmount?: number | null; fxRate?: number | null };
   base: string;
 }) {
-  const label = fxBadgeLabel(doc, base);
+  const locale = useLocale();
+  const label = fxBadgeLabel(doc, base, locale);
   if (!label) return null;
   // Same rule the /reports "missing exchange rates" audit lists on, in one place.
   const known = !needsFxRate(doc, base);

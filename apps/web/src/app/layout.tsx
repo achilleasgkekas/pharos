@@ -149,7 +149,7 @@ export default async function RootLayout({
       </head>
       <body>
         <CurrencyInit symbol={symbol} />
-        <LocaleProvider locale={locale} dict={dict}>
+        <LocaleProvider locale={locale} dict={dict} currency={currency}>
         <Providers>
           {/* SiteNav renders only for signed-in users AND not on a chrome-less route (see
               ChromeGate). Keep `children` in a STABLE sibling position so flipping auth
