@@ -8,83 +8,41 @@
 // handlers only, never from middleware). Reuses the existing AUTH_SECRET — no new config.
 import { cookies } from 'next/headers';
 import { SignJWT, jwtVerify } from 'jose';
-import { ACCOUNT_COOKIE, verifyAccountToken, type AccountClaims } from './accountToken';
+import {
+  ACCOUNT_COOKIE,
+  ACCOUNT_MAX_AGE,
+  ACCOUNT_ABSOLUTE_MAX_AGE,
+  verifyAccountToken,
+  signAccountToken,
+  shouldRefreshAccount,
+  accountCookieDomain,
+  accountCookieOptions,
+  accountCookieDeleteOptions,
+  accountAuthConfigured,
+  type AccountClaims,
+} from './accountToken';
 
-// Distinct cookie name so an Account session and a per-tenant User session can coexist in
-// the same browser without clobbering each other.
-export { ACCOUNT_COOKIE, accountAuthConfigured } from './accountToken';
+export {
+  ACCOUNT_COOKIE,
+  ACCOUNT_MAX_AGE,
+  ACCOUNT_ABSOLUTE_MAX_AGE,
+  verifyAccountToken,
+  signAccountToken,
+  shouldRefreshAccount,
+  accountCookieDomain,
+  accountCookieOptions,
+  accountCookieDeleteOptions,
+  accountAuthConfigured,
+};
 export type { AccountClaims } from './accountToken';
-
-// Idle window for the SaaS account session (its own knob, independent of the self-hosted
-// SESSION_IDLE_HOURS). Clamped to a sane range; default 12h.
-const IDLE_HOURS = Math.min(8760, Math.max(0.25, Number(process.env.SAAS_SESSION_IDLE_HOURS) || 12));
-export const ACCOUNT_MAX_AGE = Math.round(IDLE_HOURS * 3600); // seconds
-
-function getSecret(): Uint8Array | null {
-  const s = process.env.AUTH_SECRET;
-  if (!s || s.length < 16) return null; // fail closed without a real secret
-  return new TextEncoder().encode(s);
-}
-
-/**
- * Optional cookie `Domain`, from `SAAS_COOKIE_DOMAIN` (e.g. `.ph-aros.com`).
- *
- * Why this exists: tenants live on subdomains (`acme.ph-aros.com`) and the feature pages
- * resolve their tenant from the HOST, but a cookie set without a Domain is host-only. A
- * session established while signing up on the apex would therefore not be sent to the
- * workspace subdomain, and the product pages would answer "not authenticated" to a user who
- * just logged in. Setting the parent domain once makes the session span every subdomain.
- *
- * Empty/unset (ALWAYS, for self-hosted) → no Domain attribute → today's exact behaviour.
- * A leading dot is optional; browsers treat `ph-aros.com` and `.ph-aros.com` identically.
- * PURE (env injectable for tests).
- */
-export function accountCookieDomain(env: Env = process.env): string | undefined {
-  const d = (env.SAAS_COOKIE_DOMAIN || '').trim().toLowerCase();
-  return d || undefined;
-}
-
-type Env = Record<string, string | undefined>;
-
-export function accountCookieOptions(env: Env = process.env) {
-  const domain = accountCookieDomain(env);
-  return {
-    httpOnly: true,
-    sameSite: 'lax' as const,
-    secure: env.AUTH_COOKIE_SECURE === 'true',
-    path: '/',
-    maxAge: ACCOUNT_MAX_AGE,
-    // Spread rather than `domain: undefined`, so the emitted cookie is byte-identical to the
-    // pre-SaaS one when unset.
-    ...(domain ? { domain } : {}),
-  };
-}
-
-/**
- * Attributes identifying a cookie for DELETION. A cookie set with a Domain can only be
- * cleared by an expiry carrying the SAME Domain: `cookies().delete(name)` alone would leave a
- * domain-scoped session alive in the browser, i.e. a logout that silently does nothing.
- */
-export function accountCookieDeleteOptions(name: string, env: Env = process.env) {
-  const domain = accountCookieDomain(env);
-  return { name, path: '/', ...(domain ? { domain } : {}) };
-}
-
-export async function signAccountSession(claims: AccountClaims): Promise<string> {
-  const secret = getSecret();
-  if (!secret) throw new Error('AUTH_SECRET is not set (min 16 chars)');
-  return await new SignJWT({ email: claims.email })
-    .setProtectedHeader({ alg: 'HS256' })
-    .setSubject(claims.sub)
-    .setIssuedAt()
-    .setExpirationTime(`${ACCOUNT_MAX_AGE}s`)
-    .sign(secret);
-}
 
 /** Verify an account token → claims, or null on any failure. Never throws.
  *  The implementation lives in the edge-safe ./accountToken so the middleware can run the
  *  SAME check without dragging next/headers onto the Edge runtime. */
 export const verifyAccountSession = verifyAccountToken;
+
+/** Sign an account session token. Edge-safe implementation in accountToken.ts. */
+export const signAccountSession = signAccountToken;
 
 /** Read + verify the account cookie (token-only, no DB hit). Null when logged out. */
 export async function getCurrentAccount(): Promise<AccountClaims | null> {
@@ -119,6 +77,14 @@ export const MFA_PENDING_COOKIE = 'pharos_account_mfa_pending';
 // independent of ACCOUNT_MAX_AGE.
 const MFA_PENDING_MINUTES = Math.min(60, Math.max(1, Number(process.env.SAAS_MFA_PENDING_MINUTES) || 5));
 export const MFA_PENDING_MAX_AGE = Math.round(MFA_PENDING_MINUTES * 60); // seconds
+
+type Env = Record<string, string | undefined>;
+
+function getSecret(): Uint8Array | null {
+  const s = process.env.AUTH_SECRET;
+  if (!s || s.length < 16) return null; // fail closed without a real secret
+  return new TextEncoder().encode(s);
+}
 
 export function mfaPendingCookieOptions(env: Env = process.env) {
   const domain = accountCookieDomain(env);

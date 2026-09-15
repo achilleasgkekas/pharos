@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { SESSION_COOKIE, verifySession, signSession, shouldRefresh, sessionCookieOptions } from '@/lib/session';
 import { saasMode } from '@/lib/tenancy/saasMode';
-import { ACCOUNT_COOKIE, verifyAccountToken } from '@/lib/tenancy/accountToken';
+import {
+  ACCOUNT_COOKIE,
+  verifyAccountToken,
+  signAccountToken,
+  shouldRefreshAccount,
+  accountCookieOptions,
+} from '@/lib/tenancy/accountToken';
 
 export const SAAS_LOGIN_PATH = '/account/login';
 
@@ -77,7 +83,15 @@ export async function middleware(req: NextRequest) {
   if (saasMode()) {
     if (isSaasPublicPath(pathname)) return pass();
     const account = await verifyAccountToken(req.cookies.get(ACCOUNT_COOKIE)?.value);
-    if (account) return pass();
+    if (account) {
+      const res = pass();
+      // Sliding idle window: re-issue the cookie once it's past halfway, so active use
+      // keeps you signed in but an idle session expires after SAAS_SESSION_IDLE_HOURS.
+      if (shouldRefreshAccount(account.exp)) {
+        res.cookies.set(ACCOUNT_COOKIE, await signAccountToken(account), accountCookieOptions());
+      }
+      return res;
+    }
     // Same shape as the self-hosted branch: APIs get a status, humans get the login page.
     if (pathname.startsWith('/api/')) return new NextResponse('Unauthorized', { status: 401 });
     const url = new URL(SAAS_LOGIN_PATH, req.url);

@@ -1,15 +1,41 @@
-import { describe, it, expect } from 'vitest';
-import { isSaasPublicPath, SAAS_LOGIN_PATH } from './middleware';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { NextRequest } from 'next/server';
+import { SignJWT } from 'jose';
+import { middleware, isSaasPublicPath, SAAS_LOGIN_PATH } from './middleware';
+import {
+  ACCOUNT_COOKIE,
+  ACCOUNT_MAX_AGE,
+  ACCOUNT_ABSOLUTE_MAX_AGE,
+  signAccountToken,
+  verifyAccountToken,
+} from '@/lib/tenancy/accountToken';
 
 // The SaaS front door. Before this, `if (saasMode()) return pass()` let EVERY request
-// through on the reasoning that authorization happened one layer in. It did for the account
-// pages and the operator console; it did not for the product itself. Verified live on
-// 2026-08-04: https://home.ph-aros.com/ served the hub, all module cards and the onboarding
-// checklist to a browser with no session.
+// through on the reasoning that authorization happened one layer in.
 //
-// This list is the whole security boundary now, so it is pinned deny-by-default: a new page
-// is GATED unless someone deliberately adds it here, which is the direction an error should
-// go in.
+// This list is the whole security boundary now, so it is pinned deny-by-default.
+
+const SECRET = 'test-secret-at-least-16-chars-long';
+
+let savedSaasMode: string | undefined;
+let savedSecret: string | undefined;
+let savedDomain: string | undefined;
+
+beforeEach(() => {
+  savedSaasMode = process.env.SAAS_MODE;
+  savedSecret = process.env.AUTH_SECRET;
+  savedDomain = process.env.SAAS_COOKIE_DOMAIN;
+  process.env.AUTH_SECRET = SECRET;
+});
+
+afterEach(() => {
+  if (savedSaasMode === undefined) delete process.env.SAAS_MODE;
+  else process.env.SAAS_MODE = savedSaasMode;
+  if (savedSecret === undefined) delete process.env.AUTH_SECRET;
+  else process.env.AUTH_SECRET = savedSecret;
+  if (savedDomain === undefined) delete process.env.SAAS_COOKIE_DOMAIN;
+  else process.env.SAAS_COOKIE_DOMAIN = savedDomain;
+});
 
 describe('isSaasPublicPath — what a signed-out visitor may still reach', () => {
   it('lets the auth pages through, or there is no way in at all', () => {
@@ -21,8 +47,6 @@ describe('isSaasPublicPath — what a signed-out visitor may still reach', () =>
   });
 
   it('lets /api/* through, because those routes answer with a status, not a redirect', () => {
-    // Bearer tokens, invite tokens, the Stripe webhook signature and the cron secret all
-    // authenticate per route; a login-page redirect would break every one of them.
     expect(isSaasPublicPath('/api/saas/invites/accept')).toBe(true);
     expect(isSaasPublicPath('/api/v1/items')).toBe(true);
     expect(isSaasPublicPath('/api/cron/alerts')).toBe(true);
@@ -45,8 +69,6 @@ describe('isSaasPublicPath — what a signed-out visitor may still reach', () =>
   });
 
   it('gates the self-hosted first-run wizard, which no hosted visitor should ever be offered', () => {
-    // Handing /setup to a stranger is how someone gets shown "create your admin account"
-    // on a workspace that already belongs to a paying customer.
     expect(isSaasPublicPath('/setup')).toBe(false);
     expect(isSaasPublicPath('/login')).toBe(false);
   });
@@ -56,5 +78,107 @@ describe('isSaasPublicPath — what a signed-out visitor may still reach', () =>
     expect(isSaasPublicPath('/account/verifying-something')).toBe(false);
     expect(isSaasPublicPath('/account/loginx')).toBe(false);
     expect(isSaasPublicPath('/apiv1/items')).toBe(false);
+  });
+});
+
+describe('SaaS middleware sliding refresh & revocation checks', () => {
+  beforeEach(() => {
+    process.env.SAAS_MODE = 'true';
+  });
+
+  it('re-issues cookie when past halfway through idle window and preserves domain', async () => {
+    process.env.SAAS_COOKIE_DOMAIN = '.ph-aros.com';
+    const now = Math.floor(Date.now() / 1000);
+    // exp is in 2 hours (less than half of 12h idle window remaining → needs refresh)
+    const secret = new TextEncoder().encode(SECRET);
+    const token = await new SignJWT({ email: 'user@example.com', auth_time: now - 3600 * 10 })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setSubject('acc-1')
+      .setIssuedAt(now - 3600 * 10)
+      .setExpirationTime(now + 7200)
+      .sign(secret);
+
+    const req = new NextRequest('https://app.ph-aros.com/dashboard', {
+      headers: { cookie: `${ACCOUNT_COOKIE}=${token}` },
+    });
+
+    const res = await middleware(req);
+    expect(res.status).toBe(200);
+
+    const setCookie = res.headers.get('set-cookie');
+    expect(setCookie).not.toBeNull();
+    expect(setCookie).toContain(ACCOUNT_COOKIE);
+    expect(setCookie).toContain('Domain=.ph-aros.com');
+
+    // Verify re-issued token
+    const cookieValue = res.cookies.get(ACCOUNT_COOKIE)?.value;
+    expect(cookieValue).toBeDefined();
+    const verified = await verifyAccountToken(cookieValue);
+    expect(verified).not.toBeNull();
+    expect(verified!.sub).toBe('acc-1');
+    expect(verified!.email).toBe('user@example.com');
+    expect(verified!.auth_time).toBe(now - 3600 * 10);
+    expect(verified!.exp).toBeGreaterThan(now + 7200);
+  });
+
+  it('does NOT re-issue cookie when before halfway point in idle window', async () => {
+    const now = Math.floor(Date.now() / 1000);
+    // exp is in 10 hours (well above half of 12h remaining → no refresh needed)
+    const secret = new TextEncoder().encode(SECRET);
+    const token = await new SignJWT({ email: 'user@example.com', auth_time: now - 3600 })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setSubject('acc-1')
+      .setIssuedAt(now - 3600)
+      .setExpirationTime(now + 36000)
+      .sign(secret);
+
+    const req = new NextRequest('https://app.ph-aros.com/dashboard', {
+      headers: { cookie: `${ACCOUNT_COOKIE}=${token}` },
+    });
+
+    const res = await middleware(req);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('set-cookie')).toBeNull();
+  });
+
+  it('does NOT re-issue and redirects to login when token is revoked / invalid signature', async () => {
+    const foreignSecret = new TextEncoder().encode('different-secret-that-is-16-chars');
+    const token = await new SignJWT({ email: 'user@example.com' })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setSubject('acc-1')
+      .setIssuedAt()
+      .setExpirationTime('12h')
+      .sign(foreignSecret);
+
+    const req = new NextRequest('https://app.ph-aros.com/dashboard', {
+      headers: { cookie: `${ACCOUNT_COOKIE}=${token}` },
+    });
+
+    const res = await middleware(req);
+    expect(res.status).toBe(307); // redirect
+    expect(res.headers.get('location')).toContain(SAAS_LOGIN_PATH);
+    expect(res.headers.get('set-cookie')).toBeNull();
+  });
+
+  it('does NOT re-issue and rejects when session age exceeds absolute maximum duration (30 days)', async () => {
+    const now = Math.floor(Date.now() / 1000);
+    // auth_time is 31 days ago
+    const authTime = now - (ACCOUNT_ABSOLUTE_MAX_AGE + 86400);
+    const secret = new TextEncoder().encode(SECRET);
+    const expiredByAgeToken = await new SignJWT({ email: 'user@example.com', auth_time: authTime })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setSubject('acc-1')
+      .setIssuedAt(now)
+      .setExpirationTime(now + 3600)
+      .sign(secret);
+
+    const req = new NextRequest('https://app.ph-aros.com/dashboard', {
+      headers: { cookie: `${ACCOUNT_COOKIE}=${expiredByAgeToken}` },
+    });
+
+    const res = await middleware(req);
+    expect(res.status).toBe(307); // redirect
+    expect(res.headers.get('location')).toContain(SAAS_LOGIN_PATH);
+    expect(res.headers.get('set-cookie')).toBeNull();
   });
 });
