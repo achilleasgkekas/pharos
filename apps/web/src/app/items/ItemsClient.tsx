@@ -1480,7 +1480,7 @@ function ItemCard({
           </div>
 
           <div className="flex items-start justify-between gap-2 mb-3">
-            <span className="font-semibold text-sm leading-snug flex-1" style={{ fontFamily: 'var(--font-display)' }}>
+            <span className="font-semibold text-sm leading-snug flex-1 min-w-0 [overflow-wrap:anywhere]" style={{ fontFamily: 'var(--font-display)' }}>
               {item.title}
             </span>
             <Badge status={item.status} />
