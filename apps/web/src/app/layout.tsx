@@ -22,6 +22,10 @@ import { saasMode } from '@/lib/tenancy/saasMode';
 export const metadata: Metadata = {
   title: 'PHAROS · Personal Hub',
   description: 'PHAROS, your Asset & Resource Oversight System. Oversight on everything you own: equipment, receipts, installments and price tracking. Self-hosted.',
+  icons: {
+    icon: [{ url: '/pharos-icon-32.png', sizes: '32x32', type: 'image/png' }],
+    apple: [{ url: '/pharos-apple-touch-icon.png', sizes: '180x180', type: 'image/png' }],
+  },
   // PWA: installable from the phone's "Add to Home Screen" (pairs with app/manifest.ts)
   appleWebApp: { capable: true, title: 'PHAROS', statusBarStyle: 'black-translucent' },
 };

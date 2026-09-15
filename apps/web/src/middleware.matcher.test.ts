@@ -46,3 +46,10 @@ describe('middleware matcher — everything else stays gated', () => {
     expect(isGated('/setup')).toBe(true);
   });
 });
+
+it.each(['/pharos-icon-32.png', '/pharos-icon-192.png', '/pharos-icon-512.png', '/pharos-apple-touch-icon.png'])(
+  'serves the app identity asset %s without a session', (path) => {
+    expect(isGated(path)).toBe(false);
+    expect(isGated(`${path}/private`)).toBe(true);
+  },
+);
