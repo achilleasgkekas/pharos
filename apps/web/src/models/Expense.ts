@@ -92,6 +92,11 @@ const ExpenseSchema = new Schema(
 );
 
 ExpenseSchema.index({ kind: 1, vendorKey: 1, date: -1 }); // series timeline per vendor
+// Unique compound index for auto-generated recurring occurrences to guarantee database-level atomic upserts
+ExpenseSchema.index(
+  { kind: 1, vendorKey: 1, date: 1, recurring: 1 },
+  { unique: true, partialFilterExpression: { recurring: true, vendorKey: { $gt: '' } } }
+);
 // Incremental-sync cursor (lib/apiList withSince → updatedAt $gte) for GET /api/v1/expenses.
 ExpenseSchema.index({ updatedAt: -1 });
 

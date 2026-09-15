@@ -159,24 +159,37 @@ export async function generateDueRecurring(): Promise<{ created: number }> {
     let guard = 0;
     while (next.getTime() <= now && guard < 36) {
       guard++;
-      await Expense.create({
-        kind: seed.kind,
-        vendor: seed.vendor,
-        vendorKey: seed.vendorKey,
-        category: seed.category,
-        // `amount` is base-denominated (lib/fx.ts), so a projection is base currency by
-        // definition; don't inherit the seed's printed foreign code/rate.
-        amount: seed.amount,
-        currency: base,
-        date: next,
-        period: `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}`,
-        recurring: true,
-        recurringCycle: seed.recurringCycle,
-        aiModel: 'recurring-auto',
-        verified: false,
-        notes: 'Auto-generated from recurring series',
-      });
-      created++;
+      const period = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}`;
+      const res = await Expense.updateOne(
+        {
+          kind: seed.kind,
+          vendorKey: seed.vendorKey,
+          date: next,
+        },
+        {
+          $setOnInsert: {
+            kind: seed.kind,
+            vendor: seed.vendor,
+            vendorKey: seed.vendorKey,
+            category: seed.category,
+            // `amount` is base-denominated (lib/fx.ts), so a projection is base currency by
+            // definition; don't inherit the seed's printed foreign code/rate.
+            amount: seed.amount,
+            currency: base,
+            date: next,
+            period,
+            recurring: true,
+            recurringCycle: seed.recurringCycle,
+            aiModel: 'recurring-auto',
+            verified: false,
+            notes: 'Auto-generated from recurring series',
+          },
+        },
+        { upsert: true }
+      );
+      if (res.upsertedCount) {
+        created++;
+      }
       next = addCycle(next, cycle);
     }
   }

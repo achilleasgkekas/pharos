@@ -23,11 +23,13 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 const {
   connectDBMock,
   expenseCreate,
+  expenseUpdateOne,
   expenseFindSortLean,
   revalidatePathMock,
 } = vi.hoisted(() => ({
   connectDBMock: vi.fn(async () => {}),
   expenseCreate: vi.fn(async (_doc: Record<string, any>) => ({ _id: 'new' })),
+  expenseUpdateOne: vi.fn(async (_filter: Record<string, any>, _update: Record<string, any>, _opts?: Record<string, any>) => ({ upsertedCount: 1 })),
   expenseFindSortLean: vi.fn(async () => [] as Array<Record<string, any>>),
   revalidatePathMock: vi.fn(),
 }));
@@ -35,6 +37,7 @@ const {
 const findFilterCalls: Array<Record<string, any>> = [];
 const expenseModel = {
   create: expenseCreate,
+  updateOne: expenseUpdateOne,
   find: (filter: Record<string, any>) => {
     findFilterCalls.push(filter);
     return { sort: () => ({ lean: expenseFindSortLean }) };
@@ -107,8 +110,8 @@ describe('generateDueRecurring', () => {
     ]);
     const res = await generateDueRecurring();
     expect(res).toEqual({ created: 1 });
-    expect(expenseCreate).toHaveBeenCalledTimes(1);
-    const doc = expenseCreate.mock.calls[0][0];
+    expect(expenseUpdateOne).toHaveBeenCalledTimes(1);
+    const doc = expenseUpdateOne.mock.calls[0][1].$setOnInsert;
     expect(doc.vendor).toBe('DEH');
     expect(doc.category).toBe('utilities');
     expect(doc.amount).toBe(50);
@@ -121,7 +124,7 @@ describe('generateDueRecurring', () => {
     ]);
     const res = await generateDueRecurring();
     expect(res).toEqual({ created: 2 });
-    const kinds = expenseCreate.mock.calls.map((c) => c[0].kind).sort();
+    const kinds = expenseUpdateOne.mock.calls.map((c) => c[1].$setOnInsert.kind).sort();
     expect(kinds).toEqual(['expense', 'income']);
   });
 
@@ -131,7 +134,7 @@ describe('generateDueRecurring', () => {
     ]);
     const res = await generateDueRecurring();
     expect(res).toEqual({ created: 1 });
-    const doc = expenseCreate.mock.calls[0][0];
+    const doc = expenseUpdateOne.mock.calls[0][1].$setOnInsert;
     expect(localYmd(doc.date)).toBe('2026-03-10');
     expect(doc.period).toBe('2026-03');
     expect(doc.kind).toBe('expense');
@@ -149,7 +152,7 @@ describe('generateDueRecurring', () => {
     ]);
     const res = await generateDueRecurring();
     expect(res).toEqual({ created: 1 });
-    expect(localYmd(expenseCreate.mock.calls[0][0].date)).toBe('2026-03-14');
+    expect(localYmd(expenseUpdateOne.mock.calls[0][1].$setOnInsert.date)).toBe('2026-03-14');
   });
 
   it('steps a quarterly series forward by 3 months', async () => {
@@ -158,7 +161,7 @@ describe('generateDueRecurring', () => {
     ]);
     const res = await generateDueRecurring();
     expect(res).toEqual({ created: 1 });
-    expect(localYmd(expenseCreate.mock.calls[0][0].date)).toBe('2026-03-01');
+    expect(localYmd(expenseUpdateOne.mock.calls[0][1].$setOnInsert.date)).toBe('2026-03-01');
   });
 
   it('steps a yearly series forward by 1 year', async () => {
@@ -167,7 +170,7 @@ describe('generateDueRecurring', () => {
     ]);
     const res = await generateDueRecurring();
     expect(res).toEqual({ created: 1 });
-    expect(localYmd(expenseCreate.mock.calls[0][0].date)).toBe('2026-03-01');
+    expect(localYmd(expenseUpdateOne.mock.calls[0][1].$setOnInsert.date)).toBe('2026-03-01');
   });
 
   it('defaults an unrecognized cycle string to monthly stepping', async () => {
@@ -176,7 +179,7 @@ describe('generateDueRecurring', () => {
     ]);
     const res = await generateDueRecurring();
     expect(res).toEqual({ created: 1 });
-    expect(localYmd(expenseCreate.mock.calls[0][0].date)).toBe('2026-03-10');
+    expect(localYmd(expenseUpdateOne.mock.calls[0][1].$setOnInsert.date)).toBe('2026-03-10');
   });
 
   it('creates one entry per elapsed period when several are overdue at once', async () => {
@@ -186,8 +189,57 @@ describe('generateDueRecurring', () => {
     const res = await generateDueRecurring();
     // Dec 10 -> Jan 10, Feb 10, Mar 10 (all <= 2026-03-15) -> 3 periods due.
     expect(res).toEqual({ created: 3 });
-    const dates = expenseCreate.mock.calls.map((c) => localYmd(c[0].date)).sort();
+    const dates = expenseUpdateOne.mock.calls.map((c) => localYmd(c[1].$setOnInsert.date)).sort();
     expect(dates).toEqual(['2026-01-10', '2026-02-10', '2026-03-10']);
+  });
+
+  it('prevents duplicate entries when page loads trigger generateDueRecurring concurrently', async () => {
+    // Simulate DB collection state with mock documents array
+    const dbDocs: Array<Record<string, any>> = [
+      { kind: 'expense', vendor: 'Rent', vendorKey: 'rent', category: 'housing', amount: 1000, date: new Date(2026, 1, 1), recurring: true, recurringCycle: 'monthly' },
+    ];
+
+    // Mock find query to return dbDocs (soft-delete filtered or filtered in memory)
+    expenseFindSortLean.mockImplementation(async () => {
+      // Sort desc by date
+      return [...dbDocs].sort((a, b) => b.date.getTime() - a.date.getTime());
+    });
+
+    // Mock create to simulate inserting into DB
+    expenseCreate.mockImplementation(async (doc: Record<string, any>) => {
+      const newDoc = { ...doc, _id: `id-${dbDocs.length + 1}` };
+      dbDocs.push(newDoc);
+      return newDoc;
+    });
+
+    // Mock updateOne to simulate atomic upsert in DB
+    expenseUpdateOne.mockImplementation(async (filter: Record<string, any>, update: Record<string, any>, opts?: Record<string, any>) => {
+      const existing = dbDocs.find(
+        (d) => d.kind === filter.kind && d.vendorKey === filter.vendorKey && d.date.getTime() === filter.date.getTime()
+      );
+      if (existing) {
+        return { upsertedCount: 0 };
+      }
+      if (opts?.upsert) {
+        const inserted = { ...update.$setOnInsert, _id: `id-${dbDocs.length + 1}` };
+        dbDocs.push(inserted);
+        return { upsertedCount: 1 };
+      }
+      return { upsertedCount: 0 };
+    });
+
+    // Run two concurrent loads
+    const [res1, res2] = await Promise.all([
+      generateDueRecurring(),
+      generateDueRecurring(),
+    ]);
+
+    // Total created across both calls should equal 1 (for 2026-03 period), not 2
+    expect(res1.created + res2.created).toBe(1);
+
+    // Filter dbDocs for rent entries in period 2026-03
+    const marchRentEntries = dbDocs.filter((d) => d.vendorKey === 'rent' && d.period === '2026-03');
+    expect(marchRentEntries).toHaveLength(1);
   });
 
   it('caps at 36 created entries per series even when far more periods are overdue (infinite-series guard)', async () => {
@@ -196,7 +248,7 @@ describe('generateDueRecurring', () => {
     ]);
     const res = await generateDueRecurring();
     expect(res).toEqual({ created: 36 });
-    expect(expenseCreate).toHaveBeenCalledTimes(36);
+    expect(expenseUpdateOne).toHaveBeenCalledTimes(36);
   });
 
   it('calls revalidatePath for /expenses and /income only when something was created', async () => {
