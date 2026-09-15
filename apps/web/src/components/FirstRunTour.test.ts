@@ -14,4 +14,13 @@ describe('FirstRunTour accessibility', () => {
     expect(source).toContain('<Dialog.Description');
     expect(source).not.toContain('createPortal');
   });
+
+  it('ensures all interactive controls have minimum 44px touch targets', () => {
+    // Dismiss / skip close button
+    expect(source).toMatch(/aria-label=\{t\('tour\.skip'\)\}\s*className="[^"]*min-w-\[44px\] min-h-\[44px\]/);
+    // Progress dot buttons wrap inside a 44x44 target
+    expect(source).toMatch(/aria-label=\{`\$\{n \+ 1\}`\}\s*onClick=\{\(\) => setI\(n\)\}\s*className="[^"]*min-w-\[44px\] min-h-\[44px\]/);
+    // Footer navigation buttons
+    expect(source).toContain('min-h-[44px] min-w-[44px]');
+  });
 });
