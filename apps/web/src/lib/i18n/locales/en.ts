@@ -11,6 +11,7 @@ export const en = {
   'nav.receipts': 'Receipts',
   'nav.expenses': 'Expenses',
   'nav.bills': 'Bills',
+  'nav.utilities': 'Utilities',
   'nav.income': 'Income',
   'nav.statements': 'Statements',
   'nav.subscriptions': 'Subscriptions',
@@ -81,6 +82,25 @@ export const en = {
   'common.category': 'Category',
   'common.sort': 'Sort',
   'common.resetFilters': 'reset filters',
+
+  // ── Utility meter readings (P49) ────────────────────────────────────────
+  'util.title': 'Utilities',
+  'util.subtitle': 'Track cumulative meter readings and the consumption behind each bill.',
+  'util.add': 'Add reading',
+  'util.trend': 'Reading trend',
+  'util.needTwo': 'Add at least two readings to see a trend and period consumption.',
+  'util.empty': 'No meter readings yet.',
+  'util.meter': 'Meter',
+  'util.meterHint': 'Main electricity meter',
+  'util.type': 'Utility type',
+  'util.typeHint': 'Electricity, water, gas…',
+  'util.unit': 'Unit',
+  'util.date': 'Reading date',
+  'util.reading': 'Reading',
+  'util.consumption': 'Consumption',
+  'util.period': 'Period consumption',
+  'util.space': 'Space (optional)',
+  'util.notes': 'Notes',
 
   // ── Home page ────────────────────────────────────────────────────────────
   'home.heroA': 'One light over',
@@ -1310,6 +1330,10 @@ export const en = {
   'sl.fBought': 'Bought',
   'sl.noMatch': 'No items match these filters.',
   'sl.addTitle': 'Add an item',
+  'sl.restockTitle': 'Restock reminder',
+  'sl.restockDays': 'Restock every (days, optional)',
+  'sl.restockPlaceholder': 'Leave blank for one-off',
+  'sl.restockHint': 'After you mark this bought, it will return to the list when this many days have passed.',
   'sl.select': 'Select',
   'sl.selected': '{n} selected',
   'sl.markBought': 'Mark bought',
@@ -1777,6 +1801,9 @@ export const en = {
   'reports.onTrack': 'on track',
   'reports.overPace': 'over pace',
   'it.allLocations': 'All locations',
+  'sub.stillUsing': 'Still using it ✓',
+  'set.subscriptionReviewAlert': 'Subscription usage review interval · days (0 = off)',
+  'notif.subscriptionReviewSub': 'Last confirmed {days}d ago · still using it?',
 } as const;
 
 export type Dict = Record<keyof typeof en, string>;

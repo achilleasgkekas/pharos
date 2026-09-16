@@ -85,8 +85,17 @@ describe('getListItems', () => {
     const res = await getListItems();
     expect(res).toEqual([{
       _id: 'a1', name: 'Bread', quantity: '', category: '', brand: '', note: '',
-      checked: false, aiScanned: false, createdAt: '2026-01-01T00:00:00.000Z',
+      checked: false, aiScanned: false, restockIntervalDays: null, lastRestockedAt: null, createdAt: '2026-01-01T00:00:00.000Z',
     }]);
+  });
+
+  it('re-surfaces due recurring items before returning the refreshed list', async () => {
+    await getListItems();
+    expect(itemUpdateMany).toHaveBeenCalledTimes(1);
+    const [filter, update] = itemUpdateMany.mock.calls[0];
+    expect(filter).toMatchObject({ checked: true, restockIntervalDays: { $gt: 0 }, lastRestockedAt: { $type: 'date' } });
+    expect((filter.$expr as any).$lte[1].$subtract[1]).toEqual({ $multiply: ['$restockIntervalDays', 86_400_000] });
+    expect(update).toEqual({ $set: { checked: false } });
   });
 
   it('passes through explicit field values and truthy checked/aiScanned', async () => {
@@ -154,7 +163,7 @@ describe('addListItem', () => {
     expect(res).toEqual({ ok: true });
     expect(itemCreate).toHaveBeenCalledTimes(1);
     expect(itemCreate.mock.calls[0][0]).toEqual({
-      name: 'Eggs', quantity: '12', category: 'dairy', brand: 'Farma', note: 'fresh', aiScanned: true, checked: false,
+      name: 'Eggs', quantity: '12', category: 'dairy', brand: 'Farma', note: 'fresh', aiScanned: true, checked: false, restockIntervalDays: undefined,
     });
     expect(revalidatePathMock).toHaveBeenCalledWith('/shopping-list');
   });
@@ -169,8 +178,15 @@ describe('addListItem', () => {
   it('defaults every optional field to "" and aiScanned to false when omitted', async () => {
     await addListItem({ name: 'Bread' });
     expect(itemCreate.mock.calls[0][0]).toEqual({
-      name: 'Bread', quantity: '', category: '', brand: '', note: '', aiScanned: false, checked: false,
+      name: 'Bread', quantity: '', category: '', brand: '', note: '', aiScanned: false, checked: false, restockIntervalDays: undefined,
     });
+  });
+
+  it('persists a valid optional restock interval and rejects invalid intervals', async () => {
+    await expect(addListItem({ name: 'Coffee', restockIntervalDays: 30 })).resolves.toEqual({ ok: true });
+    expect(itemCreate.mock.calls[0][0]).toMatchObject({ restockIntervalDays: 30 });
+    await expect(addListItem({ name: 'Coffee', restockIntervalDays: 0 })).resolves.toMatchObject({ ok: false });
+    expect(itemCreate).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -186,13 +202,22 @@ describe('updateListItem', () => {
     const res = await updateListItem('ghost', { name: 'X' });
     expect(res).toEqual({ ok: true, found: false });
   });
+
+  it('can set or remove the restock interval', async () => {
+    await updateListItem('id1', { restockIntervalDays: 14 });
+    expect(itemUpdateOne).toHaveBeenLastCalledWith({ _id: 'id1' }, { $set: { restockIntervalDays: 14 } });
+    await updateListItem('id1', { restockIntervalDays: null });
+    expect(itemUpdateOne).toHaveBeenLastCalledWith({ _id: 'id1' }, { $set: {}, $unset: { restockIntervalDays: 1 } });
+  });
 });
 
 describe('toggleListItem', () => {
   it('sets checked and reports found from matchedCount', async () => {
     const res = await toggleListItem('id1', true);
     expect(res).toEqual({ ok: true, found: true });
-    expect(itemUpdateOne).toHaveBeenCalledWith({ _id: 'id1' }, { $set: { checked: true } });
+    const [, update] = itemUpdateOne.mock.calls[0];
+    expect(update.$set.checked).toBe(true);
+    expect(update.$set.lastRestockedAt).toBeInstanceOf(Date);
     expect(revalidatePathMock).toHaveBeenCalledWith('/shopping-list');
   });
 
@@ -226,7 +251,7 @@ describe('clearChecked', () => {
     const res = await clearChecked();
     expect(res).toEqual({ ok: true, cleared: 3 });
     const [filter, update] = itemUpdateMany.mock.calls[0];
-    expect(filter).toEqual({ checked: true });
+    expect(filter).toEqual({ checked: true, restockIntervalDays: { $exists: false } });
     expect(update.$set.deletedAt).toBeInstanceOf(Date);
     expect(revalidatePathMock).toHaveBeenCalledWith('/shopping-list');
   });

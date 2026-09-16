@@ -11,6 +11,8 @@ const ShoppingListItemSchema = new Schema(
     brand: { type: String, default: '' },
     note: { type: String, default: '' },
     checked: { type: Boolean, default: false, index: true }, // bought
+    restockIntervalDays: { type: Number, min: 1 },
+    lastRestockedAt: { type: Date },
     aiScanned: { type: Boolean, default: false }, // captured via product photo
   },
   { timestamps: true }

@@ -9,3 +9,18 @@ export function relTime(iso: string, t: TFunc): string {
   const d = Math.floor(s / 86400);
   return d === 1 ? t('time.yesterday') : t('time.days', { n: d });
 }
+
+/** Money display only: locale and ISO currency are explicit so concurrent requests stay isolated. */
+export function formatCurrency(
+  amount: number,
+  currency: string,
+  locale = 'en',
+  options: Intl.NumberFormatOptions = {},
+): string {
+  const value = Number.isFinite(amount) ? amount : 0;
+  return new Intl.NumberFormat(locale, {
+    style: 'currency', currency,
+    minimumFractionDigits: 2, maximumFractionDigits: 2,
+    ...options,
+  }).format(value);
+}

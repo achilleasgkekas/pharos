@@ -173,7 +173,7 @@ describe('formatMoney', () => {
   });
 
   it('falls back to the bare code for an unknown currency', () => {
-    expect(formatMoney(10, 'XYZ')).toBe('XYZ 10.00');
+    expect(formatMoney(10, 'XYZ')).toBe('XYZ\u00a010.00');
   });
 
   it('treats junk amounts as zero', () => {

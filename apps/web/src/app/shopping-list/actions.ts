@@ -8,6 +8,7 @@ import { currentModel } from '@/lib/tenancy/connection';
 import { parseProductPhoto, type ParsedProductPhoto } from '@/lib/ollama';
 import { isFeatureEnabled } from '@/lib/aiFeatures.server';
 import { assertCanWrite } from '@/lib/auth';
+import { resurfaceDueRestocks } from '@/lib/shoppingListRestock';
 
 export type SerializedListItem = {
   _id: string;
@@ -18,6 +19,8 @@ export type SerializedListItem = {
   note: string;
   checked: boolean;
   aiScanned: boolean;
+  restockIntervalDays: number | null;
+  lastRestockedAt: string | null;
   createdAt: string;
 };
 
@@ -30,6 +33,8 @@ type ListItemLean = {
   note?: string;
   checked?: boolean;
   aiScanned?: boolean;
+  restockIntervalDays?: number;
+  lastRestockedAt?: Date;
   createdAt: Date;
 };
 
@@ -43,6 +48,8 @@ function serialize(d: ListItemLean): SerializedListItem {
     note: d.note ?? '',
     checked: !!d.checked,
     aiScanned: !!d.aiScanned,
+    restockIntervalDays: d.restockIntervalDays ?? null,
+    lastRestockedAt: d.lastRestockedAt ? new Date(d.lastRestockedAt).toISOString() : null,
     createdAt: new Date(d.createdAt).toISOString(),
   };
 }
@@ -58,6 +65,7 @@ export async function getListItems(): Promise<SerializedListItem[]> {
   return withRequestTenant(async () => {
     await connectDB();
     const ShoppingListItem = await currentModel(ShoppingListItemModel);
+    await resurfaceDueRestocks(ShoppingListItem);
     // Unchecked first, then newest. Checked items sink to the bottom.
     const docs = (await ShoppingListItem.find().sort({ checked: 1, createdAt: -1 }).lean()) as ListItemLean[];
     return docs.map(serialize);
@@ -78,12 +86,18 @@ export async function scanProductPhoto(formData: FormData): Promise<ScanProductR
   }
 }
 
-type NewItem = { name: string; quantity?: string; category?: string; brand?: string; note?: string; aiScanned?: boolean };
+type NewItem = { name: string; quantity?: string; category?: string; brand?: string; note?: string; aiScanned?: boolean; restockIntervalDays?: number | null };
+
+function validRestockDays(value: number | null | undefined): number | undefined {
+  if (value == null) return undefined;
+  return Number.isInteger(value) && value > 0 && value <= 3650 ? value : undefined;
+}
 
 export async function addListItem(data: NewItem): Promise<{ ok: boolean; error?: string }> {
   await assertCanWrite();
   const name = (data.name || '').trim();
   if (!name) return { ok: false, error: 'Name required' };
+  if (data.restockIntervalDays != null && validRestockDays(data.restockIntervalDays) === undefined) return { ok: false, error: 'Restock interval must be a whole number from 1 to 3650' };
   return withRequestTenant(async () => {
     await connectDB();
     const ShoppingListItem = await currentModel(ShoppingListItemModel);
@@ -95,6 +109,7 @@ export async function addListItem(data: NewItem): Promise<{ ok: boolean; error?:
       note: (data.note || '').trim(),
       aiScanned: !!data.aiScanned,
       checked: false,
+      restockIntervalDays: validRestockDays(data.restockIntervalDays),
     });
     revalidatePath('/shopping-list');
     return { ok: true };
@@ -109,10 +124,16 @@ export async function updateListItem(id: string, data: Partial<NewItem>): Promis
   for (const k of ['name', 'quantity', 'category', 'brand', 'note'] as const) {
     if (data[k] !== undefined) set[k] = String(data[k]).trim();
   }
+  const unset: Record<string, 1> = {};
+  if (data.restockIntervalDays !== undefined) {
+    if (data.restockIntervalDays === null) unset.restockIntervalDays = 1;
+    else if (validRestockDays(data.restockIntervalDays) !== undefined) (set as Record<string, string | number>).restockIntervalDays = data.restockIntervalDays;
+  }
   return withRequestTenant(async () => {
     await connectDB();
     const ShoppingListItem = await currentModel(ShoppingListItemModel);
-    const r = await ShoppingListItem.updateOne({ _id: id }, { $set: set });
+    const update = Object.keys(unset).length ? { $set: set, $unset: unset } : { $set: set };
+    const r = await ShoppingListItem.updateOne({ _id: id }, update);
     revalidatePath('/shopping-list');
     return { ok: true, found: (r.matchedCount ?? 0) > 0 };
   });
@@ -123,7 +144,9 @@ export async function toggleListItem(id: string, checked: boolean): Promise<{ ok
   return withRequestTenant(async () => {
     await connectDB();
     const ShoppingListItem = await currentModel(ShoppingListItemModel);
-    const r = await ShoppingListItem.updateOne({ _id: id }, { $set: { checked } });
+    const set: Record<string, boolean | Date> = { checked };
+    if (checked) set.lastRestockedAt = new Date();
+    const r = await ShoppingListItem.updateOne({ _id: id }, { $set: set });
     revalidatePath('/shopping-list');
     return { ok: true, found: (r.matchedCount ?? 0) > 0 };
   });
@@ -146,7 +169,8 @@ export async function clearChecked(): Promise<{ ok: boolean; cleared: number }> 
   return withRequestTenant(async () => {
     await connectDB();
     const ShoppingListItem = await currentModel(ShoppingListItemModel);
-    const r = await ShoppingListItem.updateMany({ checked: true }, { $set: { deletedAt: new Date() } });
+    // Recurring entries must remain as bought records so the on-read pass can re-surface them.
+    const r = await ShoppingListItem.updateMany({ checked: true, restockIntervalDays: { $exists: false } }, { $set: { deletedAt: new Date() } });
     revalidatePath('/shopping-list');
     return { ok: true, cleared: r.modifiedCount ?? 0 };
   });

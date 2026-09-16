@@ -38,9 +38,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 //  - keep.itemIds becomes the de-duplicated union of its own ids plus every drop's ids;
 //    keep.markModified('lineItems')/('itemIds') and keep.save() are always called once.
 //  - Per dropped receipt: Item.updateMany is called TWICE (addToSet the keep id, then pull
-//    the dropped id) to re-point linked items, its file + thumb are best-effort deleted
-//    (a delete rejection is swallowed, never fails the merge), and finally
-//    Receipt.deleteMany removes every dropped doc in one call.
+//    the dropped id) to re-point linked items. Receipt.deleteMany removes every dropped doc
+//    in one call before their file + thumb are best-effort deleted (a storage rejection is
+//    swallowed, but a database rejection leaves storage intact).
 //  - Revalidates both /receipts and /items; returns `{ok:true, merged: drops.length}`.
 
 const KEEP_ID = '507f1f77bcf86cd799439011';
@@ -397,6 +397,18 @@ describe('mergeReceipts', () => {
     receiptFind.mockReturnValue(Promise.resolve([drop1]) as any);
 
     await mergeReceipts(KEEP_ID, [DROP1_ID]);
+
+    expect(deleteFileMock).not.toHaveBeenCalled();
+  });
+
+  it('does not delete drop files when deleting their receipt documents fails', async () => {
+    const keep = makeReceiptDoc();
+    const drop1 = { _id: DROP1_ID, lineItems: [], itemIds: [], filePath: 'receipts/d1.pdf', thumbPath: 'thumbs/d1.jpg' };
+    receiptFindById.mockResolvedValue(keep);
+    receiptFind.mockReturnValue(Promise.resolve([drop1]) as any);
+    receiptDeleteMany.mockRejectedValueOnce(new Error('database disconnected'));
+
+    await expect(mergeReceipts(KEEP_ID, [DROP1_ID])).rejects.toThrow('database disconnected');
 
     expect(deleteFileMock).not.toHaveBeenCalled();
   });

@@ -1,3 +1,4 @@
+import { getLocale } from '@/lib/i18n/server';
 // User-facing WORKSPACE OVERVIEW (SaaS control plane). The signed-in account's landing for
 // workspace settings: it consolidates the already-built read surfaces — workspace details,
 // current-period usage + quotas, and the billing summary — into one server-rendered page.
@@ -49,6 +50,7 @@ export default async function WorkspaceOverviewPage({
   const notice = blockedNotice(blocked);
 
   // Gate (throws notFound when SaaS off) + current viewer claims.
+  const locale = await getLocale();
   const viewer = await getSaasViewer();
   if (!viewer) {
     const suffix = w ? `?w=${encodeURIComponent(w)}` : '';
@@ -161,7 +163,7 @@ export default async function WorkspaceOverviewPage({
           />
           <StatTile
             label="AI cost · this month"
-            value={formatCostMicros(usage.aiCostMicros, 'EUR')}
+            value={formatCostMicros(usage.aiCostMicros, 'EUR', locale)}
             accent="gold"
           />
         </div>
@@ -219,7 +221,7 @@ export default async function WorkspaceOverviewPage({
             label="Storage"
             value={quotaLabel(formatBytes(usage.storageBytes), storageQuota.limit, formatBytes)}
           />
-          <DefRow label="Estimated AI cost" value={formatCostMicros(usage.aiCostMicros, 'EUR')} />
+          <DefRow label="Estimated AI cost" value={formatCostMicros(usage.aiCostMicros, 'EUR', locale)} />
           {!usage.metered && (
             <p className="mt-3 text-xs text-[color:var(--color-text-faint)]">
               Metering is inactive for this workspace.

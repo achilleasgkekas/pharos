@@ -711,7 +711,7 @@ export async function findDuplicateReceipts(): Promise<DupGroup[]> {
 /**
  * Merge duplicate receipts into one. Backfills missing fields on the kept record
  * from the dropped ones, unions their linked items, re-points every item's
- * receiptIds at the survivor, then deletes the dropped receipts (and their files).
+ * receiptIds at the survivor, then deletes the dropped receipts and cleans up their files.
  */
 export async function mergeReceipts(
   keepId: string,
@@ -754,6 +754,12 @@ export async function mergeReceipts(
     // the two field updates don't conflict in one statement).
     await Item.updateMany({ receiptIds: dOid }, { $addToSet: { receiptIds: keepOid } });
     await Item.updateMany({ receiptIds: dOid }, { $pull: { receiptIds: dOid } });
+  }
+  await Receipt.deleteMany({ _id: { $in: drops.map((d) => d._id) } });
+
+  // A failed database delete must leave the dropped receipt's files intact so its
+  // still-live document never points at storage that this merge removed.
+  for (const d of drops) {
     if (d.filePath) {
       try {
         await deleteFile(d.filePath);
@@ -769,7 +775,6 @@ export async function mergeReceipts(
       }
     }
   }
-  await Receipt.deleteMany({ _id: { $in: drops.map((d) => d._id) } });
 
   revalidatePath('/receipts');
   revalidatePath('/items');

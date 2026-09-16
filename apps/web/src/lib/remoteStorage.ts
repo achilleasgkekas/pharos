@@ -43,7 +43,8 @@ async function ftpAccess(client: FtpClient, cfg: RemoteConfig): Promise<void> {
     user: cfg.user,
     password: cfg.pass,
     secure: !!cfg.secure,
-    secureOptions: { rejectUnauthorized: false }, // tolerate self-signed NAS certs
+    // FTPS credentials and backup contents must never cross an unauthenticated TLS tunnel.
+    secureOptions: { rejectUnauthorized: true },
   });
 }
 

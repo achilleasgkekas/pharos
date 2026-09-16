@@ -125,7 +125,7 @@ describe('POST create', () => {
     const res = await POST(makeReq({ body: { name: '  Eggs  ', quantity: '12', category: 'grocery', brand: 'Bio', note: 'large' } }));
     expect(res.status).toBe(201);
     // strField has no trim flag here → String(b[k]||''); addListItem itself trims later.
-    expect(state.lastAdd).toEqual({ name: '  Eggs  ', quantity: '12', category: 'grocery', brand: 'Bio', note: 'large' });
+    expect(state.lastAdd).toEqual({ name: '  Eggs  ', quantity: '12', category: 'grocery', brand: 'Bio', note: 'large', restockIntervalDays: undefined });
     const json = (await res.json()) as { ok: boolean; items: unknown[] };
     expect(json.ok).toBe(true);
     expect(json.items).toEqual(state.items);
@@ -133,6 +133,11 @@ describe('POST create', () => {
 
   it('coerces non-string fields to strings and defaults missing fields to empty strings', async () => {
     await POST(makeReq({ body: { name: 'Batteries', quantity: 4 } }));
-    expect(state.lastAdd).toEqual({ name: 'Batteries', quantity: '4', category: '', brand: '', note: '' });
+    expect(state.lastAdd).toEqual({ name: 'Batteries', quantity: '4', category: '', brand: '', note: '', restockIntervalDays: undefined });
+  });
+
+  it('forwards a numeric restock interval', async () => {
+    await POST(makeReq({ body: { name: 'Coffee', restockIntervalDays: 30 } }));
+    expect(state.lastAdd).toMatchObject({ name: 'Coffee', restockIntervalDays: 30 });
   });
 });

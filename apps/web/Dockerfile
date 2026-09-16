@@ -1,6 +1,6 @@
 # ─── Multi-stage build for Next.js 15 standalone ───────────────────────────
 
-FROM node:20-alpine AS base
+FROM node:24-alpine AS base
 # libc6-compat for some native deps under Alpine
 RUN apk add --no-cache libc6-compat
 

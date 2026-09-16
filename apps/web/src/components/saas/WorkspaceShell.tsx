@@ -1,5 +1,5 @@
 // Presentational shell for the user-facing workspace-settings pages ((saas)/account/workspace/*).
-// Server-safe (no client hooks): a header with the workspace name, plan/status/role badges, a
+// Server-safe container: a header with the workspace name, plan/status/role badges, a
 // workspace switcher (only when the account belongs to more than one), and the workspace's own
 // sub-nav (Overview/Settings/Members/...). Sign out lives in the global SiteNav's account menu
 // now that SiteNav renders on this segment too, so this shell no longer carries its own copy.
@@ -7,29 +7,11 @@
 // 404s otherwise).
 import type { ReactNode } from 'react';
 import Link from 'next/link';
-import { LayoutDashboard, SlidersHorizontal, Users, BarChart3, Activity, CreditCard, UserRound } from 'lucide-react';
-import { cn } from '@/components/ui/cn';
 import { Pill, TenantStatusBadge, MemberRoleBadge } from './StatusBadge';
 import { workspaceQuery } from './chooseWorkspace';
+import { WorkspaceTabNav, type WorkspaceTab } from './WorkspaceTabNav';
 
-export type WorkspaceTab = { href: string; label: string; active: boolean };
-
-/** Icon per tab, keyed by the STABLE part of its href (workspaceTabs.ts's `path`, before any
- *  `?w=` query is appended) — kept local to this component (not workspaceTabs.ts) since that
- *  module is deliberately pure/icon-free, see its own doc comment. */
-const TAB_ICON: Record<string, typeof LayoutDashboard> = {
-  '/account/workspace': LayoutDashboard,
-  '/account/workspace/settings': SlidersHorizontal,
-  '/account/workspace/members': Users,
-  '/account/workspace/usage': BarChart3,
-  '/account/workspace/activity': Activity,
-  '/account/workspace/billing': CreditCard,
-  '/account/settings': UserRound,
-};
-function tabIcon(href: string): typeof LayoutDashboard {
-  const path = href.split('?')[0];
-  return TAB_ICON[path] ?? LayoutDashboard;
-}
+export type { WorkspaceTab };
 
 /** A workspace the account can switch to, for the header dropdown-less switcher. */
 export type SwitchTarget = { slug: string; name: string; active: boolean };
@@ -109,31 +91,7 @@ export function WorkspaceShell({
             to be two differently-styled blocks (a muted accent-text rail + a solid-fill pill
             strip) that didn't match Settings' look or each other. */}
         <div className="flex flex-col md:flex-row gap-5">
-          {tabList.length > 0 && (
-            <nav aria-label="Workspace" className="md:w-52 md:shrink-0">
-              <div className="flex md:flex-col gap-1.5 overflow-x-auto md:overflow-visible md:sticky md:top-20 pb-1 md:pb-0 -mx-4 px-4 md:mx-0 md:px-0">
-                {tabList.map((t) => {
-                  const Icon = tabIcon(t.href);
-                  return (
-                    <Link
-                      key={t.href}
-                      href={t.href}
-                      aria-current={t.active ? 'page' : undefined}
-                      className={cn(
-                        'flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all shrink-0 md:w-full',
-                        t.active
-                          ? 'bg-[color:var(--color-accent)] text-black'
-                          : 'bg-[color:var(--color-surface-2)] md:bg-transparent border border-[color:var(--color-border)] md:border-transparent text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface-2)]'
-                      )}
-                    >
-                      <Icon size={15} />
-                      {t.label}
-                    </Link>
-                  );
-                })}
-              </div>
-            </nav>
-          )}
+          <WorkspaceTabNav tabs={tabList} />
 
           <div className="min-w-0 flex-1">
             <main>{children}</main>
