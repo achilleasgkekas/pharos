@@ -506,6 +506,7 @@ export async function deleteExpense(id: string): Promise<{ ok: boolean }> {
     const Expense = await currentModel(ExpenseModel);
     // Soft delete → Trash (Settings → Storage & data). Files stay until purge.
     await Expense.updateOne({ _id: id }, { $set: { deletedAt: new Date() } });
+    await syncGiftCardUses(id, [], new Date(), '');
     revalidatePath('/expenses');
     revalidatePath('/income');
     return { ok: true };

@@ -37,6 +37,7 @@ const {
   expenseBulkWrite,
   getAppSettingsMock,
   revalidatePathMock,
+  giftCardUpdateMany,
 } = vi.hoisted(() => ({
   connectDBMock: vi.fn(async () => {}),
   expenseCreate: vi.fn(async (_doc: Record<string, any>) => ({ _id: 'e1' })),
@@ -46,6 +47,7 @@ const {
   expenseBulkWrite: vi.fn(async (_ops: any) => ({})),
   getAppSettingsMock: vi.fn(async () => ({ categoryRules: [] as any[] })),
   revalidatePathMock: vi.fn(),
+  giftCardUpdateMany: vi.fn(async (_filter: Record<string, any>, _update: Record<string, any>) => ({ modifiedCount: 0 })),
 }));
 
 const expenseModel = {
@@ -56,10 +58,18 @@ const expenseModel = {
   bulkWrite: expenseBulkWrite,
 };
 
+const giftCardModel = {
+  updateMany: giftCardUpdateMany,
+  updateOne: vi.fn(async () => ({})),
+};
+
 vi.mock('@/lib/db', () => ({ connectDB: connectDBMock }));
 vi.mock('@/lib/tenancy/request', () => ({ withRequestTenant: async (fn: () => Promise<any>) => fn() }));
-vi.mock('@/lib/tenancy/connection', () => ({ currentModel: async () => expenseModel }));
-vi.mock('@/models/Expense', () => ({ Expense: {} }));
+vi.mock('@/lib/tenancy/connection', () => ({
+  currentModel: async (model: any) => (model?.modelName === 'GiftCard' ? giftCardModel : expenseModel),
+}));
+vi.mock('@/models/Expense', () => ({ Expense: { modelName: 'Expense' } }));
+vi.mock('@/models/GiftCard', () => ({ GiftCard: { modelName: 'GiftCard' } }));
 vi.mock('@/lib/storage', () => ({ saveFile: vi.fn(), deleteFile: vi.fn() }));
 vi.mock('@/lib/ollama', () => ({ parseExpenseText: vi.fn(), parseExpenseImage: vi.fn() }));
 vi.mock('@/lib/aiFeatures.server', () => ({ isFeatureEnabled: vi.fn(async () => true) }));
@@ -294,6 +304,15 @@ describe('deleteExpense', () => {
     expect(update.$set.deletedAt).toBeInstanceOf(Date);
     expect(revalidatePathMock).toHaveBeenCalledWith('/expenses');
     expect(revalidatePathMock).toHaveBeenCalledWith('/income');
+  });
+
+  it('cleans up linked gift card uses when soft-deleting an expense', async () => {
+    const res = await deleteExpense('e1');
+    expect(res).toEqual({ ok: true });
+    expect(giftCardUpdateMany).toHaveBeenCalledWith(
+      { 'uses.expenseId': 'e1' },
+      { $pull: { uses: { expenseId: 'e1' } } }
+    );
   });
 
   it('swallows a DB error and reports ok:false', async () => {
