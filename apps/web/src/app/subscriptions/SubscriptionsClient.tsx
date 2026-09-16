@@ -735,7 +735,12 @@ function SubForm({ sub, cards, spaces = [], fx, onSuccess, onDeleted }: { sub?: 
           {t('sub.trialHint')}
         </p>
       )}
-      <SplitEditor split={split} amount={Number(form.amount) || 0} onChange={setSplit} />
+      <SplitEditor
+        split={split}
+        amount={foreign && Number(form.fxRate) > 0 ? convertToBase(Number(form.amount) || 0, Number(form.fxRate)) : Number(form.amount) || 0}
+        baseCurrency={fx.base}
+        onChange={setSplit}
+      />
       <Field label="URL">
         <Input value={form.url} onChange={set('url')} placeholder="https://..." />
       </Field>
@@ -837,7 +842,7 @@ function SubFxFields({
  *  history) — same UI idiom and pure helpers (equalSplit/splitTotals) as Expenses'
  *  SplitEditor (P35), reused as-is; the component itself is duplicated rather than
  *  shared because the two forms don't share a form-state shape. */
-function SplitEditor({ split, amount, onChange }: { split: SplitEntry[]; amount: number; onChange: (s: SplitEntry[]) => void }) {
+function SplitEditor({ split, amount, baseCurrency, onChange }: { split: SplitEntry[]; amount: number; baseCurrency?: string; onChange: (s: SplitEntry[]) => void }) {
   const t = useT();
   const money = useMoney();
   const [includeSelf, setIncludeSelf] = useState(false);
@@ -858,7 +863,7 @@ function SplitEditor({ split, amount, onChange }: { split: SplitEntry[]; amount:
   return (
     <div className="rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] p-3">
       <div className="flex items-center justify-between mb-2">
-        <span className="text-xs font-medium flex items-center gap-1.5"><SplitIcon size={13} className="text-[color:var(--color-cyan)]" /> {t('ex.splitTitle')}</span>
+        <span className="text-xs font-medium flex items-center gap-1.5"><SplitIcon size={13} className="text-[color:var(--color-cyan)]" /> {t('ex.splitTitle')}{baseCurrency ? ` (${currencySymbol(baseCurrency).trim()})` : ''}</span>
         {split.length > 0 && (
           <span className="text-[10px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
             {t('ex.splitOwedYou', { amt: money(totals.owed) })}{totals.settled > 0 ? ` · ${t('ex.splitSettled', { amt: money(totals.settled) })}` : ''}

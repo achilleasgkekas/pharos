@@ -598,16 +598,24 @@ export async function importExpensesCsv(
         .select('kind vendorKey date amount origAmount')
         .lean();
       const seen = new Set(
-        existing.map((e) =>
-          csvDedupeKey(
+        existing.map((e) => {
+          let dateIso = '';
+          if (e.date) {
+            try {
+              dateIso = e.date instanceof Date ? e.date.toISOString() : new Date(e.date).toISOString();
+            } catch {
+              dateIso = '';
+            }
+          }
+          return csvDedupeKey(
             e.kind === 'income' ? 'income' : 'expense',
             e.vendorKey || '',
-            new Date(e.date).toISOString(),
+            dateIso,
             // Compare printed against printed: a foreign record keeps its printed
             // figure in origAmount while `amount` holds the converted one.
             (e.origAmount || 0) > 0 ? e.origAmount : e.amount || 0
-          )
-        )
+          );
+        })
       );
 
       // Series inheritance (category/recurring) per vendor — one query per unique key.

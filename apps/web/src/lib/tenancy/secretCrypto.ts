@@ -64,7 +64,7 @@ export function encryptSecret(plaintext: string): string {
   if (typeof plaintext !== 'string') throw new Error('encryptSecret: plaintext must be a string');
   const key = deriveKey();
   const iv = randomBytes(IV_LEN);
-  const cipher = createCipheriv(ALGO, key, iv);
+  const cipher = createCipheriv(ALGO, key, iv, { authTagLength: TAG_LEN });
   const ct = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
   const tag = cipher.getAuthTag();
   return `${FORMAT}$${iv.toString('base64')}$${tag.toString('base64')}$${ct.toString('base64')}`;
@@ -85,7 +85,7 @@ export function decryptSecret(stored: string): string | null {
     const ct = Buffer.from(parts[3], 'base64');
     if (iv.length !== IV_LEN || tag.length !== TAG_LEN) return null;
     const key = deriveKey();
-    const decipher = createDecipheriv(ALGO, key, iv);
+    const decipher = createDecipheriv(ALGO, key, iv, { authTagLength: TAG_LEN });
     decipher.setAuthTag(tag);
     const out = Buffer.concat([decipher.update(ct), decipher.final()]);
     return out.toString('utf8');
