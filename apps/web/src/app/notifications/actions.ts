@@ -22,8 +22,9 @@ import { computeInstallmentPlans } from '@/lib/installments';
 import { detectPriceHikes, type HikeEntry } from '@/lib/priceHike';
 import type { SerializedStatement } from '@/types';
 import { assertCanWrite } from '@/lib/auth';
+import { collectSubscriptionReviews, type ReviewableSubscription } from '@/lib/subscriptionReview';
 
-export type NotifKind = 'deal' | 'installment' | 'warranty' | 'pricehike' | 'trialend' | 'giftcard' | 'bill' | 'maintenance' | 'lending' | 'claim' | 'system';
+export type NotifKind = 'deal' | 'installment' | 'warranty' | 'pricehike' | 'trialend' | 'subreview' | 'giftcard' | 'bill' | 'maintenance' | 'lending' | 'claim' | 'system';
 
 export type SerializedNotification = {
   _id: string;
@@ -36,7 +37,7 @@ export type SerializedNotification = {
 };
 
 type Alert = { dedupeKey: string; kind: NotifKind; title: string; body: string; href: string };
-const AUTO_KINDS = ['deal', 'installment', 'warranty', 'pricehike', 'trialend', 'giftcard', 'bill', 'maintenance', 'lending', 'claim'] as const;
+const AUTO_KINDS = ['deal', 'installment', 'warranty', 'pricehike', 'trialend', 'subreview', 'giftcard', 'bill', 'maintenance', 'lending', 'claim'] as const;
 
 /** Recompute the live alerts (deals / warranties / installments-due) — the same
  *  three the ntfy check uses, but as structured payloads the bell can localize.
@@ -136,6 +137,22 @@ async function computeAlerts(): Promise<Alert[]> {
       body: `${days}|${charge}`,
       href: `/subscriptions?open=${id}`,
     });
+  }
+
+  if (s.subscriptionReviewIntervalDays > 0) {
+    const reviewRows = (await Subscription.find({ active: true })
+      .select('name createdAt lastReviewedAt pausedUntil')
+      .lean()) as ReviewableSubscription[];
+    for (const sub of collectSubscriptionReviews(reviewRows, s.subscriptionReviewIntervalDays, now)) {
+      const id = String(sub._id);
+      alerts.push({
+        dedupeKey: `subreview:${id}:${sub.iso}`,
+        kind: 'subreview',
+        title: sub.name,
+        body: `${sub.days}`,
+        href: `/subscriptions?open=${id}`,
+      });
+    }
   }
 
   // Gift-card / store-credit expiring with money still on it (P32): don't let a

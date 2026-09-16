@@ -5,8 +5,7 @@ import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/components/ui/cn';
 import { useRouter } from 'next/navigation';
-import { cur } from '@/lib/money';
-import { useT } from '@/components/LocaleProvider';
+import { useT, useMoney } from '@/components/LocaleProvider';
 import { findDuplicateSubscriptions, mergeSubscriptions } from './actions';
 import type { SubscriptionDupeGroup } from '@/lib/subscriptionDupes';
 
@@ -18,6 +17,7 @@ import type { SubscriptionDupeGroup } from '@/lib/subscriptionDupes';
 export function SubscriptionDuplicatesModal({ onClose }: { onClose: () => void }) {
   const router = useRouter();
   const t = useT();
+  const money = useMoney();
   const [loading, setLoading] = useState(true);
   const [groups, setGroups] = useState<SubscriptionDupeGroup[]>([]);
   const [keepBy, setKeepBy] = useState<Record<string, string>>({});
@@ -58,7 +58,6 @@ export function SubscriptionDuplicatesModal({ onClose }: { onClose: () => void }
 
   const pending = groups.filter((g) => !done[g.key]);
   const totalDupes = groups.reduce((s, g) => s + (g.entries.length - 1), 0);
-  const money = (n: number) => `${cur()}${n.toFixed(2)}`;
 
   return (
     <Modal open onClose={onClose} title={t('subdup.title')} size="xl">

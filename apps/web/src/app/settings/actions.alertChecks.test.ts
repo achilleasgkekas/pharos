@@ -249,6 +249,7 @@ const DEFAULT_SETTINGS = {
   maintenanceAlertDays: 7,
   lendingAlertDays: 3,
   syncStaleDays: 7,
+  subscriptionReviewIntervalDays: 0,
   budgets: {} as Record<string, number>,
 };
 
@@ -663,6 +664,23 @@ describe('runAlertChecks · free trials ending', () => {
     subscriptionFind.mockReturnValue(chainSelectLean([{ name: 'Later', trialEndsAt: daysFromNow(10), amount: 5 }]));
     const result = await runAlertChecks();
     expect(result.summary).toBe('All clear — nothing to report.');
+  });
+});
+
+describe('runAlertChecks · subscription usage review', () => {
+  it('alerts from createdAt when never reviewed and ignores an active pause', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-13T12:00:00Z'));
+    getAppSettingsMock.mockImplementation(async () => ({ ...DEFAULT_SETTINGS, subscriptionReviewIntervalDays: 180 }));
+    subscriptionFind
+      .mockReturnValueOnce(chainSelectLean([]))
+      .mockReturnValueOnce(chainSelectLean([
+        { _id: 'old', name: 'Forgotten TV', createdAt: '2026-01-01' },
+        { _id: 'paused', name: 'Paused TV', createdAt: '2026-01-01', pausedUntil: '2026-10-01' },
+      ]));
+    const result = await runAlertChecks();
+    expect(result.summary).toContain('🔎 1 subscription(s) due a usage review: Forgotten TV (255d since confirmation)');
+    vi.useRealTimers();
   });
 });
 

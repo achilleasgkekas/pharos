@@ -15,6 +15,7 @@ import { GiftCard } from '@/models/GiftCard';
 import { LoyaltyCard } from '@/models/LoyaltyCard';
 import { NetWorthSnapshot } from '@/models/NetWorthSnapshot';
 import { ShoppingListItem } from '@/models/ShoppingListItem';
+import { MeterReading } from '@/models/MeterReading';
 
 /**
  * The single source of truth for what the JSON backup (Settings → Storage & backup →
@@ -52,6 +53,7 @@ export const BACKUP_MODELS = {
   loyaltyCards: LoyaltyCard,
   netWorthSnapshots: NetWorthSnapshot,
   shoppingList: ShoppingListItem,
+  meterReadings: MeterReading,
 } as const;
 
 export type BackupKey = keyof typeof BACKUP_MODELS;

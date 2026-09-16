@@ -5,7 +5,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Package, ShoppingCart, ShoppingBasket, CheckSquare, Receipt as ReceiptIcon, CalendarClock, CreditCard,
   Menu, X, Sun, Moon, Settings, BarChart3, Ticket, Wallet, Banknote, ChevronDown, CalendarDays, PiggyBank,
-  LogOut, UserRound, Activity, MessageSquare, Trash2, FileText, Building2, ShieldCheck, IdCard, Cake,
+  LogOut, UserRound, Activity, MessageSquare, Trash2, FileText, Building2, ShieldCheck, IdCard, Cake, Gauge,
 } from 'lucide-react';
 import { cn } from './ui/cn';
 import { useTheme } from './ThemeProvider';
@@ -32,6 +32,7 @@ const MONEY: NavLink[] = [
   { href: '/receipts', key: 'nav.receipts', icon: ReceiptIcon },
   { href: '/expenses', key: 'nav.expenses', icon: Wallet },
   { href: '/bills', key: 'nav.bills', icon: FileText },
+  { href: '/utilities', key: 'nav.utilities', icon: Gauge },
   { href: '/income', key: 'nav.income', icon: Banknote },
   { href: '/statements', key: 'nav.statements', icon: CreditCard },
   { href: '/subscriptions', key: 'nav.subscriptions', icon: CalendarClock },

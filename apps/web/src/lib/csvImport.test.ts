@@ -185,6 +185,14 @@ describe('csvDedupeKey', () => {
     expect(csvDedupeKey('expense', 'dei', '2026-07-09', -45.9))
       .toBe(csvDedupeKey('expense', 'dei', '2026-07-09T00:00:00.000Z', 45.9));
   });
+  it('handles Date objects, null, undefined or non-string date inputs safely', () => {
+    expect(csvDedupeKey('expense', 'dei', new Date('2026-07-09T00:00:00Z') as any, 45.9))
+      .toBe('expense|dei|2026-07-09|45.90');
+    expect(csvDedupeKey('expense', 'dei', null as any, 45.9))
+      .toBe('expense|dei||45.90');
+    expect(csvDedupeKey('expense', 'dei', undefined as any, 45.9))
+      .toBe('expense|dei||45.90');
+  });
   it('differs across kind, vendor, day and amount', () => {
     const base = csvDedupeKey('expense', 'dei', '2026-07-09', 45.9);
     expect(csvDedupeKey('income', 'dei', '2026-07-09', 45.9)).not.toBe(base);

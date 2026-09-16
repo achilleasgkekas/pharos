@@ -1,3 +1,5 @@
+import { formatCurrency } from '@/lib/i18n/format';
+
 // PURE presentation helpers for AI cost metering — turn the ledger's integer "micros"
 // into display-ready currency numbers and a compact "cost this month" summary object.
 //
@@ -22,13 +24,9 @@ export function microsToUnits(micros: number): number {
   return micros / MICROS_PER_UNIT;
 }
 
-/**
- * Format micros as a currency string with 2 decimals (e.g. 1_230_000 → "€1.23"). The symbol
- * is a plain prefix (default "€") — this is an internal dashboard label, not locale-aware
- * money formatting. Garbage/negative → "<symbol>0.00".
- */
-export function formatMicros(micros: number, symbol = '€'): string {
-  return `${symbol}${microsToUnits(micros).toFixed(2)}`;
+/** Format ledger micros using an ISO currency and the reader's locale. */
+export function formatMicros(micros: number, currency = 'EUR', locale = 'en'): string {
+  return formatCurrency(microsToUnits(micros), currency, locale);
 }
 
 /** Raw current-period ledger figures a cost summary is built from (see UsageSnapshot). */
@@ -52,7 +50,7 @@ export type CostSummary = {
   costMicros: number;
   /** costMicros as whole currency units (e.g. 1.23). */
   costUnits: number;
-  /** costMicros formatted with the given symbol (e.g. "€1.23"). */
+  /** costMicros formatted with the given currency (e.g. "€1.23"). */
   costFormatted: string;
 };
 
@@ -61,7 +59,7 @@ export type CostSummary = {
  * field is coerced to a safe non-negative integer, so a partial/garbage snapshot can never
  * produce NaN or a negative in the read surface. `period` is passed through verbatim.
  */
-export function buildCostSummary(input: CostSummaryInput, symbol = '€'): CostSummary {
+export function buildCostSummary(input: CostSummaryInput, currency = 'EUR', locale = 'en'): CostSummary {
   const aiCalls = nonNegInt(input.aiCalls);
   const inputTokens = nonNegInt(input.aiInputTokens);
   const outputTokens = nonNegInt(input.aiOutputTokens);
@@ -74,6 +72,6 @@ export function buildCostSummary(input: CostSummaryInput, symbol = '€'): CostS
     totalTokens: inputTokens + outputTokens,
     costMicros,
     costUnits: microsToUnits(costMicros),
-    costFormatted: formatMicros(costMicros, symbol),
+    costFormatted: formatMicros(costMicros, currency, locale),
   };
 }

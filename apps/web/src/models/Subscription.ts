@@ -45,6 +45,8 @@ const SubscriptionSchema = new Schema(
     trialEndsAt: { type: Date, default: null },
     firstChargeAmount: { type: Number, default: 0 },
     cancelledAt: { type: Date, default: null },
+    // P57: explicit user confirmation; absent records start their review clock at createdAt.
+    lastReviewedAt: { type: Date, default: null },
     active: { type: Boolean, default: true, index: true },
     paymentMethod: { type: String, default: '' },
     notes: { type: String, default: '' },

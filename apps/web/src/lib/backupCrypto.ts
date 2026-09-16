@@ -15,6 +15,7 @@ const R = 8;
 const P = 1;
 const KEY_LEN = 32; // AES-256
 const IV_LEN = 12; // GCM nonce
+const TAG_LEN = 16; // GCM auth tag
 const SALT_LEN = 16;
 const ALGO = 'aes-256-gcm';
 
@@ -53,7 +54,7 @@ export function encryptBackup(plaintext: string, passphrase: string): string {
   const salt = randomBytes(SALT_LEN);
   const iv = randomBytes(IV_LEN);
   const key = deriveKey(passphrase, salt);
-  const cipher = createCipheriv(ALGO, key, iv);
+  const cipher = createCipheriv(ALGO, key, iv, { authTagLength: TAG_LEN });
   const enc = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
   const tag = cipher.getAuthTag();
   const env: BackupEnvelope = {
@@ -86,8 +87,9 @@ export function decryptBackup(envelope: string, passphrase: string): string {
   const salt = Buffer.from(env.salt, 'base64');
   const iv = Buffer.from(env.iv, 'base64');
   const tag = Buffer.from(env.tag, 'base64');
+  if (tag.length !== TAG_LEN) throw new Error('Not a valid encrypted backup file');
   const key = deriveKey(passphrase, salt);
-  const decipher = createDecipheriv(ALGO, key, iv);
+  const decipher = createDecipheriv(ALGO, key, iv, { authTagLength: TAG_LEN });
   decipher.setAuthTag(tag);
   try {
     const dec = Buffer.concat([decipher.update(Buffer.from(env.data, 'base64')), decipher.final()]);

@@ -1,7 +1,6 @@
 'use client';
 import { useMemo, useState, useTransition } from 'react';
-import { cur } from '@/lib/money';
-import { useT } from '@/components/LocaleProvider';
+import { useT, useMoney } from '@/components/LocaleProvider';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { ResponsiveContainer, AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, ReferenceLine, Legend } from 'recharts';
 import { PiggyBank, Target, TrendingUp, Wallet, Plus, Trash2, Scissors, Check, AlertTriangle } from 'lucide-react';
@@ -21,11 +20,6 @@ import type { SavingsData, SavingsGoal } from './types';
 // page is handed a baseline and a projection rather than a set of finished answers: the
 // engine is pure, so "what if I moved the date?" costs nothing and needs no round trip.
 
-const money = (n: number) =>
-  `${cur()}${Math.round(n).toLocaleString('en-GB')}`;
-
-const moneyExact = (n: number) =>
-  `${cur()}${(Math.round(n * 100) / 100).toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -76,6 +70,8 @@ const VERDICT_COLOR: Record<SavingsVerdict, string> = {
 
 export function SavingsClient({ data }: { data: SavingsData }) {
   const t = useT();
+  const money = useMoney();
+  const moneyExact = useMoney({ minimumFractionDigits: 0, maximumFractionDigits: 2 });
   const { baseline, projection, goals, levers, obligations } = data;
 
   // Default six months out: far enough to be a forecast, near enough to still be about
@@ -188,7 +184,7 @@ export function SavingsClient({ data }: { data: SavingsData }) {
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
               <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} width={52} />
+              <YAxis tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} width={52} tickFormatter={(v: number) => money(v, undefined, { notation: 'compact', minimumFractionDigits: 0, maximumFractionDigits: 1 })} />
               <Tooltip
                 contentStyle={tooltipStyle}
                 formatter={(v: number) => [money(v), t('sav.chartBalance')]}
@@ -264,7 +260,7 @@ export function SavingsClient({ data }: { data: SavingsData }) {
             <BarChart data={data.history.map((m) => ({ ...m, label: m.key.slice(2) }))} margin={{ left: 0, right: 10, top: 6 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
               <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#888' }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 10, fill: '#888' }} axisLine={false} tickLine={false} width={52} />
+              <YAxis tick={{ fontSize: 10, fill: '#888' }} axisLine={false} tickLine={false} width={52} tickFormatter={(v: number) => money(v, undefined, { notation: 'compact', minimumFractionDigits: 0, maximumFractionDigits: 1 })} />
               <Tooltip contentStyle={tooltipStyle} formatter={(v: number, n) => [money(v), n]} cursor={{ fill: 'rgba(127,127,127,0.08)' }} />
               <Legend wrapperStyle={{ fontSize: 11 }} />
               <Bar dataKey="income" name={t('sav.bIncome')} radius={[5, 5, 0, 0]} fill="#00ff88" />
@@ -280,6 +276,8 @@ export function SavingsClient({ data }: { data: SavingsData }) {
 /** The verdict, the arithmetic behind it, and what to do about a gap. */
 function PlanReadout({ plan, levers }: { plan: SavingsPlan; levers: SavingsData['levers'] }) {
   const t = useT();
+  const money = useMoney();
+  const moneyExact = useMoney({ minimumFractionDigits: 0, maximumFractionDigits: 2 });
   const cover = useMemo(() => coverShortfall(plan.shortfallPerMonth, levers), [plan.shortfallPerMonth, levers]);
   const color = VERDICT_COLOR[plan.verdict];
 
@@ -342,6 +340,7 @@ function PlanReadout({ plan, levers }: { plan: SavingsPlan; levers: SavingsData[
 /** A goal, run through the same planner, with the progress + contribute controls. */
 function GoalPlanCard({ goal, data }: { goal: SavingsGoal; data: SavingsData }) {
   const t = useT();
+  const money = useMoney();
   const confirm = useConfirm();
   const [pending, startTransition] = useTransition();
   const [amount, setAmount] = useState('');

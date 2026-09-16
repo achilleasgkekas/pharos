@@ -21,6 +21,9 @@ services:
       OLLAMA_NUM_CTX: ${OLLAMA_NUM_CTX:-8192}
       # FlareSolverr (headless Chromium) for Cloudflare-protected shops like Skroutz
       SOLVER_URL: ${SOLVER_URL:-http://flaresolverr:8191}
+      # Optional error reporting (lib/errorReporting.ts). Empty ⇒ off, nothing is sent anywhere.
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-}
       # SearXNG metasearch for web/image search (AI fill without a link, product photos)
       SEARXNG_URL: ${SEARXNG_URL:-http://searxng:8080}
       STORAGE_ROOT: /storage
