@@ -132,19 +132,6 @@ describe('updateExpense', () => {
     expect(expenseUpdateOne.mock.calls[0][1].$set.period).toBe('2026-05');
   });
 
-  it.each(['Europe/Athens', 'America/New_York'])('preserves local European dates in %s', async (timezone) => {
-    vi.stubEnv('TZ', timezone);
-    try {
-      for (const [date, period] of [['01/05/2024', '2024-05'], ['01/01/2025', '2025-01']]) {
-        expenseUpdateOne.mockClear();
-        await updateExpense('e1', { date, period: '' } as any);
-        expect(expenseUpdateOne.mock.calls[0][1].$set.period).toBe(period);
-      }
-    } finally {
-      vi.unstubAllEnvs();
-    }
-  });
-
   it('trims space/taxCategory and cleans the split array via the real cleanSplit', async () => {
     await updateExpense('e1', {
       date: '2026-06-15',

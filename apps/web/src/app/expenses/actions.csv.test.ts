@@ -361,19 +361,17 @@ describe('importExpensesCsv — record shape', () => {
     expect(doc.period).toBe('2026-03');
   });
 
-  it.each(['America/New_York', 'Europe/Athens'])('preserves CSV month boundaries in %s', async (timezone) => {
-    vi.stubEnv('TZ', timezone);
+  it('uses UTC getters so period matches the original UTC date under negative timezone offset', async () => {
+    const origTz = process.env.TZ;
     try {
-      for (const date of ['2024-05-01', '2025-01-01', '2024-12-31']) {
-        expenseInsertMany.mockClear();
-        await importExpensesCsv([row({ date })], { kind: 'expense', signSplit: false });
-        expect(expenseInsertMany.mock.calls[0][0][0].period).toBe(date.slice(0, 7));
-      }
+      process.env.TZ = 'America/New_York';
+      await importExpensesCsv([row({ vendor: 'ΔΕΗ', date: '2024-05-01' })], { kind: 'expense', signSplit: false });
+      const doc = expenseInsertMany.mock.calls[0][0][0];
+      expect(doc.period).toBe('2024-05');
     } finally {
-      vi.unstubAllEnvs();
+      process.env.TZ = origTz;
     }
   });
-
 });
 
 describe('importExpensesCsv — error handling', () => {

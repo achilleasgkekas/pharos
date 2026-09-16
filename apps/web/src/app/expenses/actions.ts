@@ -118,7 +118,7 @@ async function inheritFromSeries(kind: Kind, vKey: string): Promise<{ category?:
 
 function periodFrom(date: Date, parsedPeriod?: string): string {
   if (parsedPeriod && /^\d{4}-\d{2}$/.test(parsedPeriod)) return parsedPeriod;
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
 }
 
 /**
@@ -637,8 +637,7 @@ export async function importExpensesCsv(
           origAmount: r.fx.origAmount,
           fxRate: r.fx.fxRate,
           date,
-          // CSV dates are validated calendar values, independent of server timezone.
-          period: r.date.slice(0, 7),
+          period: periodFrom(date),
           recurring: rule?.recurring || inh?.recurring || false,
           recurringCycle: (rule?.recurringCycle || inh?.recurringCycle || '') as RecurringCycle,
           notes: r.notes,
