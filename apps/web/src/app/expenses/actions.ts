@@ -118,7 +118,7 @@ async function inheritFromSeries(kind: Kind, vKey: string): Promise<{ category?:
 
 function periodFrom(date: Date, parsedPeriod?: string): string {
   if (parsedPeriod && /^\d{4}-\d{2}$/.test(parsedPeriod)) return parsedPeriod;
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
 }
 
 /**
@@ -169,7 +169,7 @@ export async function generateDueRecurring(): Promise<{ created: number }> {
         amount: seed.amount,
         currency: base,
         date: next,
-        period: `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}`,
+        period: periodFrom(next),
         recurring: true,
         recurringCycle: seed.recurringCycle,
         aiModel: 'recurring-auto',

@@ -360,6 +360,18 @@ describe('importExpensesCsv — record shape', () => {
     expect(doc.vendorKey).toBe('dei');
     expect(doc.period).toBe('2026-03');
   });
+
+  it('uses UTC getters so period matches the original UTC date under negative timezone offset', async () => {
+    const origTz = process.env.TZ;
+    try {
+      process.env.TZ = 'America/New_York';
+      await importExpensesCsv([row({ vendor: 'ΔΕΗ', date: '2024-05-01' })], { kind: 'expense', signSplit: false });
+      const doc = expenseInsertMany.mock.calls[0][0][0];
+      expect(doc.period).toBe('2024-05');
+    } finally {
+      process.env.TZ = origTz;
+    }
+  });
 });
 
 describe('importExpensesCsv — error handling', () => {
