@@ -1,3 +1,4 @@
+import { getLocale } from '@/lib/i18n/server';
 // User-facing USAGE deep-dive (SaaS control plane). The detail view behind the Overview's
 // summary Usage panel: current-period AI + storage consumption rendered as quota progress bars
 // (with remaining + %) plus a token/cost breakdown. SSR consumes the already-built readers
@@ -37,6 +38,7 @@ export default async function WorkspaceUsagePage({
   const { w } = await searchParams;
 
   // Gate (throws notFound when SaaS off) + current viewer claims.
+  const locale = await getLocale();
   const viewer = await getSaasViewer();
   if (!viewer) {
     const suffix = w ? `?w=${encodeURIComponent(w)}` : '';
@@ -66,7 +68,8 @@ export default async function WorkspaceUsagePage({
       aiOutputTokens: usage.aiOutputTokens,
       aiCostMicros: usage.aiCostMicros,
     },
-    '€',
+    'EUR',
+    locale,
   );
 
   return (
@@ -90,7 +93,7 @@ export default async function WorkspaceUsagePage({
           <StatTile label="Storage" value={formatBytes(usage.storageBytes)} accent="purple" />
           <StatTile
             label="AI cost · this month"
-            value={formatCostMicros(usage.aiCostMicros, 'EUR')}
+            value={formatCostMicros(usage.aiCostMicros, 'EUR', locale)}
             accent="gold"
           />
         </div>

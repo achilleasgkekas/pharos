@@ -1,0 +1,59 @@
+name: Security scan
+
+# Weekly static analysis of OUR code (dependency advisories are Dependabot's job). Report-only:
+# it never blocks a PR — a new rule in the public registry would otherwise turn every open PR red
+# overnight for code nobody touched. Findings are kept in ONE issue that is rewritten each week,
+# so the automation (pharos-brain / Codex builder) sees a single, current to-do list.
+on:
+  schedule:
+    - cron: "17 4 * * 1"   # Monday 04:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  semgrep:
+    name: Semgrep (report-only)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with: { python-version: "3.12" }
+      - run: pip install --quiet semgrep
+      - name: Scan
+        # --metrics=off: nothing about the code is sent to semgrep.dev beyond fetching the rule packs.
+        run: |
+          semgrep scan --metrics=off --severity ERROR --severity WARNING \
+            --config p/typescript --config p/react --config p/nextjs --config p/secrets \
+            --exclude '**/*.test.ts' --exclude '**/*.test.tsx' --exclude '**/node_modules/**' \
+            --json --output semgrep.json apps services || true
+          jq '.results | length' semgrep.json
+      - name: Update the weekly security issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          N=$(jq '.results | length' semgrep.json)
+          TITLE="[security] Semgrep weekly report"
+          EXISTING=$(gh issue list --state open --search "in:title \"$TITLE\"" --json number --jq '.[0].number // empty')
+          if [ "$N" -eq 0 ]; then
+            [ -n "$EXISTING" ] && gh issue close "$EXISTING" --comment "Semgrep ($(date -u +%F)): no findings any more. Closing."
+            exit 0
+          fi
+          {
+            echo "> Weekly Semgrep scan, main @ \`${GITHUB_SHA::7}\` ($(date -u +%F)). **$N findings.** Rewritten every Monday."
+            echo
+            echo "**For the agent:** triage each row — fix real issues, or add a \`// nosemgrep: <rule-id>\` comment with a one-line reason for false positives. Never disable a rule globally."
+            echo
+            echo "| Severity | Rule | Where | Message |"
+            echo "|---|---|---|---|"
+            jq -r '.results | sort_by(.extra.severity) | .[:60][] |
+              "| \(.extra.severity) | `\(.check_id | split(".") | last)` | `\(.path):\(.start.line)` | \(.extra.message | gsub("\n";" ") | gsub("\\|";"/") | .[0:180]) |"' semgrep.json
+          } > body.md
+          gh label create security --color B60205 --description "Security finding" --force >/dev/null 2>&1 || true
+          if [ -n "$EXISTING" ]; then
+            gh issue edit "$EXISTING" --body-file body.md
+          else
+            gh issue create --title "$TITLE" --label "security,needs-triage" --body-file body.md
+          fi

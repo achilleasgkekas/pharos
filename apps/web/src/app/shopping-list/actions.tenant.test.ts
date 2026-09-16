@@ -122,7 +122,8 @@ describe('shopping-list actions — tenant routing', () => {
 
     // The rows came out of acme's collection, so a read answered by the wrong db is visible here.
     expect(mine.map((i) => i.name)).toEqual(['Acme bread']);
-    expect(writes.get('acme')?.[0].doc.sort).toEqual({ checked: 1, createdAt: -1 });
+    expect(writes.get('acme')?.map((w) => w.op)).toEqual(['updateMany', 'find']);
+    expect(writes.get('acme')?.[1].doc.sort).toEqual({ checked: 1, createdAt: -1 });
     expect(writes.get('default')).toBeUndefined();
   });
 
@@ -133,7 +134,8 @@ describe('shopping-list actions — tenant routing', () => {
     expect(writes.get('acme')?.map((w) => w.op)).toEqual(['updateOne']);
     expect(writes.get('acme')?.[0].doc.filter).toEqual({ _id: 'l1' });
     expect(writes.get('acme')?.[0].doc.update.$set).toEqual({ name: 'Bread' });
-    expect(writes.get('globex')?.[0].doc.update.$set).toEqual({ checked: true });
+    expect(writes.get('globex')?.[0].doc.update.$set.checked).toBe(true);
+    expect(writes.get('globex')?.[0].doc.update.$set.lastRestockedAt).toBeInstanceOf(Date);
     expect(writes.get('default')).toBeUndefined();
   });
 
@@ -146,7 +148,7 @@ describe('shopping-list actions — tenant routing', () => {
     expect(cleared).toEqual({ ok: true, cleared: 2 });
     expect(writes.get('globex')?.map((w) => w.op)).toEqual(['updateOne', 'updateMany']);
     expect(writes.get('globex')?.[0].doc.update.$set.deletedAt).toBeInstanceOf(Date);
-    expect(writes.get('globex')?.[1].doc.filter).toEqual({ checked: true });
+    expect(writes.get('globex')?.[1].doc.filter).toEqual({ checked: true, restockIntervalDays: { $exists: false } });
     expect(writes.get('default')).toBeUndefined();
     expect(writes.get('acme')).toBeUndefined();
   });

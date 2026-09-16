@@ -4,7 +4,7 @@ import { BILLING_CYCLES, monthlyEquivalent, isBillingCycle } from '@/lib/billing
 // The countdown lives with the roll-forward that keeps `nextRenewal` from going stale, so
 // the badge and the derived date can never disagree about the day a renewal stops being today.
 import { renewalDaysUntil } from '@/lib/subscriptionRenewal';
-import { isForeignCurrency, normalizeCurrency, convertToBase, deriveFxRate, formatMoney, toPrinted } from '@/lib/fx';
+import { isForeignCurrency, normalizeCurrency, convertToBase, deriveFxRate, toPrinted } from '@/lib/fx';
 import { FxBadge } from '@/components/FxBadge';
 import { FxRateButton } from '@/components/FxRateButton';
 import { useState, useTransition, useMemo } from 'react';
@@ -20,7 +20,7 @@ import { cn } from '@/components/ui/cn';
 import { CardSelect } from '@/components/CardSelect';
 import { useOpenParam } from '@/components/useOpenParam';
 import type { SerializedSubscription, SerializedCard } from '@/types';
-import { useT } from '@/components/LocaleProvider';
+import { useT, useMoney } from '@/components/LocaleProvider';
 import type { TKey } from '@/lib/i18n';
 import type { RecurringCandidate } from '@/lib/recurringDiscovery';
 import { equalSplit, splitTotals, type SplitEntry } from '@/lib/split';
@@ -29,6 +29,7 @@ import {
   updateSubscription,
   deleteSubscription,
   toggleSubscriptionActive,
+  reviewSubscription,
   suggestSubscriptionInfo,
   trackDiscoveredSubscription,
 } from './actions';
@@ -68,7 +69,6 @@ function currencyCodes(base: string): string[] {
 }
 
 
-const money = (n: number) => `${cur()}${(n || 0).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 /** Multi-currency context (P9): the deployment's base currency code + whether the per-entry
  *  currency/FX controls are switched on at all. One object, so prop lists grow by one entry. */
@@ -102,6 +102,7 @@ export function SubscriptionsClient({
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const t = useT();
+  const money = useMoney();
   // Discovered untracked recurring charges (P7). Ephemeral hide list — "dismiss" is
   // per-session only (no persisted ignore list yet); "track" removes it via the
   // vendorKey now existing as a real Subscription on next page load too.
@@ -248,21 +249,21 @@ export function SubscriptionsClient({
               {t('v.activeCount', { n: active.length })}
             </span>
           </h1>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
             <div
-              className="flex gap-4 text-xs text-[color:var(--color-text-dim)]"
+              className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-[color:var(--color-text-dim)]"
               style={{ fontFamily: 'var(--font-mono)' }}
             >
               <span>
                 {t('sub.monthly')}{' '}
                 <span className="text-[color:var(--color-accent)] font-semibold">
-                  {cur()}{monthlyTotal.toFixed(2)}
+                  {money(monthlyTotal)}
                 </span>
               </span>
               <span>
                 {t('sub.yearly')}{' '}
                 <span className="text-[color:var(--color-gold)] font-semibold">
-                  {cur()}{yearlyTotal.toFixed(0)}
+                  {money(yearlyTotal)}
                 </span>
               </span>
             </div>
@@ -316,7 +317,7 @@ export function SubscriptionsClient({
                     )}
                     style={{ fontFamily: 'var(--font-mono)' }}
                   >
-                    {d === 0 ? 'today' : d === 1 ? 'tomorrow' : `in ${d} days`} · {cur()}{s.amount}
+                    {d === 0 ? 'today' : d === 1 ? 'tomorrow' : `in ${d} days`} · {money(s.amount)}
                   </span>
                 </button>
               );
@@ -342,7 +343,7 @@ export function SubscriptionsClient({
               >
                 <span className="text-sm font-semibold flex-1 min-w-[100px] truncate">{c.vendor || c.vendorKey}</span>
                 <span className="text-xs text-[color:var(--color-text-dim)]" style={{ fontFamily: 'var(--font-mono)' }}>
-                  ~{cur()}{c.avgAmount.toFixed(2)} · {t(`sub.${c.cycle}` as TKey)} · {t('sub.discoveredOccurrences', { n: c.occurrences })}
+                  ~{money(c.avgAmount)} · {t(`sub.${c.cycle}` as TKey)} · {t('sub.discoveredOccurrences', { n: c.occurrences })}
                 </span>
                 <div className="flex items-center gap-1.5 ml-auto">
                   <Button
@@ -420,6 +421,7 @@ export function SubscriptionsClient({
 /** Cyan chip: this subscription is split with household members — shows what's still
  *  owed to you (or ✓ when settled). Same idiom as Expenses' SplitBadge (P35/P73). */
 function SplitBadge({ split }: { split?: SplitEntry[] }) {
+  const money = useMoney();
   if (!split || split.length === 0) return null;
   const { owed } = splitTotals(split);
   const settledUp = owed <= 0.009;
@@ -443,6 +445,7 @@ function SplitBadge({ split }: { split?: SplitEntry[] }) {
 
 function SubCard({ sub, base, onEdit }: { sub: SerializedSubscription; base: string; onEdit: () => void }) {
   const t = useT();
+  const money = useMoney();
   const [pending, startTransition] = useTransition();
   const confirm = useConfirm();
   const meta = categoryMeta(sub.category);
@@ -485,7 +488,7 @@ function SubCard({ sub, base, onEdit }: { sub: SerializedSubscription; base: str
 
       <div className="flex items-baseline gap-1.5 mb-2">
         <span className="text-2xl font-bold text-[color:var(--color-accent)]" style={{ fontFamily: 'var(--font-display)' }}>
-          {cur()}{sub.amount}
+          {money(sub.amount)}
         </span>
         <span className="text-xs text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
           / {cycleLabel.toLowerCase()}
@@ -508,6 +511,15 @@ function SubCard({ sub, base, onEdit }: { sub: SerializedSubscription; base: str
       )}
 
       <div className="flex items-center gap-1 pt-2 border-t border-[color:var(--color-border)]">
+        {sub.active && (
+          <button
+            onClick={() => startTransition(() => reviewSubscription(sub._id))}
+            disabled={pending}
+            className="mr-1 px-2 py-1 rounded-md text-[10px] font-semibold text-[color:var(--color-accent)] hover:bg-[color:var(--color-surface-2)] transition-colors"
+          >
+            <CheckCircle2 size={12} className="inline mr-1" />{t('sub.stillUsing')}
+          </button>
+        )}
         <button
           onClick={onEdit}
           className="p-1.5 rounded-md text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface-2)] transition-colors"
@@ -723,7 +735,12 @@ function SubForm({ sub, cards, spaces = [], fx, onSuccess, onDeleted }: { sub?: 
           {t('sub.trialHint')}
         </p>
       )}
-      <SplitEditor split={split} amount={Number(form.amount) || 0} onChange={setSplit} />
+      <SplitEditor
+        split={split}
+        amount={foreign && Number(form.fxRate) > 0 ? convertToBase(Number(form.amount) || 0, Number(form.fxRate)) : Number(form.amount) || 0}
+        baseCurrency={fx.base}
+        onChange={setSplit}
+      />
       <Field label="URL">
         <Input value={form.url} onChange={set('url')} placeholder="https://..." />
       </Field>
@@ -772,6 +789,7 @@ function SubFxFields({
   base: string;
 }) {
   const t = useT();
+  const money = useMoney();
   const [charged, setCharged] = useState('');
   const printed = Number(form.amount) || 0;
   const rate = Number(form.fxRate) || 0;
@@ -810,7 +828,7 @@ function SubFxFields({
       </Field>
       <p className="text-[11px] pb-2" style={{ fontFamily: 'var(--font-mono)' }}>
         {rate > 0 ? (
-          <span className="text-[color:var(--color-purple)]">= {formatMoney(convertToBase(printed, rate), base)}</span>
+          <span className="text-[color:var(--color-purple)]">= {money(convertToBase(printed, rate), base)}</span>
         ) : (
           <span className="text-[color:var(--color-gold)]">⚠ {t('ex.fxNoRate', { base })}</span>
         )}
@@ -824,8 +842,9 @@ function SubFxFields({
  *  history) — same UI idiom and pure helpers (equalSplit/splitTotals) as Expenses'
  *  SplitEditor (P35), reused as-is; the component itself is duplicated rather than
  *  shared because the two forms don't share a form-state shape. */
-function SplitEditor({ split, amount, onChange }: { split: SplitEntry[]; amount: number; onChange: (s: SplitEntry[]) => void }) {
+function SplitEditor({ split, amount, baseCurrency, onChange }: { split: SplitEntry[]; amount: number; baseCurrency?: string; onChange: (s: SplitEntry[]) => void }) {
   const t = useT();
+  const money = useMoney();
   const [includeSelf, setIncludeSelf] = useState(false);
   const totals = splitTotals(split);
   const yourShare = Math.round((amount - split.reduce((s, e) => s + (e.share || 0), 0)) * 100) / 100;
@@ -844,7 +863,7 @@ function SplitEditor({ split, amount, onChange }: { split: SplitEntry[]; amount:
   return (
     <div className="rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] p-3">
       <div className="flex items-center justify-between mb-2">
-        <span className="text-xs font-medium flex items-center gap-1.5"><SplitIcon size={13} className="text-[color:var(--color-cyan)]" /> {t('ex.splitTitle')}</span>
+        <span className="text-xs font-medium flex items-center gap-1.5"><SplitIcon size={13} className="text-[color:var(--color-cyan)]" /> {t('ex.splitTitle')}{baseCurrency ? ` (${currencySymbol(baseCurrency).trim()})` : ''}</span>
         {split.length > 0 && (
           <span className="text-[10px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
             {t('ex.splitOwedYou', { amt: money(totals.owed) })}{totals.settled > 0 ? ` · ${t('ex.splitSettled', { amt: money(totals.settled) })}` : ''}

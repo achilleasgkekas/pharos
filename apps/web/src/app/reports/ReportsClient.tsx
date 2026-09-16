@@ -1,7 +1,7 @@
 'use client';
 import { useState, useTransition } from 'react';
 import { cur } from "@/lib/money";
-import { useT } from '@/components/LocaleProvider';
+import { useT, useMoney } from '@/components/LocaleProvider';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import {
   ResponsiveContainer,
@@ -19,7 +19,7 @@ import {
   CartesianGrid,
 } from 'recharts';
 import { Store, Package, CalendarClock, Receipt as ReceiptIcon, Layers, ShieldCheck, TrendingUp, CreditCard, Wallet, Target, Plus, Trash2, X, Sparkles, AlertTriangle, Check, ArrowRight } from 'lucide-react';
-import { formatMoney, convertToBase } from '@/lib/fx';
+import { convertToBase } from '@/lib/fx';
 import { applyFxRate, applyFxRateToCurrency } from './fxActions';
 import { FxRateButton } from '@/components/FxRateButton';
 import { createGoal, addGoalContribution, deleteGoal, sweepBudgetLeftoverToGoal } from './goalsActions';
@@ -209,6 +209,7 @@ function fmtDate(s: string): string {
  */
 function FxCurrencyGroup({ currency, rows, base }: { currency: string; rows: FxIssueRow[]; base: string }) {
   const t = useT();
+  const money = useMoney();
   const [rate, setRate] = useState('');
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -234,7 +235,7 @@ function FxCurrencyGroup({ currency, rows, base }: { currency: string; rows: FxI
           {' · '}
           {rows.length}
           {' · '}
-          {formatMoney(total, currency)}
+          {money(total, currency)}
         </p>
         <div className="flex items-center gap-1.5">
           <span className="text-[10px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
@@ -277,6 +278,7 @@ function FxCurrencyGroup({ currency, rows, base }: { currency: string; rows: FxI
 /** A single rate-less record: what it is, what it printed, and the rate that converts it. */
 function FxIssueLine({ row, base, fallbackRate }: { row: FxIssueRow; base: string; fallbackRate: number }) {
   const t = useT();
+  const money = useMoney();
   const [rate, setRate] = useState('');
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -303,14 +305,14 @@ function FxIssueLine({ row, base, fallbackRate }: { row: FxIssueRow; base: strin
         </span>
       </a>
       <span className="text-sm font-semibold text-[color:var(--color-gold)] whitespace-nowrap" style={{ fontFamily: 'var(--font-mono)' }}>
-        {formatMoney(row.origAmount, row.currency)}
+        {money(row.origAmount, row.currency)}
       </span>
       <div className="flex items-center gap-1.5">
         {/* Live preview of what will actually be stored, so a mistyped rate is visible
             before it is written rather than after. */}
         {ok && (
           <span className="text-[11px] text-[color:var(--color-text-dim)] whitespace-nowrap" style={{ fontFamily: 'var(--font-mono)' }}>
-            → {formatMoney(convertToBase(row.origAmount, effective), base)}
+            → {money(convertToBase(row.origAmount, effective), base)}
           </span>
         )}
         <input
@@ -342,6 +344,7 @@ function FxIssueLine({ row, base, fallbackRate }: { row: FxIssueRow; base: strin
 
 export function ReportsClient({ data, months = 12 }: { data: Data; months?: number }) {
   const t = useT();
+  const money = useMoney();
   const s = data.summary;
   const spend12 = data.monthlySpend.reduce((a, m) => a + m.total, 0);
   const netWorthNow = s.ownedValue + data.netWorth.accountsTotal - s.installmentsRemaining - s.outstanding;
@@ -403,14 +406,14 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
           <div>
             <p className="text-[10px] uppercase tracking-[0.15em] text-[color:var(--color-text-faint)] mb-1" style={{ fontFamily: 'var(--font-mono)' }}>{t('reports.netWorth')}</p>
             <p className="text-3xl md:text-4xl font-bold" style={{ fontFamily: 'var(--font-display)', color: netWorthNow >= 0 ? 'var(--color-accent)' : 'var(--color-red)' }}>
-              {cur()}{netWorthNow.toLocaleString('en-GB')}
+              {money(netWorthNow)}
             </p>
           </div>
           <div className="flex flex-wrap gap-5 text-xs" style={{ fontFamily: 'var(--font-mono)' }}>
-            <div><span className="text-[color:var(--color-text-faint)] block mb-0.5">{t('reports.inventoryValue')}</span><span className="text-[color:var(--color-text)] text-sm">{cur()}{s.ownedValue.toLocaleString('en-GB')}</span></div>
-            <div><span className="text-[color:var(--color-text-faint)] block mb-0.5">{t('reports.accounts')}</span><span className="text-[color:var(--color-cyan)] text-sm">{cur()}{data.netWorth.accountsTotal.toLocaleString('en-GB')}</span></div>
-            <div><span className="text-[color:var(--color-text-faint)] block mb-0.5">{t('reports.owed')}</span><span className="text-[color:var(--color-red)] text-sm">-{cur()}{s.installmentsRemaining.toLocaleString('en-GB')}</span></div>
-            <div><span className="text-[color:var(--color-text-faint)] block mb-0.5">{t('reports.cardBalance')}</span><span className="text-[color:var(--color-gold)] text-sm">-{cur()}{s.outstanding.toLocaleString('en-GB')}</span></div>
+            <div><span className="text-[color:var(--color-text-faint)] block mb-0.5">{t('reports.inventoryValue')}</span><span className="text-[color:var(--color-text)] text-sm">{money(s.ownedValue)}</span></div>
+            <div><span className="text-[color:var(--color-text-faint)] block mb-0.5">{t('reports.accounts')}</span><span className="text-[color:var(--color-cyan)] text-sm">{money(data.netWorth.accountsTotal)}</span></div>
+            <div><span className="text-[color:var(--color-text-faint)] block mb-0.5">{t('reports.owed')}</span><span className="text-[color:var(--color-red)] text-sm">-{money(s.installmentsRemaining)}</span></div>
+            <div><span className="text-[color:var(--color-text-faint)] block mb-0.5">{t('reports.cardBalance')}</span><span className="text-[color:var(--color-gold)] text-sm">-{money(s.outstanding)}</span></div>
           </div>
         </div>
         {data.netWorth.series.length >= 2 ? (
@@ -425,8 +428,8 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
                 </defs>
                 <CartesianGrid stroke="var(--color-border)" strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="period" tick={{ fill: 'var(--color-text-faint)', fontSize: 10 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: 'var(--color-text-faint)', fontSize: 10 }} axisLine={false} tickLine={false} width={52} tickFormatter={(v: number) => `${cur()}${v >= 1000 || v <= -1000 ? `${Math.round(v / 1000)}k` : v}`} />
-                <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${cur()}${Number(v).toLocaleString('en-GB')}`, t('reports.netWorth')]} />
+                <YAxis tick={{ fill: 'var(--color-text-faint)', fontSize: 10 }} axisLine={false} tickLine={false} width={52} tickFormatter={(v: number) => money(v, undefined, { notation: 'compact', minimumFractionDigits: 0, maximumFractionDigits: 1 })} />
+                <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [money(Number(v)), t('reports.netWorth')]} />
                 <Area type="monotone" dataKey="net" stroke="#00ff88" strokeWidth={2} fill="url(#netWorthFill)" />
               </AreaChart>
             </ResponsiveContainer>
@@ -445,10 +448,10 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
               <Wallet size={12} /> {t('reports.safeToSpend')} · {data.safeToSpend.monthLabel}
             </p>
             <p className="text-3xl md:text-4xl font-bold" style={{ fontFamily: 'var(--font-display)', color: data.safeToSpend.thisMonth.net >= 0 ? 'var(--color-accent)' : 'var(--color-red)' }}>
-              {data.safeToSpend.thisMonth.net >= 0 ? '' : '-'}{cur()}{Math.abs(data.safeToSpend.thisMonth.net).toLocaleString('en-GB')}
+              {data.safeToSpend.thisMonth.net >= 0 ? '' : '-'}{money(Math.abs(data.safeToSpend.thisMonth.net))}
             </p>
             <p className="text-[11px] text-[color:var(--color-text-dim)] mt-1" style={{ fontFamily: 'var(--font-mono)' }}>
-              <span className="text-[color:var(--color-accent)]">+{cur()}{data.safeToSpend.thisMonth.income.toLocaleString('en-GB')}</span> {t('reports.stsIncome')} · <span className="text-[color:var(--color-red)]">-{cur()}{data.safeToSpend.thisMonth.outflow.toLocaleString('en-GB')}</span> {t('reports.stsFixed')}
+              <span className="text-[color:var(--color-accent)]">+{money(data.safeToSpend.thisMonth.income)}</span> {t('reports.stsIncome')} · <span className="text-[color:var(--color-red)]">-{money(data.safeToSpend.thisMonth.outflow)}</span> {t('reports.stsFixed')}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -456,7 +459,7 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
               <div key={w.days} className="rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] px-3 py-2 min-w-[92px]" style={{ fontFamily: 'var(--font-mono)' }}>
                 <span className="block text-[10px] text-[color:var(--color-text-faint)] mb-0.5">{t('reports.stsWindow', { d: w.days })}</span>
                 <span className="block text-sm font-semibold" style={{ color: w.net >= 0 ? 'var(--color-accent)' : 'var(--color-red)' }}>
-                  {w.net >= 0 ? '' : '-'}{cur()}{Math.abs(w.net).toLocaleString('en-GB')}
+                  {w.net >= 0 ? '' : '-'}{money(Math.abs(w.net))}
                 </span>
               </div>
             ))}
@@ -476,7 +479,7 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
           <div className="mt-3 flex flex-wrap gap-2 text-[11px]" style={{ fontFamily: 'var(--font-mono)' }}>
             {data.monthReview.overBudget.map((b) => (
               <span key={`b-${b.category}`} className="px-2 py-1 rounded-md border border-[color:var(--color-red)]/40 text-[color:var(--color-red)]">
-                {b.category} {cur()}{b.actual}/{cur()}{b.budget}
+                {b.category} {money(b.actual)}/{money(b.budget)}
               </span>
             ))}
             {data.monthReview.priceChanges.slice(0, 5).map((p) => (
@@ -495,10 +498,10 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-        <Stat icon={<ReceiptIcon size={14} />} label={t('reports.receiptsTotal')} value={`${cur()}${s.receiptsTotal.toLocaleString('en-GB')}`} sub={t('reports.receiptsSub', { n: s.receiptsCount, vat: `${cur()}${s.receiptsVat}` })} />
-        <Stat icon={<TrendingUp size={14} />} label={t('reports.spendAvg')} value={`${cur()}${avgMonth.toLocaleString('en-GB')}`} sub={t('reports.spendAvgSub', { x: `${cur()}${spend12.toLocaleString('en-GB')}`, n: months })} />
-        <Stat icon={<CreditCard size={14} />} label={t('reports.cardsBalance')} value={`${cur()}${s.outstanding.toLocaleString('en-GB')}`} sub={t('reports.cardsBalanceSub', { n: s.installmentsCount, x: `${cur()}${s.installmentsRemaining}` })} accent="var(--color-gold)" />
-        <Stat icon={<CalendarClock size={14} />} label={t('nav.subscriptions')} value={`${cur()}${s.monthlySubs}/mo`} sub={`${cur()}${s.monthlySubs * 12}/yr`} />
+        <Stat icon={<ReceiptIcon size={14} />} label={t('reports.receiptsTotal')} value={money(s.receiptsTotal)} sub={t('reports.receiptsSub', { n: s.receiptsCount, vat: money(s.receiptsVat) })} />
+        <Stat icon={<TrendingUp size={14} />} label={t('reports.spendAvg')} value={money(avgMonth)} sub={t('reports.spendAvgSub', { x: money(spend12), n: months })} />
+        <Stat icon={<CreditCard size={14} />} label={t('reports.cardsBalance')} value={money(s.outstanding)} sub={t('reports.cardsBalanceSub', { n: s.installmentsCount, x: money(s.installmentsRemaining) })} accent="var(--color-gold)" />
+        <Stat icon={<CalendarClock size={14} />} label={t('nav.subscriptions')} value={`${money(s.monthlySubs)}/mo`} sub={`${money(s.monthlySubs * 12)}/yr`} />
       </div>
 
       {/* Monthly spend — full width hero chart */}
@@ -516,10 +519,10 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
               <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} width={44} />
+              <YAxis tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} width={44} tickFormatter={(v: number) => money(v, undefined, { notation: 'compact', minimumFractionDigits: 0, maximumFractionDigits: 1 })} />
               <Tooltip
                 contentStyle={tooltipStyle}
-                formatter={(v: number, _n, p) => [`${cur()}${v} · ${(p?.payload?.count ?? 0)} receipts`, t('reports.spent')]}
+                formatter={(v: number, _n, p) => [`${money(v)} · ${(p?.payload?.count ?? 0)} receipts`, t('reports.spent')]}
                 cursor={{ stroke: 'var(--color-accent)', strokeWidth: 1, strokeOpacity: 0.3 }}
               />
               <Area type="monotone" dataKey="total" stroke="#00ff88" strokeWidth={2} fill="url(#spendGrad)" />
@@ -536,15 +539,15 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
           <>
             <div className="flex flex-wrap gap-x-5 gap-y-1 mb-3 text-xs" style={{ fontFamily: 'var(--font-mono)' }}>
               <span className="text-[color:var(--color-text-dim)]">
-                {t('reports.thisMonth')} <span className="text-[color:var(--color-accent)]">+{cur()}{s.incomeMonth.toLocaleString('en-GB')}</span> {t('reports.in')} · <span className="text-[color:var(--color-red)]">-{cur()}{s.expenseMonth.toLocaleString('en-GB')}</span> {t('reports.out')} · {t('reports.net')}{' '}
+                {t('reports.thisMonth')} <span className="text-[color:var(--color-accent)]">+{money(s.incomeMonth)}</span> {t('reports.in')} · <span className="text-[color:var(--color-red)]">-{money(s.expenseMonth)}</span> {t('reports.out')} · {t('reports.net')}{' '}
                 <span className={s.incomeMonth - s.expenseMonth >= 0 ? 'text-[color:var(--color-accent)]' : 'text-[color:var(--color-red)]'}>
-                  {cur()}{(s.incomeMonth - s.expenseMonth).toLocaleString('en-GB')}
+                  {money((s.incomeMonth - s.expenseMonth))}
                 </span>
               </span>
               <span className="text-[color:var(--color-text-dim)]">
                 {t('reports.thisYear')} {t('reports.net')}{' '}
                 <span className={s.incomeYear - s.expenseYear >= 0 ? 'text-[color:var(--color-accent)]' : 'text-[color:var(--color-red)]'}>
-                  {cur()}{(s.incomeYear - s.expenseYear).toLocaleString('en-GB')}
+                  {money((s.incomeYear - s.expenseYear))}
                 </span>
               </span>
             </div>
@@ -552,8 +555,8 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
               <BarChart data={data.incomeExpense} margin={{ left: 0, right: 10, top: 6 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
                 <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} width={44} />
-                <Tooltip contentStyle={tooltipStyle} formatter={(v: number, n) => [`${cur()}${v.toLocaleString('en-GB')}`, n]} cursor={{ fill: 'rgba(127,127,127,0.08)' }} />
+                <YAxis tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} width={44} tickFormatter={(v: number) => money(v, undefined, { notation: 'compact', minimumFractionDigits: 0, maximumFractionDigits: 1 })} />
+                <Tooltip contentStyle={tooltipStyle} formatter={(v: number, n) => [money(v), n]} cursor={{ fill: 'rgba(127,127,127,0.08)' }} />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
                 <Bar dataKey="income" name={t('nav.income')} radius={[5, 5, 0, 0]} fill="#00ff88" />
                 <Bar dataKey="expense" name={t('reports.expense')} radius={[5, 5, 0, 0]} fill="#ff4757" />
@@ -573,9 +576,9 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
             <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 mb-3 text-xs" style={{ fontFamily: 'var(--font-mono)' }}>
               <span className="text-[color:var(--color-text)]">{data.yearOverYear.headline.label}</span>
               <span className="text-[color:var(--color-text-dim)]">
-                {cur()}{data.yearOverYear.headline.current.toLocaleString('en-GB')}
+                {money(data.yearOverYear.headline.current)}
                 {' '}{t('reports.yoyVs')}{' '}
-                {cur()}{data.yearOverYear.headline.previous.toLocaleString('en-GB')} ({data.yearOverYear.headline.prevLabel})
+                {money(data.yearOverYear.headline.previous)} ({data.yearOverYear.headline.prevLabel})
               </span>
               {data.yearOverYear.headline.pct != null && (
                 <span
@@ -594,8 +597,8 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
             <BarChart data={data.yearOverYear.rows} margin={{ left: 0, right: 10, top: 6 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
               <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} width={44} />
-              <Tooltip contentStyle={tooltipStyle} formatter={(v: number, n) => [`${cur()}${v.toLocaleString('en-GB')}`, n]} cursor={{ fill: 'rgba(127,127,127,0.08)' }} />
+              <YAxis tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} width={44} tickFormatter={(v: number) => money(v, undefined, { notation: 'compact', minimumFractionDigits: 0, maximumFractionDigits: 1 })} />
+              <Tooltip contentStyle={tooltipStyle} formatter={(v: number, n) => [money(v), n]} cursor={{ fill: 'rgba(127,127,127,0.08)' }} />
               <Legend wrapperStyle={{ fontSize: 11 }} />
               <Bar dataKey="previous" name={t('reports.yoyLastYear')} radius={[5, 5, 0, 0]} fill="#4a4a4a" />
               <Bar dataKey="current" name={t('reports.yoyThisYear')} radius={[5, 5, 0, 0]} fill="#00d4ff" />
@@ -628,12 +631,12 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
                           style={{ fontFamily: 'var(--font-mono)' }}
                           className={`text-[10px] px-1.5 py-px rounded ${carried > 0 ? 'text-[color:var(--color-accent)] bg-[color:var(--color-accent)]/10' : 'text-[color:var(--color-red)] bg-[color:var(--color-red)]/10'}`}
                         >
-                          {carried > 0 ? '+' : '−'}{cur()}{Math.abs(carried).toLocaleString('en-GB')}
+                          {carried > 0 ? '+' : '−'}{money(Math.abs(carried))}
                         </span>
                       )}
                     </span>
                     <span style={{ fontFamily: 'var(--font-mono)' }} className={over ? 'text-[color:var(--color-red)]' : 'text-[color:var(--color-text-dim)]'}>
-                      {cur()}{b.actual.toLocaleString('en-GB')} / {cur()}{limit.toLocaleString('en-GB')}{over ? ` · over ${cur()}${(b.actual - limit).toLocaleString('en-GB')}` : ''}
+                      {money(b.actual)} / {money(limit)}{over ? ` · over ${money((b.actual - limit))}` : ''}
                     </span>
                   </div>
                   <div className="h-2 rounded-full bg-[color:var(--color-surface-2)] overflow-hidden">
@@ -647,7 +650,7 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
                     return (
                       <div className="mt-1 flex items-center gap-1.5 text-[10px]" style={{ fontFamily: 'var(--font-mono)' }}>
                         <span className="text-[color:var(--color-text-faint)]">
-                          {t('reports.pace', { x: `~${cur()}${b.projected.toLocaleString('en-GB')}` })}
+                          {t('reports.pace', { x: `~${money(b.projected)}` })}
                         </span>
                         <span className={`px-1.5 py-px rounded ${overPace ? 'text-[color:var(--color-red)] bg-[color:var(--color-red)]/10' : 'text-[color:var(--color-accent)] bg-[color:var(--color-accent)]/10'}`}>
                           {overPace ? t('reports.overPace') : t('reports.onTrack')}
@@ -678,8 +681,8 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
               <BarChart data={data.upcomingInstallments} margin={{ left: 0, right: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
                 <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} width={44} />
-                <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${cur()}${v}`, 'due']} cursor={{ fill: 'rgba(127,127,127,0.08)' }} />
+                <YAxis tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} width={44} tickFormatter={(v: number) => money(v, undefined, { notation: 'compact', minimumFractionDigits: 0, maximumFractionDigits: 1 })} />
+                <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [money(v), 'due']} cursor={{ fill: 'rgba(127,127,127,0.08)' }} />
                 <Bar dataKey="amount" radius={[5, 5, 0, 0]} fill="#a55eea" />
               </BarChart>
             </ResponsiveContainer>
@@ -693,9 +696,9 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
           ) : (
             <ResponsiveContainer width="100%" height={Math.max(200, data.spendByStore.length * 30)}>
               <BarChart data={data.spendByStore} layout="vertical" margin={{ left: 8, right: 16 }}>
-                <XAxis type="number" tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} />
+                <XAxis type="number" tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} tickFormatter={(v: number) => money(v, undefined, { notation: 'compact', minimumFractionDigits: 0, maximumFractionDigits: 1 })} />
                 <YAxis type="category" dataKey="name" width={110} tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} />
-                <Tooltip contentStyle={tooltipStyle} formatter={(v: number, _n, p) => [`${cur()}${v} · ${p?.payload?.count ?? 0} receipts`, 'spent']} cursor={{ fill: 'rgba(127,127,127,0.08)' }} />
+                <Tooltip contentStyle={tooltipStyle} formatter={(v: number, _n, p) => [`${money(v)} · ${p?.payload?.count ?? 0} receipts`, 'spent']} cursor={{ fill: 'rgba(127,127,127,0.08)' }} />
                 <Bar dataKey="total" radius={[0, 5, 5, 0]}>
                   {data.spendByStore.map((_, i) => (
                     <Cell key={i} fill={PALETTE[i % PALETTE.length]} />
@@ -718,7 +721,7 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
                     <Cell key={i} fill={PALETTE[i % PALETTE.length]} stroke="var(--color-bg)" />
                   ))}
                 </Pie>
-                <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${cur()}${v}`, 'value']} />
+                <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [money(v), 'value']} />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
               </PieChart>
             </ResponsiveContainer>
@@ -732,9 +735,9 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
           ) : (
             <ResponsiveContainer width="100%" height={Math.max(200, data.expenseByCategory.length * 34)}>
               <BarChart data={data.expenseByCategory} layout="vertical" margin={{ left: 8, right: 16 }}>
-                <XAxis type="number" tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} />
+                <XAxis type="number" tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} tickFormatter={(v: number) => money(v, undefined, { notation: 'compact', minimumFractionDigits: 0, maximumFractionDigits: 1 })} />
                 <YAxis type="category" dataKey="name" width={90} tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} />
-                <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${cur()}${v.toLocaleString('en-GB')}`, 'total']} cursor={{ fill: 'rgba(127,127,127,0.08)' }} />
+                <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [money(v), 'total']} cursor={{ fill: 'rgba(127,127,127,0.08)' }} />
                 <Bar dataKey="value" radius={[0, 5, 5, 0]}>
                   {data.expenseByCategory.map((_, i) => (
                     <Cell key={i} fill={PALETTE[(i + 4) % PALETTE.length]} />
@@ -750,9 +753,9 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
           <Card title={t('reports.cExpBySpace')}>
             <ResponsiveContainer width="100%" height={Math.max(200, data.expenseBySpace.length * 34)}>
               <BarChart data={data.expenseBySpace.map((s) => ({ name: s.name || t('ex.spaceNone'), value: s.value }))} layout="vertical" margin={{ left: 8, right: 16 }}>
-                <XAxis type="number" tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} />
+                <XAxis type="number" tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} tickFormatter={(v: number) => money(v, undefined, { notation: 'compact', minimumFractionDigits: 0, maximumFractionDigits: 1 })} />
                 <YAxis type="category" dataKey="name" width={90} tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} />
-                <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${cur()}${v.toLocaleString('en-GB')}`, 'total']} cursor={{ fill: 'rgba(127,127,127,0.08)' }} />
+                <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [money(v), 'total']} cursor={{ fill: 'rgba(127,127,127,0.08)' }} />
                 <Bar dataKey="value" radius={[0, 5, 5, 0]}>
                   {data.expenseBySpace.map((_, i) => (
                     <Cell key={i} fill={PALETTE[(i + 1) % PALETTE.length]} />
@@ -772,8 +775,8 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
               <BarChart data={data.subsByCategory} margin={{ left: 0, right: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
                 <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} width={36} />
-                <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${cur()}${v}/mo`, 'cost']} cursor={{ fill: 'rgba(127,127,127,0.08)' }} />
+                <YAxis tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} width={36} tickFormatter={(v: number) => money(v, undefined, { notation: 'compact', minimumFractionDigits: 0, maximumFractionDigits: 1 })} />
+                <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${money(v)}/mo`, 'cost']} cursor={{ fill: 'rgba(127,127,127,0.08)' }} />
                 <Bar dataKey="value" radius={[5, 5, 0, 0]}>
                   {data.subsByCategory.map((_, i) => (
                     <Cell key={i} fill={PALETTE[(i + 2) % PALETTE.length]} />
@@ -789,9 +792,9 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
           <Card title={t('reports.cSubsBySpace', { cur: cur() })}>
             <ResponsiveContainer width="100%" height={Math.max(200, data.subsBySpace.length * 34)}>
               <BarChart data={data.subsBySpace} layout="vertical" margin={{ left: 8, right: 16 }}>
-                <XAxis type="number" tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} />
+                <XAxis type="number" tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} tickFormatter={(v: number) => money(v, undefined, { notation: 'compact', minimumFractionDigits: 0, maximumFractionDigits: 1 })} />
                 <YAxis type="category" dataKey="name" width={90} tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} />
-                <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${cur()}${v}/mo`, 'cost']} cursor={{ fill: 'rgba(127,127,127,0.08)' }} />
+                <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${money(v)}/mo`, 'cost']} cursor={{ fill: 'rgba(127,127,127,0.08)' }} />
                 <Bar dataKey="value" radius={[0, 5, 5, 0]}>
                   {data.subsBySpace.map((_, i) => (
                     <Cell key={i} fill={PALETTE[(i + 3) % PALETTE.length]} />
@@ -843,7 +846,7 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
                     {b.date && <span className="text-[10px] text-[color:var(--color-text-faint)] shrink-0">{fmtDate(b.date)}</span>}
                   </span>
                   <span className="text-xs font-bold text-[color:var(--color-accent)] shrink-0 tabular-nums" style={{ fontFamily: 'var(--font-mono)' }}>
-                    {cur()}{b.total.toLocaleString('en-GB')}
+                    {money(b.total)}
                   </span>
                 </div>
               ))}
@@ -875,8 +878,8 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
                     <div className="h-full rounded-full" style={{ width: `${pct}%`, background: p.done ? 'var(--color-accent)' : 'var(--color-purple)' }} />
                   </div>
                   <div className="flex items-center justify-between text-[10px] text-[color:var(--color-text-faint)] mt-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
-                    <span>{cur()}{p.perAmount.toFixed(2)}/mo</span>
-                    <span>{p.done ? 'paid off ✓' : `${cur()}${p.remainingAmount.toFixed(2)} left`}</span>
+                    <span>{money(p.perAmount)}/mo</span>
+                    <span>{p.done ? 'paid off ✓' : `${money(p.remainingAmount)} left`}</span>
                   </div>
                 </div>
               );
@@ -965,6 +968,7 @@ function NewGoalForm({ onDone }: { onDone: () => void }) {
 
 function GoalItem({ g }: { g: GoalRow }) {
   const t = useT();
+  const money = useMoney();
   const confirm = useConfirm();
   const [pending, startTransition] = useTransition();
   const [amount, setAmount] = useState('');
@@ -1006,12 +1010,12 @@ function GoalItem({ g }: { g: GoalRow }) {
       </div>
 
       <div className="flex items-center justify-between text-[10px] text-[color:var(--color-text-dim)] mb-2" style={{ fontFamily: 'var(--font-mono)' }}>
-        <span>{cur()}{g.current.toLocaleString('en-GB')} / {cur()}{g.target.toLocaleString('en-GB')}</span>
+        <span>{money(g.current)} / {money(g.target)}</span>
         <span>{g.pct}%</span>
       </div>
 
       {!g.done && g.perMonth != null && (
-        <p className="text-[10px] text-[color:var(--color-text-faint)] mb-2">{t('reports.gPerMonth', { x: `${cur()}${g.perMonth.toFixed(0)}` })}</p>
+        <p className="text-[10px] text-[color:var(--color-text-faint)] mb-2">{t('reports.gPerMonth', { x: money(g.perMonth) })}</p>
       )}
 
       {!g.done && (
@@ -1040,6 +1044,7 @@ function GoalItem({ g }: { g: GoalRow }) {
  *  seeing the amount and choosing where it lands. */
 function SweepToGoal({ category, monthKey, amount, goals }: { category: string; monthKey: string; amount: number; goals: GoalRow[] }) {
   const t = useT();
+  const money = useMoney();
   const [pending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
   const [goalId, setGoalId] = useState(goals[0]?._id ?? '');
@@ -1056,7 +1061,7 @@ function SweepToGoal({ category, monthKey, amount, goals }: { category: string; 
     });
   }
 
-  const label = `${cur()}${amount.toLocaleString('en-GB')}`;
+  const label = money(amount);
 
   if (!open) {
     return (

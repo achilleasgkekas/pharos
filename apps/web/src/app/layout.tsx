@@ -16,10 +16,16 @@ import { FirstRunTour } from '@/components/FirstRunTour';
 import { getServerT } from '@/lib/i18n/server';
 import { LocaleProvider } from '@/components/LocaleProvider';
 import { headers } from 'next/headers';
+import { sentryDsn, sentryEnvironment } from '@/lib/errorReporting';
+import { saasMode } from '@/lib/tenancy/saasMode';
 
 export const metadata: Metadata = {
   title: 'PHAROS · Personal Hub',
   description: 'PHAROS, your Asset & Resource Oversight System. Oversight on everything you own: equipment, receipts, installments and price tracking. Self-hosted.',
+  icons: {
+    icon: [{ url: '/pharos-icon-32.png', sizes: '32x32', type: 'image/png' }],
+    apple: [{ url: '/pharos-apple-touch-icon.png', sizes: '180x180', type: 'image/png' }],
+  },
   // PWA: installable from the phone's "Add to Home Screen" (pairs with app/manifest.ts)
   appleWebApp: { capable: true, title: 'PHAROS', statusBarStyle: 'black-translucent' },
 };
@@ -124,6 +130,16 @@ export default async function RootLayout({
     <html lang={locale} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        {/* Error reporting config for instrumentation-client.ts — rendered ONLY when the operator set
+            SENTRY_DSN, so self-hosted installs ship no reporting at all. Inline so it exists before
+            any bundle runs (startup/hydration errors). JSON is escaped against </script> injection. */}
+        {sentryDsn() && (
+          <script
+            dangerouslySetInnerHTML={{
+              __html: `window.__PHAROS_SENTRY__=${JSON.stringify({ dsn: sentryDsn(), environment: sentryEnvironment(saasMode()) }).replace(/</g, '\\u003c')};`,
+            }}
+          />
+        )}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
@@ -133,7 +149,7 @@ export default async function RootLayout({
       </head>
       <body>
         <CurrencyInit symbol={symbol} />
-        <LocaleProvider locale={locale} dict={dict}>
+        <LocaleProvider locale={locale} dict={dict} currency={currency}>
         <Providers>
           {/* SiteNav renders only for signed-in users AND not on a chrome-less route (see
               ChromeGate). Keep `children` in a STABLE sibling position so flipping auth

@@ -24,8 +24,8 @@ describe('formatMicros', () => {
     expect(formatMicros(0)).toBe('€0.00');
   });
 
-  it('honours a custom symbol', () => {
-    expect(formatMicros(2_500_000, '$')).toBe('$2.50');
+  it('honours a custom currency', () => {
+    expect(formatMicros(2_500_000, 'USD')).toBe('$2.50');
   });
 
   it('clamps negative/garbage to <symbol>0.00', () => {
@@ -57,8 +57,8 @@ describe('buildCostSummary', () => {
     });
   });
 
-  it('passes the period through verbatim and honours a custom symbol', () => {
-    const s = buildCostSummary({ ...base, period: '2025-12' }, '$');
+  it('passes the period through verbatim and honours a custom currency', () => {
+    const s = buildCostSummary({ ...base, period: '2025-12' }, 'USD');
     expect(s.period).toBe('2025-12');
     expect(s.costFormatted).toBe('$0.68');
   });
@@ -80,4 +80,9 @@ describe('buildCostSummary', () => {
     expect(s.costUnits).toBe(0);
     expect(s.costFormatted).toBe('€0.00');
   });
+});
+
+it('formats server-rendered ledger totals with the request locale', () => {
+  expect(formatMicros(1_230_000, 'EUR', 'el')).toBe('1,23\u00a0€');
+  expect(buildCostSummary({ period: '2026-09', aiCalls: 1, aiInputTokens: 1, aiOutputTokens: 1, aiCostMicros: 1_230_000 }, 'EUR', 'el').costFormatted).toBe('1,23\u00a0€');
 });

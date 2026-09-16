@@ -6,16 +6,17 @@ import { toggleListItem, updateListItem, deleteListItem } from '@/app/shopping-l
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-/** PATCH /api/v1/shopping-list/:id  { checked?, name?, quantity?, category?, brand?, note? } */
+/** PATCH /api/v1/shopping-list/:id  { checked?, name?, quantity?, category?, brand?, note?, restockIntervalDays? } */
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   return withAuth(req, async () => {
     if (!isObjectId(id)) return apiError('bad id');
     const b = await readBody(req);
-    const fields: Record<string, string> = {};
+    const fields: Record<string, string | number | null> = {};
     for (const k of ['name', 'quantity', 'category', 'brand', 'note']) {
       if (typeof b[k] === 'string') fields[k] = b[k] as string;
     }
+    if (typeof b.restockIntervalDays === 'number' || b.restockIntervalDays === null) fields.restockIntervalDays = b.restockIntervalDays as number | null;
     const hasChecked = typeof b.checked === 'boolean';
     const hasFields = Object.keys(fields).length > 0;
     if (!hasChecked && !hasFields) return apiError('no valid fields');

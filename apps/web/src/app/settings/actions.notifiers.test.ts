@@ -263,6 +263,7 @@ describe('saveDefaults', () => {
       lendingAlertDays: 0, // same explicit-zero rule (P47)
       staleClaimDays: 0, // same explicit-zero rule (P44 phase 2): zero silence = nudge off
       syncStaleDays: 0,
+      subscriptionReviewIntervalDays: 0,
       autoAddStores: false,
       currency: 'EUR',
       multiCurrency: false,

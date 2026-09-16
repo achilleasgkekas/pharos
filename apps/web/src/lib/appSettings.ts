@@ -35,6 +35,7 @@ export type AppSettings = {
   lendingAlertDays: number; // lead-time (days) for the "lent item due back" alert (P47); overdue nags regardless
   staleClaimDays: number; // days of silence before an open warranty claim counts as forgotten (P44); 0 = off
   syncStaleDays: number; // days without a successful remote push before alerting (P48); 0 = off
+  subscriptionReviewIntervalDays: number; // days since user confirmation before nudging (P57); 0 = off
   autoAddStores: boolean;
   ntfyUrl: string;
   ntfyEnabled: boolean;
@@ -70,6 +71,7 @@ export type RawAppConfigDoc = {
   lendingAlertDays?: number;
   staleClaimDays?: number;
   syncStaleDays?: number;
+  subscriptionReviewIntervalDays?: number;
   autoAddStores?: boolean;
   ntfyUrl?: string;
   ntfyEnabled?: boolean;
@@ -114,6 +116,7 @@ const DEFAULTS: AppSettings = {
   lendingAlertDays: 3,
   staleClaimDays: DEFAULT_STALE_CLAIM_DAYS,
   syncStaleDays: 7,
+  subscriptionReviewIntervalDays: 0,
   autoAddStores: true,
   ntfyUrl: '',
   ntfyEnabled: false,
@@ -167,6 +170,10 @@ export function normalizeSettings(doc: RawAppConfigDoc | null | undefined): AppS
     lendingAlertDays: typeof doc?.lendingAlertDays === 'number' ? doc.lendingAlertDays : DEFAULTS.lendingAlertDays,
     staleClaimDays: typeof doc?.staleClaimDays === 'number' ? doc.staleClaimDays : DEFAULTS.staleClaimDays,
     syncStaleDays: typeof doc?.syncStaleDays === 'number' ? doc.syncStaleDays : DEFAULTS.syncStaleDays,
+    subscriptionReviewIntervalDays:
+      typeof doc?.subscriptionReviewIntervalDays === 'number'
+        ? doc.subscriptionReviewIntervalDays
+        : DEFAULTS.subscriptionReviewIntervalDays,
     autoAddStores: doc?.autoAddStores !== false,
     ntfyUrl: doc?.ntfyUrl || '',
     ntfyEnabled: !!doc?.ntfyEnabled,
@@ -208,7 +215,7 @@ export async function getAppSettings(): Promise<AppSettings> {
     await connectDB();
     const Config = tenantModel(await tenantDb(ctx), AppConfig);
     doc = await Config.findOne({ key: 'singleton' })
-      .select('defaultItemView defaultWarrantyMonths warrantyAlertDays trialAlertDays giftCardAlertDays billAlertDays documentAlertDays specialDateAlertDays maintenanceAlertDays lendingAlertDays staleClaimDays syncStaleDays autoAddStores ntfyUrl ntfyEnabled currency multiCurrency defaultVatRate defaultReturnWindowDays lists spaces budgets budgetRollover assetAccounts depreciation categoryRules onboardingDismissed notifyTypes quietHours')
+      .select('defaultItemView defaultWarrantyMonths warrantyAlertDays trialAlertDays giftCardAlertDays billAlertDays documentAlertDays specialDateAlertDays maintenanceAlertDays lendingAlertDays staleClaimDays syncStaleDays subscriptionReviewIntervalDays autoAddStores ntfyUrl ntfyEnabled currency multiCurrency defaultVatRate defaultReturnWindowDays lists spaces budgets budgetRollover assetAccounts depreciation categoryRules onboardingDismissed notifyTypes quietHours')
       .lean();
   } catch {
     /* DB down → hard defaults */

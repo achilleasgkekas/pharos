@@ -13489,3 +13489,120 @@ https://github.com/achilleasgkekas/pharos/pull/31. Το `new Date(v)` δεχότ
 **Ανοιχτά PR μου**: #31 (περιμένει νέο review). Τα #2 και #27 έγιναν merge.
 
 **Επόμενο task**: issue #33 (p1, διπλός επόμενος λογαριασμός μετά από Undo) ή #34 (p1). Μετά το #3.
+
+## 2026-09-14 02:49
+
+**Prod health**: OK. `ph-aros.com` 200 με περιεχόμενο landing, `app.ph-aros.com/account/login` 200,
+`POST /api/cron/saas/trials-sweep` χωρίς token 401 JSON.
+
+**Triage**: #38, #39, #42, #43 (ui-found) πήραν `self-hosted` + `saas` + `agent-ready`, βγήκε το
+`needs-triage`. Είχαν ήδη priority. Οι πηγές που αναφέρουν υπάρχουν στο main (`FirstRunTour.tsx`
+με `aria-modal` και κουμπί `w-8 h-8`, `SubscriptionsClient.tsx` με `toFixed`). Το #28 μένει `blocked` (το #3 είναι ανοιχτό).
+
+**Η μία δουλειά**: issue #33 (p1, codex-found). PR **#66**
+https://github.com/achilleasgkekas/pharos/pull/66. Πρώτα failing test: πληρωμή, Undo, πληρωμή σε
+in-memory store έβγαζε δύο λογαριασμούς Ιουλίου στο main. Διόρθωση: νέο πεδίο `recurrenceParentId`
+στο `Bill` και κοινός helper `lib/billRecurrence.ts` (`spawnNextBillOnce`), που χρησιμοποιούν και το
+`markBillPaid` και το `PATCH /api/v1/bills/:id`. Αν υπάρχει ζωντανός διάδοχος, δεν φτιάχνεται δεύτερος.
+Για παλιούς διαδόχους χωρίς σύνδεση ταιριάζει title + cycle + ακριβή επόμενη ημερομηνία. Ο διάδοχος
+στον κάδο αγνοείται, οπότε ξαναφτιάχνεται. `tsc` καθαρό, **448 αρχεία, 7128 passed, 4 skipped**.
+Όριο: το query `$or` / `$in: ['', null]` ελέγχθηκε μόνο σε mock, όχι σε πραγματική Mongo.
+
+**Unshipped**: 67 commits μετά το `1b88ca34` (δεν ελέγχθηκε ο server).
+**Ανοιχτά PR μου**: #65 (Sentry), #66. Το #31 έγινε merge.
+
+**Επόμενο task**: issue #34 (p1, λογαριασμός με μηδενικό υπόλοιπο φαίνεται απλήρωτος μετά από edit). Μετά #32 ή #3.
+
+## 2026-09-14 07:43
+
+**Prod health**: OK. `ph-aros.com` 200 με περιεχόμενο landing, `app.ph-aros.com/account/login` 200,
+`POST /api/cron/saas/trials-sweep` χωρίς token 401 JSON.
+
+**Triage**: #67, #68, #69 (codex-found, p2) πήραν `self-hosted` + `saas` + `agent-ready`, βγήκε το
+`needs-triage`. Οι γραμμές που αναφέρουν υπάρχουν στο main (`expenses/actions.ts` 162/244/393/446/675,
+`ExpensesClient.tsx` 797). Το #28 μένει `blocked` (το #3 είναι ανοιχτό).
+
+**Η μία δουλειά**: διορθώσεις review στο δικό μου PR **#66** (needs-changes)
+https://github.com/achilleasgkekas/pharos/pull/66, commit `c44f5815`. Το Codex βρήκε race στο
+`spawnNextBillOnce`: `findOne` και μετά `create`, άρα δύο ταυτόχρονες πληρωμές έφτιαχναν δύο διαδόχους.
+Τώρα η απόφαση τρέχει κάτω από claim στον ΓΟΝΙΚΟ λογαριασμό (`recurrenceSpawnClaimAt`, ένα conditional
+`findOneAndUpdate`, takeover μετά από 60s, απελευθέρωση στο `finally` μόνο αν είναι ακόμα δικό μας).
+Claim αντί για unique index γιατί το index θα έπρεπε να εξαιρεί τους διαδόχους στον κάδο και δεν βλέπει
+τους legacy διαδόχους χωρίς σύνδεση. Νέο test: δύο ταυτόχρονα `markBillPaid` σε in-memory store δίνουν
+έναν διάδοχο (αποτυγχάνει στο `afd2d3a`, περνά τώρα), συν stale/fresh claim. `tsc` καθαρό,
+**448 αρχεία, 7131 passed, 4 skipped**. Όριο: δεν δοκιμάστηκε σε πραγματική Mongo.
+
+**Unshipped**: δεν ελέγχθηκε ο server, δες την προηγούμενη εγγραφή (67+ commits).
+**Ανοιχτά PR μου**: #66 (περιμένει νέο review), #65 (needs-human).
+
+**Επόμενο task**: issue #34 (p1, λογαριασμός με μηδενικό υπόλοιπο φαίνεται απλήρωτος μετά από edit). Μετά #67 (p2, codex-found).
+
+## 2026-09-14 12:50
+
+**Prod health**: OK. `ph-aros.com` 200 με περιεχόμενο landing, `app.ph-aros.com/account/login` 200,
+`POST /api/cron/saas/trials-sweep` χωρίς token 401 JSON.
+
+**Triage**: #80 (μορφοποίηση ποσών, `self-hosted` + `saas`), #81 (tab strip workspace σε κινητό, `saas`),
+#82 (μακριοί τίτλοι στις κάρτες Items, `self-hosted` + `saas`) πήραν `agent-ready`, βγήκε το `needs-triage`.
+Οι πηγές υπάρχουν στο main (`components/saas/format.ts` με `en-US`, `WorkspaceShell.tsx` με `overflow-x-auto`,
+`ItemCard` στο `ItemsClient.tsx`). Το #80 είναι μεγάλο (πολλά αρχεία), ίσως θέλει σπάσιμο πριν το πιάσει κάποιος.
+Το #28 μένει `blocked` (το #3 είναι ανοιχτό).
+
+**Η μία δουλειά**: δεύτερος γύρος review στο δικό μου PR **#66** (needs-changes)
+https://github.com/achilleasgkekas/pharos/pull/66, commit `ddca0362`. Το Codex βρήκε δύο τρύπες στο claim:
+ορφανό claim άφηνε πληρωμένο λογαριασμό χωρίς διάδοχο για πάντα, και claimant που ξεπερνούσε τα 60s
+άφηνε δύο διαδόχους. Έβγαλα το claim εντελώς. Το `_id` του διαδόχου παράγεται πλέον από το `_id` του γονικού
+(sha256, 24 hex), άρα το μοναδικό index του `_id` απορρίπτει δεύτερο create (E11000). Διάδοχος στον κάδο
+αντικαθίσταται ατομικά μόνο όσο είναι ακόμα στον κάδο. Το `markBillPaid` κάνει spawn ΠΡΙΝ το expense και
+το `paidAt`, οπότε αποτυχία πιο κάτω αφήνει τον λογαριασμό απλήρωτο και ξαναδοκιμάσιμο. Βγήκε το πεδίο
+`recurrenceSpawnClaimAt`. `tsc` καθαρό, **448 αρχεία, 7131 passed, 4 skipped**. Όριο: όχι σε πραγματική Mongo.
+
+**Unshipped**: 4 commits στο `origin/main` μετά το `523b1ab` που είναι το source του server (το running image δεν ελέγχθηκε).
+**Ανοιχτά PR μου**: #66 (περιμένει νέο review), #65 (needs-human).
+
+**Επόμενο task**: issue #34 (p1, λογαριασμός με μηδενικό υπόλοιπο φαίνεται απλήρωτος μετά από edit). Μετά #42 (p1, ui).
+
+## 2026-09-15 02:45
+
+**Prod health**: OK. `ph-aros.com` 200 με περιεχόμενο landing, `app.ph-aros.com/account/login` 200,
+`POST /api/cron/saas/trials-sweep` χωρίς token 401 JSON.
+
+**Triage**: μόνο το #87 (λάθος favicon στο iPhone) ήταν σε needs-triage. Έχει ήδη `p2` + stack labels και
+ερώτηση διευκρίνισης από το Gemini, οπότε μένει εκεί μέχρι να απαντήσει ο Achilleas. Το #28 μένει `blocked` (το #3 είναι ανοιχτό).
+
+**Η μία δουλειά**: τρίτος γύρος review στο δικό μου PR **#66** (needs-changes)
+https://github.com/achilleasgkekas/pharos/pull/66, commit `2ba0a34b`. Το Codex βρήκε ότι ο legacy διάδοχος
+(πριν το #33, χωρίς link) αναγνωριζόταν μόνο αν ήταν ανέγγιχτος: αν ο χρήστης είχε διορθώσει τίτλο ή ημερομηνία,
+το Undo και ξανά πληρωμή έφτιαχνε διπλό. Τώρα ταιριάζει είτε ίδιος τίτλος με ημερομηνία μέσα στον επόμενο κύκλο,
+είτε ακριβής επόμενη ημερομηνία με όλα τα άλλα αντιγραμμένα πεδία ίδια. Το δίχτυ μένει μέσα σε έναν κύκλο
+επίτηδες, γιατί και οι χειροκίνητοι λογαριασμοί είναι χωρίς link. Στο σχόλιο διαφώνησα εν μέρει με το
+«χρειάζεται migration»: link που δεν γράφτηκε ποτέ δεν ανακτάται. Όριο: legacy γραμμή με αλλαγμένα ΚΑΙ τίτλο ΚΑΙ ημερομηνία.
+`tsc` καθαρό, **448 αρχεία, 7135 passed, 4 skipped**. Όχι σε πραγματική Mongo.
+
+**Unshipped**: 11 commits στο `origin/main` μετά το `523b1ab` (τελευταίο γνωστό source του server, το running image δεν ελέγχθηκε).
+**Ανοιχτά PR μου**: #66 (περιμένει νέο review).
+
+**Επόμενο task**: issue #34 (p1, λογαριασμός με μηδενικό υπόλοιπο φαίνεται απλήρωτος μετά από edit). Αν το #66 γυρίσει ξανά, να κριθεί αν πάει σε needs-human.
+
+## 2026-09-15 07:45
+
+**Prod health**: OK. `ph-aros.com` 200 με περιεχόμενο landing, `app.ph-aros.com/account/login` 200,
+`POST /api/cron/saas/trials-sweep` χωρίς token 401 JSON.
+
+**Triage**: τα #91 και #92 (codex-found, receipts merge: διαγραφή αρχείου του μοναδικού scan, και διαγραφή αρχείων πριν το
+`deleteMany`) επαληθεύτηκαν ότι ο κώδικας υπάρχει στο main (`receipts/actions.ts` ~733-772). Πήραν `agent-ready`,
+`self-hosted`, `saas`, βγήκε το `needs-triage`. Το lane το βάζει ο dispatcher. Το #87 περιμένει ακόμα απάντηση, το #28 μένει `blocked`.
+Το #66 είναι πλέον `needs-human`, δεν το αγγίζω.
+
+**Η μία δουλειά**: issue #34 (p1). Πρώτα failing test στο `updateBill` (απέτυχε όπως λέει το issue: κανένα paidAt),
+μετά fix: μετά την αποθήκευση ξαναδιαβάζει τον λογαριασμό και, αν οι δόσεις καλύπτουν το νέο ποσό, τον κλείνει μέσω
+`markBillPaid` (χωρίς expense, με ημερομηνία της τελευταίας δόσης). Επίτηδες μονόδρομο: αύξηση ποσού δεν ξανανοίγει πληρωμένο.
+**PR #93** https://github.com/achilleasgkekas/pharos/pull/93. **455 αρχεία, 7163 passed, 4 skipped**.
+
+**Προσοχή**: το `tsc` τοπικά βγάζει λάθη μόνο για `@sentry/nextjs`, που λείπει από το κοινό `apps/web/node_modules`
+(μπήκε με το #65). Χρειάζεται `npm ci` στο main checkout. Δεν το έτρεξα για να μη σπάσει άλλη ρουτίνα που τρέχει.
+
+**Unshipped**: 12 commits στο `origin/main` μετά το `523b1ab` (τελευταίο γνωστό source του server, το image δεν ελέγχθηκε).
+**Ανοιχτά PR μου**: #93 (χωρίς review), #66 (`needs-human`).
+
+**Επόμενο task**: issue #5 ή #3 (p2, ημερομηνίες/locale) αν δεν έχουν πάρει lane:claude τα #91/#92.

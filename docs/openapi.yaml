@@ -503,6 +503,7 @@ paths:
                 category: { type: string }
                 brand: { type: string }
                 note: { type: string }
+                restockIntervalDays: { type: integer, minimum: 1, maximum: 3650 }
       responses:
         '201':
           description: Updated list.
@@ -537,6 +538,7 @@ paths:
                 category: { type: string }
                 brand: { type: string }
                 note: { type: string }
+                restockIntervalDays: { type: integer, minimum: 1, maximum: 3650, nullable: true, description: 'Null removes recurrence.' }
       responses:
         '200':
           description: Updated list.
@@ -2436,6 +2438,8 @@ components:
         note: { type: string }
         checked: { type: boolean }
         aiScanned: { type: boolean, description: True when the entry came from a product-photo scan. }
+        restockIntervalDays: { type: integer, nullable: true, description: Days after a purchase before the item returns unchecked. }
+        lastRestockedAt: { type: string, format: date-time, nullable: true }
         createdAt: { type: string, format: date-time }
     LineItem:
       type: object

@@ -71,6 +71,7 @@ import { BACKUP_MODELS, BACKUP_KEYS } from '@/lib/backupModels';
 import { verifyBackupJson, formatBackupCounts, type BackupVerifyResult } from '@/lib/backupVerify';
 import { encryptBackup, decryptBackup } from '@/lib/backupCrypto';
 import { detectSyncStaleness, formatSyncStaleness } from '@/lib/syncStaleness';
+import { collectSubscriptionReviews, type ReviewableSubscription } from '@/lib/subscriptionReview';
 import { markRemoteSync, getLastRemoteSync } from '@/lib/syncState';
 import { splitFreshAlerts } from '@/lib/alertDedup';
 import { dispatchAlert, getNotifiers, testNotifier, type NotifierConfig } from '@/lib/notifiers';
@@ -375,6 +376,8 @@ export async function saveDefaults(formData: FormData): Promise<{ ok: boolean }>
   // 0 is meaningful (remote-mirror staleness alerts off), so parse explicitly (P48).
   const syncRaw = Number(formData.get('syncStaleDays'));
   const syncStaleDays = Number.isFinite(syncRaw) ? Math.max(0, Math.min(365, Math.round(syncRaw))) : 7;
+  const reviewRaw = Number(formData.get('subscriptionReviewIntervalDays'));
+  const subscriptionReviewIntervalDays = Number.isFinite(reviewRaw) ? Math.max(0, Math.min(730, Math.round(reviewRaw))) : 0;
   const autoAdd = formData.get('autoAddStores') === 'true';
   const currency = (String(formData.get('currency') || 'EUR').trim().toUpperCase()) || 'EUR';
   const multiCurrency = formData.get('multiCurrency') === 'true'; // P9 opt-in
@@ -396,6 +399,7 @@ export async function saveDefaults(formData: FormData): Promise<{ ok: boolean }>
         lendingAlertDays,
         staleClaimDays,
         syncStaleDays,
+        subscriptionReviewIntervalDays,
         autoAddStores: autoAdd,
         currency,
         multiCurrency,
@@ -670,6 +674,14 @@ export async function runAlertChecks(opts: { dedupe?: boolean } = {}): Promise<{
     .filter((tr) => !isNaN(tr.days) && tr.days >= 0 && tr.days <= s.trialAlertDays)
     .sort((a, b) => a.days - b.days);
 
+  const reviewRows =
+    s.subscriptionReviewIntervalDays > 0
+      ? ((await (await scoped(Subscription)).find({ active: true })
+          .select('name createdAt lastReviewedAt pausedUntil')
+          .lean()) as ReviewableSubscription[])
+      : [];
+  const subscriptionReviews = collectSubscriptionReviews(reviewRows, s.subscriptionReviewIntervalDays, now);
+
   // Gift-card / store-credit expiring with money still on it (P32): soonest first.
   const giftRows = (await (await scoped(GiftCard)).find({ archived: { $ne: true }, expiresAt: { $ne: null } })
     .select('title initialAmount uses expiresAt')
@@ -794,6 +806,7 @@ export async function runAlertChecks(opts: { dedupe?: boolean } = {}): Promise<{
   const returnsSplit = splitFreshAlerts(nt.returns ? returnsClosing : [], (r) => `return:${String(r._id)}`, previouslySent);
   const hikesSplit = splitFreshAlerts(nt.priceHikes ? hikes : [], (h) => `pricehike:${h.vendorKey}:${h.curr}`, previouslySent);
   const trialsSplit = splitFreshAlerts(nt.trials ? trialsEnding : [], (tr) => `trialend:${String(tr._id)}:${tr.iso}`, previouslySent);
+  const reviewsSplit = splitFreshAlerts(nt.subscriptionReviews ? subscriptionReviews : [], (r) => `subreview:${String(r._id)}:${r.iso}`, previouslySent);
   const giftsSplit = splitFreshAlerts(nt.giftCards ? giftsExpiring : [], (g) => `giftcard:${String(g._id)}:${g.iso}`, previouslySent);
   const billsSplit = splitFreshAlerts(nt.bills ? billsDue : [], (b) => `bill:${String(b._id)}:${b.iso}`, previouslySent);
   const documentsSplit = splitFreshAlerts(nt.documents ? documentsExpiring : [], (d) => `document:${String(d._id)}:${d.iso}`, previouslySent);
@@ -819,6 +832,7 @@ export async function runAlertChecks(opts: { dedupe?: boolean } = {}): Promise<{
     ...returnsSplit.keys,
     ...hikesSplit.keys,
     ...trialsSplit.keys,
+    ...reviewsSplit.keys,
     ...giftsSplit.keys,
     ...billsSplit.keys,
     ...documentsSplit.keys,
@@ -837,6 +851,7 @@ export async function runAlertChecks(opts: { dedupe?: boolean } = {}): Promise<{
   const freshReturnsClosing = returnsSplit.fresh;
   const freshHikes = hikesSplit.fresh;
   const freshTrialsEnding = trialsSplit.fresh;
+  const freshSubscriptionReviews = reviewsSplit.fresh;
   const freshGiftsExpiring = giftsSplit.fresh;
   const freshBillsDue = billsSplit.fresh;
   const freshDocumentsExpiring = documentsSplit.fresh;
@@ -872,6 +887,13 @@ export async function runAlertChecks(opts: { dedupe?: boolean } = {}): Promise<{
       `⏳ ${freshTrialsEnding.length} free trial(s) ending ≤${s.trialAlertDays}d: ${freshTrialsEnding
         .slice(0, 5)
         .map((tr) => `${tr.name} (${tr.days}d${tr.charge > 0 ? `, ${cur()}${tr.charge}` : ''})`)
+        .join(', ')}`
+    );
+  if (freshSubscriptionReviews.length)
+    lines.push(
+      `🔎 ${freshSubscriptionReviews.length} subscription(s) due a usage review: ${freshSubscriptionReviews
+        .slice(0, 5)
+        .map((r) => `${r.name} (${r.days}d since confirmation)`)
         .join(', ')}`
     );
   if (freshGiftsExpiring.length)
