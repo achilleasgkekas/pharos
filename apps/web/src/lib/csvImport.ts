@@ -234,5 +234,6 @@ export function mapCsvRow(cells: string[], mapping: CsvMapping): CsvRowResult {
  *  printed number in `origAmount`), otherwise re-importing the same foreign file
  *  would compare a converted amount against a printed one and insert duplicates. */
 export function csvDedupeKey(kind: 'income' | 'expense', vendorKey: string, dateIso: string, amount: number): string {
-  return `${kind}|${vendorKey}|${dateIso.slice(0, 10)}|${Math.abs(amount).toFixed(2)}`;
+  const dStr = typeof dateIso === 'string' ? dateIso : dateIso && (dateIso as unknown) instanceof Date ? (dateIso as unknown as Date).toISOString() : '';
+  return `${kind}|${vendorKey}|${dStr.slice(0, 10)}|${Math.abs(amount).toFixed(2)}`;
 }

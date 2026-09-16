@@ -183,6 +183,15 @@ describe('importExpensesCsv — existing-record dedupe', () => {
     expect(expenseInsertMany).not.toHaveBeenCalled();
   });
 
+  it('handles existing records with invalid or missing date fields safely without throwing', async () => {
+    expenseFindLean.mockResolvedValue([
+      { kind: 'expense', vendorKey: 'dei', date: 'invalid-date', amount: 45.9 },
+      { kind: 'expense', vendorKey: 'dei', date: null, amount: 45.9 },
+    ]);
+    const res = await importExpensesCsv([row()], { kind: 'expense', signSplit: false });
+    expect(res).toMatchObject({ ok: true, imported: 1 });
+  });
+
   it('does not skip when kind, vendorKey, date or amount differ from the existing record', async () => {
     expenseFindLean.mockResolvedValue([
       { kind: 'income', vendorKey: 'dei', date: '2026-06-15T00:00:00.000Z', amount: 45.9 },
