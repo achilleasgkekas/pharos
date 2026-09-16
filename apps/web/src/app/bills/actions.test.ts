@@ -420,7 +420,7 @@ describe('recurring spawn survives Undo (#33)', () => {
   it('recognises a successor spawned before the parent link existed (legacy row)', async () => {
     // Paid before this fix shipped: the July row exists but carries no recurrenceParentId.
     store.set('legacy', {
-      _id: 'legacy', title: 'Ενοίκιο', cycle: 'monthly', paidAt: null, dueDate: new Date(2026, 6, 15),
+      ...store.get('b1'), _id: 'legacy', title: 'Ενοίκιο', cycle: 'monthly', paidAt: null, dueDate: new Date(2026, 6, 15),
     });
     await markBillPaid('b1');
     expect(billCreate).not.toHaveBeenCalled();
@@ -430,7 +430,7 @@ describe('recurring spawn survives Undo (#33)', () => {
   // legacy successor must still be recognised after its due date or its title was edited.
   it('recognises a legacy successor whose due date was moved within the next cycle', async () => {
     store.set('legacy', {
-      _id: 'legacy', title: 'Ενοίκιο', cycle: 'monthly', paidAt: null, dueDate: new Date(2026, 6, 20),
+      ...store.get('b1'), _id: 'legacy', title: 'Ενοίκιο', cycle: 'monthly', paidAt: null, dueDate: new Date(2026, 6, 20),
     });
     await markBillPaid('b1');
     expect(billCreate).not.toHaveBeenCalled();
@@ -454,9 +454,18 @@ describe('recurring spawn survives Undo (#33)', () => {
     expect(successors().filter((d) => d.recurrenceParentId === 'b1')).toHaveLength(1);
   });
 
+  it.each(['vendor', 'amount', 'category', 'notes', 'currency'])('a same-title bill with different %s does not suppress the next occurrence', async (field) => {
+    const parent = store.get('b1')!;
+    const other: Doc = { ...parent, _id: 'other', dueDate: new Date(2026, 5, 20) };
+    other[field] = field === 'amount' ? 250 : 'different';
+    store.set('other', other);
+    await markBillPaid('b1');
+    expect(successors().filter((d) => d.recurrenceParentId === 'b1')).toHaveLength(1);
+  });
+
   it('a same-title bill two cycles ahead does not count as the next instance', async () => {
     store.set('august', {
-      _id: 'august', title: 'Ενοίκιο', cycle: 'monthly', paidAt: null, dueDate: new Date(2026, 7, 15),
+      ...store.get('b1'), _id: 'august', title: 'Ενοίκιο', cycle: 'monthly', paidAt: null, dueDate: new Date(2026, 7, 15),
     });
     await markBillPaid('b1');
     expect(successors().filter((d) => d.recurrenceParentId === 'b1')).toHaveLength(1);
