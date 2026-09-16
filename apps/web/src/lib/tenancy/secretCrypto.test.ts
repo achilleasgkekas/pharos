@@ -80,6 +80,12 @@ describe('decrypt failure modes (never throws → null)', () => {
     expect(decryptSecret(tampered)).toBeNull();
   });
 
+  it('rejects a non-standard GCM authentication tag', () => {
+    const parts = encryptSecret('short-tag').split('$');
+    parts[2] = Buffer.from(parts[2], 'base64').subarray(0, 12).toString('base64');
+    expect(decryptSecret(parts.join('$'))).toBeNull();
+  });
+
   it('returns null when decrypted with a different AUTH_SECRET', () => {
     const enc = encryptSecret('rotate-me');
     process.env.AUTH_SECRET = 'a-completely-different-secret-16+';
