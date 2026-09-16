@@ -26,6 +26,7 @@ import { vendorKey, serializeExpense } from './lib';
 import { csvDedupeKey } from '@/lib/csvImport';
 import { groupExpenseDupes, type ExpenseDupeGroup } from '@/lib/expenseDupes';
 import { assertCanWrite } from '@/lib/auth';
+import { insertRecurringExpense } from '@/lib/recurringExpense';
 
 type Kind = 'income' | 'expense';
 function asKind(v: unknown): Kind {
@@ -152,6 +153,7 @@ export async function generateDueRecurring(): Promise<{ created: number }> {
 
   const now = Date.now();
   const base = (await getAppSettings()).currency;
+  if (seeds.length) await Expense.init();
   let created = 0;
   for (const seed of seeds) {
     const cycle = String(seed.recurringCycle);
@@ -160,34 +162,24 @@ export async function generateDueRecurring(): Promise<{ created: number }> {
     while (next.getTime() <= now && guard < 36) {
       guard++;
       const period = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}`;
-      const res = await Expense.updateOne(
-        {
-          kind: seed.kind,
-          vendorKey: seed.vendorKey,
-          date: next,
-        },
-        {
-          $setOnInsert: {
-            kind: seed.kind,
-            vendor: seed.vendor,
-            vendorKey: seed.vendorKey,
-            category: seed.category,
-            // `amount` is base-denominated (lib/fx.ts), so a projection is base currency by
-            // definition; don't inherit the seed's printed foreign code/rate.
-            amount: seed.amount,
-            currency: base,
-            date: next,
-            period,
-            recurring: true,
-            recurringCycle: seed.recurringCycle,
-            aiModel: 'recurring-auto',
-            verified: false,
-            notes: 'Auto-generated from recurring series',
-          },
-        },
-        { upsert: true }
-      );
-      if (res.upsertedCount) {
+      const inserted = await insertRecurringExpense(Expense, {
+        kind: seed.kind,
+        vendor: seed.vendor,
+        vendorKey: seed.vendorKey,
+        category: seed.category,
+        // `amount` is base-denominated (lib/fx.ts), so a projection is base currency by
+        // definition; don't inherit the seed's printed foreign code/rate.
+        amount: seed.amount,
+        currency: base,
+        date: next,
+        period,
+        recurring: true,
+        recurringCycle: seed.recurringCycle,
+        aiModel: 'recurring-auto',
+        verified: false,
+        notes: 'Auto-generated from recurring series',
+      });
+      if (inserted) {
         created++;
       }
       next = addCycle(next, cycle);

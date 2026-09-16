@@ -36,6 +36,9 @@ const ExpenseSchema = new Schema(
     recurring: { type: Boolean, default: false },
     // Kept in sync with RECURRING_CYCLES in lib/billingCycle.ts.
     recurringCycle: { type: String, enum: ['monthly', 'quarterly', 'yearly', 'weekly', 'biennial', ''], default: '' },
+    // Only newly generated occurrences receive this marker. Legacy/manual/scanned rows remain
+    // outside the unique index, including legitimate duplicates in existing databases.
+    recurringGenerated: { type: Boolean },
 
     filePath: { type: String, default: '' }, // /storage/expenses/...  (empty for manual entries)
     fileType: { type: String, default: '' },
@@ -92,10 +95,12 @@ const ExpenseSchema = new Schema(
 );
 
 ExpenseSchema.index({ kind: 1, vendorKey: 1, date: -1 }); // series timeline per vendor
-// Unique compound index for auto-generated recurring occurrences to guarantee database-level atomic upserts
+// Trash releases the occurrence slot; restoring an old copy while a replacement exists
+// is a uniqueness conflict, rather than silently producing two active projections.
 ExpenseSchema.index(
-  { kind: 1, vendorKey: 1, date: 1, recurring: 1 },
-  { unique: true, partialFilterExpression: { recurring: true, vendorKey: { $gt: '' } } }
+  { kind: 1, vendorKey: 1, date: 1, recurringGenerated: 1, deletedAt: 1 },
+  { unique: true, name: 'active_recurring_occurrence',
+    partialFilterExpression: { recurringGenerated: true, deletedAt: null } }
 );
 // Incremental-sync cursor (lib/apiList withSince → updatedAt $gte) for GET /api/v1/expenses.
 ExpenseSchema.index({ updatedAt: -1 });

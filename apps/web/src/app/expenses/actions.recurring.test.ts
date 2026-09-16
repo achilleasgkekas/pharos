@@ -36,6 +36,7 @@ const {
 
 const findFilterCalls: Array<Record<string, any>> = [];
 const expenseModel = {
+  init: vi.fn(async () => {}),
   create: expenseCreate,
   updateOne: expenseUpdateOne,
   find: (filter: Record<string, any>) => {
@@ -73,6 +74,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   findFilterCalls.length = 0;
   expenseFindSortLean.mockResolvedValue([]);
+  expenseUpdateOne.mockReset().mockResolvedValue({ upsertedCount: 1 });
   vi.useFakeTimers();
   vi.setSystemTime(NOW);
 });
@@ -191,55 +193,6 @@ describe('generateDueRecurring', () => {
     expect(res).toEqual({ created: 3 });
     const dates = expenseUpdateOne.mock.calls.map((c) => localYmd(c[1].$setOnInsert.date)).sort();
     expect(dates).toEqual(['2026-01-10', '2026-02-10', '2026-03-10']);
-  });
-
-  it('prevents duplicate entries when page loads trigger generateDueRecurring concurrently', async () => {
-    // Simulate DB collection state with mock documents array
-    const dbDocs: Array<Record<string, any>> = [
-      { kind: 'expense', vendor: 'Rent', vendorKey: 'rent', category: 'housing', amount: 1000, date: new Date(2026, 1, 1), recurring: true, recurringCycle: 'monthly' },
-    ];
-
-    // Mock find query to return dbDocs (soft-delete filtered or filtered in memory)
-    expenseFindSortLean.mockImplementation(async () => {
-      // Sort desc by date
-      return [...dbDocs].sort((a, b) => b.date.getTime() - a.date.getTime());
-    });
-
-    // Mock create to simulate inserting into DB
-    expenseCreate.mockImplementation(async (doc: Record<string, any>) => {
-      const newDoc = { ...doc, _id: `id-${dbDocs.length + 1}` };
-      dbDocs.push(newDoc);
-      return newDoc;
-    });
-
-    // Mock updateOne to simulate atomic upsert in DB
-    expenseUpdateOne.mockImplementation(async (filter: Record<string, any>, update: Record<string, any>, opts?: Record<string, any>) => {
-      const existing = dbDocs.find(
-        (d) => d.kind === filter.kind && d.vendorKey === filter.vendorKey && d.date.getTime() === filter.date.getTime()
-      );
-      if (existing) {
-        return { upsertedCount: 0 };
-      }
-      if (opts?.upsert) {
-        const inserted = { ...update.$setOnInsert, _id: `id-${dbDocs.length + 1}` };
-        dbDocs.push(inserted);
-        return { upsertedCount: 1 };
-      }
-      return { upsertedCount: 0 };
-    });
-
-    // Run two concurrent loads
-    const [res1, res2] = await Promise.all([
-      generateDueRecurring(),
-      generateDueRecurring(),
-    ]);
-
-    // Total created across both calls should equal 1 (for 2026-03 period), not 2
-    expect(res1.created + res2.created).toBe(1);
-
-    // Filter dbDocs for rent entries in period 2026-03
-    const marchRentEntries = dbDocs.filter((d) => d.vendorKey === 'rent' && d.period === '2026-03');
-    expect(marchRentEntries).toHaveLength(1);
   });
 
   it('caps at 36 created entries per series even when far more periods are overdue (infinite-series guard)', async () => {

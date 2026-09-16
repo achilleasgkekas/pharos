@@ -17,7 +17,7 @@
  * method without a scoping idiom must be listed here WITH a reason, or the suite fails.
  * Adding such a file forces a conscious "is this really allowed to skip tenant scoping?"
  *
- * The three reasons a file legitimately skips scoping, and nothing else:
+ * The reasons a file legitimately has no local scoping call:
  *   1. SaaS CONTROL PLANE — Account/Tenant/Membership/Invite/Usage/AuditEvent and the
  *      admin/billing surfaces live in the central registry DB by design; they are not any
  *      one workspace's data, so they must NOT be routed to a tenant connection.
@@ -26,6 +26,8 @@
  *      is a base-connection identity, not per-workspace content.
  *   3. GLOBAL-BY-DESIGN / SELF-HOST-ONLY — a shared cache or an in-process worker that is
  *      deliberately one global collection, or a helper that no-ops under `saasMode()`.
+ *   4. INJECTED MODEL — a persistence helper accepts an already tenant-bound model from
+ *      its caller and never imports a runtime model or chooses a connection itself.
  *
  * SCOPE / KNOWN LIMITATION. This is a FILE-level guard: it catches a brand-new file that
  * touches a model with no scoping idiom anywhere in it (the common drift). It does NOT
@@ -33,7 +35,7 @@
  * already scopes elsewhere — because at file granularity that file looks scoped. Those are
  * rarer and more visible in review; tightening to call-site granularity is future work
  * (see PROGRESS / WEB_DEBT). Audited read-only on 2026-09-06: no genuine bypass found —
- * every entry below is one of the three legitimate reasons.
+ * every entry below must document its reason.
  */
 
 /**
@@ -41,6 +43,7 @@
  * each mapped to the reason. Paths are relative to `apps/web/src`.
  */
 export const SCOPING_EXEMPT_FILES: Record<string, string> = {
+  'lib/recurringExpense.ts': 'Injected model: expenses/actions.ts passes currentModel(ExpenseModel) inside withRequestTenant; imports ExpenseDoc only as a type. Real Mongo integration tests exercise separate databases.',
   // — 1. SaaS control plane: central registry DB, never a tenant connection —
   'app/api/saas/account/export/route.ts': 'Control plane: Account self-service data export (registry DB).',
   'app/api/saas/account/mfa/route.ts': 'Control plane: Account MFA enrolment (registry DB).',
