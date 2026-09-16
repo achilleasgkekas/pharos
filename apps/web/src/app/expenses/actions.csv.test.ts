@@ -189,8 +189,7 @@ describe('importExpensesCsv — existing-record dedupe', () => {
       { kind: 'expense', vendorKey: 'dei', date: null, amount: 45.9 },
     ]);
     const res = await importExpensesCsv([row()], { kind: 'expense', signSplit: false });
-    expect(res.ok).toBe(true);
-    expect(res.imported).toBe(1);
+    expect(res).toMatchObject({ ok: true, imported: 1 });
   });
 
   it('does not skip when kind, vendorKey, date or amount differ from the existing record', async () => {
