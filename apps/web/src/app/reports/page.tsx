@@ -25,6 +25,7 @@ import { goalProgress } from '@/lib/goals';
 import { buildMonthReview } from '@/lib/monthReview';
 import { buildYearOverYear } from '@/lib/yearOverYear';
 import { listEntriesNeedingRate } from '@/lib/fxAudit';
+import { reportWindowStart, inReportWindow, monthKeyOfDate } from '@/lib/reportWindow';
 import type { SerializedStatement } from '@/types';
 import { ReportsClient } from './ReportsClient';
 
@@ -92,6 +93,10 @@ async function getReports(monthsBack = 12) {
   const subs = JSON.parse(JSON.stringify(subsRaw)) as LeanSub[];
 
   const now = new Date();
+  // Everything labelled with the selected period is computed from these (#122). Month-by-month
+  // history (year-over-year, rollover, calendar-year totals) still reads the full record set.
+  const windowStart = reportWindowStart(now, monthsBack);
+  const windowReceipts = receipts.filter((r) => inReportWindow(monthKeyOfDate(r.date), windowStart));
 
   // ── Monthly spend (last 12 months, from receipts) ────────────────────────
   const months: { key: string; label: string; total: number; count: number }[] = [];
@@ -102,7 +107,7 @@ async function getReports(monthsBack = 12) {
   const mIdx = new Map(months.map((m, i) => [m.key, i]));
   let receiptsTotal = 0;
   let receiptsVat = 0;
-  for (const r of receipts) {
+  for (const r of windowReceipts) {
     receiptsTotal += r.total || 0;
     receiptsVat += r.vatAmount || 0;
     if (!r.date) continue;
@@ -148,11 +153,6 @@ async function getReports(monthsBack = 12) {
     if (amt <= 0) continue;
     const isIncome = e.kind === 'income';
     const cat = e.category || 'other';
-    if (!isIncome) {
-      expCatMap.set(cat, (expCatMap.get(cat) ?? 0) + amt);
-      const sp = (e.space || '').trim();
-      expSpaceMap.set(sp, (expSpaceMap.get(sp) ?? 0) + amt);
-    }
     // Bucket by period (YYYY-MM) if present, else by date.
     let mk = e.period && /^\d{4}-\d{2}$/.test(e.period) ? e.period : '';
     if (!mk && e.date) {
@@ -160,6 +160,11 @@ async function getReports(monthsBack = 12) {
       if (!isNaN(d.getTime())) mk = monthKey(d);
     }
     if (!mk) continue;
+    if (!isIncome && inReportWindow(mk, windowStart)) {
+      expCatMap.set(cat, (expCatMap.get(cat) ?? 0) + amt);
+      const sp = (e.space || '').trim();
+      expSpaceMap.set(sp, (expSpaceMap.get(sp) ?? 0) + amt);
+    }
     if (!isIncome) {
       totalByMonth.set(mk, (totalByMonth.get(mk) ?? 0) + amt);
       let byCat = catByMonth.get(mk);
@@ -190,7 +195,10 @@ async function getReports(monthsBack = 12) {
   // παράθυρο) και ΟΧΙ στο cash-flow / στα μηνιαία-ετήσια σύνολα: οι αποδείξεις έχουν
   // ήδη το δικό τους "Monthly spend" chart παραπάνω και θα μετριόντουσαν δύο φορές.
   const rcSpend = receiptCategorySpend(receipts);
-  for (const [cat, amt] of rcSpend.all) expCatMap.set(cat, (expCatMap.get(cat) ?? 0) + amt);
+  for (const [mk, byCat] of rcSpend.byMonth) {
+    if (!inReportWindow(mk, windowStart)) continue;
+    for (const [cat, amt] of byCat) expCatMap.set(cat, (expCatMap.get(cat) ?? 0) + amt);
+  }
   for (const [mk, byCat] of rcSpend.byMonth) {
     let target = catByMonth.get(mk);
     if (!target) catByMonth.set(mk, (target = new Map<string, number>()));
@@ -204,7 +212,7 @@ async function getReports(monthsBack = 12) {
   // Ίδιος κανόνας με το P64 ακριβώς από πάνω: μόνο ό,τι έχει tag μετράει (μια απόδειξη
   // χωρίς `space` δεν αλλάζει τίποτα), και μπαίνει ΜΟΝΟ στο space-scoped άθροισμα, όχι
   // στο cash flow ή στα μηνιαία σύνολα, γιατί εκεί οι αποδείξεις μετριούνται ήδη.
-  for (const [sp, amt] of receiptSpaceSpend(receipts)) expSpaceMap.set(sp, (expSpaceMap.get(sp) ?? 0) + amt);
+  for (const [sp, amt] of receiptSpaceSpend(windowReceipts)) expSpaceMap.set(sp, (expSpaceMap.get(sp) ?? 0) + amt);
   const incomeExpense = ie.map((m) => ({ ...m, income: Math.round(m.income), expense: Math.round(m.expense) }));
   // Budget vs actual (this month), per budgeted category. In envelope mode (P25)
   // each category also gets a `carried` (net unspent from recent complete months)
@@ -288,7 +296,7 @@ async function getReports(monthsBack = 12) {
 
   // ── Spend by store (top 8) ───────────────────────────────────────────────
   const storeMap = new Map<string, { total: number; count: number }>();
-  for (const r of receipts) {
+  for (const r of windowReceipts) {
     const k = r.store || '—';
     const e = storeMap.get(k) ?? { total: 0, count: 0 };
     e.total += r.total || 0;
@@ -301,7 +309,7 @@ async function getReports(monthsBack = 12) {
     .slice(0, 8);
 
   // ── Biggest single purchases (top receipts) ──────────────────────────────
-  const biggestPurchases = receipts
+  const biggestPurchases = windowReceipts
     .filter((r) => (r.total || 0) > 0)
     .sort((a, b) => (b.total || 0) - (a.total || 0))
     .slice(0, 8)
@@ -470,7 +478,7 @@ async function getReports(monthsBack = 12) {
     summary: {
       receiptsTotal: Math.round(receiptsTotal),
       receiptsVat: Math.round(receiptsVat),
-      receiptsCount: receipts.length,
+      receiptsCount: windowReceipts.length,
       outstanding: Math.round(outstanding),
       ownedValue: Math.round(ownedValue),
       shoppingValue: Math.round(shoppingValue),
