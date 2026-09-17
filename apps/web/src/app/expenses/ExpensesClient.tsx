@@ -29,7 +29,7 @@ import { ExpenseDuplicatesModal } from './ExpenseDuplicatesModal';
 import { OpenInOneDriveButton } from '@/components/OpenInOneDriveButton';
 import { useLocale, useT, useMoney } from '@/components/LocaleProvider';
 import type { TKey } from '@/lib/i18n';
-import { formatDate, formatTime, formatDateTime } from '@/lib/i18n/format';
+import { formatDate, formatTime, formatDateTime, compareNames } from '@/lib/i18n/format';
 
 const CYCLES = RECURRING_CYCLES;
 // Filter sentinel for "records with no space assigned" (distinct from '' = no filter).
@@ -56,6 +56,7 @@ type FxCtx = { base: string; enabled: boolean };
 type Props = { kind: 'income' | 'expense'; expenses: SerializedExpense[]; cards: SerializedCard[]; giftCards: GiftCardOption[]; vendors: string[]; ollamaUp: boolean; categories: string[]; spaces: string[]; baseCurrency: string; multiCurrency: boolean };
 
 export function ExpensesClient({ kind, expenses, cards, giftCards, vendors, ollamaUp, categories, spaces, baseCurrency, multiCurrency }: Props) {
+  const locale = useLocale();
   const fx: FxCtx = { base: baseCurrency, enabled: multiCurrency };
   const router = useRouter();
   const confirm = useConfirm();
@@ -140,7 +141,7 @@ export function ExpensesClient({ kind, expenses, cards, giftCards, vendors, olla
         case 'oldest': return new Date(a.date).getTime() - new Date(b.date).getTime();
         case 'amount-desc': return (b.amount || 0) - (a.amount || 0);
         case 'amount-asc': return (a.amount || 0) - (b.amount || 0);
-        case 'vendor': return (a.vendor || '').localeCompare(b.vendor || '');
+        case 'vendor': return compareNames(a.vendor, b.vendor, locale);
         default: return new Date(b.date).getTime() - new Date(a.date).getTime();
       }
     });

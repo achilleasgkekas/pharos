@@ -44,7 +44,7 @@ import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { useLocale, useT } from '@/components/LocaleProvider';
 import { DuplicatesModal } from './DuplicatesModal';
 import { useRouter } from 'next/navigation';
-import { formatDate, formatTime, formatDateTime } from '@/lib/i18n/format';
+import { formatDate, formatTime, formatDateTime, compareNames } from '@/lib/i18n/format';
 
 function fileUrl(filePath: string) {
   const u = `/api/files/${filePath.split('/').map(encodeURIComponent).join('/')}`;
@@ -82,6 +82,7 @@ export function ReceiptsClient({
   baseCurrency: string;
   multiCurrency: boolean;
 }) {
+  const locale = useLocale();
   const fx: FxCtx = { base: baseCurrency, enabled: multiCurrency };
   const t = useT();
   const [selected, setSelected] = useState<SerializedReceipt | null>(null);
@@ -188,7 +189,7 @@ export function ReceiptsClient({
       const key = fold(name);
       if (!seen.has(key)) seen.set(key, name);
     }
-    return [...seen.values()].sort((a, b) => a.localeCompare(b));
+    return [...seen.values()].sort((a, b) => compareNames(a, b, locale));
   }, [receipts]);
 
   // Line-item categories actually present on the receipts (P64), so the dropdown only
@@ -196,7 +197,7 @@ export function ReceiptsClient({
   const usedCategories = useMemo(() => {
     const seen = new Set<string>();
     for (const r of receipts) for (const l of r.lineItems ?? []) if (l.category) seen.add(l.category);
-    return [...seen].sort((a, b) => a.localeCompare(b));
+    return [...seen].sort((a, b) => compareNames(a, b, locale));
   }, [receipts]);
 
   // Same for payment methods.
@@ -206,7 +207,7 @@ export function ReceiptsClient({
       const m = (r.paymentMethod || '').trim();
       if (m && !seen.has(fold(m))) seen.set(fold(m), m);
     }
-    return [...seen.values()].sort((a, b) => a.localeCompare(b));
+    return [...seen.values()].sort((a, b) => compareNames(a, b, locale));
   }, [receipts]);
   const visible = useMemo(() => {
     const out = receipts.filter((r) => {
@@ -263,7 +264,7 @@ export function ReceiptsClient({
         case 'total-asc':
           return (a.total || 0) - (b.total || 0);
         case 'store':
-          return (a.store || '').localeCompare(b.store || '');
+          return compareNames(a.store, b.store, locale);
         default:
           return new Date(b.date).getTime() - new Date(a.date).getTime();
       }

@@ -139,7 +139,7 @@ describe('formatCurrency', () => {
   });
 });
 
-import { formatDate, formatDateTime, formatTime, intlTag } from './format';
+import { compareNames, formatDate, formatDateTime, formatTime, intlTag } from './format';
 
 describe('date formatting follows the app language (#5)', () => {
   const d = new Date(2026, 6, 4, 9, 5); // 4 July 2026, 09:05 local
@@ -170,5 +170,32 @@ describe('date formatting follows the app language (#5)', () => {
     expect(formatDate('not a date', 'en', undefined, '—')).toBe('—');
     expect(formatTime(undefined, 'en')).toBe('');
     expect(formatDateTime('garbage', 'en', undefined, '—')).toBe('—');
+  });
+});
+
+describe('compareNames — one order on the server and in the browser (#152)', () => {
+  const list = ['Apple Music', 'Μπαταρίες UPS', 'Zoom', 'apple tv'];
+
+  it('sorts by the APP language, not the runtime default', () => {
+    // Greek collation puts Greek before Latin; en/de put it after. Before #152 the sort took the
+    // RUNTIME default — Node said one thing, the browser another, and React blew up on hydration.
+    expect([...list].sort((a, b) => compareNames(a, b, 'el'))[0]).toBe('Μπαταρίες UPS');
+    expect([...list].sort((a, b) => compareNames(a, b, 'en'))[0]).toBe('Apple Music');
+    expect([...list].sort((a, b) => compareNames(a, b, 'de')).at(-1)).toBe('Μπαταρίες UPS');
+  });
+
+  it('is stable for the same locale no matter how it is spelled, and ignores case', () => {
+    const byEn = [...list].sort((a, b) => compareNames(a, b, 'en'));
+    expect([...list].sort((a, b) => compareNames(a, b, 'en'))).toEqual(byEn);
+    expect(compareNames('apple tv', 'Apple TV', 'en')).toBe(0);
+  });
+
+  it('orders numbers the way a person reads them', () => {
+    expect(['Room 10', 'Room 2'].sort((a, b) => compareNames(a, b, 'en'))).toEqual(['Room 2', 'Room 10']);
+  });
+
+  it('treats empty and missing names as equal, never throwing', () => {
+    expect(compareNames(null, undefined, 'el')).toBe(0);
+    expect(compareNames('', null, 'en')).toBe(0);
   });
 });

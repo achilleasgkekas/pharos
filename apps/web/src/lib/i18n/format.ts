@@ -59,3 +59,24 @@ export function formatDateTime(value: DateLike, locale: string, options?: Intl.D
   const d = toDate(value);
   return d ? d.toLocaleString(intlTag(locale), options) : fallback;
 }
+
+// Collators are expensive to build and there are only ever a handful of locales in play.
+const collators = new Map<string, Intl.Collator>();
+
+/**
+ * Compare two user-visible names in the APP's language (#152).
+ *
+ * `a.localeCompare(b)` with no locale uses the RUNTIME's default: Node on the server (en) and the
+ * browser (el-GR for a Greek user) disagree about where Greek sorts relative to Latin, so the same
+ * list came back in a different order on each side and React threw a hydration mismatch on
+ * /subscriptions. Passing the app locale explicitly makes both sides produce the same order.
+ *
+ * `numeric` so "Room 2" precedes "Room 10", `sensitivity: 'base'` so case and accents do not split
+ * a list a person reads as one alphabet.
+ */
+export function compareNames(a: string | null | undefined, b: string | null | undefined, locale: string): number {
+  const tag = intlTag(locale);
+  let c = collators.get(tag);
+  if (!c) collators.set(tag, (c = new Intl.Collator(tag, { numeric: true, sensitivity: 'base' })));
+  return c.compare(a || '', b || '');
+}

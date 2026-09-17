@@ -78,7 +78,7 @@ import { useOpenParam } from '@/components/useOpenParam';
 import { ItemPhotoGallery } from './ItemPhotoGallery';
 import { ItemDocuments } from './ItemDocuments';
 import { ItemAssetTag } from './ItemAssetTag';
-import { formatDate, formatTime, formatDateTime } from '@/lib/i18n/format';
+import { formatDate, formatTime, formatDateTime, compareNames } from '@/lib/i18n/format';
 import { assetLabelSubtitle } from '@/lib/assetLabel';
 import { printAssetTags } from './printAssetTags';
 import { createItem, updateItem, deleteItem, logSaleAsIncome, markItemArrived, markMaintenanceDone, markItemReturned, previewItemFromUrl, confirmImportItem, aiFillItem, aiFillInfo, fetchItemPhotos, mergeItems, bulkUpdateItems, convertItemToTask, type DupItem } from './actions';
@@ -256,6 +256,7 @@ export function ItemsClient({
   baseCurrency?: string;
   multiCurrency?: boolean;
 }) {
+  const locale = useLocale();
   if (categoryList.length) _itemCats = categoryList;
   const fx: FxCtx = { base: baseCurrency, enabled: multiCurrency };
   const t = useT();
@@ -310,16 +311,16 @@ export function ItemsClient({
   const confirm = useConfirm();
 
   const stores = useMemo(
-    () => [...new Set(items.map((i) => i.purchasedFrom).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
+    () => [...new Set(items.map((i) => i.purchasedFrom).filter(Boolean))].sort((a, b) => compareNames(a, b, locale)),
     [items]
   );
   const categories = useMemo(
-    () => [...new Set(items.map((i) => i.category).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
+    () => [...new Set(items.map((i) => i.category).filter(Boolean))].sort((a, b) => compareNames(a, b, locale)),
     [items]
   );
   // P92 — distinct physical locations (room / rack / shelf), for the browse-by-location filter.
   const locations = useMemo(
-    () => [...new Set(items.map((i) => i.location).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
+    () => [...new Set(items.map((i) => i.location).filter(Boolean))].sort((a, b) => compareNames(a, b, locale)),
     [items]
   );
 
@@ -377,7 +378,7 @@ export function ItemsClient({
         case 'price-asc':
           return (a.currentPrice || 0) - (b.currentPrice || 0);
         case 'name':
-          return a.title.localeCompare(b.title);
+          return compareNames(a.title, b.title, locale);
         case 'recent':
           return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
         default:
