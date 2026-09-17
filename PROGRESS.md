@@ -13655,3 +13655,15 @@ https://github.com/achilleasgkekas/pharos/pull/66, commit `2ba0a34b`. Το Codex
 - **Αναμονή για deploy:** 1 merged commit μετά το `2387e908` που τρέχει στο `/opt/pharos`.
 - **Ανοιχτά brain PRs:** 1 (#159, περιμένει review).
 - **Επόμενο:** το #157 (νεκροί σύνδεσμοι GitHub στο landing, p2) ή το #28 τώρα που ξεμπλόκαρε, ένα PR ανά 2-3 αρχεία.
+
+## 2026-09-18 01:15
+
+**pharos-brain** · issue #157 (p2, lane:claude, νεκροί σύνδεσμοι landing)
+
+- **Υγεία prod:** OK. `ph-aros.com` 200 με περιεχόμενο self-host, `app.ph-aros.com/account/login` 200, `POST trials-sweep` χωρίς token 401 JSON.
+- **Triage:** τίποτα νέο σε needs-triage, καμία εγγραφή `blocked` ανοιχτή αυτή τη φορά. Το #28 δεν είναι lane:claude, το προσπέρασα.
+- **Δουλειά:** το #157, από τον νέο εβδομαδιαίο `site-check.sh`. Το `REPO_PUBLIC=false` έκρυβε μόνο τη στήλη GitHub στο footer· κάθε άλλος σύνδεσμος (nav, mobile drawer, hero CTA, δεύτερο CTA band, η κάρτα self-hosted στο pricing, τρεις σύνδεσμοι σε καθένα από `/privacy` και `/terms`) έδειχνε ακόμα στο ιδιωτικό repo και έδινε 404 σε κάθε επισκέπτη. Έφτιαξα κοινό `app/site.ts` (GITHUB_URL + REPO_PUBLIC, πριν ήταν διπλωμένο σε 3 αρχεία) και component `<GithubLink>` που γίνεται πραγματικός σύνδεσμος μόνο όταν το repo είναι δημόσιο, αλλιώς απλό κείμενο με τις ίδιες κλάσεις. Το JSON-LD (`sameAs`, `softwareHelp`) δεν δηλώνει πια URL που δεν υπάρχει όσο το repo είναι ιδιωτικό.
+- **PR:** #160 https://github.com/achilleasgkekas/pharos/pull/160 (type-check και `next build` καθαρά για apps/landing· το apps/landing δεν έχει test suite, επαλήθευσα χειροκίνητα ότι το prerendered HTML δεν έχει κανένα `github.com` href ενώ το ορατό κείμενο «GitHub» παραμένει παντού). Δεν έτρεξα το ίδιο το `site-check.sh` (χτυπά το live site, όχι local build).
+- **Αναμονή για deploy:** 1 merged code commit (`5b3921db`) μετά το `2387e908` που τρέχει στο `/opt/pharos`.
+- **Ανοιχτά brain PRs:** 2 (#159, #160), κανένα δεν έχει ακόμα label review.
+- **Επόμενο:** cap ημέρας 2/3. Αν μείνει τρίτο run: έλεγχος αν κάποιο από τα #159/#160 πήρε `needs-changes`, αλλιώς #158 (LCP 3.6s στο landing) είναι lane-eligible τώρα.
