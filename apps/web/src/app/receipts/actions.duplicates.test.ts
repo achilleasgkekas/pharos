@@ -376,7 +376,9 @@ describe('mergeReceipts', () => {
   });
 
   it('best-effort deletes each drop\'s file + thumbnail, swallowing a delete rejection instead of failing the merge', async () => {
-    const keep = makeReceiptDoc();
+    // The survivor has its own scan, so the drop's copy is redundant and must go (#91: a
+    // fileless survivor would adopt it instead, see the next tests).
+    const keep = makeReceiptDoc({ filePath: 'receipts/k.pdf', thumbPath: 'thumbs/k.jpg' });
     const drop1 = { _id: DROP1_ID, lineItems: [], itemIds: [], filePath: 'receipts/d1.pdf', thumbPath: 'thumbs/d1.jpg' };
     receiptFindById.mockResolvedValue(keep);
     receiptFind.mockReturnValue(Promise.resolve([drop1]) as any);
@@ -411,6 +413,47 @@ describe('mergeReceipts', () => {
     await expect(mergeReceipts(KEEP_ID, [DROP1_ID])).rejects.toThrow('database disconnected');
 
     expect(deleteFileMock).not.toHaveBeenCalled();
+  });
+
+  // #91: a fileless survivor (legacy / manually created, sorted first because verified)
+  // used to keep "No scan file" while the only real scan was deleted with the drop.
+  it('adopts a drop\'s scan when the survivor has none, and does not delete the adopted file', async () => {
+    const keep = makeReceiptDoc({ verified: true, filePath: '', thumbPath: '' });
+    const drop1 = { _id: DROP1_ID, lineItems: [], itemIds: [], filePath: '', thumbPath: '' };
+    const drop2 = {
+      _id: DROP2_ID,
+      lineItems: [],
+      itemIds: [],
+      filePath: 'receipts/d2.pdf',
+      thumbPath: 'thumbs/d2.jpg',
+      fileType: 'application/pdf',
+      fileSize: 12345,
+    };
+    receiptFindById.mockResolvedValue(keep);
+    receiptFind.mockReturnValue(Promise.resolve([drop1, drop2]) as any);
+
+    const result = await mergeReceipts(KEEP_ID, [DROP1_ID, DROP2_ID]);
+
+    expect(result.ok).toBe(true);
+    expect(keep.filePath).toBe('receipts/d2.pdf');
+    expect(keep.thumbPath).toBe('thumbs/d2.jpg');
+    expect((keep as Record<string, any>).fileType).toBe('application/pdf');
+    expect((keep as Record<string, any>).fileSize).toBe(12345);
+    expect(deleteFileMock).not.toHaveBeenCalled();
+  });
+
+  it('keeps the survivor\'s own scan and still deletes the drop\'s file when both have one', async () => {
+    const keep = makeReceiptDoc({ filePath: 'receipts/k.pdf', thumbPath: 'thumbs/k.jpg' });
+    const drop1 = { _id: DROP1_ID, lineItems: [], itemIds: [], filePath: 'receipts/d1.pdf', thumbPath: 'thumbs/d1.jpg' };
+    receiptFindById.mockResolvedValue(keep);
+    receiptFind.mockReturnValue(Promise.resolve([drop1]) as any);
+
+    await mergeReceipts(KEEP_ID, [DROP1_ID]);
+
+    expect(keep.filePath).toBe('receipts/k.pdf');
+    expect(keep.thumbPath).toBe('thumbs/k.jpg');
+    expect(deleteFileMock).toHaveBeenCalledWith('receipts/d1.pdf');
+    expect(deleteFileMock).toHaveBeenCalledWith('thumbs/d1.jpg');
   });
 
   it('hard-deletes every dropped receipt in one call, revalidates /receipts and /items, and reports merged = drops.length', async () => {

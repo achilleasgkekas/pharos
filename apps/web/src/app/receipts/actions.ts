@@ -740,6 +740,16 @@ export async function mergeReceipts(
     if (!keep.warrantyMonths && d.warrantyMonths) keep.warrantyMonths = d.warrantyMonths;
     if (!keep.paymentMethod && d.paymentMethod) keep.paymentMethod = d.paymentMethod;
     if (!keep.notes && d.notes) keep.notes = d.notes;
+    // The survivor is picked for completeness (verified first), not for having a scan, so a
+    // fileless legacy/manual record can win over an import holding the only PDF (#91). Adopt
+    // the drop's file as one unit (path + thumb + type + size belong together) rather than
+    // field by field, which could pair one drop's PDF with another drop's thumbnail.
+    if (!keep.filePath && d.filePath) {
+      keep.filePath = d.filePath;
+      keep.thumbPath = d.thumbPath || '';
+      if (d.fileType) keep.fileType = d.fileType;
+      if (d.fileSize) keep.fileSize = d.fileSize;
+    }
     for (const id of d.itemIds ?? []) {
       if (!keep.itemIds.some((x) => String(x) === String(id))) keep.itemIds.push(id);
     }
@@ -760,14 +770,15 @@ export async function mergeReceipts(
   // A failed database delete must leave the dropped receipt's files intact so its
   // still-live document never points at storage that this merge removed.
   for (const d of drops) {
-    if (d.filePath) {
+    // Never delete a path the survivor now points at (adopted above).
+    if (d.filePath && d.filePath !== keep.filePath) {
       try {
         await deleteFile(d.filePath);
       } catch {
         /* file already gone */
       }
     }
-    if (d.thumbPath) {
+    if (d.thumbPath && d.thumbPath !== keep.thumbPath) {
       try {
         await deleteFile(d.thumbPath);
       } catch {
