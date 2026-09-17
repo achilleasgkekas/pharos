@@ -32,6 +32,10 @@ function makeBillModel(tag: string) {
     findById: (id: string) => ({
       lean: async () => seeded.get(tag) ?? { _id: id, title: `${tag} bill`, amount: 10, tenantTag: tag },
     }),
+    // #33 legacy-successor lookup before a recurring spawn: none in any db here.
+    findOne: () => ({ lean: async () => null }),
+    // #33 respawn over a trashed successor: never reached here, since create always succeeds.
+    replaceOne: () => ({ setOptions: async () => ({ modifiedCount: 0 }) }),
     findByIdAndUpdate: async (id: string, update: Record<string, any>) => {
       log(tag, 'findByIdAndUpdate', { id, ...update });
       return update;
@@ -145,9 +149,9 @@ describe('bills actions — tenant routing', () => {
     await withTenant(acme, () => markBillPaid('b1'));
 
     const ops = writes.get('acme')?.map((w) => w.op);
-    // pay + spawn of the next month's instance, both in acme's db
-    expect(ops).toEqual(['findByIdAndUpdate', 'create']);
-    expect(writes.get('acme')?.[1].doc.title).toBe('Rent');
+    // spawn of the next month's instance (first, see lib/billRecurrence.ts) + pay, both in acme's db
+    expect(ops).toEqual(['create', 'findByIdAndUpdate']);
+    expect(writes.get('acme')?.[0].doc.title).toBe('Rent');
     expect(writes.get('default')).toBeUndefined();
   });
 

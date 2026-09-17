@@ -31,6 +31,8 @@ const {
   connectDBMock,
   billCreate,
   billFindById,
+  billFindOne,
+  billReplaceOne,
   billFindByIdAndUpdate,
   billUpdateOne,
   addExpenseMock,
@@ -40,6 +42,9 @@ const {
   connectDBMock: vi.fn(async () => {}),
   billCreate: vi.fn(async (_doc: Record<string, unknown>) => ({})),
   billFindById: vi.fn(async (_id: string) => null as Record<string, any> | null),
+  billFindOne: vi.fn(async (_filter: Record<string, any>) => null as Record<string, any> | null),
+  // #33 respawn over a trashed successor (chained .setOptions({ withDeleted: true })).
+  billReplaceOne: vi.fn(async (_filter: Record<string, any>, _doc: Record<string, any>) => ({ modifiedCount: 0 })),
   billFindByIdAndUpdate: vi.fn(async (_id: string, _update: Record<string, any>) => ({})),
   billUpdateOne: vi.fn(async (_filter: Record<string, unknown>, _update: Record<string, any>) => ({})),
   addExpenseMock: vi.fn(async (_data: Record<string, unknown>) => ({ ok: true, id: 'exp1' } as { ok: boolean; id?: string; error?: string })),
@@ -55,6 +60,8 @@ const {
 const billModel = {
   create: billCreate,
   findById: (id: string) => ({ lean: () => billFindById(id) }),
+  findOne: (filter: Record<string, any>) => ({ lean: () => billFindOne(filter) }),
+  replaceOne: (filter: Record<string, any>, doc: Record<string, any>) => ({ setOptions: () => billReplaceOne(filter, doc) }),
   findByIdAndUpdate: billFindByIdAndUpdate,
   updateOne: billUpdateOne,
 };
@@ -90,6 +97,8 @@ beforeEach(() => {
   connectDBMock.mockImplementation(async () => {});
   billCreate.mockImplementation(async () => ({}));
   billFindById.mockImplementation(async () => null);
+  billFindOne.mockImplementation(async () => null);
+  billReplaceOne.mockImplementation(async () => ({ modifiedCount: 0 }));
   billFindByIdAndUpdate.mockImplementation(async () => ({}));
   billUpdateOne.mockImplementation(async () => ({}));
   addExpenseMock.mockImplementation(async () => ({ ok: true, id: 'exp1' }));
@@ -374,6 +383,158 @@ describe('markBillPaid', () => {
     billFindById.mockResolvedValueOnce({ _id: 'b1', title: 'X', amount: 40, cycle: '', paidAt: null, linkedExpenseId: '', dueDate: new Date('2026-06-15') });
     await markBillPaid('b1');
     expect(billCreate).not.toHaveBeenCalled();
+  });
+});
+
+// #33 — "mark paid → Undo → mark paid" on a recurring bill used to spawn a SECOND copy of
+// the next instance: Undo only clears paidAt, so the re-payment looked like a first payment.
+// Driven against a tiny in-memory store (not per-call stubs) so the test follows the real
+// sequence of reads and writes instead of pinning one query shape.
+describe('recurring spawn survives Undo (#33)', () => {
+  type Doc = Record<string, any>;
+  let store: Map<string, Doc>;
+  // Just enough of Mongo's matcher for the lookups the action makes: equality (Dates by
+  // value), null, $ne, $in, $gt/$lt on Dates, and a top-level $or.
+  const matches = (doc: Doc, filter: Doc): boolean =>
+    Object.entries(filter).every(([k, v]) => {
+      if (k === '$or') return (v as Doc[]).some((f) => matches(doc, f));
+      const actual = doc[k];
+      if (v === null) return actual == null;
+      if (v && typeof v === 'object' && ('$gt' in v || '$lt' in v)) {
+        const t = actual instanceof Date ? actual.getTime() : NaN;
+        const { $gt, $lt } = v as { $gt?: Date; $lt?: Date };
+        return (!$gt || t > $gt.getTime()) && (!$lt || t < $lt.getTime());
+      }
+      if (v && typeof v === 'object' && '$ne' in v) return v.$ne === null ? actual != null : actual !== v.$ne;
+      if (v && typeof v === 'object' && '$in' in v) return (v.$in as unknown[]).some((x) => (x == null ? actual == null : actual === x));
+      if (v instanceof Date) return actual instanceof Date && actual.getTime() === v.getTime();
+      return actual === v;
+    });
+  const successors = () => [...store.values()].filter((d) => d._id !== 'b1');
+
+  beforeEach(() => {
+    store = new Map([['b1', {
+      _id: 'b1', title: 'Ενοίκιο', vendor: '', amount: 100, category: 'housing', cycle: 'monthly',
+      notes: '', paidAt: null, linkedExpenseId: '', dueDate: new Date(2026, 5, 15),
+    }]]);
+    billFindById.mockImplementation(async (id) => (store.has(id) ? { ...store.get(id)! } : null));
+    // Yield before answering, like a real round trip, so concurrent callers can interleave.
+    // Trashed rows are hidden, as the soft-delete plugin does.
+    billFindOne.mockImplementation(async (filter) => {
+      await new Promise((r) => setTimeout(r, 0));
+      return [...store.values()].find((d) => d.deletedAt == null && matches(d, filter)) ?? null;
+    });
+    billFindByIdAndUpdate.mockImplementation(async (id, update) => { Object.assign(store.get(id)!, update); return {}; });
+    // The unique _id index: a second insert with the same id fails whether or not the holder is trashed.
+    billCreate.mockImplementation(async (doc) => {
+      await new Promise((r) => setTimeout(r, 0));
+      if (store.has(doc._id as string)) throw Object.assign(new Error('E11000 duplicate key'), { code: 11000 });
+      store.set(doc._id as string, { ...doc });
+      return { _id: doc._id };
+    });
+    billReplaceOne.mockImplementation(async (filter, doc) => {
+      const hit = [...store.values()].find((d) => matches(d, filter));
+      if (!hit) return { modifiedCount: 0 };
+      store.set(hit._id, { ...doc });
+      return { modifiedCount: 1 };
+    });
+  });
+
+  it('paying again after Undo does not create a second next instance', async () => {
+    await markBillPaid('b1');
+    await markBillUnpaid('b1');
+    await markBillPaid('b1');
+    expect(successors()).toHaveLength(1);
+    expect(localYmd(successors()[0].dueDate)).toBe('2026-07-15');
+    expect(successors()[0].recurrenceParentId).toBe('b1');
+  });
+
+  it('recognises a successor spawned before the parent link existed (legacy row)', async () => {
+    // Paid before this fix shipped: the July row exists but carries no recurrenceParentId.
+    store.set('legacy', {
+      ...store.get('b1'), _id: 'legacy', title: 'Ενοίκιο', cycle: 'monthly', paidAt: null, dueDate: new Date(2026, 6, 15),
+    });
+    await markBillPaid('b1');
+    expect(billCreate).not.toHaveBeenCalled();
+  });
+
+  // Codex review of ddca036: users correct the projected row when the real bill arrives, so a
+  // legacy successor must still be recognised after its due date or its title was edited.
+  it('recognises a legacy successor whose due date was moved within the next cycle', async () => {
+    store.set('legacy', {
+      ...store.get('b1'), _id: 'legacy', title: 'Ενοίκιο', cycle: 'monthly', paidAt: null, dueDate: new Date(2026, 6, 20),
+    });
+    await markBillPaid('b1');
+    expect(billCreate).not.toHaveBeenCalled();
+  });
+
+  it('recognises a legacy successor whose title was corrected but every copied field kept', async () => {
+    store.set('legacy', {
+      _id: 'legacy', title: 'Ενοίκιο Ιουλίου', vendor: '', amount: 100, category: 'housing', cycle: 'monthly',
+      notes: '', paidAt: null, dueDate: new Date(2026, 6, 15),
+    });
+    await markBillPaid('b1');
+    expect(billCreate).not.toHaveBeenCalled();
+  });
+
+  it('an unrelated manually entered bill on the same next due date does not suppress the successor', async () => {
+    store.set('internet', {
+      _id: 'internet', title: 'Internet', vendor: 'Cosmote', amount: 30, category: 'utilities', cycle: 'monthly',
+      notes: '', paidAt: null, dueDate: new Date(2026, 6, 15),
+    });
+    await markBillPaid('b1');
+    expect(successors().filter((d) => d.recurrenceParentId === 'b1')).toHaveLength(1);
+  });
+
+  it.each(['vendor', 'amount', 'category', 'notes', 'currency'])('a same-title bill with different %s does not suppress the next occurrence', async (field) => {
+    const parent = store.get('b1')!;
+    const other: Doc = { ...parent, _id: 'other', dueDate: new Date(2026, 5, 20) };
+    other[field] = field === 'amount' ? 250 : 'different';
+    store.set('other', other);
+    await markBillPaid('b1');
+    expect(successors().filter((d) => d.recurrenceParentId === 'b1')).toHaveLength(1);
+  });
+
+  it('a same-title bill two cycles ahead does not count as the next instance', async () => {
+    store.set('august', {
+      ...store.get('b1'), _id: 'august', title: 'Ενοίκιο', cycle: 'monthly', paidAt: null, dueDate: new Date(2026, 7, 15),
+    });
+    await markBillPaid('b1');
+    expect(successors().filter((d) => d.recurrenceParentId === 'b1')).toHaveLength(1);
+  });
+
+  it('two payments landing at the same moment create only one next instance', async () => {
+    await Promise.all([markBillPaid('b1'), markBillPaid('b1')]);
+    expect(successors()).toHaveLength(1);
+  });
+
+  it('a payment whose paidAt write fails can be retried without losing or duplicating the successor', async () => {
+    // The spawn runs first, so the failed attempt leaves the bill UNPAID (retryable) rather than
+    // paid with no successor and a wasPaid guard that would never let it spawn again.
+    billFindByIdAndUpdate.mockRejectedValueOnce(new Error('connection reset'));
+    await expect(markBillPaid('b1')).rejects.toThrow('connection reset');
+    expect(store.get('b1')!.paidAt).toBeNull();
+    await markBillPaid('b1');
+    expect(store.get('b1')!.paidAt).toBeInstanceOf(Date);
+    expect(successors()).toHaveLength(1);
+  });
+
+  it('a failed spawn does not mark the bill paid', async () => {
+    billCreate.mockRejectedValueOnce(new Error('write concern timeout'));
+    await expect(markBillPaid('b1')).rejects.toThrow('write concern timeout');
+    expect(store.get('b1')!.paidAt).toBeNull();
+  });
+
+  it('still spawns when the earlier successor was trashed, replacing it rather than adding a second row', async () => {
+    await markBillPaid('b1');
+    const [july] = successors();
+    july.deletedAt = new Date();
+    july.amount = 999; // edited before trashing: the respawn is a fresh projection, not a restore
+    await markBillUnpaid('b1');
+    await markBillPaid('b1');
+    expect(successors()).toHaveLength(1);
+    expect(successors()[0].deletedAt).toBeNull();
+    expect(successors()[0].amount).toBe(100);
   });
 });
 

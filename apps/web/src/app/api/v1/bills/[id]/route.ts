@@ -5,7 +5,7 @@ import { isObjectId, readBody } from '@/lib/apiBody';
 import { connectDB } from '@/lib/db';
 import { Bill as BillModel } from '@/models/Bill';
 import { currentModel } from '@/lib/tenancy/connection';
-import { nextBillDue } from '@/lib/bill';
+import { spawnNextBillOnce } from '@/lib/billRecurrence';
 import { getAppSettings } from '@/lib/appSettings';
 import { resolveFx, isForeignCurrency } from '@/lib/fx';
 import { trim, type BillLean } from '../serialize';
@@ -78,25 +78,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         const paidDate = typeof b.paidDate === 'string' && b.paidDate.trim() ? new Date(b.paidDate) : new Date();
         set.paidAt = Number.isNaN(paidDate.getTime()) ? new Date() : paidDate;
         const wasPaid = !!existing.paidAt;
+        // #33: same once-per-bill spawn as the web markBillPaid action, so a `paid:false`
+        // then `paid:true` round trip does not leave two copies of the next instance.
         if (!wasPaid && existing.cycle) {
-          await Bill.create({
-            title: existing.title,
-            vendor: existing.vendor,
-            amount: existing.amount,
-            // P9: the projection inherits currency AND last known rate, so `amount` stays
-            // base-denominated instead of spawning a rate-less foreign row every cycle
-            // (same rule as the web markBillPaid action).
-            currency: existing.currency,
-            origAmount: existing.origAmount,
-            fxRate: existing.fxRate,
-            dueDate: nextBillDue(existing.dueDate, existing.cycle),
-            paidAt: null,
-            category: existing.category,
-            cycle: existing.cycle,
-            notes: existing.notes,
-            archived: false,
-          });
-          spawnedNext = true;
+          spawnedNext = await spawnNextBillOnce(Bill, existing);
         }
       } else {
         set.paidAt = null;
