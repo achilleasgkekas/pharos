@@ -82,6 +82,8 @@ vi.mock('@/lib/appSettings', () => ({ getAppSettings: getAppSettingsMock }));
 vi.mock('@/lib/mirror', () => ({ mirrorFileToRemote: mirrorFileToRemoteMock }));
 vi.mock('@/lib/webhooks', () => ({ dispatchEventWebhooks: vi.fn(async () => ({ sent: 0, total: 0 })) }));
 vi.mock('@/lib/htmlReceipt', () => ({ htmlReceiptToText: vi.fn() }));
+const { learnStoreAliasMock } = vi.hoisted(() => ({ learnStoreAliasMock: vi.fn(async (_p: string, _n: string) => {}) }));
+vi.mock('@/lib/storeLearning', () => ({ learnStoreAlias: learnStoreAliasMock }));
 vi.mock('next/cache', () => ({ revalidatePath: (p: string) => revalidatePathMock(p) }));
 
 import { updateReceipt, quickVerifyReceipt, deleteReceipt, archiveReceipt } from './actions';
@@ -352,5 +354,27 @@ describe('archiveReceipt', () => {
     await archiveReceipt('r1', true);
     expect(revalidatePathMock).toHaveBeenCalledTimes(1);
     expect(revalidatePathMock).toHaveBeenCalledWith('/receipts');
+  });
+});
+
+describe('store correction teaches an alias (P60, #13)', () => {
+  it('quick-verify passes the store it had BEFORE and the corrected one', async () => {
+    receiptFindByIdLean.mockResolvedValueOnce({ currency: 'EUR', fxRate: 0, store: 'Κωτσόβολος' });
+    receiptFindByIdAndUpdateLean.mockResolvedValueOnce({ _id: 'r1', store: 'TechLamb', date: '2026-06-15', total: 99, filePath: '', verified: true });
+    await quickVerifyReceipt('r1', { store: 'TechLamb', date: '2026-06-15', total: 99 });
+    expect(learnStoreAliasMock).toHaveBeenCalledWith('Κωτσόβολος', 'TechLamb');
+  });
+
+  it('the full form learns only when the receipt is saved as verified', async () => {
+    learnStoreAliasMock.mockClear();
+    const base = { store: 'TechLamb', date: '2026-06-15', total: 10 };
+    receiptFindByIdAndUpdateLean.mockResolvedValueOnce({ _id: 'r1', store: 'TechLamb', verified: false, filePath: '' });
+    await updateReceipt('r1', { ...base, verified: false });
+    expect(learnStoreAliasMock).not.toHaveBeenCalled();
+
+    receiptFindByIdLean.mockResolvedValueOnce({ store: 'TL Computers' });
+    receiptFindByIdAndUpdateLean.mockResolvedValueOnce({ _id: 'r1', store: 'TechLamb', verified: true, filePath: '' });
+    await updateReceipt('r1', { ...base, verified: true });
+    expect(learnStoreAliasMock).toHaveBeenCalledWith('TL Computers', 'TechLamb');
   });
 });

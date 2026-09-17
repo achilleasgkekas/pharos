@@ -41,6 +41,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (typeof b.category === 'string' && b.category.trim()) set.category = b.category.trim();
     if (typeof b.cycle === 'string' && CYCLES.includes(b.cycle)) set.cycle = b.cycle;
     if (typeof b.notes === 'string') set.notes = b.notes.trim();
+    if (typeof b.space === 'string') set.space = b.space.trim().slice(0, 40); // #14 (P68)
     if (typeof b.archived === 'boolean') set.archived = b.archived;
 
     await connectDB();

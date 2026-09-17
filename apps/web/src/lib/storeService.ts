@@ -70,7 +70,11 @@ export async function getStoreNames(): Promise<string[]> {
 export function matchIn(raw: string, stores: StoreLite[]): string | null {
   const q = (raw || '').toLowerCase().trim();
   if (!q) return null;
-  for (const s of stores) {
+  // Curated stores before `auto` ones (#13): once a correction teaches a real store the raw text
+  // an auto-created store was named after, the real store must win — otherwise the old auto
+  // entry keeps catching that text first whenever it happens to sort earlier.
+  const ordered = [...stores.filter((s) => !s.auto), ...stores.filter((s) => s.auto)];
+  for (const s of ordered) {
     if (s.name.toLowerCase() === q) return s.name;
     for (const a of s.aliases) {
       const al = a.toLowerCase();

@@ -63,6 +63,7 @@ export async function POST(req: NextRequest) {
       category: strField(b, 'category', 'other', true) || 'other',
       cycle: enumField(b, 'cycle', CYCLES, ''),
       notes: strField(b, 'notes', '', true),
+      space: strField(b, 'space').trim().slice(0, 40), // #14 (P68): per-property ledger tag
       paidAt: null,
       archived: false,
     });

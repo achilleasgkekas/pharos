@@ -49,6 +49,12 @@ const BillSchema = new Schema(
     // '' on hand-entered bills and on pre-#33 successors.
     recurrenceParentId: { type: String, default: '', index: true },
     notes: { type: String, default: '' },
+    // P68 φάση 3 (#14): το ίδιο optional per-property ledger tag με `Expense.space` (P34),
+    // `Receipt.space` και `Subscription.space`, από το ίδιο taxonomy `AppConfig.spaces`.
+    // '' = χωρίς χώρο. Ένας λογαριασμός είναι πραγματική δαπάνη, αλλά ΔΕΝ αθροίζεται μόνος του
+    // στο per-space card: μπαίνει εκεί μέσω του expense που γράφει η πληρωμή του, το οποίο
+    // κληρονομεί αυτό το tag — αλλιώς ένας πληρωμένος λογαριασμός θα μετριόταν δύο φορές.
+    space: { type: String, default: '', index: true },
     archived: { type: Boolean, default: false, index: true },
     linkedExpenseId: { type: String, default: '' }, // set when "mark paid" also logged an expense
   },

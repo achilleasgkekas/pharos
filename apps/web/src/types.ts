@@ -269,6 +269,8 @@ export type SerializedBill = {
   category: string;
   cycle: import('@/lib/billingCycle').RecurringCycle;
   notes: string;
+  /** #14 (P68): per-property ledger tag; '' = none. */
+  space?: string;
   archived: boolean;
   linkedExpenseId: string;
   createdAt: string;

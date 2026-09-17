@@ -821,3 +821,34 @@ describe('removeBillPayment', () => {
     expect(billUpdateOne).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('per-space tag on bills (#14, P68 phase 3)', () => {
+  it('create stores a trimmed space, and "" when the picker was hidden', async () => {
+    await createBill(formData({ title: 'ΔΕΗ Καλάμου', dueDate: '15/07/2026', space: '  Kalamos ' }));
+    expect(billCreate.mock.calls[0][0].space).toBe('Kalamos');
+    await createBill(formData({ title: 'ΔΕΗ', dueDate: '15/07/2026' }));
+    expect(billCreate.mock.calls[1][0].space).toBe('');
+  });
+
+  it('update without the field keeps the existing tag (hidden picker never wipes it)', async () => {
+    await updateBill('bill1', formData({ title: 'ΔΕΗ', dueDate: '20/08/2026' }));
+    expect(billFindByIdAndUpdate.mock.calls[0][1]).not.toHaveProperty('space');
+    await updateBill('bill1', formData({ title: 'ΔΕΗ', dueDate: '20/08/2026', space: 'Kalamos' }));
+    expect(billFindByIdAndUpdate.mock.calls[1][1].space).toBe('Kalamos');
+  });
+
+  it('the expense logged by "mark paid" carries the bill’s space, so it reaches the per-space card once', async () => {
+    billFindById.mockResolvedValueOnce({ _id: 'b1', title: 'ΔΕΗ', vendor: 'ΔΕΗ', amount: 40, paidAt: null, cycle: '', linkedExpenseId: '', space: 'Kalamos' });
+    await markBillPaid('b1', { logExpense: true });
+    expect(addExpenseMock.mock.calls[0][0].space).toBe('Kalamos');
+  });
+
+  it('the next instance of a recurring bill keeps the space', async () => {
+    billFindById.mockResolvedValueOnce({
+      _id: 'b1', title: 'ΔΕΗ', vendor: 'ΔΕΗ', amount: 40, category: 'utilities', cycle: 'monthly', notes: '',
+      paidAt: null, linkedExpenseId: '', dueDate: new Date('2026-06-15'), space: 'Kalamos',
+    });
+    await markBillPaid('b1');
+    expect(billCreate.mock.calls[0][0].space).toBe('Kalamos');
+  });
+});

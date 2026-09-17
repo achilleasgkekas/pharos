@@ -140,7 +140,7 @@ export async function searchAll(query: string): Promise<SearchHit[]> {
         .limit(6)
         .select('title store discount used')
         .lean<VoucherLean[]>(),
-      Bill.find({ $or: [{ title: r }, { vendor: r }, { category: r }, { notes: r }] })
+      Bill.find({ $or: [{ title: r }, { vendor: r }, { category: r }, { notes: r }, { space: r }] })
         .limit(6)
         .select('title vendor amount dueDate paidAt')
         .lean<BillLean[]>(),

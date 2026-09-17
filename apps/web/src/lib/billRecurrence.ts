@@ -25,6 +25,7 @@ type SpawnSource = {
   category?: string | null;
   cycle?: string | null;
   notes?: string | null;
+  space?: string | null;
 };
 
 /**
@@ -99,6 +100,7 @@ export async function spawnNextBillOnce(Bill: BillStore, bill: SpawnSource): Pro
     category: bill.category,
     cycle: bill.cycle,
     notes: bill.notes,
+    space: bill.space || '', // #14: next month's ΔΕΗ bill is still the summer house's
     archived: false,
     recurrenceParentId: parentId,
     deletedAt: null,

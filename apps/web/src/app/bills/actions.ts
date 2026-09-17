@@ -31,6 +31,10 @@ const BillFormSchema = z.object({
   category: z.string().default('other'),
   cycle: z.enum(CYCLES).default(''),
   notes: z.string().default(''),
+  // #14 (P68 φάση 3): per-property ledger tag, ίδιο ταβάνι 40 χαρακτήρων με Expense/Receipt/
+  // Subscription. Optional: the picker is hidden until a space exists, and an absent field must
+  // not wipe a tag set earlier.
+  space: z.string().max(40).optional(),
 });
 
 /**
@@ -59,7 +63,7 @@ export async function createBill(formData: FormData): Promise<{ ok: boolean; err
   return withRequestTenant(async () => {
     await connectDB();
     const Bill = await currentModel(BillModel);
-    await Bill.create({ ...raw, ...(await resolveBillFx(raw)), dueDate: due, paidAt: null, archived: false });
+    await Bill.create({ ...raw, ...(await resolveBillFx(raw)), space: (raw.space ?? '').trim(), dueDate: due, paidAt: null, archived: false });
     revalidatePath('/bills');
     return { ok: true };
   });
@@ -77,7 +81,8 @@ export async function updateBill(id: string, formData: FormData): Promise<{ ok: 
     const Bill = await currentModel(BillModel);
     // The form always shows the PRINTED amount (see BillsClient), so re-saving an unchanged
     // foreign bill re-resolves to the same stored figure instead of converting it twice.
-    await Bill.findByIdAndUpdate(id, { ...raw, ...(await resolveBillFx(raw)), dueDate: due });
+    const { space, ...rest } = raw;
+    await Bill.findByIdAndUpdate(id, { ...rest, ...(await resolveBillFx(raw)), ...(space !== undefined ? { space: space.trim() } : {}), dueDate: due });
 
     // #34: status is derived from paidAt alone, so lowering the total below what the P61
     // instalments already cover would show "remaining €0" on a bill still listed as open or
@@ -158,6 +163,7 @@ export async function markBillPaid(
       kind: 'expense',
       vendor: bill.vendor || bill.title,
       category: bill.category || 'other',
+      space: bill.space || '', // #14: the logged spend lands in the bill's house on the per-space card
       amount: owed,
       date: paidAt.toISOString(),
       notes: `Bill: ${bill.title} (final payment)`,
@@ -172,6 +178,7 @@ export async function markBillPaid(
       kind: 'expense',
       vendor: bill.vendor || bill.title,
       category: bill.category || 'other',
+      space: bill.space || '', // #14: the logged spend lands in the bill's house on the per-space card
       // P9: addExpense runs its OWN resolveFx, so it must be handed the PRINTED figure plus
       // the bill's currency + rate. Passing the already-converted `bill.amount` here would
       // convert it a second time and log a foreign bill at rate².
@@ -260,6 +267,7 @@ export async function logBillPayment(
         kind: 'expense',
         vendor: bill.vendor || bill.title,
         category: bill.category || 'other',
+        space: bill.space || '', // #14: the logged spend lands in the bill's house on the per-space card
         amount: p.amount,
         date: paidOn.toISOString(),
         notes: `Bill: ${bill.title}${p.note ? ` (${p.note})` : ''}`,

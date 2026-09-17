@@ -6,7 +6,7 @@ export type BillPaymentLean = { _id?: unknown; amount?: number; date?: Date | nu
 export type BillLean = {
   _id: unknown; title: string; vendor?: string; amount?: number; currency?: string;
   origAmount?: number; fxRate?: number; dueDate: Date;
-  paidAt?: Date | null; payments?: BillPaymentLean[]; category?: string; cycle?: string; notes?: string;
+  paidAt?: Date | null; payments?: BillPaymentLean[]; category?: string; cycle?: string; notes?: string; space?: string;
   archived?: boolean; linkedExpenseId?: string; updatedAt?: Date; deletedAt?: Date | null;
 };
 
@@ -24,7 +24,7 @@ export type BillLean = {
 export function trim(b: BillLean): {
   id: string; title: string; vendor: string; amount: number; currency: string;
   origAmount: number; fxRate: number; dueDate: string | null;
-  paidAt: string | null; category: string; cycle: string; notes: string; archived: boolean;
+  paidAt: string | null; category: string; cycle: string; notes: string; space: string; archived: boolean;
   status: BillStatus; paidAmount: number; remaining: number; paymentState: BillPaymentState;
   payments: { id: string; amount: number; date: string | null; note: string }[];
   updatedAt: string | null; deleted: boolean;
@@ -34,7 +34,7 @@ export function trim(b: BillLean): {
     id: String(b._id), title: b.title, vendor: b.vendor ?? '', amount: b.amount ?? 0,
     currency: b.currency ?? 'EUR', origAmount: b.origAmount ?? 0, fxRate: b.fxRate ?? 0,
     dueDate: iso(b.dueDate), paidAt: iso(b.paidAt ?? null), category: b.category ?? 'other',
-    cycle: b.cycle ?? '', notes: b.notes ?? '', archived: !!b.archived,
+    cycle: b.cycle ?? '', notes: b.notes ?? '', space: b.space ?? '', archived: !!b.archived,
     status: billStatus(b.dueDate, b.paidAt ?? null),
     paidAmount: billPaidAmount(payments),
     remaining: billRemaining(b.amount, payments, b.paidAt ?? null),

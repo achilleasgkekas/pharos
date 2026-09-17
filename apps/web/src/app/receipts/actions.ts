@@ -24,6 +24,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import type { SerializedReceipt } from '@/types';
 import { assertCanWrite } from '@/lib/auth';
+import { learnStoreAlias } from '@/lib/storeLearning';
 
 const LineItemSchema = z.object({
   name: z.string(),
@@ -312,6 +313,8 @@ export async function updateReceipt(
   await connectDB();
   const Receipt = await currentModel(ReceiptModel);
   const { currency: base } = await getAppSettings();
+  // P60 (#13): remember what the store said BEFORE this save, so a verified correction can teach it.
+  const before = parsed.verified ? await Receipt.findById(id).select('store').lean() : null;
   const doc = await Receipt.findByIdAndUpdate(
     id,
     { ...parsed, space: parsed.space.trim(), date: safeDate(parsed.date), ...fxFields(parsed, base) },
@@ -322,6 +325,7 @@ export async function updateReceipt(
   if (doc?.verified && doc.filePath) {
     void mirrorFileToRemote({ kind: 'receipts', store: doc.store, date: doc.date, total: doc.total, id: doc._id }, doc.filePath);
   }
+  if (doc?.verified && before?.store) await learnStoreAlias(before.store, doc.store);
   revalidatePath('/receipts');
   });
 }
@@ -340,7 +344,7 @@ export async function quickVerifyReceipt(
   // receipt has to go back through the same conversion as the full form. The currency
   // and rate are not editable here, so they come from the stored document.
   const { currency: base } = await getAppSettings();
-  const prev = await Receipt.findById(id).select('currency fxRate').lean();
+  const prev = await Receipt.findById(id).select('currency fxRate store').lean();
   const fx = resolveFx(
     { amount: Number(fields.total) || 0, currency: prev?.currency, fxRate: prev?.fxRate },
     base
@@ -366,6 +370,7 @@ export async function quickVerifyReceipt(
   if (doc?.filePath) {
     void mirrorFileToRemote({ kind: 'receipts', store: doc.store, date: doc.date, total: doc.total, id: doc._id }, doc.filePath);
   }
+  if (doc && prev?.store) await learnStoreAlias(prev.store, doc.store); // P60 (#13)
   revalidatePath('/receipts');
   return { ok: true };
   });
