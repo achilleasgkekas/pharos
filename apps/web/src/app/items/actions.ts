@@ -33,10 +33,10 @@ import {
 } from '@/lib/fx';
 import type { SerializedItem, SerializedAttachment } from '@/types';
 import { assertCanWrite } from '@/lib/auth';
-import { parseCustomFields } from '@/lib/customFields';
+import { parseCustomFields, MAX_CUSTOM_FIELDS } from '@/lib/customFields';
 import { maintenanceApplies, normalizeMaintenanceInterval } from '@/lib/maintenance';
 import { isLentOut, lendingApplies, normalizeBorrower } from '@/lib/lending';
-import { parseWarrantyClaims } from '@/lib/warrantyClaims';
+import { parseWarrantyClaims, MAX_WARRANTY_CLAIMS } from '@/lib/warrantyClaims';
 import { addExpense } from '@/app/expenses/actions';
 
 const CATEGORIES = ['network', 'storage', 'compute', 'audio', 'video', 'mobile', 'peripheral', 'consumable', 'other'] as const;
@@ -1550,7 +1550,8 @@ export async function findDuplicateItems(): Promise<ItemDupGroup[]> {
 
 /**
  * Merge duplicate items into one. Backfills empty fields on the survivor, unions
- * its arrays (tags/links/priceHistory/photos/receiptIds), re-points every reference
+ * its arrays (tags/links/priceHistory/photos/receiptIds/customFields/warrantyClaims),
+ * re-points every reference
  * (Receipt.itemIds, Receipt.lineItems[].matchedItemId, Statement.transactions[].
  * matchedItemIds) at the survivor, then soft-deletes the duplicates to Trash. Their
  * photo paths are released to the survivor (so a future purge won't delete shared files).
@@ -1634,6 +1635,58 @@ export async function mergeItems(
     for (const rid of d.receiptIds ?? []) {
       if (!keep.receiptIds.some((x) => String(x) === String(rid))) keep.receiptIds.push(rid);
     }
+
+    // Union customFields by key (case-insensitive) — the survivor's value wins, since a
+    // collision means the same attribute was recorded twice and one of them must go.
+    const seenKeys = new Set((keep.customFields ?? []).map((c) => String(c.key).toLowerCase()));
+    for (const f of d.customFields ?? []) {
+      const key = String(f.key ?? '').trim();
+      const low = key.toLowerCase();
+      if (!key || seenKeys.has(low) || keep.customFields.length >= MAX_CUSTOM_FIELDS) continue;
+      keep.customFields.push({ key, value: f.value ?? '' } as (typeof keep.customFields)[number]);
+      seenKeys.add(low);
+    }
+    // Concat warranty claims as fresh plain objects (same reason as priceHistory: never
+    // reparent another document's subdocs). Every claim is a distinct past event, so there
+    // is nothing to dedupe — only the cap keeps a pathological merge bounded.
+    for (const c of d.warrantyClaims ?? []) {
+      if (keep.warrantyClaims.length >= MAX_WARRANTY_CLAIMS) break;
+      keep.warrantyClaims.push({
+        ref: c.ref,
+        status: c.status,
+        reportedAt: c.reportedAt,
+        lastUpdateAt: c.lastUpdateAt,
+        trackingNumber: c.trackingNumber,
+        notes: c.notes,
+      } as (typeof keep.warrantyClaims)[number]);
+    }
+    // Maintenance clock: two independent facts about the same physical object, so each
+    // backfills on its own.
+    if (keep.maintenanceIntervalDays == null && d.maintenanceIntervalDays != null)
+      keep.maintenanceIntervalDays = d.maintenanceIntervalDays;
+    if (keep.lastMaintenanceAt == null && d.lastMaintenanceAt != null)
+      keep.lastMaintenanceAt = d.lastMaintenanceAt;
+    // The next three groups copy ALL-OR-NOTHING, unlike the scalars above: a loan, a sale
+    // and a parcel are each one event, and mixing halves of two of them would invent a
+    // record that never happened (Nikos' borrow date on Maria's loan, an ACS number under
+    // ELTA). `soldIncomeId` travels with its sale on purpose — copying the price without it
+    // would let "log as income" book the same sale a second time.
+    if (!keep.lentTo && d.lentTo) {
+      keep.lentTo = d.lentTo;
+      keep.lentAt = d.lentAt;
+      keep.expectedReturnAt = d.expectedReturnAt;
+    }
+    if (keep.soldPrice == null && keep.soldAt == null && !keep.soldTo && (d.soldPrice != null || d.soldAt != null || d.soldTo)) {
+      keep.soldPrice = d.soldPrice;
+      keep.soldAt = d.soldAt;
+      keep.soldTo = d.soldTo;
+      keep.soldIncomeId = d.soldIncomeId;
+    }
+    if (!keep.trackingNumber && d.trackingNumber) {
+      keep.trackingNumber = d.trackingNumber;
+      keep.carrier = d.carrier;
+      keep.trackingUrl = d.trackingUrl;
+    }
   }
 
   const lowest = lowestKnownPrice(keep);
@@ -1645,6 +1698,8 @@ export async function mergeItems(
   keep.markModified('photos');
   keep.markModified('attachments');
   keep.markModified('receiptIds');
+  keep.markModified('customFields');
+  keep.markModified('warrantyClaims');
   await keep.save();
 
   for (const d of drops) {
