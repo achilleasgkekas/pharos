@@ -13606,3 +13606,16 @@ https://github.com/achilleasgkekas/pharos/pull/66, commit `2ba0a34b`. Το Codex
 **Ανοιχτά PR μου**: #93 (χωρίς review), #66 (`needs-human`).
 
 **Επόμενο task**: issue #5 ή #3 (p2, ημερομηνίες/locale) αν δεν έχουν πάρει lane:claude τα #91/#92.
+
+## 2026-09-17 06:30
+
+**pharos-brain** · issue #91 (codex-found, p1, lane:claude)
+
+- **Υγεία prod:** OK. `ph-aros.com` 200 με περιεχόμενο self-host, `app.ph-aros.com/account/login` 200, `POST trials-sweep` χωρίς token 401 JSON.
+- **Triage:** τίποτα νέο. Τα #124 και #122 περιμένουν απάντηση σε ερώτηση του Gemini. Το #28 μένει `blocked` (το #3 είναι ακόμα ανοιχτό).
+- **Δουλειά:** ένα προηγούμενο run είχε αφήσει μισή διόρθωση του #91 χωρίς commit στο `/private/tmp/brain-issue-91-merge-keeps-scan`, πάνω σε παλιό main. Την ξαναέστησα σε καθαρό worktree από το origin/main και την προσάρμοσα με το χέρι, γιατί στο μεταξύ το #116 είχε αλλάξει τη σειρά διαγραφής. Το bug αναπαράχθηκε πρώτα: το νέο test αποτυγχάνει στο main. Διόρθωση: όταν ο επιζών στο merge διπλοτύπων δεν έχει scan, παίρνει το αρχείο του πρώτου drop ως ενιαίο σύνολο (filePath, thumbPath, fileType, fileSize), και ο βρόχος καθαρισμού δεν σβήνει ποτέ διαδρομή που δείχνει πια ο επιζών. Ένα παλιό test στηριζόταν ακριβώς στο buggy σενάριο, οπότε ο επιζών του πήρε δικό του scan.
+- **PR:** #125 https://github.com/achilleasgkekas/pharos/pull/125 (type-check καθαρό, 7199 tests περνούν).
+- **Σημείωση:** στο κοινό `node_modules` έλειπε το `@sentry/nextjs` (νέα εξάρτηση στο main), γι' αυτό το type-check έβγαινε κόκκινο. Έτρεξα `npm ci` στο main checkout, όπως ορίζει το CLAUDE.md.
+- **Αναμονή για deploy:** τουλάχιστον 2 merged commits που δεν έχουν φτάσει στον server (το `/opt/pharos` είναι στο `18a4f93`, το image μπορεί να είναι ακόμα παλιότερο).
+- **Ανοιχτά brain PRs:** 2 (#125 περιμένει review, το #66 έχει `needs-human`).
+- **Επόμενο:** το #1 (`lane:claude`, `needs-changes`), ή το επόμενο `lane:claude` agent-ready issue.
