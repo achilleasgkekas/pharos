@@ -29,13 +29,13 @@ export function Modal({ open, onClose, title, children, size = 'md' }: ModalProp
         <Dialog.Overlay className={cn('fixed inset-0 z-50', isFull ? 'bg-[color:var(--color-bg)]' : 'bg-black/70')} />
         <Dialog.Content
           className={cn(
-            'fixed z-50 bg-[color:var(--color-surface)] outline-none overflow-y-auto overscroll-contain',
+            'fixed z-50 bg-[color:var(--color-surface)] outline-none overflow-y-auto overscroll-contain max-w-full',
             isFull
               ? 'inset-0 bg-[color:var(--color-bg)]'
               : cn(
                   'border border-[color:var(--color-border)] shadow-2xl',
                   'bottom-0 left-0 right-0 rounded-t-2xl max-h-[92vh]',
-                  'md:bottom-auto md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:right-auto md:rounded-2xl md:max-h-[90vh]',
+                  'md:bottom-auto md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:right-auto md:rounded-2xl md:max-h-[90vh] md:max-w-[calc(100vw-2rem)]',
                   sizes[size]
                 )
           )}
