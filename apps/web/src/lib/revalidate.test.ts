@@ -67,7 +67,7 @@ describe('safeRevalidate', () => {
 
   it('swallows non-Error throws too (e.g. a thrown string)', () => {
     revalidatePathMock.mockImplementation(() => {
-      // eslint-disable-next-line @typescript-eslint/no-throw-literal
+      // eslint-disable-next-line @typescript-eslint/only-throw-error
       throw 'not-an-error';
     });
     expect(() => safeRevalidate('/tasks')).not.toThrow();

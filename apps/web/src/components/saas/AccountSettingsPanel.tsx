@@ -561,7 +561,7 @@ export function AccountSettingsPanel({ email, name, emailVerified, mfaEnabled, m
                 onClick={finishRecoveryCodes}
                 className="rounded-lg border border-[color:var(--color-accent)] px-4 py-2 text-sm font-medium text-[color:var(--color-accent)] hover:bg-[color:var(--color-accent)]/10"
               >
-                I've saved these codes
+                I&rsquo;ve saved these codes
               </button>
             </div>
           )}

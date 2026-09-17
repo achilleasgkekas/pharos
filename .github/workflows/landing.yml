@@ -1,0 +1,33 @@
+name: Landing
+
+# The marketing site ships to the same host as the app but had no gate at all: a type error there
+# was only found when the image failed to build during a deploy (#136).
+on:
+  push:
+    branches: [main]
+    paths: ['apps/landing/**', '.github/workflows/landing.yml']
+  pull_request:
+    paths: ['apps/landing/**', '.github/workflows/landing.yml']
+  workflow_dispatch:
+
+concurrency:
+  group: landing-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  build:
+    name: Type-check & build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/landing
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/landing/package-lock.json
+      - run: npm ci
+      - run: npm run type-check
+      - run: npm run build
