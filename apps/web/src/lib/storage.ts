@@ -7,7 +7,9 @@ import { assertStorageQuota, recordStorageDelta } from './billing/storageMeter';
 
 const STORAGE_ROOT = process.env.STORAGE_ROOT ?? path.join(process.cwd(), 'storage');
 
-export type StorageBucket = 'receipts' | 'statements' | 'equipment' | 'expenses';
+// 'share' is the staging bucket for files handed to us by the OS share sheet (#123): they live
+// there only until the user picks a destination, then move into the real bucket.
+export type StorageBucket = 'receipts' | 'statements' | 'equipment' | 'expenses' | 'share';
 
 /**
  * The root this call should read/write under: the ambient tenant's own subtree
@@ -18,7 +20,8 @@ export type StorageBucket = 'receipts' | 'statements' | 'equipment' | 'expenses'
  * scopes Mongo access — so re-deriving the root here from `currentTenant()` at call time is
  * always correct without threading it through 13+ call sites' signatures.
  */
-function activeStorageRoot(): string {
+// Exported for the share-inbox sweeper (#123), which walks the `share` bucket directly.
+export function activeStorageRoot(): string {
   return tenantStorageRoot(currentTenant()) ?? STORAGE_ROOT;
 }
 

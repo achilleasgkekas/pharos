@@ -11,6 +11,16 @@ export default function manifest(): MetadataRoute.Manifest {
     display: 'standalone',
     background_color: '#0a0a0a',
     theme_color: '#0a0a0a',
+    // #123 — Pharos appears in the phone's Share sheet for PDFs and images. The POST lands on
+    // /capture/share/receive (a page and a route handler cannot share one path in Next), which parks
+    // the file and redirects to the picker at /capture/share.
+    // iOS only offers this once Pharos is installed to the Home Screen.
+    share_target: {
+      action: '/capture/share/receive',
+      method: 'POST',
+      enctype: 'multipart/form-data',
+      params: { files: [{ name: 'file', accept: ['application/pdf', 'image/*'] }] },
+    },
     icons: [
       { src: '/icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
       { src: '/pharos-icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
