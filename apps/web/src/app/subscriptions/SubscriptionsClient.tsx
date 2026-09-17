@@ -14,6 +14,7 @@ import { SavedViews } from '@/components/ui/SavedViews';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { DateInput } from '@/components/ui/DateInput';
 import { Modal } from '@/components/ui/Modal';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { cn } from '@/components/ui/cn';
@@ -716,7 +717,7 @@ function SubForm({ sub, cards, spaces = [], fx, onSuccess, onDeleted }: { sub?: 
       {foreign && <SubFxFields form={form} setRate={(v) => setForm((p) => ({ ...p, fxRate: v }))} base={fx.base} />}
       <div className="grid grid-cols-2 gap-3">
         <Field label={t('sub.fStartDate')}>
-          <Input type="date" required value={form.startDate} onChange={set('startDate')} />
+          <DateInput required value={form.startDate} onValueChange={(v) => setForm((p) => ({ ...p, startDate: v }))} />
         </Field>
         <Field label={t('sub.fPayment')}>
           <CardSelect cards={cards} value={form.paymentMethod} onChange={(v) => setForm((p) => ({ ...p, paymentMethod: v }))} />
@@ -724,7 +725,7 @@ function SubForm({ sub, cards, spaces = [], fx, onSuccess, onDeleted }: { sub?: 
       </div>
       <div className="grid grid-cols-2 gap-3">
         <Field label={t('sub.fTrialEnds')}>
-          <Input type="date" value={form.trialEndsAt} onChange={set('trialEndsAt')} />
+          <DateInput value={form.trialEndsAt} onValueChange={(v) => setForm((p) => ({ ...p, trialEndsAt: v }))} />
         </Field>
         <Field label={t('sub.fFirstCharge', { cur: fx.enabled ? currencySymbol(form.currency).trim() : cur() })}>
           <Input type="number" step="0.01" min="0" value={form.firstChargeAmount} onChange={set('firstChargeAmount')} placeholder={form.amount || '9.99'} />
