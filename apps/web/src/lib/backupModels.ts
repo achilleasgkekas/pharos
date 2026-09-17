@@ -16,6 +16,7 @@ import { LoyaltyCard } from '@/models/LoyaltyCard';
 import { NetWorthSnapshot } from '@/models/NetWorthSnapshot';
 import { ShoppingListItem } from '@/models/ShoppingListItem';
 import { MeterReading } from '@/models/MeterReading';
+import { Conversation } from '@/models/Conversation';
 
 /**
  * The single source of truth for what the JSON backup (Settings → Storage & backup →
@@ -54,6 +55,7 @@ export const BACKUP_MODELS = {
   netWorthSnapshots: NetWorthSnapshot,
   shoppingList: ShoppingListItem,
   meterReadings: MeterReading,
+  conversations: Conversation,
 } as const;
 
 export type BackupKey = keyof typeof BACKUP_MODELS;
@@ -94,8 +96,6 @@ export const BACKUP_EXCLUDED: Record<string, string> = {
   // — Transient / regenerable state —
   Job: 'Background job queue state; a finished or interrupted job means nothing after a restore.',
   Notification: 'Alert instances, re-derived by the next alert check (dedupeKey keeps them unique).',
-  Conversation:
-    'AI command-bar chat log (/history). User-visible but large and regenerable; the backup stays a data-recovery file rather than a log archive.',
   Phase: 'Legacy setup-phases model from the original tracker import; no UI imports it any more.',
   ScrapedPrice:
     'Global scraped-price cache (shared, not per-tenant); pure derived data that regenerates on the next scrape, and per-tenant restore does not apply to it.',
