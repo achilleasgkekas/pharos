@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { useT } from '@/components/LocaleProvider';
 import { shrinkImage } from '@/lib/clientImage';
+import { compareNames } from '@/lib/i18n/format';
+import { useLocale } from '@/components/LocaleProvider';
 import {
   addListItem,
   toggleListItem,
@@ -36,6 +38,7 @@ function catColor(cat: string): string | null {
 }
 
 export function ShoppingListClient({ initialItems }: { initialItems: SerializedListItem[] }) {
+  const locale = useLocale();
   const t = useT();
   const [items, setItems] = useState<SerializedListItem[]>(initialItems);
   const [, start] = useTransition();
@@ -81,8 +84,8 @@ export function ShoppingListClient({ initialItems }: { initialItems: SerializedL
     return [...list].sort((a, b) => {
       const c = (a.checked ? 1 : 0) - (b.checked ? 1 : 0); // unchecked first
       if (c) return c;
-      if (sortBy === 'name') return a.name.localeCompare(b.name);
-      if (sortBy === 'category') return (a.category || '').localeCompare(b.category || '') || a.name.localeCompare(b.name);
+      if (sortBy === 'name') return compareNames(a.name, b.name, locale);
+      if (sortBy === 'category') return compareNames(a.category, b.category, locale) || compareNames(a.name, b.name, locale);
       return b.createdAt.localeCompare(a.createdAt);
     });
   }, [items, statusFilter, catFilter, search, sortBy]);

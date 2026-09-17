@@ -25,6 +25,8 @@ import { useT, useMoney } from '@/components/LocaleProvider';
 import type { TKey } from '@/lib/i18n';
 import type { RecurringCandidate } from '@/lib/recurringDiscovery';
 import { equalSplit, splitTotals, type SplitEntry } from '@/lib/split';
+import { compareNames } from '@/lib/i18n/format';
+import { useLocale } from '@/components/LocaleProvider';
 import {
   createSubscription,
   updateSubscription,
@@ -95,6 +97,7 @@ export function SubscriptionsClient({
   baseCurrency?: string;
   multiCurrency?: boolean;
 }) {
+  const locale = useLocale();
   if (categoryList.length) _subCats = categoryList;
   const fx: FxCtx = { base: baseCurrency, enabled: multiCurrency };
   const [showCreate, setShowCreate] = useState(false);
@@ -169,10 +172,10 @@ export function SubscriptionsClient({
         case 'renewal':
           return (renewalDaysUntil(a.nextRenewal) ?? 9999) - (renewalDaysUntil(b.nextRenewal) ?? 9999);
         default:
-          return a.name.localeCompare(b.name);
+          return compareNames(a.name, b.name, locale);
       }
     });
-  }, [subscriptions, search, categoryFilter, statusFilter, sortBy]);
+  }, [subscriptions, search, categoryFilter, statusFilter, sortBy, locale]);
 
   const anyF = !!(search || categoryFilter || statusFilter !== 'all' || sortBy !== 'name');
   const fLabel = 'text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-[0.12em] mb-1.5';

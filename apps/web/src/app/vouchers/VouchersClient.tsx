@@ -13,6 +13,8 @@ import type { SerializedVoucher } from '@/types';
 import { useT } from '@/components/LocaleProvider';
 import type { TKey } from '@/lib/i18n';
 import { createVoucher, updateVoucher, deleteVoucher, toggleVoucherUsed, scanVoucherText, scanVoucherImage } from './actions';
+import { compareNames } from '@/lib/i18n/format';
+import { useLocale } from '@/components/LocaleProvider';
 
 const FILTERS = [
   { label: 'All', value: 'all' },
@@ -26,6 +28,7 @@ function daysUntil(dateStr: string | null): number | null {
 }
 
 export function VouchersClient({ vouchers }: { vouchers: SerializedVoucher[] }) {
+  const locale = useLocale();
   const t = useT();
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
@@ -57,9 +60,9 @@ export function VouchersClient({ vouchers }: { vouchers: SerializedVoucher[] }) 
       if (a.used !== b.used) return a.used ? 1 : -1; // active first
       switch (sortBy) {
         case 'store':
-          return (a.store || '').localeCompare(b.store || '');
+          return compareNames(a.store, b.store, locale);
         case 'title':
-          return a.title.localeCompare(b.title);
+          return compareNames(a.title, b.title, locale);
         default:
           return (daysUntil(a.expiresAt) ?? 99999) - (daysUntil(b.expiresAt) ?? 99999);
       }
