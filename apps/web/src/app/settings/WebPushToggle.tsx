@@ -3,26 +3,17 @@ import { useEffect, useState } from 'react';
 import { Loader2, BellRing, BellOff } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import { getWebPushKey, savePushSubscription, deletePushSubscription, testWebPush } from './webPushActions';
+import { enableWebPush } from '@/lib/webPushClient';
 
 /**
  * P102: "Enable browser push" — the one notifier channel that needs no external account.
- * Registers the minimal service worker (served by app/sw.js/route.ts), asks for permission,
+ * Asks for permission, registers the minimal service worker (served by app/sw.js/route.ts),
  * subscribes via the tenant's VAPID public key, and stores the subscription server-side.
+ * The step order lives in lib/webPushClient.ts, where it is tested (issue #1, iOS).
  *
  * English-only strings, matching the rest of the Notifications section (which does not go
  * through i18n). One subscription per browser/device (P102 MVP).
  */
-
-/** VAPID public key (base64url) → the Uint8Array the Push API wants as applicationServerKey. */
-function urlBase64ToUint8Array(base64: string): Uint8Array<ArrayBuffer> {
-  const padding = '='.repeat((4 - (base64.length % 4)) % 4);
-  const b64 = (base64 + padding).replace(/-/g, '+').replace(/_/g, '/');
-  const raw = atob(b64);
-  // Build on an explicit ArrayBuffer (not ArrayBufferLike) so it satisfies BufferSource.
-  const out = new Uint8Array(new ArrayBuffer(raw.length));
-  for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
-  return out;
-}
 
 export function WebPushToggle() {
   const [supported, setSupported] = useState<boolean | null>(null);
@@ -47,37 +38,21 @@ export function WebPushToggle() {
     setBusy(true);
     setMsg('');
     try {
-      const reg = await navigator.serviceWorker.register('/sw.js');
-      await navigator.serviceWorker.ready;
-      const perm = await Notification.requestPermission();
-      if (perm !== 'granted') {
-        setMsg('Permission denied — allow notifications for this site in your browser.');
-        return;
-      }
-      const { publicKey } = await getWebPushKey();
-      if (!publicKey) {
-        setMsg('Could not set up push on the server.');
-        return;
-      }
-      const sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(publicKey),
+      // enableWebPush asks for permission before its first await, so this call has to stay
+      // directly in the click handler with nothing awaited ahead of it (iOS drops the gesture).
+      const r = await enableWebPush({
+        permission: Notification.permission,
+        requestPermission: () => Notification.requestPermission(),
+        registerWorker: async () => {
+          await navigator.serviceWorker.register('/sw.js');
+          const reg = await navigator.serviceWorker.ready;
+          return { subscribe: (opts) => reg.pushManager.subscribe(opts) };
+        },
+        getPublicKey: getWebPushKey,
+        save: (sub) => savePushSubscription(sub, navigator.userAgent),
       });
-      const json = sub.toJSON() as { endpoint?: string; keys?: { p256dh?: string; auth?: string } };
-      if (!json.endpoint || !json.keys?.p256dh || !json.keys?.auth) {
-        setMsg('Subscription was incomplete — try again.');
-        return;
-      }
-      const r = await savePushSubscription(
-        { endpoint: json.endpoint, keys: { p256dh: json.keys.p256dh, auth: json.keys.auth } },
-        navigator.userAgent
-      );
-      if (r.ok) {
-        setSubscribed(true);
-        setMsg('Browser push enabled ✓');
-      } else {
-        setMsg(r.error || 'Could not save the subscription.');
-      }
+      if (r.ok) setSubscribed(true);
+      setMsg(r.message);
     } catch (e) {
       setMsg((e as Error)?.message || 'Could not enable browser push.');
     } finally {
