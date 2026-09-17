@@ -13631,3 +13631,15 @@ https://github.com/achilleasgkekas/pharos/pull/66, commit `2ba0a34b`. Το Codex
 - **Αναμονή για deploy:** 2 merged commits κώδικα μετά το `18a4f93` που είναι στο `/opt/pharos`.
 - **Ανοιχτά brain PRs:** 3 (#125 και #127 περιμένουν review, το #66 έχει `needs-human`).
 - **Επόμενο:** μετά το merge του #127, ξεμπλοκάρισμα του #28 (τα υπόλοιπα 25 πεδία ημερομηνίας), ή το #1 αν βρεθεί τρόπος να επαληθευτεί χωρίς συσκευή.
+
+## 2026-09-17 14:00
+
+**pharos-brain** · issue #1 (p0, lane:claude, iOS push)
+
+- **Υγεία prod:** OK. `ph-aros.com` 200 με περιεχόμενο self-host, `app.ph-aros.com/account/login` 200, `POST trials-sweep` χωρίς token 401 JSON.
+- **Triage:** τίποτα νέο. Τα #124 και #122 περιμένουν ακόμα απάντηση στην ερώτηση του Gemini. Το #28 μένει `blocked` (το #3 είναι ανοιχτό, PR #127).
+- **Δουλειά:** το #1 ("ενεργοποίησα push στο iPhone και δεν έγινε τίποτα"). Το `WebPushToggle.enable()` περίμενε `serviceWorker.register` και `ready` πριν καλέσει `Notification.requestPermission()`. Το iOS WebKit δείχνει το prompt μόνο όσο ζει το user gesture, οπότε το prompt δεν εμφανιζόταν ποτέ. Η ροή μεταφέρθηκε στο νέο `lib/webPushClient.ts` με injected deps: πρώτα η άδεια, μέσα στο click handler πριν από κάθε await, και μετά worker, κλειδί VAPID, subscribe και save. 7 νέα tests, ένα από αυτά ελέγχει ότι πριν από το πρώτο microtask ξεκινά μόνο το `requestPermission`.
+- **PR:** #128 https://github.com/achilleasgkekas/pharos/pull/128 (type-check καθαρό, 7204 tests περνούν). Δεν αναπαράχθηκε σε συσκευή, η διάγνωση βασίζεται στη συμπεριφορά του WebKit. Μετά το deploy στο self-hosted θέλει δοκιμή σε iPhone.
+- **Αναμονή για deploy:** 2 merged commits κώδικα μετά το `18a4f93` που είναι στο `/opt/pharos` (image δεν ελέγχθηκε).
+- **Ανοιχτά brain PRs:** 4 (#125, #127, #128 περιμένουν review, το #66 έχει `needs-human`).
+- **Επόμενο:** το cap της ημέρας έπιασε 3/3. Αύριο: ξεμπλοκάρισμα του #28 αν γίνει merge το #127, αλλιώς το #15 (Grocy/Firefly θέλουν δείγμα export, πιθανότατα ερώτηση προς τον Αχιλλέα).
