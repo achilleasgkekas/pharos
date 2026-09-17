@@ -161,11 +161,11 @@ describe('computeMoneyAgenda — window structure', () => {
 
   it('queries each collection with the documented filters', async () => {
     await computeMoneyAgenda(NOW);
-    expect(subscriptionFind).toHaveBeenCalledWith({ active: true, nextRenewal: { $ne: null } });
+    expect(subscriptionFind).toHaveBeenCalledWith({ active: true, nextRenewal: { $ne: null }, deletedAt: null });
     expect(statementFind).toHaveBeenCalledWith();
-    expect(itemFind).toHaveBeenCalledWith({ warrantyUntil: { $gte: new Date(2026, 2, 1), $lt: new Date(2026, 5, 1) } });
-    expect(voucherFind).toHaveBeenCalledWith({ used: false, expiresAt: { $gte: new Date(2026, 2, 1), $lt: new Date(2026, 5, 1) } });
-    expect(expenseFind).toHaveBeenCalledWith({ recurring: true, recurringCycle: { $nin: ['', null] }, amount: { $gt: 0 } });
+    expect(itemFind).toHaveBeenCalledWith({ warrantyUntil: { $gte: new Date(2026, 2, 1), $lt: new Date(2026, 5, 1) }, deletedAt: null });
+    expect(voucherFind).toHaveBeenCalledWith({ used: false, expiresAt: { $gte: new Date(2026, 2, 1), $lt: new Date(2026, 5, 1) }, deletedAt: null });
+    expect(expenseFind).toHaveBeenCalledWith({ recurring: true, recurringCycle: { $nin: ['', null] }, amount: { $gt: 0 }, deletedAt: null });
   });
 });
 
@@ -462,11 +462,12 @@ describe('computeMoneyAgenda — open bills (P67)', () => {
   it('asks the DB only for unpaid, unarchived bills inside the window', async () => {
     setRows({});
     await computeMoneyAgenda(NOW);
-    const f = billFind.mock.calls[0][0] as { paidAt: null; archived: unknown; dueDate: { $gte: Date; $lt: Date } };
+    const f = billFind.mock.calls[0][0] as { paidAt: null; archived: unknown; dueDate: { $gte: Date; $lt: Date }; deletedAt: null };
     expect(f.paidAt).toBeNull();
     expect(f.archived).toEqual({ $ne: true });
     expect(f.dueDate.$gte).toEqual(new Date(2026, 2, 1));
     expect(f.dueDate.$lt).toEqual(new Date(2026, 5, 1));
+    expect(f.deletedAt).toBeNull();
   });
 
   it('falls back to the vendor when a bill has no title', async () => {
@@ -508,9 +509,10 @@ describe('computeMoneyAgenda — goal deadlines (P67)', () => {
   it('asks the DB only for unarchived goals whose target date falls in the window', async () => {
     setRows({});
     await computeMoneyAgenda(NOW);
-    const f = goalFind.mock.calls[0][0] as { archived: unknown; targetDate: { $gte: Date; $lt: Date } };
+    const f = goalFind.mock.calls[0][0] as { archived: unknown; targetDate: { $gte: Date; $lt: Date }; deletedAt: null };
     expect(f.archived).toEqual({ $ne: true });
     expect(f.targetDate.$gte).toEqual(new Date(2026, 2, 1));
     expect(f.targetDate.$lt).toEqual(new Date(2026, 5, 1));
+    expect(f.deletedAt).toBeNull();
   });
 });
