@@ -691,6 +691,11 @@ export const it: Partial<Dict> = {
 
   'common.save': 'Salva',
   'common.cancel': 'Annulla',
+  'date.placeholderDay': 'GG',
+  'date.placeholderMonth': 'MM',
+  'date.placeholderYear': 'AAAA',
+  'date.invalid': 'Inserisci una data valida',
+  'date.openCalendar': 'Apri calendario',
   'common.delete': 'Elimina',
   'common.deleteForever': 'Elimina definitivamente',
   'common.edit': 'Modifica',
