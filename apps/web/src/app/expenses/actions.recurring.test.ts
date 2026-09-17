@@ -62,8 +62,8 @@ function localYmd(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-// Fixed "now": 2026-03-15 12:00 local. addCycle uses local setDate/setMonth/setFullYear,
-// so seeds below are chosen (well clear of the boundary) to be timezone-independent.
+// Fixed "now": 2026-03-15 12:00 local. Stepping uses UTC setters (addCycleUTC, #103); seeds that
+// sit on a month boundary are built with Date.UTC, like the UTC-midnight dates the app stores.
 const NOW = new Date(2026, 2, 15, 12, 0, 0);
 
 beforeEach(() => {
@@ -177,11 +177,13 @@ describe('generateDueRecurring', () => {
 
   it('steps a quarterly series forward by 3 months', async () => {
     expenseFindSortLean.mockResolvedValue([
-      { kind: 'expense', vendor: 'Insurance', vendorKey: 'insurance', category: 'insurance', amount: 200, date: new Date(2025, 11, 1), recurringCycle: 'quarterly' },
+      { kind: 'expense', vendor: 'Insurance', vendorKey: 'insurance', category: 'insurance', amount: 200, date: new Date(Date.UTC(2025, 11, 1)), recurringCycle: 'quarterly' },
     ]);
     const res = await generateDueRecurring();
     expect(res).toEqual({ created: 1 });
-    expect(localYmd(expenseCreate.mock.calls[0][0].date)).toBe('2026-03-01');
+    // Stored dates are UTC midnight (safeDate('YYYY-MM-DD')); stepping is UTC-exact since #103.
+    expect((expenseCreate.mock.calls[0][0].date as Date).toISOString().slice(0, 10)).toBe('2026-03-01');
+    expect(expenseCreate.mock.calls[0][0].period).toBe('2026-03');
   });
 
   it('steps a yearly series forward by 1 year', async () => {

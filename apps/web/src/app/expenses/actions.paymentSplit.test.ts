@@ -63,7 +63,7 @@ vi.mock('@/lib/mirror', () => ({ mirrorFileToRemote: vi.fn() }));
 vi.mock('@/lib/csvImport', () => ({ csvDedupeKey: vi.fn() }));
 vi.mock('next/cache', () => ({ revalidatePath: (p: string) => revalidatePathMock(p) }));
 
-import { updateExpense, addExpense } from './actions';
+import { updateExpense, addExpense, deleteExpense } from './actions';
 
 const BASE = { kind: 'expense' as const, vendor: 'IKEA', date: '2026-08-28', amount: 75 };
 
@@ -204,5 +204,15 @@ describe('gift-card mirroring', () => {
     giftCardUpdateMany.mockResolvedValue({ modifiedCount: 0 });
     await updateExpense('e1', { ...BASE, paymentSplits: SPLIT });
     expect(revalidatePathMock).toHaveBeenCalledWith('/vouchers');
+  });
+});
+
+describe('deleting an expense gives the gift-card credit back (#104)', () => {
+  it('soft-deletes AND pulls this expense’s mirrored uses from every card, pushing nothing', async () => {
+    const res = await deleteExpense('e9');
+    expect(res).toEqual({ ok: true });
+    expect(expenseUpdateOne).toHaveBeenCalledWith({ _id: 'e9' }, { $set: { deletedAt: expect.any(Date) } });
+    expect(giftCardUpdateMany).toHaveBeenCalledWith({ 'uses.expenseId': 'e9' }, { $pull: { uses: { expenseId: 'e9' } } });
+    expect(giftCardUpdateOne).not.toHaveBeenCalled();
   });
 });

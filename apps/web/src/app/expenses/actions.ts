@@ -14,9 +14,9 @@ import { getAppSettings } from '@/lib/appSettings';
 import { matchCategoryRule } from '@/lib/categoryRules';
 import { mirrorFileToRemote } from '@/lib/mirror';
 import { cleanSplit } from '@/lib/split';
-import { cleanPaymentSplits, giftCardSpend, type PaymentSplitEntry } from '@/lib/paymentSplit';
-import { addCycle, RECURRING_CYCLE_VALUES, type RecurringCycle } from '@/lib/billingCycle';
-import { GiftCard as GiftCardModel } from '@/models/GiftCard';
+import { cleanPaymentSplits } from '@/lib/paymentSplit';
+import { addCycleUTC, RECURRING_CYCLE_VALUES, type RecurringCycle } from '@/lib/billingCycle';
+import { syncGiftCardUses } from '@/lib/giftCardMirror';
 import { resolveFx, normalizeCurrency } from '@/lib/fx';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
@@ -118,7 +118,9 @@ async function inheritFromSeries(kind: Kind, vKey: string): Promise<{ category?:
 
 function periodFrom(date: Date, parsedPeriod?: string): string {
   if (parsedPeriod && /^\d{4}-\d{2}$/.test(parsedPeriod)) return parsedPeriod;
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+  // UTC getters (#103): dates are date-only values stored at UTC midnight. Local getters put
+  // 2024-05-01T00Z into April on any server west of UTC.
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
 }
 
 /**
@@ -155,7 +157,7 @@ export async function generateDueRecurring(): Promise<{ created: number }> {
   let created = 0;
   for (const seed of seeds) {
     const cycle = String(seed.recurringCycle);
-    let next = addCycle(new Date(seed.date), cycle);
+    let next = addCycleUTC(new Date(seed.date), cycle);
     let guard = 0;
     while (next.getTime() <= now && guard < 36) {
       guard++;
@@ -172,7 +174,7 @@ export async function generateDueRecurring(): Promise<{ created: number }> {
         amount: seed.amount,
         currency: base,
         date: next,
-        period: `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}`,
+        period: periodFrom(next),
         recurring: true,
         recurringCycle: seed.recurringCycle,
         aiModel: 'recurring-auto',
@@ -180,7 +182,7 @@ export async function generateDueRecurring(): Promise<{ created: number }> {
         notes: 'Auto-generated from recurring series',
       });
       created++;
-      next = addCycle(next, cycle);
+      next = addCycleUTC(next, cycle);
     }
   }
 
@@ -326,39 +328,6 @@ const UpdateSchema = z.object({
     .catch([]),
   verified: z.boolean().default(false),
 });
-
-/**
- * P62 — mirror an expense's payment split into the linked gift cards' `uses[]` logs,
- * so a purchase partly paid from store credit lowers that card's balance without the
- * user entering the same spend twice.
- *
- * Idempotent by construction: every entry it writes is tagged with `expenseId`, and
- * the first step removes THIS expense's previously-mirrored entries from every card.
- * So re-saving, moving the money to a different card, or clearing the split all end
- * with exactly the rows the current split describes. Uses typed by hand on the card
- * itself carry `expenseId: ''` and are never touched.
- *
- * Never throws: a bad/stale giftCardId (or a card deleted meanwhile) must not stop an
- * expense from being saved. Runs inside the caller's tenant context.
- */
-async function syncGiftCardUses(expenseId: string, splits: PaymentSplitEntry[], date: Date, vendor: string): Promise<void> {
-  try {
-    const spend = giftCardSpend(splits);
-    const GiftCard = await currentModel(GiftCardModel);
-    const had = await GiftCard.updateMany({ 'uses.expenseId': expenseId }, { $pull: { uses: { expenseId } } });
-    const note = (vendor || '').trim().slice(0, 200);
-    for (const [cardId, amount] of spend) {
-      try {
-        await GiftCard.updateOne({ _id: cardId }, { $push: { uses: { amount, date, note, expenseId } } });
-      } catch {
-        // Unknown/malformed card id — skip this row, keep the rest.
-      }
-    }
-    if (spend.size > 0 || (had?.modifiedCount ?? 0) > 0) revalidatePath('/vouchers');
-  } catch {
-    // Gift-card mirroring is a convenience; the expense itself is already saved.
-  }
-}
 
 export async function updateExpense(id: string, data: z.input<typeof UpdateSchema>): Promise<{ ok: boolean; error?: string }> {
   await assertCanWrite();
@@ -509,6 +478,9 @@ export async function deleteExpense(id: string): Promise<{ ok: boolean }> {
     const Expense = await currentModel(ExpenseModel);
     // Soft delete → Trash (Settings → Storage & data). Files stay until purge.
     await Expense.updateOne({ _id: id }, { $set: { deletedAt: new Date() } });
+    // #104: hand the gift-card money back. The mirrored `uses` rows were the only thing lowering
+    // the card's balance, and a trashed expense no longer spent anything. Restore re-applies them.
+    await syncGiftCardUses(id, [], new Date(), '');
     revalidatePath('/expenses');
     revalidatePath('/income');
     return { ok: true };
