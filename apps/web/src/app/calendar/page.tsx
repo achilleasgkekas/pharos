@@ -40,19 +40,19 @@ async function getAgenda(t: TFunc, intlTag: string): Promise<{ months: MonthBloc
   const windowEnd = new Date(now.getFullYear(), now.getMonth() + 3, 1);
 
   const [subs, statements, items, vouchers, recurring, bills, goals] = await Promise.all([
-    Subscription.find({ active: true, nextRenewal: { $ne: null } }).select('name amount billingCycle nextRenewal').lean(),
+    Subscription.find({ active: true, nextRenewal: { $ne: null }, deletedAt: null }).select('name amount billingCycle nextRenewal').lean(),
     Statement.find().lean(),
-    Item.find({ warrantyUntil: { $gte: windowStart, $lt: windowEnd } }).select('title warrantyUntil').lean(),
-    Voucher.find({ used: false, expiresAt: { $gte: windowStart, $lt: windowEnd } }).select('title store discount expiresAt').lean(),
-    Expense.find({ recurring: true, recurringCycle: { $nin: ['', null] }, amount: { $gt: 0 } })
+    Item.find({ warrantyUntil: { $gte: windowStart, $lt: windowEnd }, deletedAt: null }).select('title warrantyUntil').lean(),
+    Voucher.find({ used: false, expiresAt: { $gte: windowStart, $lt: windowEnd }, deletedAt: null }).select('title store discount expiresAt').lean(),
+    Expense.find({ recurring: true, recurringCycle: { $nin: ['', null] }, amount: { $gt: 0 }, deletedAt: null })
       .sort({ date: -1 })
       .select('kind vendor vendorKey amount date recurringCycle')
       .lean(),
     // P67 — the two money dates this agenda used to miss: an open payable and a goal deadline.
-    Bill.find({ paidAt: null, archived: { $ne: true }, dueDate: { $gte: windowStart, $lt: windowEnd } })
+    Bill.find({ paidAt: null, archived: { $ne: true }, dueDate: { $gte: windowStart, $lt: windowEnd }, deletedAt: null })
       .select('title vendor amount payments dueDate')
       .lean(),
-    Goal.find({ archived: { $ne: true }, targetDate: { $gte: windowStart, $lt: windowEnd } })
+    Goal.find({ archived: { $ne: true }, targetDate: { $gte: windowStart, $lt: windowEnd }, deletedAt: null })
       .select('title targetAmount contributions targetDate')
       .lean(),
   ]);
