@@ -5,9 +5,10 @@ import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/components/ui/cn';
 import { useRouter } from 'next/navigation';
-import { useT, useMoney } from '@/components/LocaleProvider';
+import { useLocale, useT, useMoney } from '@/components/LocaleProvider';
 import { findDuplicateExpenses, mergeExpenses } from './actions';
 import type { ExpenseDupeGroup } from '@/lib/expenseDupes';
+import { formatDate, formatTime, formatDateTime } from '@/lib/i18n/format';
 
 /**
  * Review-before-merge for duplicate expenses/income (P46) — the same shape as the
@@ -15,6 +16,7 @@ import type { ExpenseDupeGroup } from '@/lib/expenseDupes';
  * an explicit click per group, and the drops land in the Trash rather than disappearing.
  */
 export function ExpenseDuplicatesModal({ kind, onClose }: { kind: 'income' | 'expense'; onClose: () => void }) {
+  const locale = useLocale();
   const router = useRouter();
   const t = useT();
   const money = useMoney();
@@ -59,8 +61,7 @@ export function ExpenseDuplicatesModal({ kind, onClose }: { kind: 'income' | 'ex
   const pending = groups.filter((g) => !done[g.key]);
   const totalDupes = groups.reduce((s, g) => s + (g.entries.length - 1), 0);
   const fmtDate = (s: string) => {
-    const d = new Date(s);
-    return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' });
+    return formatDate(s, locale, { day: '2-digit', month: '2-digit', year: '2-digit' }, '—');
   };
 
   return (

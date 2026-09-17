@@ -27,8 +27,9 @@ import { TAX_CATEGORY_PRESETS } from '@/lib/taxonomies';
 import { CsvImportModal } from './CsvImportModal';
 import { ExpenseDuplicatesModal } from './ExpenseDuplicatesModal';
 import { OpenInOneDriveButton } from '@/components/OpenInOneDriveButton';
-import { useT, useMoney } from '@/components/LocaleProvider';
+import { useLocale, useT, useMoney } from '@/components/LocaleProvider';
 import type { TKey } from '@/lib/i18n';
+import { formatDate, formatTime, formatDateTime } from '@/lib/i18n/format';
 
 const CYCLES = RECURRING_CYCLES;
 // Filter sentinel for "records with no space assigned" (distinct from '' = no filter).
@@ -37,10 +38,7 @@ const NO_SPACE = '\x00none';
 function fileUrl(p: string) {
   return `/api/files/${p.split('/').map(encodeURIComponent).join('/')}`;
 }
-const fmtDate = (s: string) => {
-  const d = new Date(s);
-  return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-GB');
-};
+const fmtDate = (s: string, locale: string) => formatDate(s, locale, undefined, '—');
 type Status = 'verified' | 'parsed' | 'failed';
 function statusOf(e: SerializedExpense): Status {
   if (e.verified) return 'verified';
@@ -515,6 +513,7 @@ function SelectCheckbox({ selectMode, selected, onToggleSelect }: SelectProps) {
 }
 
 function ExpenseRow({ expense, isIncome, series, fx, onClick, selectMode, selected, onToggleSelect }: { expense: SerializedExpense; isIncome: boolean; series: number; fx: FxCtx; onClick: () => void } & SelectProps) {
+  const locale = useLocale();
   const t = useT();
   const money = useMoney();
   const mainClick = selectMode ? onToggleSelect : onClick;
@@ -526,7 +525,7 @@ function ExpenseRow({ expense, isIncome, series, fx, onClick, selectMode, select
         <div className="min-w-0 flex-1">
           <span className="font-semibold text-sm truncate block" style={{ fontFamily: 'var(--font-display)' }}>{expense.vendor || t('ex.unknown')}</span>
           <span className="text-[10px] text-[color:var(--color-text-faint)] block mt-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
-            {fmtDate(expense.date)} · {expense.category}{expense.space ? ` · ${expense.space}` : ''}{expense.recurring ? ` · ${t('ex.recurringTag')}` : ''}{series > 1 ? ` · ×${series}` : ''}
+            {fmtDate(expense.date, locale)} · {expense.category}{expense.space ? ` · ${expense.space}` : ''}{expense.recurring ? ` · ${t('ex.recurringTag')}` : ''}{series > 1 ? ` · ×${series}` : ''}
           </span>
         </div>
       </button>
@@ -544,6 +543,7 @@ function ExpenseRow({ expense, isIncome, series, fx, onClick, selectMode, select
 }
 
 function ExpenseCard({ expense, isIncome, series, fx, onClick, selectMode, selected, onToggleSelect }: { expense: SerializedExpense; isIncome: boolean; series: number; fx: FxCtx; onClick: () => void } & SelectProps) {
+  const locale = useLocale();
   const t = useT();
   const money = useMoney();
   const mainClick = selectMode ? onToggleSelect : onClick;
@@ -575,7 +575,7 @@ function ExpenseCard({ expense, isIncome, series, fx, onClick, selectMode, selec
         </div>
         <div className="flex items-center justify-between mt-1 text-[11px] text-[color:var(--color-text-faint)]">
           <span className="flex items-center gap-1.5 min-w-0">
-            {fmtDate(expense.date)}
+            {fmtDate(expense.date, locale)}
             {expense.space && <span className="flex items-center gap-0.5 text-[color:var(--color-purple)] truncate" title={t('ex.fSpace')}><MapPin size={10} className="shrink-0" />{expense.space}</span>}
           </span>
           <span className="flex items-center gap-2 shrink-0">{series > 1 && <span title={t('ex.recordsFromVendor')}>×{series}</span>}{expense.filePath && <FileText size={12} />}</span>

@@ -7,8 +7,9 @@ import type { SerializedItem } from '@/types';
 import { logItemPrice, setItemTarget, refreshItemPrices, type PriceRefresh } from '@/app/items/actions';
 import { getBulkAiGuard } from '@/app/jobActions';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
-import { useT } from '@/components/LocaleProvider';
+import { useLocale, useT } from '@/components/LocaleProvider';
 import type { TKey } from '@/lib/i18n';
+import { formatDate, formatTime, formatDateTime } from '@/lib/i18n/format';
 
 const VERDICT_KEY: Record<string, TKey> = { deal: 'pp.vDeal', dropping: 'pp.vDropping', rising: 'pp.vRising', good: 'pp.vGood', high: 'pp.vHigh' };
 
@@ -70,6 +71,7 @@ const VERDICT_META: Record<Verdict, { label: string; cls: string; icon?: typeof 
 const money = (n: number) => `${cur()}${Math.round(n * 100) / 100}`;
 
 export function PricePanel({ item, summary = true, onChanged, onSearchOnline }: { item: SerializedItem; summary?: boolean; onChanged?: () => void; onSearchOnline?: () => void }) {
+  const locale = useLocale();
   const s = useMemo(() => priceStatus(item), [item]);
   const t = useT();
   const [pending, startTransition] = useTransition();
@@ -308,7 +310,7 @@ export function PricePanel({ item, summary = true, onChanged, onSearchOnline }: 
                   <div key={entry._id || i} className="flex items-center justify-between text-xs bg-[color:var(--color-surface-2)] rounded-lg px-3 py-2">
                     <span className="font-semibold text-[color:var(--color-text)]" style={{ fontFamily: 'var(--font-mono)' }}>{cur()}{entry.price}</span>
                     <span className="text-[color:var(--color-text-dim)]">{entry.store}</span>
-                    <span className="text-[color:var(--color-text-faint)]">{new Date(entry.date).toLocaleDateString('en-GB')}</span>
+                    <span className="text-[color:var(--color-text-faint)]">{formatDate(entry.date, locale)}</span>
                   </div>
                 ))}
               </div>

@@ -1,10 +1,11 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { useT } from '@/components/LocaleProvider';
+import { useLocale, useT } from '@/components/LocaleProvider';
 import type { TKey } from '@/lib/i18n';
 import { CalendarClock, Layers, ShieldCheck, Ticket, Wallet, Banknote, Receipt, Target, CalendarDays, List, LayoutGrid, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cur } from '@/lib/money';
 import { cn } from '@/components/ui/cn';
+import { formatDate, formatTime, formatDateTime } from '@/lib/i18n/format';
 
 export type Kind = 'renewal' | 'installments' | 'bill' | 'payable' | 'income' | 'goal' | 'warranty' | 'voucher';
 export type Entry = { date: string; pinned?: boolean; kind: Kind; label: string; sub: string; amount: number | null };
@@ -32,7 +33,7 @@ const VIEWS: { id: View; label: string; icon: React.ReactNode }[] = [
 ];
 
 const fmt = (n: number) => `${cur()}${n.toLocaleString('en-GB')}`;
-const dayMonth = (iso: string) => new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+const dayMonth = (iso: string, locale: string) => formatDate(iso, locale, { day: 'numeric', month: 'short' });
 
 function Amount({ e }: { e: Entry }) {
   if (e.amount == null) return null;
@@ -45,6 +46,7 @@ function Amount({ e }: { e: Entry }) {
 
 /** One agenda/list row (icon · label/sub · date · amount). */
 function EntryRow({ e, showMonth }: { e: Entry; showMonth?: boolean }) {
+  const locale = useLocale();
   const meta = KIND_META[e.kind];
   return (
     <div className="flex items-center gap-3 bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-xl px-3.5 py-2.5">
@@ -56,7 +58,7 @@ function EntryRow({ e, showMonth }: { e: Entry; showMonth?: boolean }) {
         <p className="text-[10px] text-[color:var(--color-text-faint)]" style={mono}>{e.sub}</p>
       </div>
       <span className="text-[11px] text-[color:var(--color-text-faint)] shrink-0 w-20 text-right" style={mono}>
-        {e.pinned ? 'monthly' : showMonth ? new Date(e.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : dayMonth(e.date)}
+        {e.pinned ? 'monthly' : dayMonth(e.date, locale)}
       </span>
       <span className="shrink-0 w-20 text-right text-sm">
         <Amount e={e} />

@@ -7,18 +7,18 @@ import { Button } from '@/components/ui/Button';
 import { cn } from '@/components/ui/cn';
 import { useRouter } from 'next/navigation';
 import { findDuplicateReceipts, mergeReceipts, type DupGroup } from './actions';
-import { useT } from '@/components/LocaleProvider';
+import { useLocale, useT } from '@/components/LocaleProvider';
+import { formatDate, formatTime, formatDateTime } from '@/lib/i18n/format';
 
 function fileUrl(p: string) {
   return `/api/files/${p.split('/').map(encodeURIComponent).join('/')}`;
 }
-function fmtDate(s: string) {
-  if (!s) return '—';
-  const d = new Date(s);
-  return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' });
+function fmtDate(s: string, locale: string) {
+  return formatDate(s, locale, { day: '2-digit', month: '2-digit', year: '2-digit' }, '—');
 }
 
 export function DuplicatesModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const locale = useLocale();
   const router = useRouter();
   const t = useT();
   const [loading, setLoading] = useState(true);
@@ -91,7 +91,7 @@ export function DuplicatesModal({ open, onClose }: { open: boolean; onClose: () 
               >
                 <div className="flex items-center justify-between gap-2 mb-2">
                   <span className="text-xs font-semibold" style={{ fontFamily: 'var(--font-mono)' }}>
-                    {grp.receipts[0].store} · {cur()}{grp.receipts[0].total} · {fmtDate(grp.receipts[0].date)}
+                    {grp.receipts[0].store} · {cur()}{grp.receipts[0].total} · {fmtDate(grp.receipts[0].date, locale)}
                   </span>
                   {merged ? (
                     <span className="text-[11px] text-[color:var(--color-accent)] flex items-center gap-1" style={{ fontFamily: 'var(--font-mono)' }}>

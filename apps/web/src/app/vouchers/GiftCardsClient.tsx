@@ -11,6 +11,8 @@ import { cur } from '@/lib/money';
 import { giftCardBalance, giftCardSpentPct, giftCardDaysLeft } from '@/lib/giftcard';
 import type { SerializedGiftCard } from '@/types';
 import { createGiftCard, updateGiftCard, deleteGiftCard, setGiftCardArchived, addGiftCardUse, removeGiftCardUse } from './giftcardActions';
+import { formatDate, formatTime, formatDateTime } from '@/lib/i18n/format';
+import { useLocale } from '@/components/LocaleProvider';
 
 const money = (n: number) => `${cur()}${n.toFixed(2)}`;
 
@@ -159,6 +161,7 @@ function GiftCardTile({ card, onOpen }: { card: SerializedGiftCard; onOpen: () =
 }
 
 function GiftCardForm({ card, onSuccess, onDeleted }: { card?: SerializedGiftCard; onSuccess: () => void; onDeleted?: () => void }) {
+  const locale = useLocale();
   const [pending, startTransition] = useTransition();
   const confirm = useConfirm();
   const [error, setError] = useState('');
@@ -305,7 +308,7 @@ function GiftCardForm({ card, onSuccess, onDeleted }: { card?: SerializedGiftCar
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <span className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
-                        {u.date ? new Date(u.date).toLocaleDateString('en-GB') : ''}
+                        {formatDate(u.date, locale)}
                       </span>
                       <button
                         type="button"

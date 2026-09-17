@@ -2,6 +2,8 @@
 import { cur } from "@/lib/money";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from 'recharts';
 import type { SerializedPriceEntry } from '@/types';
+import { formatDate, formatTime, formatDateTime } from '@/lib/i18n/format';
+import { useLocale } from '@/components/LocaleProvider';
 
 const tooltipStyle = {
   background: 'var(--color-surface-2)',
@@ -21,12 +23,12 @@ const PALETTE = [
   'var(--color-orange)',
 ];
 
-const fmtDate = (t: number) =>
-  new Date(t).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' });
+const fmtDate = (t: number, locale: string) => formatDate(t, locale, { day: '2-digit', month: '2-digit', year: '2-digit' });
 
 /** Multi-series price history: one dotted line per store-link, plotted over time.
  *  Seeded on URL import, then a dot is appended per store every scraper pass (6h). */
 export function PriceHistoryChart({ history }: { history: SerializedPriceEntry[] }) {
+  const locale = useLocale();
   const valid = history.filter((h) => typeof h.price === 'number' && h.price > 0);
   if (valid.length < 2) return null;
 
@@ -62,7 +64,7 @@ export function PriceHistoryChart({ history }: { history: SerializedPriceEntry[]
           tick={{ fontSize: 10, fill: '#888' }}
           axisLine={false}
           tickLine={false}
-          tickFormatter={fmtDate}
+          tickFormatter={(t: number) => fmtDate(t, locale)}
         />
         <YAxis
           domain={[min - pad, max + pad]}
@@ -74,7 +76,7 @@ export function PriceHistoryChart({ history }: { history: SerializedPriceEntry[]
         />
         <Tooltip
           contentStyle={tooltipStyle}
-          labelFormatter={(t: number) => fmtDate(t)}
+          labelFormatter={(t: number) => fmtDate(t, locale)}
           formatter={(v: number, name: string) => [`${cur()}${v}`, name]}
           cursor={{ stroke: 'var(--color-border-light)' }}
         />

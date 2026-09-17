@@ -55,7 +55,7 @@ import { createCard, updateCard, deleteCard, toggleCardActive, scanCard } from '
 import { CreditCard as CreditCardIcon, Wallet, Power, Camera, ScanLine } from 'lucide-react';
 import { shrinkImage } from '@/lib/clientImage';
 import { OpenInOneDriveButton } from '@/components/OpenInOneDriveButton';
-import { useT } from '@/components/LocaleProvider';
+import { useLocale, useT } from '@/components/LocaleProvider';
 import { FxBadge } from '@/components/FxBadge';
 import { FxRateButton } from '@/components/FxRateButton';
 import {
@@ -66,6 +66,7 @@ import {
   convertToBase,
   formatMoney,
 } from '@/lib/fx';
+import { formatDate, formatTime, formatDateTime } from '@/lib/i18n/format';
 
 export type ItemOption = {
   _id: string;
@@ -1036,13 +1037,14 @@ function TransactionRow({
   onDelete: () => void;
   pending: boolean;
 }) {
+  const locale = useLocale();
   const t = useT();
   const credit = tx.amount < 0;
   return (
     <div className="group bg-[color:var(--color-surface-2)] rounded-lg px-3 py-2">
       <div className="flex items-center gap-3">
         <span className="text-[10px] text-[color:var(--color-text-faint)] tabular-nums shrink-0" style={{ fontFamily: 'var(--font-mono)' }}>
-          {new Date(tx.date).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' })}
+          {formatDate(tx.date, locale, { day: '2-digit', month: '2-digit' })}
         </span>
         <div className="flex-1 min-w-0">
           <span className="text-xs truncate block">{tx.description}</span>

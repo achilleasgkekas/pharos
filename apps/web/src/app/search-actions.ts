@@ -19,6 +19,8 @@ import { ShoppingListItem as ShoppingListItemModel } from '@/models/ShoppingList
 import { OWNED_STATUSES } from '@/lib/itemStatus';
 import { matchedLineItemName } from '@/lib/receiptSearch';
 import { giftCardBalance } from '@/lib/giftcard';
+import { formatDate } from '@/lib/i18n/format';
+import { getLocaleSafe } from '@/lib/i18n/server';
 
 // P66: five modules shipped after this file was written (Bills, Goals, Gift cards, Loyalty
 // cards, Shopping list) were never added here, so both the navbar search AND the AI assistant's
@@ -88,6 +90,7 @@ export async function searchAll(query: string): Promise<SearchHit[]> {
   if (q.length < 2) return [];
   const r = rx(q);
   await connectDB();
+  const locale = await getLocaleSafe();
 
   return withRequestTenant(async () => {
     const [Item, Receipt, Statement, Task, Subscription, Expense, Voucher, Bill, Goal, GiftCard, LoyaltyCard, ShoppingListItem] =
@@ -181,7 +184,7 @@ export async function searchAll(query: string): Promise<SearchHit[]> {
         type: 'receipt',
         id,
         title: rc.store,
-        subtitle: `Receipt · ${new Date(rc.date).toLocaleDateString('en-GB')} · ${cur()}${rc.total}${matched ? ` · ${matched}` : ''}`,
+        subtitle: `Receipt · ${formatDate(rc.date, locale)} · ${cur()}${rc.total}${matched ? ` · ${matched}` : ''}`,
         href: `/receipts?open=${id}`,
       });
     }
@@ -222,7 +225,7 @@ export async function searchAll(query: string): Promise<SearchHit[]> {
         type: 'expense',
         id,
         title: ex.vendor || ex.category || (income ? 'Income' : 'Expense'),
-        subtitle: `${income ? 'Income' : 'Expense'} · ${ex.date ? new Date(ex.date).toLocaleDateString('en-GB') : ''} · ${cur()}${ex.amount ?? 0}`,
+        subtitle: `${income ? 'Income' : 'Expense'} · ${formatDate(ex.date, locale)} · ${cur()}${ex.amount ?? 0}`,
         href: `${income ? '/income' : '/expenses'}?open=${id}`,
       });
     }
@@ -238,7 +241,7 @@ export async function searchAll(query: string): Promise<SearchHit[]> {
     }
     for (const b of bills) {
       const id = String(b._id);
-      const due = b.dueDate ? new Date(b.dueDate).toLocaleDateString('en-GB') : '';
+      const due = formatDate(b.dueDate, locale);
       hits.push({
         type: 'bill',
         id,

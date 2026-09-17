@@ -16,6 +16,7 @@ import type { SerializedStatement } from '@/types';
 import { CalendarClient, type Entry, type MonthBlock } from './CalendarClient';
 import { getServerT } from '@/lib/i18n/server';
 import type { TFunc, TKey } from '@/lib/i18n';
+import { intlTag } from '@/lib/i18n/format';
 
 // Money calendar — everything money-related coming up in the next 3 months:
 // subscription renewals, card installments, recurring bills/income, open bills
@@ -176,7 +177,6 @@ async function getAgenda(t: TFunc, intlTag: string): Promise<{ months: MonthBloc
 
 export default async function CalendarPage() {
   const { t, locale } = await getServerT();
-  const intlTag = ({ en: 'en-GB', el: 'el', es: 'es', fr: 'fr', de: 'de', it: 'it', pt: 'pt', nl: 'nl' } as Record<string, string>)[locale] ?? 'en-GB';
-  const { months, dueThisMonth } = await getAgenda(t, intlTag);
+  const { months, dueThisMonth } = await getAgenda(t, intlTag(locale));
   return <CalendarClient months={months} dueThisMonth={dueThisMonth} />;
 }

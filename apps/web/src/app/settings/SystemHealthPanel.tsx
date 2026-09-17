@@ -2,10 +2,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Activity, AlertTriangle, CheckCircle2, CircleSlash, Database, HardDrive, Loader2, RefreshCw, Sparkles, Cloud, ListChecks, Clock, XCircle } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
-import { useT } from '@/components/LocaleProvider';
+import { useLocale, useT } from '@/components/LocaleProvider';
 import type { TKey } from '@/lib/i18n';
 import type { HealthCheck, HealthCheckId, HealthLevel, SystemHealth } from '@/lib/systemHealth';
 import { getSystemHealth } from './healthActions';
+import { formatDate, formatTime, formatDateTime } from '@/lib/i18n/format';
 
 /**
  * P77 — Settings → System status. A read-only traffic-light grid over the checks the app
@@ -57,6 +58,7 @@ const CHECK_META: Record<HealthCheckId, { icon: React.ReactNode; key: TKey }> = 
 };
 
 export function SystemHealthPanel() {
+  const locale = useLocale();
   const t = useT();
   const [health, setHealth] = useState<SystemHealth | null>(null);
   const [busy, setBusy] = useState<'idle' | 'quick' | 'deep'>('quick');
@@ -86,7 +88,7 @@ export function SystemHealthPanel() {
           <span className={cn('font-semibold', style.text)}>{t(style.key)}</span>
           {health?.checkedAt && (
             <span className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
-              {new Date(health.checkedAt).toLocaleTimeString('en-GB')}
+              {formatTime(health.checkedAt, locale)}
             </span>
           )}
         </div>
@@ -127,6 +129,7 @@ export function SystemHealthPanel() {
 }
 
 function CheckCard({ check }: { check: HealthCheck }) {
+  const locale = useLocale();
   const t = useT();
   const style = LEVEL_STYLE[check.level];
   const meta = CHECK_META[check.id];
@@ -151,7 +154,7 @@ function CheckCard({ check }: { check: HealthCheck }) {
           <div key={m.key} className="flex items-baseline justify-between gap-2 min-w-0">
             <dt className="text-[10px] uppercase tracking-wide text-[color:var(--color-text-faint)] truncate">{t(m.key as TKey)}</dt>
             <dd className="text-xs font-medium truncate" style={{ fontFamily: 'var(--font-mono)' }}>
-              {m.key === 'sys.mLastSync' ? (m.value ? new Date(m.value).toLocaleDateString('en-GB') : t('sys.never')) : m.value || '—'}
+              {m.key === 'sys.mLastSync' ? (m.value ? formatDate(m.value, locale) : t('sys.never')) : m.value || '—'}
             </dd>
           </div>
         ))}

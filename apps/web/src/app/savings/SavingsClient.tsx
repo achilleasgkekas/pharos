@@ -1,6 +1,6 @@
 'use client';
 import { useMemo, useState, useTransition } from 'react';
-import { useT, useMoney } from '@/components/LocaleProvider';
+import { useLocale, useT, useMoney } from '@/components/LocaleProvider';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { ResponsiveContainer, AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, ReferenceLine, Legend } from 'recharts';
 import { PiggyBank, Target, TrendingUp, Wallet, Plus, Trash2, Scissors, Check, AlertTriangle } from 'lucide-react';
@@ -13,6 +13,7 @@ import {
 } from '@/lib/savingsPlan';
 import { createGoal, addGoalContribution, deleteGoal } from '@/app/reports/goalsActions';
 import type { SavingsData, SavingsGoal } from './types';
+import { formatDate, formatTime, formatDateTime } from '@/lib/i18n/format';
 
 // The Save tab. Everything shown here is derived by lib/savingsPlan.ts from the ledger
 // the rest of the app already keeps — no new bookkeeping, and no number on this page is
@@ -42,9 +43,8 @@ function addMonths(d: Date, n: number): Date {
   return out;
 }
 
-function fmtDay(value: string | null): string {
-  const d = parseDay(value);
-  return d ? d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+function fmtDay(value: string | null, locale: string): string {
+  return formatDate(parseDay(value), locale, { day: '2-digit', month: 'short', year: 'numeric' }, '—');
 }
 
 /** Calendar months from one date to another — used to size the chart to the question. */
@@ -69,6 +69,7 @@ const VERDICT_COLOR: Record<SavingsVerdict, string> = {
 };
 
 export function SavingsClient({ data }: { data: SavingsData }) {
+  const locale = useLocale();
   const t = useT();
   const money = useMoney();
   const moneyExact = useMoney({ minimumFractionDigits: 0, maximumFractionDigits: 2 });
@@ -149,7 +150,7 @@ export function SavingsClient({ data }: { data: SavingsData }) {
                 {money(forecast)}
               </p>
               <p className="text-[11px] text-[color:var(--color-text-dim)] mt-1" style={{ fontFamily: 'var(--font-mono)' }}>
-                {t('sav.onDate', { d: fmtDay(dateStr) })} ·{' '}
+                {t('sav.onDate', { d: fmtDay(dateStr, locale) })} ·{' '}
                 <span className={forecast - startBalance >= 0 ? 'text-[color:var(--color-accent)]' : 'text-[color:var(--color-red)]'}>
                   {forecast - startBalance >= 0 ? '+' : '−'}{money(Math.abs(forecast - startBalance))}
                 </span>{' '}
@@ -275,6 +276,7 @@ export function SavingsClient({ data }: { data: SavingsData }) {
 
 /** The verdict, the arithmetic behind it, and what to do about a gap. */
 function PlanReadout({ plan, levers }: { plan: SavingsPlan; levers: SavingsData['levers'] }) {
+  const locale = useLocale();
   const t = useT();
   const money = useMoney();
   const moneyExact = useMoney({ minimumFractionDigits: 0, maximumFractionDigits: 2 });
@@ -310,7 +312,7 @@ function PlanReadout({ plan, levers }: { plan: SavingsPlan; levers: SavingsData[
       </p>
       {plan.verdict !== 'reached' && (
         <p className="text-[11px] text-[color:var(--color-text-dim)] mb-2">
-          {plan.earliest ? t('sav.earliest', { d: fmtDay(plan.earliest) }) : t('sav.earliestNone')}
+          {plan.earliest ? t('sav.earliest', { d: fmtDay(plan.earliest, locale) }) : t('sav.earliestNone')}
         </p>
       )}
       {cover.picks.length > 0 && (
@@ -339,6 +341,7 @@ function PlanReadout({ plan, levers }: { plan: SavingsPlan; levers: SavingsData[
 
 /** A goal, run through the same planner, with the progress + contribute controls. */
 function GoalPlanCard({ goal, data }: { goal: SavingsGoal; data: SavingsData }) {
+  const locale = useLocale();
   const t = useT();
   const money = useMoney();
   const confirm = useConfirm();
@@ -375,7 +378,7 @@ function GoalPlanCard({ goal, data }: { goal: SavingsGoal; data: SavingsData }) 
           </p>
           <p className="text-[10px] text-[color:var(--color-text-faint)] mt-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
             {t('sav.gOf', { a: money(goal.saved), b: money(goal.target) })}
-            {goal.targetDate ? ` · ${fmtDay(goal.targetDate)}` : ''}
+            {goal.targetDate ? ` · ${fmtDay(goal.targetDate, locale)}` : ''}
           </p>
         </div>
         <button onClick={remove} disabled={pending} className="shrink-0 text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] transition-colors" aria-label={t('common.delete')}>

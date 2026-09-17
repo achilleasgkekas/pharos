@@ -2,7 +2,7 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { cur } from "@/lib/money";
-import { useT, useMoney } from '@/components/LocaleProvider';
+import { useLocale, useT, useMoney } from '@/components/LocaleProvider';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import {
   ResponsiveContainer,
@@ -24,6 +24,7 @@ import { convertToBase } from '@/lib/fx';
 import { applyFxRate, applyFxRateToCurrency } from './fxActions';
 import { FxRateButton } from '@/components/FxRateButton';
 import { createGoal, addGoalContribution, deleteGoal, sweepBudgetLeftoverToGoal } from './goalsActions';
+import { formatDate, formatTime, formatDateTime } from '@/lib/i18n/format';
 
 const PALETTE = ['#00ff88', '#00d4ff', '#ffd93d', '#a55eea', '#ff4757', '#00b894', '#fdcb6e', '#6c5ce7'];
 
@@ -196,10 +197,8 @@ const tooltipStyle = {
   color: 'var(--color-text)',
 };
 
-function fmtDate(s: string): string {
-  if (!s) return '';
-  const d = new Date(s);
-  return isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' });
+function fmtDate(s: string, locale: string): string {
+  return formatDate(s, locale, { day: '2-digit', month: '2-digit', year: '2-digit' });
 }
 
 /**
@@ -344,6 +343,7 @@ function FxIssueLine({ row, base, fallbackRate }: { row: FxIssueRow; base: strin
 }
 
 export function ReportsClient({ data, months = 12 }: { data: Data; months?: number }) {
+  const locale = useLocale();
   const t = useT();
   const money = useMoney();
   const s = data.summary;
@@ -840,7 +840,7 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
                       {w.title}
                     </span>
                     <span className="text-[10px] shrink-0 tabular-nums" style={{ fontFamily: 'var(--font-mono)', color: tone }}>
-                      {w.days}d · {fmtDate(w.until)}
+                      {w.days}d · {fmtDate(w.until, locale)}
                     </span>
                   </div>
                 );
@@ -863,7 +863,7 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
                     </span>
                     <Store size={12} className="text-[color:var(--color-text-faint)] shrink-0" />
                     <span className="truncate">{b.store}</span>
-                    {b.date && <span className="text-[10px] text-[color:var(--color-text-faint)] shrink-0">{fmtDate(b.date)}</span>}
+                    {b.date && <span className="text-[10px] text-[color:var(--color-text-faint)] shrink-0">{fmtDate(b.date, locale)}</span>}
                   </span>
                   <span className="text-xs font-bold text-[color:var(--color-accent)] shrink-0 tabular-nums" style={{ fontFamily: 'var(--font-mono)' }}>
                     {money(b.total)}

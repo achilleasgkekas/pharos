@@ -15,3 +15,13 @@ export async function getServerT(): Promise<{ locale: Locale; dict: Dict; t: TFu
   const dict = resolveDict(locale);
   return { locale, dict, t: makeT(dict) };
 }
+
+/** The request's locale, or the default outside a request (cron, scripts, unit tests), where
+ *  `cookies()` throws. For formatting only — never a reason to fail the caller (#5). */
+export async function getLocaleSafe(): Promise<Locale> {
+  try {
+    return await getLocale();
+  } catch {
+    return DEFAULT_LOCALE;
+  }
+}

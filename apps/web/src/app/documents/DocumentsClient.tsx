@@ -9,6 +9,8 @@ import { cn } from '@/components/ui/cn';
 import { documentDaysUntilExpiry, documentStatus, type DocStatus } from '@/lib/documentExpiry';
 import type { SerializedDocument } from '@/types';
 import { createDocument, updateDocument, deleteDocument, setDocumentArchived } from './actions';
+import { formatDate, formatTime, formatDateTime } from '@/lib/i18n/format';
+import { useLocale } from '@/components/LocaleProvider';
 
 // P42 — personal document expiry tracker. Inline English wording (like BillsClient), which
 // is not yet run through i18n; only the nav label is translated.
@@ -33,11 +35,7 @@ const STATUS_STYLE: Record<DocStatus, { label: (d: number) => string; color: str
   ok: { label: (d) => `in ${d}d`, color: 'var(--color-text-faint)' },
 };
 
-const fmtDate = (s: string | null) => {
-  if (!s) return '—';
-  const d = new Date(s);
-  return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-};
+const fmtDate = (s: string | null, locale: string) => formatDate(s, locale, { day: '2-digit', month: 'short', year: 'numeric' }, '—');
 
 const toInputDate = (s: string | null) => {
   if (!s) return '';
@@ -48,6 +46,7 @@ const toInputDate = (s: string | null) => {
 type Draft = Partial<SerializedDocument> | null;
 
 export function DocumentsClient({ documents, leadDays }: { documents: SerializedDocument[]; leadDays: number }) {
+  const locale = useLocale();
   const confirm = useConfirm();
   const [pending, startTransition] = useTransition();
   const [showArchived, setShowArchived] = useState(false);
@@ -149,7 +148,7 @@ export function DocumentsClient({ documents, leadDays }: { documents: Serialized
                     {d.holder && <span className="text-[10px] text-[color:var(--color-text-dim)]">· {d.holder}</span>}
                   </div>
                   <div className="flex items-center gap-2 flex-wrap text-[11px] text-[color:var(--color-text-faint)] mt-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
-                    <span>exp {fmtDate(d.expiryDate)}</span>
+                    <span>exp {fmtDate(d.expiryDate, locale)}</span>
                     {days !== null && <span style={{ color: s.color }}>· {s.label(days)}</span>}
                     {d.number && <span className="truncate">· #{d.number}</span>}
                   </div>
