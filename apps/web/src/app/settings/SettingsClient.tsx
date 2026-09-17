@@ -241,11 +241,14 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
 
               <DefaultsManager settings={info.settings} />
 
-              {/* Calendar feed (ICS) is a per-user integration, not AI — it moved here out of the
-                  AI tab so hosted workspaces (where the AI tab lives in Workspace → AI) keep it. */}
-              <Section title={t('ics.title')} icon={<CalendarPlus size={15} />}>
-                <CalendarFeedManager />
-              </Section>
+              {/* Calendar feed (ICS) is a per-user integration, not AI, so it lives here rather than in
+                  the AI tab. Self-hosted only for now (#121): its token sits on the `User` record, which
+                  a hosted customer does not have, and the feed route refuses in SaaS mode. */}
+              {!saas && (
+                <Section title={t('ics.title')} icon={<CalendarPlus size={15} />}>
+                  <CalendarFeedManager />
+                </Section>
+              )}
 
               {/* Password and two-factor belong to the ACCOUNT, not to a workspace. On a hosted
                   deployment /account/settings already owns both, and rendering them here too

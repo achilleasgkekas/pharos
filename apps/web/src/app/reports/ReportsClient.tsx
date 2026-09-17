@@ -1,5 +1,6 @@
 'use client';
 import { useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 import { cur } from "@/lib/money";
 import { useT, useMoney } from '@/components/LocaleProvider';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
@@ -356,9 +357,20 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
   const fxBase = data.baseCurrency || 'EUR';
   // P83 — goals still open (an already-reached goal is a pointless sweep target).
   const openGoals = data.goals.filter((g) => !g.done);
+  // #122: the period links used to be plain <a href>, so every switch was a full browser reload
+  // (blank page, scroll back to top) that looked like the filter "just reloads". A client
+  // navigation keeps the current report on screen, dimmed, until the new window's data arrives.
+  const router = useRouter();
+  const [periodPending, startPeriod] = useTransition();
+  const [pendingMonths, setPendingMonths] = useState<number | null>(null);
+  const shownMonths = periodPending && pendingMonths ? pendingMonths : months;
+  const inWindow = (title: string) => `${title} · ${months}mo`;
 
   return (
-    <main className="max-w-[1400px] mx-auto px-4 py-6 pb-24">
+    <main
+      className={`max-w-[1400px] mx-auto px-4 py-6 pb-24 transition-opacity ${periodPending ? 'opacity-60' : ''}`}
+      aria-busy={periodPending}
+    >
       <div className="mb-6 flex items-end justify-between gap-4 flex-wrap">
         <h1 className="text-2xl md:text-3xl font-bold" style={{ fontFamily: 'var(--font-display)' }}>
           {t('nav.reports')}
@@ -368,7 +380,15 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
             <a
               key={m}
               href={`/reports?months=${m}`}
-              className={`px-2.5 py-1 rounded-md text-xs transition-colors ${months === m ? 'bg-[color:var(--color-accent)] text-black' : 'text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]'}`}
+              aria-current={months === m ? 'page' : undefined}
+              onClick={(e) => {
+                if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return; // new tab still works
+                e.preventDefault();
+                if (m === months) return;
+                setPendingMonths(m);
+                startPeriod(() => router.push(`/reports?months=${m}`, { scroll: false }));
+              }}
+              className={`px-2.5 py-1 rounded-md text-xs transition-colors ${shownMonths === m ? 'bg-[color:var(--color-accent)] text-black' : 'text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]'}`}
             >
               {m}mo
             </a>
@@ -498,7 +518,7 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-        <Stat icon={<ReceiptIcon size={14} />} label={t('reports.receiptsTotal')} value={money(s.receiptsTotal)} sub={t('reports.receiptsSub', { n: s.receiptsCount, vat: money(s.receiptsVat) })} />
+        <Stat icon={<ReceiptIcon size={14} />} label={inWindow(t('reports.receiptsTotal'))} value={money(s.receiptsTotal)} sub={t('reports.receiptsSub', { n: s.receiptsCount, vat: money(s.receiptsVat) })} />
         <Stat icon={<TrendingUp size={14} />} label={t('reports.spendAvg')} value={money(avgMonth)} sub={t('reports.spendAvgSub', { x: money(spend12), n: months })} />
         <Stat icon={<CreditCard size={14} />} label={t('reports.cardsBalance')} value={money(s.outstanding)} sub={t('reports.cardsBalanceSub', { n: s.installmentsCount, x: money(s.installmentsRemaining) })} accent="var(--color-gold)" />
         <Stat icon={<CalendarClock size={14} />} label={t('nav.subscriptions')} value={`${money(s.monthlySubs)}/mo`} sub={`${money(s.monthlySubs * 12)}/yr`} />
@@ -690,7 +710,7 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
         </Card>
 
         {/* Spending by store */}
-        <Card title={t('reports.cByStore')}>
+        <Card title={inWindow(t('reports.cByStore'))}>
           {data.spendByStore.length === 0 ? (
             <Empty />
           ) : (
@@ -729,7 +749,7 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
         </Card>
 
         {/* Expenses by category (bills) */}
-        <Card title={t('reports.cExpByCat')}>
+        <Card title={inWindow(t('reports.cExpByCat'))}>
           {data.expenseByCategory.length === 0 ? (
             <Empty text="No expenses logged yet" />
           ) : (
@@ -750,7 +770,7 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
 
         {/* Expenses by space / property (P34) — only when the user has tagged spaces */}
         {data.expenseBySpace.length > 0 && (
-          <Card title={t('reports.cExpBySpace')}>
+          <Card title={inWindow(t('reports.cExpBySpace'))}>
             <ResponsiveContainer width="100%" height={Math.max(200, data.expenseBySpace.length * 34)}>
               <BarChart data={data.expenseBySpace.map((s) => ({ name: s.name || t('ex.spaceNone'), value: s.value }))} layout="vertical" margin={{ left: 8, right: 16 }}>
                 <XAxis type="number" tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} tickFormatter={(v: number) => money(v, undefined, { notation: 'compact', minimumFractionDigits: 0, maximumFractionDigits: 1 })} />
@@ -830,7 +850,7 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
         </Card>
 
         {/* Biggest purchases */}
-        <Card title={t('reports.cBiggest')}>
+        <Card title={inWindow(t('reports.cBiggest'))}>
           {data.biggestPurchases.length === 0 ? (
             <Empty />
           ) : (
