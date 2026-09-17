@@ -289,6 +289,18 @@ describe('uploadExpense', () => {
     expect(expenseCreate.mock.calls[0][0].category).toBe('ai-guessed');
   });
 
+  it('trusts the uploaded kind (e.g. income) over an AI guess (e.g. expense)', async () => {
+    ocrImageMock.mockResolvedValue('legible');
+    looksLikeUsableOcrMock.mockReturnValue(true);
+    parseExpenseTextMock.mockResolvedValue({ parsed: { kind: 'expense', vendor: 'Company', amount: 10 }, raw: 'r', model: 'm' });
+    const fd = new FormData();
+    fd.set('file', makeFile('bill.jpg', 'x', 'image/jpeg'));
+    fd.set('kind', 'income');
+    const res = await uploadExpense(fd);
+    expect(res.ok).toBe(true);
+    expect(expenseCreate.mock.calls[0][0].kind).toBe('income');
+  });
+
   it('inherits space/taxDeductible/taxCategory from the matching prior series', async () => {
     expenseFindOneSortLean.mockResolvedValue({ category: 'utilities', recurring: false, space: 'cottage', taxDeductible: true, taxCategory: 'medical' });
     ocrImageMock.mockResolvedValue('legible');
@@ -426,6 +438,34 @@ describe('rescanExpense', () => {
     expect(doc.amount).toBe(5);
     expect(doc.recurringCycle).toBe('monthly'); // falsy parsed cycle -> keeps old
     expect(doc.paymentMethod).toBe('cash');
+  });
+
+  it('preserves the existing kind (e.g. income) even when the AI guesses differently', async () => {
+    const doc = makeExpenseDoc({
+      filePath: 'expenses/2026/06/bill.pdf',
+      kind: 'income',
+      vendor: 'Company',
+      vendorKey: 'company',
+      category: 'other',
+      amount: 5,
+      currency: 'EUR',
+      date: new Date('2026-01-01T00:00:00.000Z'),
+      period: '2026-01',
+      recurringCycle: '',
+      paymentMethod: '',
+      verified: true,
+      _id: 'e1',
+    });
+    expenseFindById.mockResolvedValue(doc);
+    extractPdfTextMock.mockResolvedValue('some text');
+    looksLikeScannedPdfMock.mockReturnValue(false);
+    parseExpenseTextMock.mockResolvedValue({
+      parsed: { kind: 'expense', vendor: 'Company', amount: 5, date: '2026-01-15' },
+      raw: '',
+      model: 'text-model',
+    });
+    await rescanExpense('e1', false);
+    expect(doc.kind).toBe('income');
   });
 
   it('returns a friendly error when reading the stored file throws', async () => {

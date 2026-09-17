@@ -244,7 +244,7 @@ export async function uploadExpense(formData: FormData): Promise<UploadExpenseRe
     // of silently folding e.g. $88 into a euro total.
     const fx = resolveFx({ amount: parsed?.amount ?? 0, currency: parsed?.currency }, settings.currency);
     const exp = await Expense.create({
-      kind: parsed?.kind || kind,
+      kind,
       vendor,
       vendorKey: vKey,
       category: rule?.category || parsed?.category || inherited?.category || 'other',
@@ -683,7 +683,6 @@ export async function rescanExpense(id: string, useOcr: boolean): Promise<{ ok: 
     const { parsed, raw, model, aiError } = await runExpenseParse(bytes, ext, isPdf, useOcr);
     if (!parsed) return { ok: false, error: aiError || 'AI returned nothing' };
     const date = safeDate(parsed.date);
-    exp.kind = parsed.kind || exp.kind;
     exp.vendor = parsed.vendor || exp.vendor;
     exp.vendorKey = vendorKey(exp.vendor);
     exp.category = parsed.category || exp.category;
