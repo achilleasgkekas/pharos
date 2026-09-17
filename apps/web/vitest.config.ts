@@ -6,6 +6,9 @@ import { fileURLToPath } from 'node:url';
 // and keeps CI fast (no browser, no database). Add coverage/setup files later as the
 // suite grows into API-shape tests.
 export default defineConfig({
+  // Next keeps JSX as-is for its own compiler (tsconfig jsx: preserve); Vite 8's oxc transform
+  // must be told to compile it, or any test importing a .tsx component fails to parse.
+  oxc: { jsx: { runtime: 'automatic' } },
   // Mirror the tsconfig `@/*` → src/* path alias so tests can import lib modules the same
   // way production code does (e.g. `@/lib/aiFeatures`), not just via relative paths.
   resolve: {
