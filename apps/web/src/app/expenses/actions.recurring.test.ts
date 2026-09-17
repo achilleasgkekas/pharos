@@ -23,11 +23,13 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 const {
   connectDBMock,
   expenseCreate,
+  expenseUpdateOne,
   expenseFindSortLean,
   revalidatePathMock,
 } = vi.hoisted(() => ({
   connectDBMock: vi.fn(async () => {}),
   expenseCreate: vi.fn(async (_doc: Record<string, any>) => ({ _id: 'new' })),
+  expenseUpdateOne: vi.fn(async (_filter: Record<string, any>, _update: Record<string, any>, _opts?: Record<string, any>) => ({ upsertedCount: 1 })),
   expenseFindSortLean: vi.fn(async () => [] as Array<Record<string, any>>),
   revalidatePathMock: vi.fn(),
 }));
@@ -35,6 +37,7 @@ const {
 const findFilterCalls: Array<Record<string, any>> = [];
 const expenseModel = {
   create: expenseCreate,
+  updateOne: expenseUpdateOne,
   find: (filter: Record<string, any>) => {
     findFilterCalls.push(filter);
     return { sort: () => ({ lean: expenseFindSortLean }) };
@@ -87,7 +90,7 @@ describe('generateDueRecurring', () => {
   it('creates nothing and skips revalidate when there are no recurring series', async () => {
     const res = await generateDueRecurring();
     expect(res).toEqual({ created: 0 });
-    expect(expenseCreate).not.toHaveBeenCalled();
+    expect(expenseUpdateOne).not.toHaveBeenCalled();
     expect(revalidatePathMock).not.toHaveBeenCalled();
   });
 
@@ -97,7 +100,7 @@ describe('generateDueRecurring', () => {
     ]);
     const res = await generateDueRecurring();
     expect(res).toEqual({ created: 0 });
-    expect(expenseCreate).not.toHaveBeenCalled();
+    expect(expenseUpdateOne).not.toHaveBeenCalled();
   });
 
   it('dedupes to only the first (latest) entry per kind|vendorKey series, ignoring later duplicates', async () => {
@@ -107,8 +110,8 @@ describe('generateDueRecurring', () => {
     ]);
     const res = await generateDueRecurring();
     expect(res).toEqual({ created: 1 });
-    expect(expenseCreate).toHaveBeenCalledTimes(1);
-    const doc = expenseCreate.mock.calls[0][0];
+    expect(expenseUpdateOne).toHaveBeenCalledTimes(1);
+    const doc = expenseUpdateOne.mock.calls[0][1].$setOnInsert;
     expect(doc.vendor).toBe('DEH');
     expect(doc.category).toBe('utilities');
     expect(doc.amount).toBe(50);
@@ -121,7 +124,7 @@ describe('generateDueRecurring', () => {
     ]);
     const res = await generateDueRecurring();
     expect(res).toEqual({ created: 2 });
-    const kinds = expenseCreate.mock.calls.map((c) => c[0].kind).sort();
+    const kinds = expenseUpdateOne.mock.calls.map((c) => c[1].$setOnInsert.kind).sort();
     expect(kinds).toEqual(['expense', 'income']);
   });
 
@@ -131,7 +134,7 @@ describe('generateDueRecurring', () => {
     ]);
     const res = await generateDueRecurring();
     expect(res).toEqual({ created: 1 });
-    const doc = expenseCreate.mock.calls[0][0];
+    const doc = expenseUpdateOne.mock.calls[0][1].$setOnInsert;
     expect(localYmd(doc.date)).toBe('2026-03-10');
     expect(doc.period).toBe('2026-03');
     expect(doc.kind).toBe('expense');
@@ -160,7 +163,7 @@ describe('generateDueRecurring', () => {
     ]);
     const res = await generateDueRecurring();
     expect(res).toEqual({ created: 1 });
-    const doc = expenseCreate.mock.calls[0][0];
+    const doc = expenseUpdateOne.mock.calls[0][1].$setOnInsert;
     expect(doc.space).toBe('Office');
     expect(doc.taxDeductible).toBe(true);
     expect(doc.taxCategory).toBe('Telecommunications');
@@ -172,7 +175,7 @@ describe('generateDueRecurring', () => {
     ]);
     const res = await generateDueRecurring();
     expect(res).toEqual({ created: 1 });
-    expect(localYmd(expenseCreate.mock.calls[0][0].date)).toBe('2026-03-14');
+    expect(localYmd(expenseUpdateOne.mock.calls[0][1].$setOnInsert.date)).toBe('2026-03-14');
   });
 
   it('steps a quarterly series forward by 3 months', async () => {
@@ -182,8 +185,8 @@ describe('generateDueRecurring', () => {
     const res = await generateDueRecurring();
     expect(res).toEqual({ created: 1 });
     // Stored dates are UTC midnight (safeDate('YYYY-MM-DD')); stepping is UTC-exact since #103.
-    expect((expenseCreate.mock.calls[0][0].date as Date).toISOString().slice(0, 10)).toBe('2026-03-01');
-    expect(expenseCreate.mock.calls[0][0].period).toBe('2026-03');
+    expect((expenseUpdateOne.mock.calls[0][1].$setOnInsert.date as Date).toISOString().slice(0, 10)).toBe('2026-03-01');
+    expect(expenseUpdateOne.mock.calls[0][1].$setOnInsert.period).toBe('2026-03');
   });
 
   it('steps a yearly series forward by 1 year', async () => {
@@ -192,7 +195,7 @@ describe('generateDueRecurring', () => {
     ]);
     const res = await generateDueRecurring();
     expect(res).toEqual({ created: 1 });
-    expect(localYmd(expenseCreate.mock.calls[0][0].date)).toBe('2026-03-01');
+    expect(localYmd(expenseUpdateOne.mock.calls[0][1].$setOnInsert.date)).toBe('2026-03-01');
   });
 
   it('defaults an unrecognized cycle string to monthly stepping', async () => {
@@ -201,7 +204,7 @@ describe('generateDueRecurring', () => {
     ]);
     const res = await generateDueRecurring();
     expect(res).toEqual({ created: 1 });
-    expect(localYmd(expenseCreate.mock.calls[0][0].date)).toBe('2026-03-10');
+    expect(localYmd(expenseUpdateOne.mock.calls[0][1].$setOnInsert.date)).toBe('2026-03-10');
   });
 
   it('creates one entry per elapsed period when several are overdue at once', async () => {
@@ -211,7 +214,7 @@ describe('generateDueRecurring', () => {
     const res = await generateDueRecurring();
     // Dec 10 -> Jan 10, Feb 10, Mar 10 (all <= 2026-03-15) -> 3 periods due.
     expect(res).toEqual({ created: 3 });
-    const dates = expenseCreate.mock.calls.map((c) => localYmd(c[0].date)).sort();
+    const dates = expenseUpdateOne.mock.calls.map((c) => localYmd(c[1].$setOnInsert.date)).sort();
     expect(dates).toEqual(['2026-01-10', '2026-02-10', '2026-03-10']);
   });
 
@@ -221,7 +224,7 @@ describe('generateDueRecurring', () => {
     ]);
     const res = await generateDueRecurring();
     expect(res).toEqual({ created: 36 });
-    expect(expenseCreate).toHaveBeenCalledTimes(36);
+    expect(expenseUpdateOne).toHaveBeenCalledTimes(36);
   });
 
   it('calls revalidatePath for /expenses and /income only when something was created', async () => {
@@ -240,7 +243,50 @@ describe('generateDueRecurring', () => {
     const res = await generateDueRecurring();
     // next due = 2026-04-14, which is after NOW (2026-03-15) -> nothing created.
     expect(res).toEqual({ created: 0 });
-    expect(expenseCreate).not.toHaveBeenCalled();
+    expect(expenseUpdateOne).not.toHaveBeenCalled();
     expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+
+  it('handles concurrent generateDueRecurring calls without creating duplicates', async () => {
+    expenseFindSortLean.mockImplementation(async () => {
+      // Defer resolution to let both calls read before either creates.
+      await Promise.resolve();
+      await Promise.resolve();
+      return [
+        { kind: 'expense', vendor: 'Rent', vendorKey: 'rent', category: 'housing', amount: 500, date: new Date(2026, 1, 10), recurringCycle: 'monthly' },
+      ];
+    });
+
+    // We expect the fix to use updateOne(..., { upsert: true }). For backward-compat with the original
+    // failing test, we check that either create was called exactly once, or updateOne with upsert exactly once.
+    // In our mock, if they both read the seed, they will both fire updateOne. But wait, if they fire updateOne
+    // concurrently, they will BOTH call updateOne. However, MongoDB handles the upsert atomically, so only one
+    // will return upsertedCount: 1. In our mock we need to simulate this atomic behavior or just check that
+    // the code returns the sum of upsertedCounts.
+    // Actually, MongoDB handles the deduplication. The issue is that the code uses `Expense.create`.
+    // Let's modify the mock to simulate MongoDB's unique constraint or upsert behaviour.
+    // Since we mock `updateOne`, let's just make `updateOne` track inserts and return `upsertedCount: 0` for duplicates.
+    const upsertedKeys = new Set<string>();
+    expenseUpdateOne.mockImplementation(async (filter: Record<string, any>, update: Record<string, any>, opts?: Record<string, any>) => {
+      const key = `${filter.kind}|${filter.vendorKey}|${filter.date?.toISOString()}`;
+      if (opts?.upsert) {
+        if (upsertedKeys.has(key)) return { upsertedCount: 0 };
+        upsertedKeys.add(key);
+        return { upsertedCount: 1 };
+      }
+      return { upsertedCount: 0 };
+    });
+
+    const [res1, res2] = await Promise.all([
+      generateDueRecurring(),
+      generateDueRecurring(),
+    ]);
+
+    // If it uses Expense.create(), both calls will blindly insert.
+    // If it uses updateOne upsert, we expect one call to create (upsertedCount: 1) and the other to not (upsertedCount: 0).
+    expect(res1.created + res2.created).toBe(1);
+    
+    // Cleanup
+    upsertedKeys.clear();
   });
 });

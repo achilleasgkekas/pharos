@@ -161,27 +161,39 @@ export async function generateDueRecurring(): Promise<{ created: number }> {
     let guard = 0;
     while (next.getTime() <= now && guard < 36) {
       guard++;
-      await Expense.create({
-        kind: seed.kind,
-        vendor: seed.vendor,
-        vendorKey: seed.vendorKey,
-        category: seed.category,
-        space: seed.space || '',
-        taxDeductible: seed.taxDeductible || false,
-        taxCategory: seed.taxCategory || '',
-        // `amount` is base-denominated (lib/fx.ts), so a projection is base currency by
-        // definition; don't inherit the seed's printed foreign code/rate.
-        amount: seed.amount,
-        currency: base,
-        date: next,
-        period: periodFrom(next),
-        recurring: true,
-        recurringCycle: seed.recurringCycle,
-        aiModel: 'recurring-auto',
-        verified: false,
-        notes: 'Auto-generated from recurring series',
-      });
-      created++;
+      const res = await Expense.updateOne(
+        {
+          kind: seed.kind,
+          vendorKey: seed.vendorKey,
+          date: next,
+          recurring: true,
+          aiModel: 'recurring-auto'
+        },
+        {
+          $setOnInsert: {
+            kind: seed.kind,
+            vendor: seed.vendor,
+            vendorKey: seed.vendorKey,
+            category: seed.category,
+            space: seed.space || '',
+            taxDeductible: seed.taxDeductible || false,
+            taxCategory: seed.taxCategory || '',
+            // `amount` is base-denominated (lib/fx.ts), so a projection is base currency by
+            // definition; don't inherit the seed's printed foreign code/rate.
+            amount: seed.amount,
+            currency: base,
+            date: next,
+            period: periodFrom(next),
+            recurring: true,
+            recurringCycle: seed.recurringCycle,
+            aiModel: 'recurring-auto',
+            verified: false,
+            notes: 'Auto-generated from recurring series',
+          }
+        },
+        { upsert: true }
+      );
+      if (res.upsertedCount) created++;
       next = addCycleUTC(next, cycle);
     }
   }
