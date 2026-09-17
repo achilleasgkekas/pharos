@@ -771,6 +771,37 @@ paths:
         '400': { $ref: '#/components/responses/BadInput' }
         '401': { $ref: '#/components/responses/Unauthorized' }
 
+  /share:
+    post:
+      tags: [Scan]
+      summary: Send a shared file to Receipts or Statements
+      description: 'What the iPhone share-sheet Shortcut calls (iOS has no Web Share Target). Multipart `file` + `target` (`receipt` | `statement`, statements must be PDF). Imports through the module''s normal upload.'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, target]
+              properties:
+                file: { type: string, format: binary }
+                target: { type: string, enum: [receipt, statement] }
+      responses:
+        '200':
+          description: Imported.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      target: { type: string, enum: [receipt, statement] }
+                      redirectTo: { type: string }
+        '400': { $ref: '#/components/responses/BadInput' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
   /scan/voucher:
     post:
       tags: [Scan]
