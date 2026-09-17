@@ -7,7 +7,9 @@ import { assertStorageQuota, recordStorageDelta } from './billing/storageMeter';
 
 const STORAGE_ROOT = process.env.STORAGE_ROOT ?? path.join(process.cwd(), 'storage');
 
-export type StorageBucket = 'receipts' | 'statements' | 'equipment' | 'expenses';
+// 'share' is the staging bucket for files handed to us by the OS share sheet (#123): they live
+// there only until the user picks a destination, then move into the real bucket.
+export type StorageBucket = 'receipts' | 'statements' | 'equipment' | 'expenses' | 'share';
 
 /**
  * The root this call should read/write under: the ambient tenant's own subtree

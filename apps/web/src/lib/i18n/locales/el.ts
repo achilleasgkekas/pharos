@@ -487,6 +487,18 @@ export const el: Partial<Dict> = {
   'bm.hint': 'Δεν μπορείς να το σύρεις; Αντίγραψε τον κώδικα, φτιάξε σελιδοδείκτη χειροκίνητα και επικόλλησέ τον ως URL. Ανοίγει ένα μικρό popup του Pharos για τη σελίδα που βλέπεις, χωρίς extension και χωρίς στοιχεία λογαριασμού μέσα στον ίδιο τον σύνδεσμο.',
   'bm.extHint':
     'Προτιμάς κουμπί στη γραμμή εργαλείων και δεξί κλικ; Το repository έχει και extension για Chrome/Edge στο apps/extension: φόρτωσέ το unpacked από το chrome://extensions (Developer mode, Load unpacked) και δώσε του αυτή τη διεύθυνση. Δουλεύει το ίδιο, χωρίς API token και χωρίς πρόσβαση στο περιεχόμενο των σελίδων.',
+  // #123 — OS share sheet destination picker (/capture/share)
+  'share.title': 'Αποστολή στο Pharos',
+  'share.noName': 'Κοινόχρηστο αρχείο',
+  'share.nothingShared': 'Δεν στάλθηκε αρχείο. Άνοιξε ένα PDF ή μια φωτογραφία και πάτα Κοινή χρήση.',
+  'share.asReceipt': 'Απόδειξη',
+  'share.asReceiptHint': 'Σάρωση και καταχώριση εξόδου',
+  'share.asStatement': 'Κατάσταση κάρτας',
+  'share.asStatementHint': 'Εισαγωγή των συναλλαγών',
+  'share.pdfOnly': 'Μόνο PDF',
+  'share.lastUsed': 'τελευταία επιλογή',
+  'share.unsupported': 'Αυτός ο τύπος αρχείου δεν υποστηρίζεται — στείλε PDF ή εικόνα.',
+  'share.failed': 'Το αρχείο δεν διαβάστηκε — στείλ’ το ξανά.',
   'cap.title': 'Προσθήκη στο Pharos',
   'cap.urlPlaceholder': 'URL σελίδας προϊόντος',
   'cap.fetching': 'Διαβάζω τη σελίδα του προϊόντος…',
