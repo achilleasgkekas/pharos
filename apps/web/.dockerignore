@@ -5,6 +5,10 @@ node_modules
 storage
 npm-debug.log*
 .DS_Store
+# macOS resource forks: metadata files that shadow every real source file when the tree has
+# ever been copied through a Mac or an SMB share. They must never reach the image.
+._*
+**/._*
 README.md
 Dockerfile
 .dockerignore

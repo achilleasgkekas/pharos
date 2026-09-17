@@ -11,7 +11,7 @@ const compat = new FlatCompat({ baseDirectory: import.meta.dirname });
 // doubles and Mongoose lean() shapes) — visible in the output, not a blocker — and the test files
 // keep the freedoms that make test doubles readable.
 export default [
-  { ignores: ['.next/**', 'node_modules/**', 'public/**', 'next-env.d.ts', 'coverage/**'] },
+  { ignores: ['.next/**', 'node_modules/**', 'public/**', 'next-env.d.ts', 'coverage/**', '**/._*'] },
   ...compat.extends('next/core-web-vitals', 'next/typescript'),
   {
     rules: {
