@@ -164,6 +164,9 @@ export async function generateDueRecurring(): Promise<{ created: number }> {
         vendor: seed.vendor,
         vendorKey: seed.vendorKey,
         category: seed.category,
+        space: seed.space || '',
+        taxDeductible: seed.taxDeductible || false,
+        taxCategory: seed.taxCategory || '',
         // `amount` is base-denominated (lib/fx.ts), so a projection is base currency by
         // definition; don't inherit the seed's printed foreign code/rate.
         amount: seed.amount,
