@@ -143,6 +143,29 @@ describe('generateDueRecurring', () => {
     expect(doc.notes).toBe('Auto-generated from recurring series');
   });
 
+  it('copies taxonomy fields (space, taxDeductible, taxCategory) from the seed record', async () => {
+    expenseFindSortLean.mockResolvedValue([
+      {
+        kind: 'expense',
+        vendor: 'Cosmote',
+        vendorKey: 'cosmote',
+        category: 'utilities',
+        space: 'Office',
+        taxDeductible: true,
+        taxCategory: 'Telecommunications',
+        amount: 45,
+        date: new Date(2026, 1, 10),
+        recurringCycle: 'monthly',
+      },
+    ]);
+    const res = await generateDueRecurring();
+    expect(res).toEqual({ created: 1 });
+    const doc = expenseCreate.mock.calls[0][0];
+    expect(doc.space).toBe('Office');
+    expect(doc.taxDeductible).toBe(true);
+    expect(doc.taxCategory).toBe('Telecommunications');
+  });
+
   it('steps a weekly series forward by 7 days', async () => {
     expenseFindSortLean.mockResolvedValue([
       { kind: 'expense', vendor: 'Gym', vendorKey: 'gym', category: 'health', amount: 20, date: new Date(2026, 2, 7), recurringCycle: 'weekly' },
