@@ -1,0 +1,32 @@
+name: Scraper
+
+# The price-scraper worker runs on the server against real data and had no gate either: it is
+# TypeScript executed through tsx, so a type error only surfaced at 05:00 on the host (#136).
+on:
+  push:
+    branches: [main]
+    paths: ['services/scraper/**', '.github/workflows/scraper.yml']
+  pull_request:
+    paths: ['services/scraper/**', '.github/workflows/scraper.yml']
+  workflow_dispatch:
+
+concurrency:
+  group: scraper-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  typecheck:
+    name: Type-check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/scraper
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: services/scraper/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck

@@ -100,7 +100,7 @@ export function InviteAcceptForm({ token, next }: { token: string; next?: string
           disabled={busy}
         />
         <p className="mt-1 text-xs text-[color:var(--color-text-faint)]">
-          If you're new here, set one now (at least {MIN_PASSWORD} characters).
+          If you&rsquo;re new here, set one now (at least {MIN_PASSWORD} characters).
         </p>
       </div>
 

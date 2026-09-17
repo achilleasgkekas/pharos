@@ -3,7 +3,12 @@ name: CI
 on:
   push:
     branches: [main]
+    # Markdown-only commits (the routines write PROGRESS.md / SAAS_PROGRESS.md daily) cannot break
+    # the build, and running the full gate on them was a large slice of the monthly Actions minutes
+    # (#136). docs/openapi.yaml is NOT excluded: a route test reads it.
+    paths-ignore: ['**/*.md']
   pull_request:
+    paths-ignore: ['**/*.md']
   # Lets a human (or `gh workflow run CI`) re-run the gate on demand — e.g. to confirm
   # the pipeline is alive after it has been disabled, without pushing a dummy commit.
   workflow_dispatch:
