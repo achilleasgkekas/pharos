@@ -138,3 +138,37 @@ describe('formatCurrency', () => {
     }
   });
 });
+
+import { formatDate, formatDateTime, formatTime, intlTag } from './format';
+
+describe('date formatting follows the app language (#5)', () => {
+  const d = new Date(2026, 6, 4, 9, 5); // 4 July 2026, 09:05 local
+
+  it("maps the app's `en` to British English, keeps every other locale", () => {
+    expect(intlTag('en')).toBe('en-GB');
+    expect(intlTag(undefined)).toBe('en-GB');
+    expect(intlTag('el')).toBe('el');
+    expect(intlTag('de')).toBe('de');
+  });
+
+  it('month names come out in the selected language, not English', () => {
+    const opts = { month: 'long', year: 'numeric' } as const;
+    expect(formatDate(d, 'en', opts)).toBe('July 2026');
+    expect(formatDate(d, 'el', opts)).toMatch(/Ιο[υύ]λ/);
+    expect(formatDate(d, 'de', opts)).toBe('Juli 2026');
+    expect(formatDate(d, 'fr', opts)).toBe('juillet 2026');
+  });
+
+  it('numeric dates keep DD/MM for en (never US order)', () => {
+    expect(formatDate(d, 'en')).toBe('04/07/2026');
+    expect(formatDate(d, 'de')).toBe('4.7.2026');
+  });
+
+  it('empty or invalid input returns the fallback instead of "Invalid Date"', () => {
+    expect(formatDate(null, 'el')).toBe('');
+    expect(formatDate('', 'el', undefined, '—')).toBe('—');
+    expect(formatDate('not a date', 'en', undefined, '—')).toBe('—');
+    expect(formatTime(undefined, 'en')).toBe('');
+    expect(formatDateTime('garbage', 'en', undefined, '—')).toBe('—');
+  });
+});

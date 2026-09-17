@@ -12,6 +12,7 @@ import { Goal as GoalModel } from '@/models/Goal';
 import { billRemaining } from '@/lib/bill';
 import { computeInstallmentPlans } from '@/lib/installments';
 import type { SerializedStatement } from '@/types';
+import { formatDate } from '@/lib/i18n/format';
 
 // Shared 3-month "money agenda" computation: subscription renewals (stepped per
 // cycle), card installments aggregated per month, recurring bills/income projected,
@@ -39,7 +40,7 @@ const cycleWord = (c: string) =>
 
 /** Compute the current-month + next-2-month money agenda. `now` is injectable for
  *  deterministic tests; defaults to the real clock. Reads the DB (connectDB first). */
-export async function computeMoneyAgenda(now: Date = new Date()): Promise<{ months: AgendaMonth[]; dueThisMonth: number }> {
+export async function computeMoneyAgenda(now: Date = new Date(), locale = 'en'): Promise<{ months: AgendaMonth[]; dueThisMonth: number }> {
   await connectDB();
   const windowStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const windowEnd = new Date(now.getFullYear(), now.getMonth() + 3, 1);
@@ -88,7 +89,7 @@ export async function computeMoneyAgenda(now: Date = new Date()): Promise<{ mont
     const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
     return {
       key: mk(d),
-      label: d.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }),
+      label: formatDate(d, locale, { month: 'long', year: 'numeric' }),
       entries: [],
       out: 0,
       inc: 0,

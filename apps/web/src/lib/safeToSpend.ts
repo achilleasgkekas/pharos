@@ -1,4 +1,5 @@
 import type { AgendaMonth } from '@/lib/moneyAgenda';
+import { formatDate } from '@/lib/i18n/format';
 
 // "Safe-to-spend" forward cashflow (P19). The money agenda (lib/moneyAgenda.ts)
 // already projects every dated future money event across the current + next two
@@ -31,7 +32,7 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
 
 /** Aggregate the money agenda into forward cashflow windows. Only entries dated
  *  today-or-later with a known amount count; income adds, everything else subtracts. */
-export function computeSafeToSpend(months: AgendaMonth[], now: Date = new Date()): SafeToSpend {
+export function computeSafeToSpend(months: AgendaMonth[], now: Date = new Date(), locale = 'en'): SafeToSpend {
   const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const endMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
 
@@ -59,7 +60,7 @@ export function computeSafeToSpend(months: AgendaMonth[], now: Date = new Date()
   });
 
   return {
-    monthLabel: now.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }),
+    monthLabel: formatDate(now, locale, { month: 'long', year: 'numeric' }),
     thisMonth: sum(endMonth, true),
     windows,
   };

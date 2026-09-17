@@ -4,6 +4,7 @@
 // show payoff progress on the dashboard, reports, the statement, and the product.
 
 import type { SerializedStatement, SerializedTransaction } from '@/types';
+import { formatDate } from '@/lib/i18n/format';
 
 export type InstallmentPlan = {
   key: string; // item:<id> when linked, else desc:<signature>
@@ -202,8 +203,6 @@ export function plansForItem(plans: InstallmentPlan[], itemId: string): Installm
 }
 
 /** Month label like "Jun 2026" for compact UI. */
-export function shortMonth(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  return d.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
+export function shortMonth(iso: string, locale = 'en'): string {
+  return formatDate(iso, locale, { month: 'short', year: 'numeric' });
 }

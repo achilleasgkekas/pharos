@@ -50,8 +50,9 @@ import { getSampleDataStatus, loadSampleData, clearSampleData } from './sampleDa
 import { renderStoragePath, TEMPLATE_TOKENS } from '@/lib/storagePath';
 import { CURRENCIES } from '@/lib/money';
 import type { SerializedCard } from '@/types';
-import { useT } from '@/components/LocaleProvider';
+import { useT, useLocale } from '@/components/LocaleProvider';
 import type { TKey } from '@/lib/i18n';
+import { formatDate, formatTime, formatDateTime } from '@/lib/i18n/format';
 
 type ProviderId = 'ollama' | 'anthropic' | 'openai' | 'gemini' | 'openrouter' | 'custom';
 
@@ -1406,6 +1407,7 @@ function OnedriveWizard({ connected: initialConnected, account }: { connected: b
 }
 
 function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Info['counts'] }) {
+  const locale = useLocale();
   const t = useT();
   const [pending, startTransition] = useTransition();
   const [backend, setBackend] = useState<StorageInfo['backend']>(storage.backend);
@@ -1758,7 +1760,7 @@ function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Inf
           {syncedNow
             ? t('set.lastSyncJustNow')
             : storage.lastSyncAt
-              ? t('set.lastSync', { date: new Date(storage.lastSyncAt).toLocaleString('en-GB') })
+              ? t('set.lastSync', { date: formatDateTime(storage.lastSyncAt, locale) })
               : t('set.lastSyncNever')}
           {!syncedNow && storage.syncIsStale && ` · ${t('set.lastSyncStale', { n: storage.syncStaleDays })}`}
         </p>
@@ -2307,6 +2309,7 @@ function DefaultsManager({ settings }: { settings: AppSettings }) {
 /** Recent outbound delivery attempts for one channel (P80). Until this existed a failed
  *  delivery left no trace at all, so a broken endpoint looked identical to a quiet week. */
 function DeliveryHistory({ log }: { log?: DeliveryLogEntry[] }) {
+  const locale = useLocale();
   const [expanded, setExpanded] = useState(false);
   if (!log || log.length === 0) return null;
   const rows = [...log].reverse(); // newest first
@@ -2320,7 +2323,7 @@ function DeliveryHistory({ log }: { log?: DeliveryLogEntry[] }) {
       {shown.map((r, i) => (
         <div key={`${r.at}-${i}`} className="flex items-center gap-2 text-[11px]" style={{ fontFamily: 'var(--font-mono)' }}>
           <span className={cn('h-1.5 w-1.5 rounded-full shrink-0', r.ok ? 'bg-[color:var(--color-accent)]' : 'bg-[color:var(--color-red)]')} />
-          <span className="text-[color:var(--color-text-faint)]">{new Date(r.at).toLocaleString('en-GB')}</span>
+          <span className="text-[color:var(--color-text-faint)]">{formatDateTime(r.at, locale)}</span>
           <span className={cn('truncate', r.ok ? 'text-[color:var(--color-text-dim)]' : 'text-[color:var(--color-red)]')}>
             {r.ok ? `delivered${r.status ? ` · ${r.status}` : ''}` : r.error || 'failed'}
           </span>
@@ -2824,6 +2827,7 @@ function WebhookManager() {
 // ─── Trash (soft-deleted records) ────────────────────────────────────────────
 
 function TrashManager() {
+  const locale = useLocale();
   const t = useT();
   const [rows, setRows] = useState<TrashRow[] | null>(null);
   const [pending, startTransition] = useTransition();
@@ -2893,7 +2897,7 @@ function TrashManager() {
                 <div className="min-w-0 flex-1">
                   <span className="text-xs font-medium truncate block">{r.title}</span>
                   <span className="text-[10px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
-                    {r.subtitle} · {t('set.deletedOn', { date: new Date(r.deletedAt).toLocaleDateString('en-GB') })}
+                    {r.subtitle} · {t('set.deletedOn', { date: formatDate(r.deletedAt, locale) })}
                   </span>
                 </div>
                 <button onClick={() => restore(r)} disabled={pending && busyId === r.id} className="text-[11px] text-[color:var(--color-accent)] hover:underline disabled:opacity-50 shrink-0">
@@ -2929,6 +2933,7 @@ function MigrationImportManager() {
 }
 
 function ImapImportManager({ imap }: { imap: ImapInfo }) {
+  const locale = useLocale();
   const t = useT();
   const [pending, startTransition] = useTransition();
   const [enabled, setEnabled] = useState(imap.enabled);
@@ -2947,7 +2952,7 @@ function ImapImportManager({ imap }: { imap: ImapInfo }) {
   function fmt(iso: string): string {
     if (!iso) return '';
     const d = new Date(iso);
-    return `${d.toLocaleDateString('en-GB')} ${d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`;
+    return `${formatDate(d, locale)} ${formatTime(d, locale, { hour: '2-digit', minute: '2-digit' })}`;
   }
 
   function save() {
@@ -3133,6 +3138,7 @@ function SampleDataManager() {
 }
 
 function BackupRestore() {
+  const locale = useLocale();
   const t = useT();
   const [pending, startTransition] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
@@ -3236,7 +3242,7 @@ function BackupRestore() {
     startTransition(async () => {
       try {
         const r = await verifyBackup(text);
-        const stamp = r.exportedAt ? new Date(r.exportedAt).toLocaleDateString('en-GB') : '—';
+        const stamp = formatDate(r.exportedAt, locale, undefined, '—');
         setReport({
           ok: r.ok,
           headline: r.ok

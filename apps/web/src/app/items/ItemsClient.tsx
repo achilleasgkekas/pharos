@@ -66,7 +66,7 @@ import {
 import type { SerializedItem } from '@/types';
 import { VIEW_CONFIG, type ItemView } from '@/lib/itemStatus';
 import { type InstallmentPlan } from '@/lib/installments';
-import { useT } from '@/components/LocaleProvider';
+import { useLocale, useT } from '@/components/LocaleProvider';
 import type { TKey, TFunc } from '@/lib/i18n';
 
 // value → i18n key maps (so the const arrays stay untouched)
@@ -78,6 +78,7 @@ import { useOpenParam } from '@/components/useOpenParam';
 import { ItemPhotoGallery } from './ItemPhotoGallery';
 import { ItemDocuments } from './ItemDocuments';
 import { ItemAssetTag } from './ItemAssetTag';
+import { formatDate, formatTime, formatDateTime } from '@/lib/i18n/format';
 import { assetLabelSubtitle } from '@/lib/assetLabel';
 import { printAssetTags } from './printAssetTags';
 import { createItem, updateItem, deleteItem, logSaleAsIncome, markItemArrived, markMaintenanceDone, markItemReturned, previewItemFromUrl, confirmImportItem, aiFillItem, aiFillInfo, fetchItemPhotos, mergeItems, bulkUpdateItems, convertItemToTask, type DupItem } from './actions';
@@ -1418,6 +1419,7 @@ function ItemCard({
   onToggleSelect,
   selectMode,
 }: ItemCardProps) {
+  const locale = useLocale();
   const t = useT();
   const cover = item.photos[0];
   const links = (item.links ?? []).slice(0, 3);
@@ -1472,7 +1474,7 @@ function ItemCard({
             {item.aiFilledAt && (
               <span
                 className="flex items-center gap-0.5 text-[color:var(--color-accent)] shrink-0"
-                title={t('it.aiEnriched', { date: new Date(item.aiFilledAt).toLocaleDateString('en-GB') })}
+                title={t('it.aiEnriched', { date: formatDate(item.aiFilledAt, locale) })}
               >
                 <Sparkles size={9} /> AI
               </span>
@@ -1657,6 +1659,7 @@ function ItemDetailModal({
   onClose: () => void;
   onItemUpdated: (item: SerializedItem) => void;
 }) {
+  const locale = useLocale();
   const t = useT();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -1894,7 +1897,7 @@ function ItemDetailModal({
               {item.purchasedFrom && (
                 <div className="text-xs text-[color:var(--color-text-dim)] mt-0.5">
                   from {item.purchasedFrom}
-                  {item.purchasedAt && ` · ${new Date(item.purchasedAt).toLocaleDateString('en-GB')}`}
+                  {item.purchasedAt && ` · ${formatDate(item.purchasedAt, locale)}`}
                 </div>
               )}
             </div>
@@ -1922,7 +1925,7 @@ function ItemDetailModal({
                     <div className="text-xs text-[color:var(--color-text-dim)] mt-0.5">
                       {item.soldTo}
                       {item.soldTo && item.soldAt ? ' · ' : ''}
-                      {item.soldAt ? new Date(item.soldAt).toLocaleDateString('en-GB') : ''}
+                      {formatDate(item.soldAt, locale)}
                     </div>
                   )}
                 </div>

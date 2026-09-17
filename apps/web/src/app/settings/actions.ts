@@ -78,6 +78,8 @@ import { splitFreshAlerts } from '@/lib/alertDedup';
 import { dispatchAlert, getNotifiers, testNotifier, type NotifierConfig } from '@/lib/notifiers';
 import { getDeliveryLog } from '@/lib/deliveryLog';
 import type { DeliveryLogEntry } from '@/lib/deliveryLog.shared';
+import { formatDate } from '@/lib/i18n/format';
+import { getLocaleSafe } from '@/lib/i18n/server';
 import { computeInstallmentPlans } from '@/lib/installments';
 import { generateNotifications } from '@/app/notifications/actions';
 import { detectBudgetExceeded, type BudgetAlertRow } from '@/lib/budgetAlert';
@@ -2159,17 +2161,17 @@ const TRASH_MODELS: Record<TrashType, typeof Item> = {
 };
 const TRASH_RETENTION_DAYS = 30;
 
-function trashLabel(type: TrashType, d: Record<string, unknown>): { title: string; subtitle: string } {
+function trashLabel(type: TrashType, d: Record<string, unknown>, locale = 'en'): { title: string; subtitle: string } {
   switch (type) {
     case 'item': return { title: String(d.title || '—'), subtitle: String(d.category || '') };
-    case 'receipt': return { title: String(d.store || '—'), subtitle: `€${d.total ?? 0} · ${d.date ? new Date(d.date as string).toLocaleDateString('en-GB') : ''}` };
+    case 'receipt': return { title: String(d.store || '—'), subtitle: `€${d.total ?? 0} · ${formatDate(d.date as string, locale)}` };
     case 'expense': return { title: String(d.vendor || d.category || '—'), subtitle: `${d.kind} · €${d.amount ?? 0}` };
     case 'subscription': return { title: String(d.name || '—'), subtitle: `€${d.amount ?? 0}/${d.billingCycle || ''}` };
     case 'voucher': return { title: String(d.title || '—'), subtitle: String(d.store || '') };
     case 'giftcard': return { title: String(d.title || '—'), subtitle: `${d.store || ''} · €${d.initialAmount ?? 0}`.trim() };
     case 'loyaltycard': return { title: String(d.title || '—'), subtitle: String(d.store || '') };
     case 'bill': return { title: String(d.title || '—'), subtitle: `${d.vendor || ''} · €${d.amount ?? 0}`.trim() };
-    case 'goal': return { title: String(d.title || '—'), subtitle: `€${d.targetAmount ?? 0}${d.targetDate ? ` · ${new Date(d.targetDate as string).toLocaleDateString('en-GB')}` : ''}` };
+    case 'goal': return { title: String(d.title || '—'), subtitle: `€${d.targetAmount ?? 0}${d.targetDate ? ` · ${formatDate(d.targetDate as string, locale)}` : ''}` };
     case 'task': return { title: String(d.title || '—'), subtitle: String(d.status || '') };
     case 'conversation': return { title: String(d.title || 'Conversation'), subtitle: `${d.turns || 0} turn${d.turns === 1 ? '' : 's'}` };
   }
@@ -2179,6 +2181,7 @@ function trashLabel(type: TrashType, d: Record<string, unknown>): { title: strin
 export async function getTrash(): Promise<TrashRow[]> {
   await connectDB();
   const cutoff = new Date(Date.now() - TRASH_RETENTION_DAYS * 86400000);
+  const locale = await getLocaleSafe();
   const rows: TrashRow[] = [];
   for (const [type, RawModel] of Object.entries(TRASH_MODELS) as [TrashType, typeof Item][]) {
     const Model = await scoped(RawModel);
@@ -2189,7 +2192,7 @@ export async function getTrash(): Promise<TrashRow[]> {
         await purgeTrashEntry(type, String(d._id));
         continue;
       }
-      const { title, subtitle } = trashLabel(type, d);
+      const { title, subtitle } = trashLabel(type, d, locale);
       rows.push({ type, id: String(d._id), title, subtitle, deletedAt: deletedAt.toISOString() });
     }
   }

@@ -4,16 +4,15 @@
 // field instead and these pure helpers do the locale work. The value crossing the
 // component boundary stays ISO `YYYY-MM-DD`, so forms and server actions do not change.
 
+import { intlTag } from './i18n/format';
+
 export type DatePart = 'day' | 'month' | 'year';
 
 const ISO_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
 
-// The app's `en` means British English: every other date in the UI is formatted `en-GB`
-// (DD/MM). Letting bare `en` resolve to US order here would make this one field disagree
-// with the dates printed right next to it.
-function intlLocale(locale: string): string {
-  return locale === 'en' ? 'en-GB' : locale;
-}
+// The app's `en` means British English (DD/MM). Shared with every printed date (#5) so this
+// field can never disagree with the dates shown right next to it.
+const intlLocale = intlTag;
 
 /** Field order and separator the locale prints numeric dates with, read from Intl, never hardcoded. */
 export function dateLayout(locale: string): { order: DatePart[]; separator: string } {

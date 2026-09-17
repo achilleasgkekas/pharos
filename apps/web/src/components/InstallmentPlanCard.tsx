@@ -2,6 +2,7 @@
 import { cur } from "@/lib/money";
 import { Package } from 'lucide-react';
 import { shortMonth, type InstallmentPlan } from '@/lib/installments';
+import { useLocale } from '@/components/LocaleProvider';
 
 /**
  * Payoff card for a single installment plan. Shared by statements, items,
@@ -16,6 +17,7 @@ export function InstallmentPlanCard({
   itemTitles?: string[]; // titles of the linked product(s), if any
   compact?: boolean;
 }) {
+  const locale = useLocale();
   const pct =
     plan.totalInstallments > 0
       ? Math.round((plan.paidInstallments / plan.totalInstallments) * 100)
@@ -52,7 +54,7 @@ export function InstallmentPlanCard({
           <span className="text-[color:var(--color-accent)]">paid off ✓</span>
         ) : (
           <span>
-            {plan.remainingInstallments} left · ends {shortMonth(plan.projectedEndDate)}
+            {plan.remainingInstallments} left · ends {shortMonth(plan.projectedEndDate, locale)}
           </span>
         )}
       </div>

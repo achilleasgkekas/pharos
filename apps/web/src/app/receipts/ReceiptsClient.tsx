@@ -41,9 +41,10 @@ import { QuickVerify } from './QuickVerify';
 import { useJobs } from '@/components/JobsProvider';
 import { enqueueRescanReceipts, getBulkAiGuard } from '@/app/jobActions';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
-import { useT } from '@/components/LocaleProvider';
+import { useLocale, useT } from '@/components/LocaleProvider';
 import { DuplicatesModal } from './DuplicatesModal';
 import { useRouter } from 'next/navigation';
+import { formatDate, formatTime, formatDateTime } from '@/lib/i18n/format';
 
 function fileUrl(filePath: string) {
   const u = `/api/files/${filePath.split('/').map(encodeURIComponent).join('/')}`;
@@ -663,6 +664,7 @@ export function ReceiptsClient({
 
 // Compact horizontal row for the receipts list layout
 function ReceiptRow({ receipt, base, onClick }: { receipt: SerializedReceipt; base: string; onClick: () => void }) {
+  const locale = useLocale();
   const t = useT();
   const isImage = receipt.fileType.startsWith('image/');
   const isHtml = receipt.fileType.includes('html');
@@ -697,7 +699,7 @@ function ReceiptRow({ receipt, base, onClick }: { receipt: SerializedReceipt; ba
         </span>
         <span className="text-[10px] text-[color:var(--color-text-faint)] mt-0.5 flex items-center gap-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
           <span className="truncate">
-            {isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-GB')} · {receipt.lineItems?.length ?? 0} {t('it.items')}
+            {isNaN(d.getTime()) ? '—' : formatDate(d, locale)} · {receipt.lineItems?.length ?? 0} {t('it.items')}
             {receipt.fileType === 'pdf' ? ' · pdf' : isHtml ? ' · email' : ''}
           </span>
           <ReturnBadge days={receipt.returnDaysLeft} />
@@ -733,6 +735,7 @@ function ReceiptCard({
   base: string;
   onClick: () => void;
 }) {
+  const locale = useLocale();
   const t = useT();
   const isImage = receipt.fileType.startsWith('image/');
   const isHtml = receipt.fileType.includes('html');
@@ -811,7 +814,7 @@ function ReceiptCard({
           style={{ fontFamily: 'var(--font-mono)' }}
         >
           <span>
-            {new Date(receipt.date).toLocaleDateString('en-GB')}
+            {formatDate(receipt.date, locale)}
             {receipt.lineItems.length > 0 && ` · ${receipt.lineItems.length} ${t('it.items')}`}
           </span>
           <ReturnBadge days={receipt.returnDaysLeft} />

@@ -28,11 +28,12 @@ import { listEntriesNeedingRate } from '@/lib/fxAudit';
 import { reportWindowStart, inReportWindow, monthKeyOfDate } from '@/lib/reportWindow';
 import type { SerializedStatement } from '@/types';
 import { ReportsClient } from './ReportsClient';
+import { formatDate } from '@/lib/i18n/format';
+import { getLocaleSafe } from '@/lib/i18n/server';
 
 export const dynamic = 'force-dynamic';
 
 
-const MN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 type LeanReceipt = {
   store?: string;
@@ -59,17 +60,16 @@ type LeanSub = { amount?: number; billingCycle?: string; category?: string; spac
 function monthKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
-function monthLabel(d: Date): string {
-  return `${MN[d.getMonth()]} ${String(d.getFullYear()).slice(2)}`;
+function monthLabel(d: Date, locale = 'en'): string {
+  return formatDate(d, locale, { month: 'short', year: '2-digit' });
 }
-/** 'YYYY-MM' → 'Jul 26'. Same shape as monthLabel, without building a Date. */
-function labelFromKey(key: string): string {
-  const [y, m] = key.split('-');
-  const idx = Number(m) - 1;
-  return `${MN[idx] ?? m} ${y.slice(2)}`;
+/** 'YYYY-MM' → 'Jul 26' (in the active language, #5). An unparseable key is shown as-is. */
+function labelFromKey(key: string, locale = 'en'): string {
+  const [y, m] = key.split('-').map(Number);
+  return y && m ? monthLabel(new Date(y, m - 1, 1), locale) : key;
 }
 
-async function getReports(monthsBack = 12) {
+async function getReports(monthsBack = 12, locale = 'en') {
   return withRequestTenant(async () => {
   await connectDB();
   const Receipt = await currentModel(ReceiptModel);
@@ -102,7 +102,7 @@ async function getReports(monthsBack = 12) {
   const months: { key: string; label: string; total: number; count: number }[] = [];
   for (let i = monthsBack - 1; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    months.push({ key: monthKey(d), label: monthLabel(d), total: 0, count: 0 });
+    months.push({ key: monthKey(d), label: monthLabel(d, locale), total: 0, count: 0 });
   }
   const mIdx = new Map(months.map((m, i) => [m.key, i]));
   let receiptsTotal = 0;
@@ -283,12 +283,12 @@ async function getReports(monthsBack = 12) {
     yoyRaw.comparable > 0
       ? {
           comparable: yoyRaw.comparable,
-          rows: yoyRaw.rows.map((r) => ({ ...r, label: labelFromKey(r.key), prevLabel: labelFromKey(r.prevKey) })),
+          rows: yoyRaw.rows.map((r) => ({ ...r, label: labelFromKey(r.key, locale), prevLabel: labelFromKey(r.prevKey, locale) })),
           headline: yoyRaw.headline
             ? {
                 ...yoyRaw.headline,
-                label: labelFromKey(yoyRaw.headline.key),
-                prevLabel: labelFromKey(yoyRaw.headline.prevKey),
+                label: labelFromKey(yoyRaw.headline.key, locale),
+                prevLabel: labelFromKey(yoyRaw.headline.prevKey, locale),
               }
             : null,
         }
@@ -378,7 +378,7 @@ async function getReports(monthsBack = 12) {
     const amount = installmentsActive
       .filter((p) => p.remainingInstallments >= n)
       .reduce((s, p) => s + p.perAmount, 0);
-    return { label: monthLabel(d), amount: Math.round(amount) };
+    return { label: monthLabel(d, locale), amount: Math.round(amount) };
   });
 
   // ── Outstanding (last statement per card) + subscriptions ────────────────
@@ -422,8 +422,8 @@ async function getReports(monthsBack = 12) {
 
   // Safe-to-spend forward cashflow (P19) — reuse the /calendar money agenda and
   // distil it into a single available figure + 30/60/90-day windows.
-  const { months: agendaMonths } = await computeMoneyAgenda();
-  const safeToSpend = computeSafeToSpend(agendaMonths);
+  const { months: agendaMonths } = await computeMoneyAgenda(now, locale);
+  const safeToSpend = computeSafeToSpend(agendaMonths, now, locale);
 
   // ── Savings / financial goals (P12) — progress is derived, never stored ──
   const goals = (goalsRaw as unknown as { _id: unknown; title?: string; targetAmount?: number; targetDate?: string | Date | null; category?: string; contributions?: { amount?: number; date?: string | Date; note?: string; _id?: unknown }[] }[]).map((g) => {
@@ -443,7 +443,7 @@ async function getReports(monthsBack = 12) {
   // fetched expense rows + item warranties + budgets (zero new DB round-trips).
   const monthReview = {
     ...buildMonthReview(expensesData, { monthKey: thisMonthKey, budgets: appSettings.budgets, warranties: items, now }),
-    monthLabel: monthLabel(now),
+    monthLabel: monthLabel(now, locale),
   };
 
   // ── Missing exchange rates (P9 slice 7) — records whose stored amount is still a
@@ -497,6 +497,6 @@ async function getReports(monthsBack = 12) {
 export default async function ReportsPage({ searchParams }: { searchParams: Promise<{ months?: string }> }) {
   const sp = await searchParams;
   const months = [6, 12, 24].includes(Number(sp.months)) ? Number(sp.months) : 12;
-  const data = await getReports(months);
+  const data = await getReports(months, await getLocaleSafe());
   return <ReportsClient data={data} months={months} />;
 }

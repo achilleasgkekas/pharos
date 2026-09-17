@@ -18,6 +18,8 @@ import {
   createBill, updateBill, deleteBill, setBillArchived, markBillPaid, markBillUnpaid,
   logBillPayment, removeBillPayment,
 } from './actions';
+import { formatDate, formatTime, formatDateTime } from '@/lib/i18n/format';
+import { useLocale } from '@/components/LocaleProvider';
 
 const money = (n: number) => `${cur()}${n.toFixed(2)}`;
 type Filter = 'open' | 'overdue' | 'part-paid' | 'paid' | 'all';
@@ -35,10 +37,10 @@ const STATUS_META: Record<BillStatus, { label: string; cls: string }> = {
   paid: { label: 'paid', cls: 'bg-[color:var(--color-accent)]/15 text-[color:var(--color-accent)]' },
 };
 
-function dueLabel(bill: SerializedBill): string {
-  if (bill.paidAt) return `paid ${new Date(bill.paidAt).toLocaleDateString('en-GB')}`;
+function dueLabel(bill: SerializedBill, locale: string): string {
+  if (bill.paidAt) return `paid ${formatDate(bill.paidAt, locale)}`;
   const days = billDaysUntilDue(bill.dueDate);
-  const date = bill.dueDate ? new Date(bill.dueDate).toLocaleDateString('en-GB') : '—';
+  const date = formatDate(bill.dueDate, locale, undefined, '—');
   if (days === null) return date;
   if (days < 0) return `${date} · ${-days}d overdue`;
   if (days === 0) return `${date} · today`;
@@ -233,6 +235,7 @@ function BillRow({
   onOpen: () => void;
   onPay: () => void;
 }) {
+  const locale = useLocale();
   const meta = STATUS_META[status];
   const paidSoFar = billPaidAmount(bill.payments);
   const total = bill.amount || 0;
@@ -257,7 +260,7 @@ function BillRow({
         </div>
         <p className="font-semibold text-[color:var(--color-text)] truncate mt-0.5">{bill.title}</p>
         <p className="text-[11px] text-[color:var(--color-text-dim)]" style={{ fontFamily: 'var(--font-mono)' }}>
-          {dueLabel(bill)}
+          {dueLabel(bill, locale)}
         </p>
         {/* P61: how far along a part-paid bill is, without stealing the urgency chip. */}
         {partPaid && (
@@ -318,6 +321,7 @@ function BillForm({
   onSuccess: () => void;
   onDeleted?: () => void;
 }) {
+  const locale = useLocale();
   const [pending, startTransition] = useTransition();
   const confirm = useConfirm();
   const [error, setError] = useState('');
@@ -463,7 +467,7 @@ function BillForm({
           {isPaid ? (
             <div className="flex items-center justify-between gap-2">
               <span className="text-sm text-[color:var(--color-accent)]">
-                Paid {bill.paidAt ? new Date(bill.paidAt).toLocaleDateString('en-GB') : ''}
+                Paid {formatDate(bill.paidAt, locale)}
                 {bill.linkedExpenseId && ' · logged as expense'}
               </span>
               <Button type="button" variant="ghost" disabled={pending} onClick={() => startTransition(async () => { await markBillUnpaid(bill._id); onDeleted?.(); })}>
@@ -485,7 +489,7 @@ function BillForm({
                       <li key={p._id} className="flex items-center gap-2 text-[11px]" style={{ fontFamily: 'var(--font-mono)' }}>
                         <span className="text-[color:var(--color-text)] w-20">{money(p.amount || 0)}</span>
                         <span className="text-[color:var(--color-text-dim)]">
-                          {p.date ? new Date(p.date).toLocaleDateString('en-GB') : ''}
+                          {formatDate(p.date, locale)}
                         </span>
                         {p.note && <span className="text-[color:var(--color-text-faint)] truncate">· {p.note}</span>}
                         {p.expenseId && <span className="text-[color:var(--color-text-faint)]">· expensed</span>}

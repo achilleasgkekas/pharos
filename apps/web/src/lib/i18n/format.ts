@@ -24,3 +24,38 @@ export function formatCurrency(
     ...options,
   }).format(value);
 }
+
+/** Intl tag for an app locale. The app's `en` is British English (DD/MM, Monday weeks); bare `en`
+ *  would resolve to US order in Intl. Every other app locale is already a valid Intl tag. */
+export function intlTag(locale: string | undefined | null): string {
+  return !locale || locale === 'en' ? 'en-GB' : locale;
+}
+
+type DateLike = string | number | Date | null | undefined;
+
+function toDate(value: DateLike): Date | null {
+  if (value === null || value === undefined || value === '') return null;
+  const d = value instanceof Date ? value : new Date(value);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+/** Date in the ACTIVE app language (#5) — replaces every hardcoded `toLocaleDateString('en-GB')`.
+ *  Invalid/empty → `fallback`. Server code has no React context, so the locale is always explicit:
+ *  pass `useLocale()` on the client and `getLocale()` on the server. Never use this for values that
+ *  feed an <input type="date"> — those must stay ISO. */
+export function formatDate(value: DateLike, locale: string, options?: Intl.DateTimeFormatOptions, fallback = ''): string {
+  const d = toDate(value);
+  return d ? d.toLocaleDateString(intlTag(locale), options) : fallback;
+}
+
+/** Time of day in the active app language. */
+export function formatTime(value: DateLike, locale: string, options?: Intl.DateTimeFormatOptions, fallback = ''): string {
+  const d = toDate(value);
+  return d ? d.toLocaleTimeString(intlTag(locale), options) : fallback;
+}
+
+/** Date + time in the active app language. */
+export function formatDateTime(value: DateLike, locale: string, options?: Intl.DateTimeFormatOptions, fallback = ''): string {
+  const d = toDate(value);
+  return d ? d.toLocaleString(intlTag(locale), options) : fallback;
+}

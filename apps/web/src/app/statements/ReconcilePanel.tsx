@@ -3,7 +3,7 @@ import { cur } from '@/lib/money';
 import { useState, useEffect, useCallback, useTransition } from 'react';
 import { Loader2, Receipt as ReceiptIcon, Link2, X, Check, AlertCircle } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
-import { useT } from '@/components/LocaleProvider';
+import { useLocale, useT } from '@/components/LocaleProvider';
 import { periodLabel } from '@/lib/cards';
 import {
   getReconciliation,
@@ -12,12 +12,12 @@ import {
   type ReconciliationResult,
   type ReconReceiptView,
 } from './actions';
+import { formatDate, formatTime, formatDateTime } from '@/lib/i18n/format';
 
 type StmtOption = { _id: string; card: string; period: string };
 
-function fmtDate(iso: string): string {
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-GB');
+function fmtDate(iso: string, locale: string): string {
+  return formatDate(iso, locale);
 }
 
 /**
@@ -26,6 +26,7 @@ function fmtDate(iso: string): string {
  * that no charge is linked to. Loads suggestions on demand per statement.
  */
 export function ReconcilePanel({ statements }: { statements: StmtOption[] }) {
+  const locale = useLocale();
   const t = useT();
   const [statementId, setStatementId] = useState(statements[0]?._id ?? '');
   const [data, setData] = useState<ReconciliationResult | null>(null);
@@ -126,7 +127,7 @@ export function ReconcilePanel({ statements }: { statements: StmtOption[] }) {
                           className="text-[11px] text-[color:var(--color-text-faint)]"
                           style={{ fontFamily: 'var(--font-mono)' }}
                         >
-                          {fmtDate(tx.date)} · {cur()}
+                          {fmtDate(tx.date, locale)} · {cur()}
                           {Math.abs(tx.amount).toFixed(2)}
                         </p>
                       </div>
@@ -139,7 +140,7 @@ export function ReconcilePanel({ statements }: { statements: StmtOption[] }) {
                           <Check size={13} className="text-[color:var(--color-accent)] shrink-0" />
                           <span className="truncate">{matched.store}</span>
                           <span className="text-[color:var(--color-text-faint)] shrink-0">
-                            {fmtDate(matched.date)} · {cur()}
+                            {fmtDate(matched.date, locale)} · {cur()}
                             {matched.total.toFixed(2)}
                           </span>
                         </span>
@@ -177,7 +178,7 @@ export function ReconcilePanel({ statements }: { statements: StmtOption[] }) {
                                 <ReceiptIcon size={13} className="text-[color:var(--color-text-dim)] shrink-0" />
                                 <span className="truncate">{r.store}</span>
                                 <span className="text-[color:var(--color-text-faint)] shrink-0">
-                                  {fmtDate(r.date)} · {cur()}
+                                  {fmtDate(r.date, locale)} · {cur()}
                                   {r.total.toFixed(2)}
                                 </span>
                                 <span className="text-[10px] text-[color:var(--color-text-faint)] shrink-0">
@@ -220,7 +221,7 @@ export function ReconcilePanel({ statements }: { statements: StmtOption[] }) {
                   >
                     {r.store} · {cur()}
                     {r.total.toFixed(2)}
-                    <span className="text-[color:var(--color-text-faint)]"> · {fmtDate(r.date)}</span>
+                    <span className="text-[color:var(--color-text-faint)]"> · {fmtDate(r.date, locale)}</span>
                   </span>
                 ))}
               </div>
