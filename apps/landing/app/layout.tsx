@@ -6,8 +6,9 @@ const SITE_URL = 'https://ph-aros.com';
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: 'PHAROS · Personal Hub',
+  // Google truncates around 155 characters; the old one ran to ~200 and lost its ending mid-list.
   description:
-    'One light over everything you run. PHAROS is a personal hub: inventory, receipts with AI, expenses, credit-card installments, subscriptions, and your network. Self-host it free, or let us host it.',
+    'A private personal hub for everything you own: inventory, AI receipts, expenses, installments and subscriptions. Self-host it free, or let us host it.',
   keywords: [
     'self-hosted',
     'personal hub',
