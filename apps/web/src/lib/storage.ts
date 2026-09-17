@@ -20,7 +20,8 @@ export type StorageBucket = 'receipts' | 'statements' | 'equipment' | 'expenses'
  * scopes Mongo access — so re-deriving the root here from `currentTenant()` at call time is
  * always correct without threading it through 13+ call sites' signatures.
  */
-function activeStorageRoot(): string {
+// Exported for the share-inbox sweeper (#123), which walks the `share` bucket directly.
+export function activeStorageRoot(): string {
   return tenantStorageRoot(currentTenant()) ?? STORAGE_ROOT;
 }
 

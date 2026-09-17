@@ -1,5 +1,6 @@
 import path from 'node:path';
-import { saveFile, readFile, deleteFile } from '@/lib/storage';
+import { promises as fs } from 'node:fs';
+import { saveFile, readFile, deleteFile, activeStorageRoot } from '@/lib/storage';
 
 /**
  * #123 — staging area for files the OS share sheet hands to Pharos.
@@ -11,6 +12,9 @@ import { saveFile, readFile, deleteFile } from '@/lib/storage';
  * is validated on every use: only paths inside `share/` with the exact `YYYY-MM-DD_<16 hex>.<ext>`
  * shape saveFile() produces are accepted. That rejects traversal (`../`) and any attempt to read a
  * receipt or a statement of another module through this door.
+ *
+ * Abandoned shares (picker closed without choosing) would otherwise sit in storage forever and
+ * count against the tenant's quota, so every new share also sweeps stale ones.
  */
 const TICKET = /^share[/\\]\d{4}[/\\]\d{2}[/\\]\d{4}-\d{2}-\d{2}_[0-9a-f]{16}\.[a-z0-9]{1,5}$/;
 
@@ -27,12 +31,39 @@ export function kindOf(filename: string, mime: string): SharedFileKind | null {
   return null;
 }
 
+const STALE_MS = 24 * 60 * 60 * 1000;
+
+/** Delete staged shares older than a day. Best effort: never let housekeeping fail a real share. */
+export async function sweepStaleShares(now = Date.now()): Promise<number> {
+  let removed = 0;
+  const root = path.join(activeStorageRoot(), 'share');
+  let years: string[];
+  try {
+    years = await fs.readdir(root);
+  } catch {
+    return 0; // nothing shared yet on this tenant
+  }
+  for (const year of years) {
+    for (const month of await fs.readdir(path.join(root, year)).catch(() => [])) {
+      const dir = path.join(root, year, month);
+      for (const name of await fs.readdir(dir).catch(() => [])) {
+        const stat = await fs.stat(path.join(dir, name)).catch(() => null);
+        if (!stat || now - stat.mtimeMs < STALE_MS) continue;
+        await deleteFile(path.join('share', year, month, name)).catch(() => {});
+        removed++;
+      }
+    }
+  }
+  return removed;
+}
+
 /** Park an incoming file. Returns the ticket, or null when the type is not something we accept. */
 export async function stashSharedFile(file: File): Promise<{ ticket: string; kind: SharedFileKind } | null> {
   const kind = kindOf(file.name, file.type);
   if (!kind) return null;
   const ext = kind === 'pdf' ? 'pdf' : (path.extname(file.name).slice(1).toLowerCase() || 'jpg');
   const bytes = Buffer.from(await file.arrayBuffer());
+  await sweepStaleShares().catch(() => {});
   const { relativePath } = await saveFile('share', bytes, ext);
   return { ticket: relativePath, kind };
 }

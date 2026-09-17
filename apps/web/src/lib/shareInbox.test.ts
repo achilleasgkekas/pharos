@@ -5,9 +5,12 @@ const { saveFile, readFile, deleteFile } = vi.hoisted(() => ({
   readFile: vi.fn(async () => Buffer.from('%PDF-1.4')),
   deleteFile: vi.fn(async () => {}),
 }));
-vi.mock('@/lib/storage', () => ({ saveFile, readFile, deleteFile }));
+vi.mock('@/lib/storage', () => ({ saveFile, readFile, deleteFile, activeStorageRoot: () => '/tmp/pharos-share-test' }));
 
-import { isShareTicket, kindOf, stashSharedFile, readSharedFile, discardSharedFile } from './shareInbox';
+import { isShareTicket, kindOf, stashSharedFile, readSharedFile, discardSharedFile, sweepStaleShares } from './shareInbox';
+import { promises as fs } from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
 
 beforeEach(() => vi.clearAllMocks());
 
@@ -66,5 +69,30 @@ describe('shareInbox · what the share sheet may hand us', () => {
   it('survives a file that was already consumed', async () => {
     readFile.mockRejectedValueOnce(new Error('ENOENT'));
     expect(await readSharedFile('share/2026/09/2026-09-17_0123456789abcdef.pdf')).toBeNull();
+  });
+});
+
+describe('shareInbox · abandoned shares do not live forever', () => {
+  it('deletes staged files older than a day and keeps fresh ones', async () => {
+    const root = path.join(os.tmpdir(), `share-sweep-${Date.now()}`);
+    const dir = path.join(root, 'share', '2026', '09');
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(path.join(dir, 'old.pdf'), 'x');
+    await fs.writeFile(path.join(dir, 'fresh.pdf'), 'x');
+    const day = 24 * 60 * 60 * 1000;
+    const old = new Date(Date.now() - 2 * day);
+    await fs.utimes(path.join(dir, 'old.pdf'), old, old);
+    const storage = await import('@/lib/storage');
+    vi.spyOn(storage, 'activeStorageRoot').mockReturnValue(root);
+
+    expect(await sweepStaleShares()).toBe(1);
+    expect(deleteFile).toHaveBeenCalledWith(path.join('share', '2026', '09', 'old.pdf'));
+    await fs.rm(root, { recursive: true, force: true });
+  });
+
+  it('is silent when nothing was ever shared', async () => {
+    const storage = await import('@/lib/storage');
+    vi.spyOn(storage, 'activeStorageRoot').mockReturnValue(path.join(os.tmpdir(), 'share-none-' + Date.now()));
+    expect(await sweepStaleShares()).toBe(0);
   });
 });
