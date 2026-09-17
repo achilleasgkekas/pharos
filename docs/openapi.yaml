@@ -1476,6 +1476,7 @@ paths:
                 category: { type: string }
                 cycle: { $ref: '#/components/schemas/BillCycle' }
                 notes: { type: string }
+                space: { type: string, description: 'Per-property ledger tag (P68, #14); trimmed, max 40 chars. Empty = unassigned. A payment that logs an expense copies it.' }
                 currency: { type: string, description: Currency code printed on the invoice. }
                 fxRate: { type: number, description: Base units per 1 unit of `currency`. }
       responses:
@@ -1517,6 +1518,7 @@ paths:
                 category: { type: string }
                 cycle: { $ref: '#/components/schemas/BillCycle' }
                 notes: { type: string }
+                space: { type: string, description: 'Per-property ledger tag (P68, #14); trimmed, max 40 chars. Empty = unassigned. A payment that logs an expense copies it.' }
                 archived: { type: boolean }
                 paid: { type: boolean }
                 paidDate: { type: string }
@@ -2638,6 +2640,7 @@ components:
         category: { type: string }
         cycle: { $ref: '#/components/schemas/BillCycle' }
         notes: { type: string }
+        space: { type: string, description: 'Per-property ledger tag (P68, #14); trimmed, max 40 chars. Empty = unassigned. A payment that logs an expense copies it.' }
         archived: { type: boolean }
         status:
           type: string

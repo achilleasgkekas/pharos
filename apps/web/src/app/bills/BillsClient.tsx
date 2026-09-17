@@ -62,11 +62,14 @@ const CYCLE_LABELS: Record<RecurringCycle, string> = {
 export function BillsClient({
   bills,
   categories,
+  spaces = [],
   baseCurrency = 'EUR',
   multiCurrency = false,
 }: {
   bills: SerializedBill[];
   categories: string[];
+  /** #14 (P68): per-property ledger tags (AppConfig.spaces). */
+  spaces?: string[];
   baseCurrency?: string;
   multiCurrency?: boolean;
 }) {
@@ -205,11 +208,11 @@ export function BillsClient({
       )}
 
       <Modal open={showCreate} onClose={() => setShowCreate(false)} title="New bill" size="lg">
-        <BillForm categories={categories} fx={fx} onSuccess={() => setShowCreate(false)} />
+        <BillForm categories={categories} spaces={spaces} fx={fx} onSuccess={() => setShowCreate(false)} />
       </Modal>
       {editing && (
         <Modal open onClose={() => setEditing(null)} title={editing.title} size="lg">
-          <BillForm bill={editing} categories={categories} fx={fx} onSuccess={() => setEditing(null)} onDeleted={() => setEditing(null)} />
+          <BillForm bill={editing} categories={categories} spaces={spaces} fx={fx} onSuccess={() => setEditing(null)} onDeleted={() => setEditing(null)} />
         </Modal>
       )}
     </main>
@@ -311,12 +314,14 @@ function BillRow({
 function BillForm({
   bill,
   categories,
+  spaces = [],
   fx,
   onSuccess,
   onDeleted,
 }: {
   bill?: SerializedBill;
   categories: string[];
+  spaces?: string[];
   fx: FxCtx;
   onSuccess: () => void;
   onDeleted?: () => void;
@@ -419,6 +424,20 @@ function BillForm({
             ))}
           </datalist>
         </div>
+        {/* #14 (P68): which property this bill belongs to. Hidden until a space is named in
+            Settings, like the Expenses/Receipts/Subscriptions forms; while hidden nothing is
+            submitted, so an existing tag is never wiped. */}
+        {spaces.length > 0 && (
+          <div>
+            <label className={label} style={{ fontFamily: 'var(--font-mono)' }}>Space</label>
+            <Input name="space" defaultValue={bill?.space || ''} list="bill-spaces" placeholder="—" maxLength={40} />
+            <datalist id="bill-spaces">
+              {spaces.map((s) => (
+                <option key={s} value={s} />
+              ))}
+            </datalist>
+          </div>
+        )}
         <div className="md:col-span-2">
           <label className={label} style={{ fontFamily: 'var(--font-mono)' }}>Notes</label>
           <Input name="notes" defaultValue={bill?.notes} placeholder="optional" />

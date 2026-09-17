@@ -8,7 +8,7 @@ import type { SerializedBill } from '@/types';
 
 export const dynamic = 'force-dynamic';
 
-async function getData(): Promise<{ bills: SerializedBill[]; categories: string[]; baseCurrency: string; multiCurrency: boolean }> {
+async function getData(): Promise<{ bills: SerializedBill[]; categories: string[]; spaces: string[]; baseCurrency: string; multiCurrency: boolean }> {
   // Read through the same tenant seam the bill actions write through, so SaaS mode never
   // shows the default tenant's bills next to another tenant's writes. Self-hosted: no-op.
   return withRequestTenant(async () => {
@@ -22,6 +22,7 @@ async function getData(): Promise<{ bills: SerializedBill[]; categories: string[
     return {
       bills: JSON.parse(JSON.stringify(bills)),
       categories: settings.expenseCategories,
+      spaces: settings.spaces ?? [], // #14: the same per-property tags the Expenses form uses
       baseCurrency: settings.currency,
       multiCurrency: settings.multiCurrency, // P9: off = no per-bill currency controls at all
     };
@@ -29,6 +30,6 @@ async function getData(): Promise<{ bills: SerializedBill[]; categories: string[
 }
 
 export default async function BillsPage() {
-  const { bills, categories, baseCurrency, multiCurrency } = await getData();
-  return <BillsClient bills={bills} categories={categories} baseCurrency={baseCurrency} multiCurrency={multiCurrency} />;
+  const { bills, categories, spaces, baseCurrency, multiCurrency } = await getData();
+  return <BillsClient bills={bills} categories={categories} spaces={spaces} baseCurrency={baseCurrency} multiCurrency={multiCurrency} />;
 }
