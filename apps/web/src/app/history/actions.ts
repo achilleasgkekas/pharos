@@ -56,7 +56,7 @@ export async function getConversations(): Promise<ConversationRow[]> {
 export async function deleteConversation(id: string): Promise<{ ok: boolean }> {
   await assertCanWrite();
   await connectDB();
-  await (await scoped()).deleteOne({ _id: id });
+  await (await scoped()).updateOne({ _id: id }, { $set: { deletedAt: new Date() } });
   revalidatePath('/history');
   return { ok: true };
 }
@@ -64,7 +64,7 @@ export async function deleteConversation(id: string): Promise<{ ok: boolean }> {
 export async function clearConversations(): Promise<{ ok: boolean }> {
   await assertCanWrite();
   await connectDB();
-  await (await scoped()).deleteMany({});
+  await (await scoped()).updateMany({}, { $set: { deletedAt: new Date() } });
   revalidatePath('/history');
   return { ok: true };
 }

@@ -157,7 +157,7 @@ describe('the Trash acts on the CURRENT workspace only', () => {
     await withTenant(acme, () => getTrash());
 
     // One find() per TRASH_MODELS type, all of them in acme's database.
-    expect(reads.get('acme')).toHaveLength(10);
+    expect(reads.get('acme')).toHaveLength(11);
     expect(reads.get('default')).toBeUndefined();
   });
 
@@ -182,10 +182,10 @@ describe('the Trash acts on the CURRENT workspace only', () => {
 
     const r = await withTenant(acme, () => emptyTrash());
 
-    // 10 types × (one doc found, one doc purged) — every delete tagged `acme`, and the
+    // 11 types × (one doc found, one doc purged) — every delete tagged `acme`, and the
     // cross-reference cleanup that an item/receipt purge drags along tagged `acme` too.
-    expect(r.purged).toBe(10);
-    expect(writes.get('acme')!.filter((w) => w.op === 'deleteOne')).toHaveLength(10);
+    expect(r.purged).toBe(11);
+    expect(writes.get('acme')!.filter((w) => w.op === 'deleteOne')).toHaveLength(11);
     expect(writes.get('globex')).toBeUndefined();
     expect(writes.get('default')).toBeUndefined();
   });
@@ -195,8 +195,8 @@ describe('the Trash acts on the CURRENT workspace only', () => {
 
     const r = await emptyTrash();
 
-    expect(r.purged).toBe(10);
-    expect(writes.get('default')!.filter((w) => w.op === 'deleteOne')).toHaveLength(10);
+    expect(r.purged).toBe(11);
+    expect(writes.get('default')!.filter((w) => w.op === 'deleteOne')).toHaveLength(11);
     expect(writes.get('acme')).toBeUndefined();
   });
 });

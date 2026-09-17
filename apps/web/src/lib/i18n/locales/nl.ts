@@ -764,6 +764,7 @@ export const nl: Partial<Dict> = {
   'trash.tSubscription': 'Abonnementen',
   'trash.tVoucher': 'Vouchers',
   'trash.tTask': 'Taken',
+  'trash.tConversation': 'AI-gesprekken',
   'trash.selectAllN': 'alles selecteren {n}',
   'trash.selected': '{n} geselecteerd',
   'trash.deleted': 'verwijderd {ago}',

@@ -126,6 +126,7 @@ export const el: Partial<Dict> = {
   'trash.tBill': 'Λογαριασμοί',
   'trash.tGoal': 'Στόχοι',
   'trash.tTask': 'Εργασίες',
+  'trash.tConversation': 'Συνομιλίες AI',
   'trash.selectAllN': 'επιλογή όλων {n}',
   'trash.selected': '{n} επιλεγμένα',
   'trash.deleted': 'διαγράφηκε {ago}',

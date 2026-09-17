@@ -24,8 +24,8 @@ function makeConversationModel(tag: string) {
       log(tag, 'find');
       return { sort: () => ({ limit: () => ({ lean: async () => [] }) }) };
     },
-    deleteOne: async () => log(tag, 'deleteOne'),
-    deleteMany: async () => log(tag, 'deleteMany'),
+    updateOne: async () => log(tag, 'updateOne'),
+    updateMany: async () => log(tag, 'updateMany'),
   };
 }
 
@@ -70,13 +70,13 @@ describe('history/actions — conversations belong to one workspace', () => {
 
   it('deleteConversation deletes inside the current tenant', async () => {
     await withTenant(acme, () => deleteConversation('507f1f77bcf86cd799439099'));
-    expect(opsOf('acme')).toEqual(['Conversation.deleteOne']);
+    expect(opsOf('acme')).toEqual(['Conversation.updateOne']);
     expect(opsOf('default')).toEqual([]);
   });
 
   it('clearConversations wipes ONLY the caller’s workspace — unscoped it emptied every customer’s history', async () => {
     await withTenant(acme, () => clearConversations());
-    expect(opsOf('acme')).toEqual(['Conversation.deleteMany']);
+    expect(opsOf('acme')).toEqual(['Conversation.updateMany']);
     expect(opsOf('globex')).toEqual([]);
     expect(opsOf('default')).toEqual([]);
   });
