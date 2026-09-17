@@ -24,6 +24,8 @@ import { Card } from '@/models/Card';
 import { Task } from '@/models/Task';
 import { Expense } from '@/models/Expense';
 import { Goal } from '@/models/Goal';
+import { syncGiftCardUses } from '@/lib/giftCardMirror';
+import { cleanPaymentSplits, type PaymentSplitEntry } from '@/lib/paymentSplit';
 import { Conversation } from '@/models/Conversation';
 import { invalidateAiConfigCache, getAiConfig } from '@/lib/aiConfig';
 import {
@@ -2207,6 +2209,12 @@ export async function restoreFromTrash(type: TrashType, id: string): Promise<{ o
   await connectDB();
   const Model = await scoped(RawModel);
   await Model.updateOne({ _id: id }, { $set: { deletedAt: null } }).setOptions({ withDeleted: true });
+  if (type === 'expense') {
+    // #104: deleting released the expense's gift-card spend; bringing the expense back takes it
+    // again, from the split the expense still carries.
+    const e = (await Model.findById(id).lean()) as { paymentSplits?: PaymentSplitEntry[]; date?: Date; vendor?: string } | null;
+    if (e) await syncGiftCardUses(id, cleanPaymentSplits(e.paymentSplits ?? []), e.date ? new Date(e.date) : new Date(), e.vendor || '');
+  }
   revalidatePath('/', 'layout');
   return { ok: true };
 }

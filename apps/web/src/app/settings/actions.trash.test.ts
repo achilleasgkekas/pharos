@@ -144,6 +144,8 @@ vi.mock('@/models/Card', () => ({ Card: {} }));
 vi.mock('@/models/Task', () => ({
   Task: { find: taskModel.findMock, findById: taskModel.findByIdMock, updateOne: taskModel.updateOneMock, deleteOne: taskModel.deleteOneMock },
 }));
+const { syncGiftCardUsesMock } = vi.hoisted(() => ({ syncGiftCardUsesMock: vi.fn(async (..._a: unknown[]) => {}) }));
+vi.mock('@/lib/giftCardMirror', () => ({ syncGiftCardUses: syncGiftCardUsesMock }));
 vi.mock('@/models/Expense', () => ({
   Expense: { find: expenseModel.findMock, findById: expenseModel.findByIdMock, updateOne: expenseModel.updateOneMock, deleteOne: expenseModel.deleteOneMock },
 }));
@@ -434,6 +436,27 @@ describe('restoreFromTrash', () => {
 
     expect(subscriptionModel.updateOneMock).toHaveBeenCalledWith({ _id: ID2 }, { $set: { deletedAt: null } });
     expect(itemModel.updateOneMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('restoreFromTrash — gift-card spend (#104)', () => {
+  it('restoring an expense re-applies its gift-card split (deleting had released it)', async () => {
+    const when = new Date('2026-08-28T00:00:00Z');
+    expenseModel.findByIdMock.mockReturnValueOnce(
+      chainOne({ _id: ID1, vendor: 'IKEA', date: when, paymentSplits: [{ method: 'giftcard', amount: 50, giftCardId: 'gc1' }] })
+    );
+    await restoreFromTrash('expense', ID1);
+    expect(syncGiftCardUsesMock).toHaveBeenCalledTimes(1);
+    const [id, splits, date, vendor] = syncGiftCardUsesMock.mock.calls[0] as [string, { giftCardId: string; amount: number }[], Date, string];
+    expect(id).toBe(ID1);
+    expect(splits).toEqual([expect.objectContaining({ giftCardId: 'gc1', amount: 50 })]);
+    expect(date.toISOString()).toBe(when.toISOString());
+    expect(vendor).toBe('IKEA');
+  });
+
+  it('other types never touch gift cards on restore', async () => {
+    await restoreFromTrash('item', ID1);
+    expect(syncGiftCardUsesMock).not.toHaveBeenCalled();
   });
 });
 

@@ -80,6 +80,23 @@ export function addCycle(d: Date, cycle: string): Date {
 }
 
 /**
+ * addCycle for DATE-ONLY values, which the app stores as UTC midnight (`safeDate('2026-05-01')`
+ * → 2026-05-01T00:00Z). The local-time setters above shift such a value whenever the server's TZ
+ * is behind UTC: 2026-05-01T00Z is Apr 30 20:00 in New York, "+1 month" there is May 30 20:00 =
+ * May 31 00Z, and a monthly series drifts a day earlier every step (#103). UTC setters keep the
+ * calendar day exactly, on any host.
+ */
+export function addCycleUTC(d: Date, cycle: string): Date {
+  const spec = specOf(cycle);
+  const n = new Date(d);
+  if (!spec.step) return n;
+  if (spec.step.days) n.setUTCDate(n.getUTCDate() + spec.step.days);
+  if (spec.step.months) n.setUTCMonth(n.getUTCMonth() + spec.step.months);
+  if (spec.step.years) n.setUTCFullYear(n.getUTCFullYear() + spec.step.years);
+  return n;
+}
+
+/**
  * Roll `start` forward one cycle at a time until it is in the future. Returns null for
  * a cycle that never renews. The guard bounds the loop for a pathological start date
  * (e.g. year 1900 on a weekly cycle is ~6500 steps, so the ceiling sits above that).

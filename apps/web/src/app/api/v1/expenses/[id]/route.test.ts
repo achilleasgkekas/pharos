@@ -33,6 +33,8 @@ const { connectDBMock, userFindOne, userState, expenseUpdate, expenseFindById, u
   return { connectDBMock: vi.fn(async () => {}), userFindOne, userState, expenseUpdate, expenseFindById, updateState, existingState, settingsState };
 });
 
+const { syncGiftCardUsesMock } = vi.hoisted(() => ({ syncGiftCardUsesMock: vi.fn(async (..._a: unknown[]) => {}) }));
+vi.mock('@/lib/giftCardMirror', () => ({ syncGiftCardUses: syncGiftCardUsesMock }));
 vi.mock('@/lib/db', () => ({ connectDB: connectDBMock }));
 vi.mock('@/models/User', () => ({ User: { findOne: userFindOne } }));
 vi.mock('@/models/Expense', () => ({ Expense: { findByIdAndUpdate: expenseUpdate, findById: expenseFindById } }));
@@ -273,11 +275,15 @@ describe('DELETE soft-delete', () => {
     expect(res.status).toBe(200);
     expect(lastSet().deletedAt).toBeInstanceOf(Date);
     expect(await res.json()).toEqual({ ok: true, id: OID });
+    // #104: the gift-card spend is released, exactly like the web delete.
+    expect(syncGiftCardUsesMock).toHaveBeenCalledWith(OID, [], expect.any(Date), '');
   });
 
   it('404s when the row is missing', async () => {
     updateState.doc = null;
+    syncGiftCardUsesMock.mockClear();
     const res = await DELETE(makeReq(), ctx(OID));
     expect(res.status).toBe(404);
+    expect(syncGiftCardUsesMock).not.toHaveBeenCalled();
   });
 });
