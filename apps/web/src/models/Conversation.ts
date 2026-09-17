@@ -1,4 +1,5 @@
 import { Schema, model, models, type Model, type InferSchemaType } from 'mongoose';
+import { softDeletePlugin } from '@/lib/softDelete';
 
 // A saved AI command-bar conversation. The command bar persists each exchange so
 // the user has a browsable history (the /history page). One document per chat;
@@ -25,6 +26,8 @@ const ConversationSchema = new Schema(
   },
   { timestamps: true }
 );
+
+ConversationSchema.plugin(softDeletePlugin);
 
 export type ConversationDoc = InferSchemaType<typeof ConversationSchema> & { _id: string };
 

@@ -3,7 +3,7 @@ import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Trash2, RotateCcw, Search, X, Package, Receipt as ReceiptIcon,
-  Wallet, CalendarClock, Ticket, CreditCard, CheckSquare, FileText, Loader2, Target, Barcode,
+  Wallet, CalendarClock, Ticket, CreditCard, CheckSquare, FileText, Loader2, Target, Barcode, Bot,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
@@ -24,6 +24,7 @@ const TYPE_META: Record<TrashType, { labelKey: TKey; Icon: React.ComponentType<{
   bill: { labelKey: 'trash.tBill', Icon: FileText },
   goal: { labelKey: 'trash.tGoal', Icon: Target },
   task: { labelKey: 'trash.tTask', Icon: CheckSquare },
+  conversation: { labelKey: 'trash.tConversation', Icon: Bot },
 };
 
 // 30-day retention (mirrors getTrash); show how long until auto-purge.

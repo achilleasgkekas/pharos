@@ -24,6 +24,7 @@ import { Card } from '@/models/Card';
 import { Task } from '@/models/Task';
 import { Expense } from '@/models/Expense';
 import { Goal } from '@/models/Goal';
+import { Conversation } from '@/models/Conversation';
 import { invalidateAiConfigCache, getAiConfig } from '@/lib/aiConfig';
 import {
   invalidateOllamaHealth,
@@ -2141,7 +2142,7 @@ export async function importDataEncrypted(
 // PRIMARY delete was the one going to the wrong database.
 
 export type TrashRow = { type: TrashType; id: string; title: string; subtitle: string; deletedAt: string };
-export type TrashType = 'item' | 'receipt' | 'expense' | 'subscription' | 'voucher' | 'giftcard' | 'loyaltycard' | 'bill' | 'goal' | 'task';
+export type TrashType = 'item' | 'receipt' | 'expense' | 'subscription' | 'voucher' | 'giftcard' | 'loyaltycard' | 'bill' | 'goal' | 'task' | 'conversation';
 
 const TRASH_MODELS: Record<TrashType, typeof Item> = {
   item: Item,
@@ -2154,6 +2155,7 @@ const TRASH_MODELS: Record<TrashType, typeof Item> = {
   bill: Bill as unknown as typeof Item,
   goal: Goal as unknown as typeof Item,
   task: Task as unknown as typeof Item,
+  conversation: Conversation as unknown as typeof Item,
 };
 const TRASH_RETENTION_DAYS = 30;
 
@@ -2169,6 +2171,7 @@ function trashLabel(type: TrashType, d: Record<string, unknown>): { title: strin
     case 'bill': return { title: String(d.title || '—'), subtitle: `${d.vendor || ''} · €${d.amount ?? 0}`.trim() };
     case 'goal': return { title: String(d.title || '—'), subtitle: `€${d.targetAmount ?? 0}${d.targetDate ? ` · ${new Date(d.targetDate as string).toLocaleDateString('en-GB')}` : ''}` };
     case 'task': return { title: String(d.title || '—'), subtitle: String(d.status || '') };
+    case 'conversation': return { title: String(d.title || 'Conversation'), subtitle: `${d.turns || 0} turn${d.turns === 1 ? '' : 's'}` };
   }
 }
 

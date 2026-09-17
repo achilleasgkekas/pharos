@@ -64,6 +64,7 @@ const {
   billModel,
   goalModel,
   taskModel,
+  conversationModel,
 } = vi.hoisted(() => {
   function makeChainList(data: unknown[]) {
     const obj: { setOptions: (o: unknown) => typeof obj; select: (f: string) => typeof obj; lean: () => Promise<unknown[]> } = {
@@ -107,6 +108,7 @@ const {
     billModel: makeTrashModel(),
     goalModel: makeTrashModel(),
     taskModel: makeTrashModel(),
+    conversationModel: makeTrashModel(),
   };
 });
 
@@ -147,6 +149,9 @@ vi.mock('@/models/Expense', () => ({
 }));
 vi.mock('@/models/Goal', () => ({
   Goal: { find: goalModel.findMock, findById: goalModel.findByIdMock, updateOne: goalModel.updateOneMock, deleteOne: goalModel.deleteOneMock },
+}));
+vi.mock('@/models/Conversation', () => ({
+  Conversation: { find: conversationModel.findMock, findById: conversationModel.findByIdMock, updateOne: conversationModel.updateOneMock, deleteOne: conversationModel.deleteOneMock },
 }));
 vi.mock('@/lib/aiConfig', () => ({ invalidateAiConfigCache: vi.fn(), getAiConfig: vi.fn(async () => ({})) }));
 vi.mock('@/lib/ollama', () => ({
@@ -254,6 +259,7 @@ const ALL_TRASH_MODELS = [
   ['bill', billModel] as const,
   ['goal', goalModel] as const,
   ['task', taskModel] as const,
+  ['conversation', conversationModel] as const,
 ];
 
 beforeEach(() => {
@@ -319,6 +325,7 @@ describe('getTrash', () => {
       ])
     );
     taskModel.findMock.mockReturnValueOnce(chainList([{ _id: ID1, title: 'Buy cables', status: 'todo', deletedAt: now }]));
+    conversationModel.findMock.mockReturnValueOnce(chainList([{ _id: ID1, title: 'AI Assistant Chat', turns: 3, deletedAt: now }]));
 
     const rows = await getTrash();
     const byType = (type: TrashType, id: string) => rows.find((r) => r.type === type && r.id === id)!;
@@ -340,6 +347,7 @@ describe('getTrash', () => {
     // no targetDate → no trailing " · " artifact (unlike the receipt's empty-date case)
     expect(byType('goal', ID2)).toMatchObject({ title: 'No-date goal', subtitle: '€500' });
     expect(byType('task', ID1)).toMatchObject({ title: 'Buy cables', subtitle: 'todo' });
+    expect(byType('conversation', ID1)).toMatchObject({ title: 'AI Assistant Chat', subtitle: '3 turns' });
   });
 
   it('a receipt with no date leaves a trailing " · " with nothing after it (template artifact, not fixed here)', async () => {
@@ -548,7 +556,7 @@ describe('purgeTrashEntry (core, no requireAdmin — callers must authorize firs
     expect(itemModel.deleteOneMock).toHaveBeenCalledWith({ _id: ID1 });
   });
 
-  it.each(['subscription', 'voucher', 'giftcard', 'loyaltycard', 'bill', 'goal', 'task'] as TrashType[])(
+  it.each(['subscription', 'voucher', 'giftcard', 'loyaltycard', 'bill', 'goal', 'task', 'conversation'] as TrashType[])(
     '%s: no file deletion or cross-reference cleanup, just deleteOne',
     async (type) => {
       const modelsByType: Record<string, (typeof itemModel)> = {
@@ -559,6 +567,7 @@ describe('purgeTrashEntry (core, no requireAdmin — callers must authorize firs
         bill: billModel,
         goal: goalModel,
         task: taskModel,
+        conversation: conversationModel,
       };
       const model = modelsByType[type];
       model.findByIdMock.mockReturnValueOnce(chainOne({ _id: ID1 }));

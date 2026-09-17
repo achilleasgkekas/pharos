@@ -161,6 +161,7 @@ export const en = {
   'trash.tBill': 'Bills',
   'trash.tGoal': 'Goals',
   'trash.tTask': 'Tasks',
+  'trash.tConversation': 'AI Chats',
   'trash.selectAllN': 'select all {n}',
   'trash.selected': '{n} selected',
   'trash.deleted': 'deleted {ago}',

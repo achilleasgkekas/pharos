@@ -8,10 +8,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 //    `preview` is the LAST assistant message's content (searching from the end, not
 //    the first assistant turn) with markdown ** stripped and capped at 160 chars —
 //    empty string when there is no assistant message at all.
-//  - deleteConversation: deleteOne({_id}), revalidates /history, returns {ok:true}.
-//  - clearConversations: deleteMany({}), revalidates /history, returns {ok:true}.
+//  - deleteConversation: soft deletes by $set deletedAt, revalidates /history, returns {ok:true}.
+//  - clearConversations: soft deletes all by $set deletedAt, revalidates /history, returns {ok:true}.
 
-const { connectDBMock, convFind, convDeleteOne, convDeleteMany, findQuery, revalidatePathMock, state } = vi.hoisted(() => {
+const { connectDBMock, convFind, convUpdateOne, convUpdateMany, findQuery, revalidatePathMock, state } = vi.hoisted(() => {
   const state: { docs: unknown[] } = { docs: [] };
   // Conversation.find({}).sort(...).limit(...).lean() — a self-returning chain.
   const findQuery: Record<string, unknown> = {};
@@ -21,8 +21,8 @@ const { connectDBMock, convFind, convDeleteOne, convDeleteMany, findQuery, reval
   return {
     connectDBMock: vi.fn(async () => {}),
     convFind,
-    convDeleteOne: vi.fn(async (_q?: unknown) => {}),
-    convDeleteMany: vi.fn(async (_q?: unknown) => {}),
+    convUpdateOne: vi.fn(async (_q?: unknown, _u?: unknown) => {}),
+    convUpdateMany: vi.fn(async (_q?: unknown, _u?: unknown) => {}),
     findQuery,
     revalidatePathMock: vi.fn(),
     state,
@@ -34,7 +34,7 @@ vi.mock('@/lib/db', () => ({ connectDB: connectDBMock }));
 vi.mock('@/lib/tenancy/request', () => ({ withRequestTenant: async (fn: () => Promise<unknown>) => fn() }));
 vi.mock('@/lib/tenancy/connection', () => ({ currentModel: async (m: unknown) => m }));
 vi.mock('@/models/Conversation', () => ({
-  Conversation: { find: convFind, deleteOne: convDeleteOne, deleteMany: convDeleteMany },
+  Conversation: { find: convFind, updateOne: convUpdateOne, updateMany: convUpdateMany },
 }));
 vi.mock('next/cache', () => ({ revalidatePath: revalidatePathMock }));
 
@@ -155,20 +155,20 @@ describe('getConversations', () => {
 });
 
 describe('deleteConversation', () => {
-  it('deletes by id, revalidates /history, returns ok:true', async () => {
+  it('soft-deletes by id ($set deletedAt), revalidates /history, returns ok:true', async () => {
     const res = await deleteConversation('c1');
     expect(connectDBMock).toHaveBeenCalledTimes(1);
-    expect(convDeleteOne).toHaveBeenCalledWith({ _id: 'c1' });
+    expect(convUpdateOne).toHaveBeenCalledWith({ _id: 'c1' }, { $set: { deletedAt: expect.any(Date) } });
     expect(revalidatePathMock).toHaveBeenCalledWith('/history');
     expect(res).toEqual({ ok: true });
   });
 });
 
 describe('clearConversations', () => {
-  it('deletes all, revalidates /history, returns ok:true', async () => {
+  it('soft-deletes all ($set deletedAt), revalidates /history, returns ok:true', async () => {
     const res = await clearConversations();
     expect(connectDBMock).toHaveBeenCalledTimes(1);
-    expect(convDeleteMany).toHaveBeenCalledWith({});
+    expect(convUpdateMany).toHaveBeenCalledWith({}, { $set: { deletedAt: expect.any(Date) } });
     expect(revalidatePathMock).toHaveBeenCalledWith('/history');
     expect(res).toEqual({ ok: true });
   });

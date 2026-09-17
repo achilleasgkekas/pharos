@@ -113,7 +113,7 @@ describe('PATCH (restore) — auth gate', () => {
 });
 
 describe('PATCH (restore) — type guard', () => {
-  it.each(['item', 'receipt', 'expense', 'subscription', 'voucher', 'giftcard', 'loyaltycard', 'bill', 'goal', 'task'])(
+  it.each(['item', 'receipt', 'expense', 'subscription', 'voucher', 'giftcard', 'loyaltycard', 'bill', 'goal', 'task', 'conversation'])(
     'accepts allow-listed type %s',
     async (type) => {
       const res = await PATCH(makeReq(type, OID), ctx(type, OID));
