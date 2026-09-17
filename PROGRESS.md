@@ -13619,3 +13619,15 @@ https://github.com/achilleasgkekas/pharos/pull/66, commit `2ba0a34b`. Το Codex
 - **Αναμονή για deploy:** τουλάχιστον 2 merged commits που δεν έχουν φτάσει στον server (το `/opt/pharos` είναι στο `18a4f93`, το image μπορεί να είναι ακόμα παλιότερο).
 - **Ανοιχτά brain PRs:** 2 (#125 περιμένει review, το #66 έχει `needs-human`).
 - **Επόμενο:** το #1 (`lane:claude`, `needs-changes`), ή το επόμενο `lane:claude` agent-ready issue.
+
+## 2026-09-17 09:00
+
+**pharos-brain** · issue #3 (p0, lane:claude), φάση 1
+
+- **Υγεία prod:** OK. `ph-aros.com` 200 με περιεχόμενο self-host, `app.ph-aros.com/account/login` 200, `POST trials-sweep` χωρίς token 401 JSON.
+- **Triage:** τίποτα νέο. Το #1 πήρε απάντηση στην ερώτηση του Gemini (iPhone, PWA στην αρχική οθόνη, ενεργοποίηση push από τις ρυθμίσεις, δεν συνέβη τίποτα). Είναι ήδη agent-ready, αλλά θέλει πραγματική συσκευή για επαλήθευση. Το #28 μένει `blocked` μέχρι να κλείσει το #3.
+- **Δουλειά:** νέο `components/ui/DateInput.tsx`. Πεδίο κειμένου με τη σειρά και το διαχωριστικό της γλώσσας της εφαρμογής (από `Intl.DateTimeFormat(...).formatToParts`), η τιμή μέσα και έξω μένει ISO. Η λογική parse/format είναι καθαρές συναρτήσεις στο `lib/dateInput.ts` με 14 tests. Το σκέτο `en` αντιστοιχίζεται σε `en-GB`, όπως όλες οι άλλες ημερομηνίες του UI. Μη έγκυρο κείμενο δίνει κενή τιμή και custom validity, οπότε η φόρμα δεν στέλνει παλιά ημερομηνία. Το κουμπί ημερολογίου ανοίγει τον picker του browser. Αντικαταστάθηκαν μόνο τα 2 πεδία στις συνδρομές, 5 νέα κλειδιά i18n και στις 8 γλώσσες.
+- **PR:** #127 https://github.com/achilleasgkekas/pharos/pull/127 (type-check καθαρό, 7211 tests περνούν). Δεν δοκιμάστηκε σε browser: το component δεν έχει DOM test και το `showPicker` σε Safari/iOS είναι ανεπιβεβαίωτο.
+- **Αναμονή για deploy:** 2 merged commits κώδικα μετά το `18a4f93` που είναι στο `/opt/pharos`.
+- **Ανοιχτά brain PRs:** 3 (#125 και #127 περιμένουν review, το #66 έχει `needs-human`).
+- **Επόμενο:** μετά το merge του #127, ξεμπλοκάρισμα του #28 (τα υπόλοιπα 25 πεδία ημερομηνίας), ή το #1 αν βρεθεί τρόπος να επαληθευτεί χωρίς συσκευή.
