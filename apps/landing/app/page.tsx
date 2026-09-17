@@ -1445,6 +1445,7 @@ export default function Home() {
               <a href="#pricing" className="navlink">Pricing</a>
               <a href="#self-host" className="navlink">Self-host</a>
               <a href="#compare" className="navlink">Compare</a>
+              <a href="/status" className="navlink">Status &amp; changelog</a>
             </div>
 
             {/* The repo is PRIVATE until launch, so every link into it (Docs, issues, the
