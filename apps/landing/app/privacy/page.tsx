@@ -1,8 +1,9 @@
 import type { Metadata } from 'next';
 import { PharosMark } from '../components/PharosMark';
+import { GithubLink } from '../components/GithubLink';
+import { GITHUB_URL } from '../site';
 
 const SITE_URL = 'https://ph-aros.com';
-const GITHUB_URL = 'https://github.com/achilleasgkekas/pharos';
 const CONTACT = 'hello@ph-aros.com';
 
 // BreadcrumbList so crawlers and AI answer engines place this page under the
@@ -121,9 +122,7 @@ export default function PrivacyPolicy() {
         <Section id="self-host" title="1. Self-hosted PHAROS (open source)">
           <p>
             When you run PHAROS yourself, from the{' '}
-            <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer" className="inline-link">
-              open-source project
-            </a>{' '}
+            <GithubLink className="inline-link">open-source project</GithubLink>{' '}
             under AGPL-3.0, we do not receive any of your data. Everything, receipts,
             expenses, statements, inventory, network state, lives on your own machine
             and in your own database.
@@ -284,18 +283,16 @@ export default function PrivacyPolicy() {
             Questions about privacy? Email{' '}
             <a href={`mailto:${CONTACT}`} className="inline-link">{CONTACT}</a>. For the
             open-source project, open an issue on{' '}
-            <a href={`${GITHUB_URL}/issues`} target="_blank" rel="noopener noreferrer" className="inline-link">
+            <GithubLink href={`${GITHUB_URL}/issues`} className="inline-link">
               GitHub
-            </a>.
+            </GithubLink>.
           </p>
         </Section>
 
         <div style={{ marginTop: 56, display: 'flex', gap: 14, flexWrap: 'wrap' }}>
           <a href="/" className="btn btn-primary">Back to home</a>
           <a href="/terms" className="btn btn-ghost">Terms of Service</a>
-          <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer" className="btn btn-ghost">
-            Self-host it free
-          </a>
+          <GithubLink className="btn btn-ghost">Self-host it free</GithubLink>
         </div>
       </div>
     </main>

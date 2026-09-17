@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { GithubLink } from './GithubLink';
 
 type NavItem = { href: string; label: string; external?: boolean };
 
@@ -17,7 +18,7 @@ const ITEMS: NavItem[] = [
   { href: '#faq', label: 'FAQ' },
 ];
 
-export function MobileNav({ githubUrl, appUrl }: { githubUrl: string; appUrl: string }) {
+export function MobileNav({ appUrl }: { appUrl: string }) {
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const burgerRef = useRef<HTMLButtonElement>(null);
@@ -160,15 +161,9 @@ export function MobileNav({ githubUrl, appUrl }: { githubUrl: string; appUrl: st
               {it.label}
             </a>
           ))}
-          <a
-            href={githubUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="drawer-link"
-            onClick={() => setOpen(false)}
-          >
+          <GithubLink className="drawer-link" onClick={() => setOpen(false)}>
             GitHub ↗
-          </a>
+          </GithubLink>
           <a
             href={`${appUrl}/account/login`}
             className="drawer-signin"
