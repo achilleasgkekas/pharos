@@ -39,7 +39,7 @@ describe('DocumentsPage', () => {
     vi.clearAllMocks();
   });
 
-  it('filters out soft-deleted documents', async () => {
+  it('passes documents and leadDays to the client', async () => {
     const element = await DocumentsPage();
     const elementProps = element.props;
 
@@ -47,7 +47,7 @@ describe('DocumentsPage', () => {
     expect(elementProps.documents).toEqual([{ _id: 'doc1', title: 'Test Document' }]);
     expect(elementProps.leadDays).toBe(30);
 
-    // Assert that find was called with { deletedAt: null }
-    expect(documentFindMock).toHaveBeenCalledWith({ deletedAt: null });
+    // Assert that find was called without an explicit soft-delete filter
+    expect(documentFindMock).toHaveBeenCalledWith(undefined);
   });
 });

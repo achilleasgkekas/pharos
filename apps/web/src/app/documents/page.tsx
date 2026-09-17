@@ -14,7 +14,7 @@ async function getData(): Promise<{ documents: SerializedDocument[]; leadDays: n
     const Document = await currentModel(DocumentModel);
     const [documents, settings] = await Promise.all([
       // Soonest expiry first — the order you renew documents in.
-      Document.find({ deletedAt: null }).sort({ expiryDate: 1 }).lean(),
+      Document.find().sort({ expiryDate: 1 }).lean(),
       getAppSettings(),
     ]);
     return {
