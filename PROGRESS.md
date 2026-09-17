@@ -13643,3 +13643,15 @@ https://github.com/achilleasgkekas/pharos/pull/66, commit `2ba0a34b`. Το Codex
 - **Αναμονή για deploy:** 2 merged commits κώδικα μετά το `18a4f93` που είναι στο `/opt/pharos` (image δεν ελέγχθηκε).
 - **Ανοιχτά brain PRs:** 4 (#125, #127, #128 περιμένουν review, το #66 έχει `needs-human`).
 - **Επόμενο:** το cap της ημέρας έπιασε 3/3. Αύριο: ξεμπλοκάρισμα του #28 αν γίνει merge το #127, αλλιώς το #15 (Grocy/Firefly θέλουν δείγμα export, πιθανότατα ερώτηση προς τον Αχιλλέα).
+
+## 2026-09-18 00:40
+
+**pharos-brain** · issue #150 (p1, lane:claude, data loss στο merge)
+
+- **Υγεία prod:** OK. `ph-aros.com` 200 με περιεχόμενο self-host, `app.ph-aros.com/account/login` 200, `POST trials-sweep` χωρίς token 401 JSON.
+- **Triage:** το #28 ξεμπλόκαρε (το #3 έκλεισε), πήρε `agent-ready`. Το #158 (LCP 3.6s στο landing) πήρε `saas` + `agent-ready`, έφυγε από needs-triage.
+- **Δουλειά:** το #150 από το bug hunt του Gemini. Επαληθεύτηκε πρώτα με tests: το `mergeItems` ήξερε μόνο το παλιό σχήμα του item, οπότε ο διπλότυπος έχανε σιωπηλά customFields (P70), warrantyClaims (P44), maintenance (P41), δανεισμό (P47), πώληση (P55) και tracking (P72). 8 νέα tests έπεφταν στο main ακριβώς για αυτόν τον λόγο. Η διόρθωση ενώνει customFields ανά key (κερδίζει ο επιζών) και warrantyClaims ως καθαρά αντικείμενα, και τα δανεισμός/πώληση/tracking αντιγράφονται όλα-ή-τίποτα γιατί το καθένα είναι ένα γεγονός. Το `soldIncomeId` ταξιδεύει μαζί με την πώληση ώστε να μην ξαναγραφτεί το έσοδο.
+- **PR:** #159 https://github.com/achilleasgkekas/pharos/pull/159 (type-check καθαρό, 7302 tests περνούν).
+- **Αναμονή για deploy:** 1 merged commit μετά το `2387e908` που τρέχει στο `/opt/pharos`.
+- **Ανοιχτά brain PRs:** 1 (#159, περιμένει review).
+- **Επόμενο:** το #157 (νεκροί σύνδεσμοι GitHub στο landing, p2) ή το #28 τώρα που ξεμπλόκαρε, ένα PR ανά 2-3 αρχεία.
