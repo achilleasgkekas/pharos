@@ -62,7 +62,7 @@ import { suggestBudgetsFromExpenses, type BudgetExpenseRow } from '@/lib/budgetS
 import { resolveCategoryRules } from '@/lib/categoryRules';
 import { detectPriceHikes, type HikeEntry } from '@/lib/priceHike';
 import { anthropicTest } from '@/lib/anthropic';
-import { getAppSettings, invalidateAppSettings } from '@/lib/appSettings';
+import { getAppSettings, invalidateAppSettings, invalidateAppSettingsForRequest } from '@/lib/appSettings';
 import { assertCanWrite, requireAdmin } from '@/lib/auth';
 import { AI_FEATURE_KEYS, type AiFeatureKey } from '@/lib/aiFeatures';
 import { PROVIDER_RECOMMEND, priceForModel, looksVisionModel, type FetchedModel, type AiProviderId } from '@/lib/aiModels';
@@ -343,7 +343,7 @@ export async function dismissOnboarding(): Promise<{ ok: boolean }> {
   await assertCanWrite();
   await connectDB();
   await (await scoped(AppConfig)).updateOne({ key: 'singleton' }, { $set: { onboardingDismissed: true } }, { upsert: true });
-  invalidateAppSettings();
+  await invalidateAppSettingsForRequest();
   revalidatePath('/', 'layout');
   return { ok: true };
 }
@@ -422,7 +422,7 @@ export async function saveDefaults(formData: FormData): Promise<{ ok: boolean }>
     },
     { upsert: true }
   );
-  invalidateAppSettings();
+  await invalidateAppSettingsForRequest();
   revalidatePath('/', 'layout'); // currency symbol shows app-wide
   return { ok: true };
 }
@@ -433,7 +433,7 @@ export async function saveNtfy(formData: FormData): Promise<{ ok: boolean }> {
   const url = String(formData.get('ntfyUrl') || '').trim();
   const enabled = formData.get('ntfyEnabled') === 'true';
   await (await scoped(AppConfig)).updateOne({ key: 'singleton' }, { $set: { ntfyUrl: url, ntfyEnabled: enabled } }, { upsert: true });
-  invalidateAppSettings();
+  await invalidateAppSettingsForRequest();
   revalidatePath('/settings');
   return { ok: true };
 }
@@ -475,7 +475,7 @@ export async function saveNotifierChannels(channels: NotifierConfig[]): Promise<
     { $set: { notifiers: clean, ntfyUrl: firstNtfy?.url || '', ntfyEnabled: !!firstNtfy?.enabled } },
     { upsert: true }
   );
-  invalidateAppSettings();
+  await invalidateAppSettingsForRequest();
   revalidatePath('/settings');
   return { ok: true };
 }
@@ -503,7 +503,7 @@ export async function saveNotifyTypes(types: NotifyTypes): Promise<{ ok: boolean
     { $set: { notifyTypes: Object.fromEntries(ALERT_TYPE_KEYS.map((k) => [k, clean[k]])) } },
     { upsert: true }
   );
-  invalidateAppSettings();
+  await invalidateAppSettingsForRequest();
   revalidatePath('/settings');
   return { ok: true };
 }
@@ -519,7 +519,7 @@ export async function saveQuietHours(quietHours: { start: string; end: string })
     { $set: { quietHours: clean } },
     { upsert: true }
   );
-  invalidateAppSettings();
+  await invalidateAppSettingsForRequest();
   revalidatePath('/settings');
   return { ok: true };
 }
@@ -1473,7 +1473,7 @@ export async function saveList(key: string, values: string[]): Promise<{ ok: boo
   } else {
     await (await scoped(AppConfig)).updateOne({ key: 'singleton' }, { $set: { [path]: cleaned } }, { upsert: true });
   }
-  invalidateAppSettings();
+  await invalidateAppSettingsForRequest();
   revalidatePath('/', 'layout');
   return { ok: true };
 }
@@ -1489,7 +1489,7 @@ export async function saveSpaces(values: string[]): Promise<{ ok: boolean }> {
   } else {
     await (await scoped(AppConfig)).updateOne({ key: 'singleton' }, { $set: { spaces: cleaned } }, { upsert: true });
   }
-  invalidateAppSettings();
+  await invalidateAppSettingsForRequest();
   revalidatePath('/', 'layout');
   return { ok: true };
 }
@@ -1956,7 +1956,7 @@ export async function saveBudgets(budgets: Record<string, number>): Promise<{ ok
     if (k && Number.isFinite(n) && n > 0) clean[k.trim()] = Math.round(n * 100) / 100;
   }
   await (await scoped(AppConfig)).updateOne({ key: 'singleton' }, { $set: { budgets: clean } }, { upsert: true });
-  invalidateAppSettings();
+  await invalidateAppSettingsForRequest();
   revalidatePath('/reports');
   revalidatePath('/settings');
   return { ok: true };
@@ -1968,7 +1968,7 @@ export async function saveBudgetRollover(enabled: boolean): Promise<{ ok: boolea
   await assertCanWrite();
   await connectDB();
   await (await scoped(AppConfig)).updateOne({ key: 'singleton' }, { $set: { budgetRollover: !!enabled } }, { upsert: true });
-  invalidateAppSettings();
+  await invalidateAppSettingsForRequest();
   revalidatePath('/reports');
   revalidatePath('/settings');
   return { ok: true };
@@ -1981,7 +1981,7 @@ export async function saveCategoryRules(rules: unknown): Promise<{ ok: boolean }
   await connectDB();
   const clean = resolveCategoryRules(rules);
   await (await scoped(AppConfig)).updateOne({ key: 'singleton' }, { $set: { categoryRules: clean } }, { upsert: true });
-  invalidateAppSettings();
+  await invalidateAppSettingsForRequest();
   revalidatePath('/settings');
   return { ok: true };
 }
@@ -2011,7 +2011,7 @@ export async function saveAssetAccounts(accounts: Record<string, number>): Promi
     if (k.trim() && Number.isFinite(n) && n > 0) clean[k.trim().slice(0, 60)] = Math.round(n * 100) / 100;
   }
   await (await scoped(AppConfig)).updateOne({ key: 'singleton' }, { $set: { assetAccounts: clean } }, { upsert: true });
-  invalidateAppSettings();
+  await invalidateAppSettingsForRequest();
   revalidatePath('/reports');
   revalidatePath('/settings');
   return { ok: true };
@@ -2044,7 +2044,7 @@ export async function saveDepreciation(cfg: {
     rates,
   };
   await (await scoped(AppConfig)).updateOne({ key: 'singleton' }, { $set: { depreciation: clean } }, { upsert: true });
-  invalidateAppSettings();
+  await invalidateAppSettingsForRequest();
   revalidatePath('/reports');
   revalidatePath('/settings');
   return { ok: true };

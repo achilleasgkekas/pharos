@@ -68,7 +68,7 @@ const {
   assertCanWriteMock: vi.fn(async () => {}),
   revalidatePathMock: vi.fn(),
   getAppSettingsMock: vi.fn(async () => ({} as Record<string, unknown>)),
-  invalidateAppSettingsMock: vi.fn(),
+  invalidateAppSettingsMock: vi.fn(async () => {}),
   sendNtfyToMock: vi.fn(async () => true),
   runNtfyTestMock: vi.fn(async () => ({ ok: true }) as { ok: boolean; error?: string }),
   getNotifiersMock: vi.fn(async () => [] as unknown[]),
@@ -135,7 +135,9 @@ vi.mock('@/lib/budgetSuggest', () => ({ suggestBudgetsFromExpenses: vi.fn() }));
 vi.mock('@/lib/categoryRules', () => ({ resolveCategoryRules: vi.fn() }));
 vi.mock('@/lib/priceHike', () => ({ detectPriceHikes: vi.fn() }));
 vi.mock('@/lib/anthropic', () => ({ anthropicTest: vi.fn() }));
-vi.mock('@/lib/appSettings', () => ({ getAppSettings: getAppSettingsMock, invalidateAppSettings: invalidateAppSettingsMock }));
+vi.mock('@/lib/appSettings', () => ({ getAppSettings: getAppSettingsMock, invalidateAppSettings: vi.fn(),
+  // #162: the eviction these actions perform is the request-scoped one.
+  invalidateAppSettingsForRequest: invalidateAppSettingsMock}));
 vi.mock('@/lib/auth', () => ({ requireAdmin: requireAdminMock, assertCanWrite: assertCanWriteMock }));
 vi.mock('@/lib/aiFeatures', () => ({ AI_FEATURE_KEYS: [] }));
 vi.mock('@/lib/aiModels', () => ({ PROVIDER_RECOMMEND: {}, priceForModel: vi.fn(), looksVisionModel: vi.fn() }));
@@ -216,7 +218,7 @@ beforeEach(() => {
   assertCanWriteMock.mockImplementation(async () => {});
   revalidatePathMock.mockImplementation(() => undefined);
   getAppSettingsMock.mockImplementation(async () => ({ ntfyUrl: '' }));
-  invalidateAppSettingsMock.mockImplementation(() => undefined);
+  invalidateAppSettingsMock.mockImplementation(async () => undefined);
   sendNtfyToMock.mockImplementation(async () => true);
   runNtfyTestMock.mockImplementation(async () => ({ ok: true }));
   getNotifiersMock.mockImplementation(async () => []);

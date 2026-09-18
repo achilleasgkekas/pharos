@@ -119,7 +119,7 @@ vi.mock('@/lib/budgetSuggest', () => ({ suggestBudgetsFromExpenses: vi.fn() }));
 vi.mock('@/lib/categoryRules', () => ({ resolveCategoryRules: vi.fn() }));
 vi.mock('@/lib/priceHike', () => ({ detectPriceHikes: vi.fn() }));
 vi.mock('@/lib/anthropic', () => ({ anthropicTest: vi.fn() }));
-vi.mock('@/lib/appSettings', () => ({ getAppSettings: vi.fn(async () => ({})), invalidateAppSettings: vi.fn() }));
+vi.mock('@/lib/appSettings', () => ({ getAppSettings: vi.fn(async () => ({})), invalidateAppSettings: vi.fn() , invalidateAppSettingsForRequest: vi.fn(async () => {})}));
 vi.mock('@/lib/auth', () => ({
   requireAdmin: vi.fn(async () => ({ id: 'admin1', role: 'admin' as const, name: 'Admin' })),
   assertCanWrite: vi.fn(async () => {}),
