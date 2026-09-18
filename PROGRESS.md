@@ -13667,3 +13667,16 @@ https://github.com/achilleasgkekas/pharos/pull/66, commit `2ba0a34b`. Το Codex
 - **Αναμονή για deploy:** 1 merged code commit (`5b3921db`) μετά το `2387e908` που τρέχει στο `/opt/pharos`.
 - **Ανοιχτά brain PRs:** 2 (#159, #160), κανένα δεν έχει ακόμα label review.
 - **Επόμενο:** cap ημέρας 2/3. Αν μείνει τρίτο run: έλεγχος αν κάποιο από τα #159/#160 πήρε `needs-changes`, αλλιώς #158 (LCP 3.6s στο landing) είναι lane-eligible τώρα.
+
+## 2026-09-18 09:52
+
+**pharos-brain** · δομικό guard στο `appSettings` projection (η λωρίδα μου ήταν άδεια)
+
+- **Υγεία prod:** OK. `ph-aros.com` 200 με περιεχόμενο self-host, `app.ph-aros.com/account/login` 200, `POST trials-sweep` χωρίς token 401 JSON.
+- **Triage:** ένα νέο, το #165 (11 major αναβαθμίσεις βιβλιοθηκών). Έχει ήδη p2. Το άφησα σε `needs-triage` με μία ερώτηση: στο tier-1 (tailwind-merge, eslint, basic-ftp, lucide-react) ανοίγει agent μόνος του PR ή θέλεις ρητό ΟΚ σε κάθε major; Ως umbrella δεν είναι agent-ready, πρότεινα ένα issue ανά πακέτο. Δεν του έβαλα label στοίβας γιατί αγγίζει και τις δύο. Κανένα `blocked` ανοιχτό.
+- **Λωρίδα:** το μόνο `lane:claude` issue είναι το #157 και το καλύπτει ήδη το ανοιχτό PR #160, οπότε η λωρίδα μου ήταν πραγματικά άδεια. Το #158 δεν έχει ακόμα lane label, δεν το άγγιξα. Το PR #148 με `needs-changes` είναι `agy/issue-69`, δικό του, όχι `brain/*`. Πήγα σε δουλειά STEP 5 (test για επικίνδυνο κώδικα).
+- **Δουλειά:** το `.select(...)` whitelist στο `getAppSettings()`. Ήταν χειρόγραφο string, και μια ρύθμιση που μπαίνει στο model, στον τύπο και στο `normalizeSettings` αλλά ξεχνιέται εκεί δεν φορτώνεται ποτέ και μένει σιωπηλά στο default. Έχει σταλεί δύο φορές έτσι (P86 και 2026-09-12). Τώρα το `APP_CONFIG_SELECT` παράγεται από χάρτη πεδίων με `satisfies Record<keyof RawAppConfigDoc, true>`: το ξεχασμένο κλειδί γίνεται TS1360 και το περιττό TS2353. Επαλήθευσα και τις δύο κατευθύνσεις προσθέτοντας πρόχειρο πεδίο και διαβάζοντας το tsc. Το παραγόμενο string είναι byte-identical με το παλιό, άρα καμία αλλαγή συμπεριφοράς σε καμία στοίβα. 3 tests διαβάζουν την πηγή, ώστε το guard να κρατά ακόμα κι αν κάποιος βγάλει το `satisfies`, και ένα από αυτά ελέγχει ότι κάθε πεδίο που διαβάζει το `normalizeSettings` υπάρχει στο projection.
+- **PR:** #166 https://github.com/achilleasgkekas/pharos/pull/166 (type-check καθαρό, 7305 tests σε 468 files περνούν).
+- **Αναμονή για deploy:** 2 merged commits κώδικα (`f432928a`, `f286bf0f`) μετά το `0135badf` που είναι στο `/opt/pharos`. Το #164 είναι αναβαθμίσεις εξαρτήσεων, θέλει προσοχή στο deploy.
+- **Ανοιχτά brain PRs:** 2 (#160, #166), κανένα με label review ακόμα.
+- **Επόμενο:** cap ημέρας 3/3, τέλος για σήμερα. Αύριο: έλεγχος αν τα #160/#166 πήραν `needs-changes`, αλλιώς το #158 (LCP 3.6s στο landing) αν ο dispatcher του δώσει `lane:claude`.
