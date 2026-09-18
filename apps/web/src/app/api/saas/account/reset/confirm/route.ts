@@ -5,6 +5,7 @@ import { hashPassword } from '@/lib/auth';
 import { readBody, strField } from '@/lib/apiBody';
 import { rateLimit, clientIp } from '@/lib/apiAuth';
 import { saasAuthGate, saasGuard } from '@/lib/tenancy/saasApi';
+import { bumpAccountSessionEpoch } from '@/lib/tenancy/accountSession';
 import { hashResetToken, isResetTokenValid, resetPasswordError } from '@/lib/tenancy/passwordReset';
 
 export const runtime = 'nodejs';
@@ -56,8 +57,10 @@ export async function POST(req: NextRequest) {
     });
     await account.save();
 
-    // Existing account sessions are not force-expired here (consistent with the password-change
-    // route); the new hash takes effect on the next login.
+    // Bumps the session epoch so all existing sessions are invalidated (P182).
+    // The user will need to log in with the new password.
+    await bumpAccountSessionEpoch(String(account._id));
+
     return NextResponse.json({ ok: true });
   });
 }

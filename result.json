@@ -1,0 +1,9 @@
+{
+  "status": "done",
+  "summary": "Added sessionEpoch to the Account model to support session revocation (P182) and updated getCurrentAccount to verify the token's epoch against the database. Updated password change and password reset routes to increment this epoch so all existing sessions for the account are invalidated.",
+  "commit_subject": "fix(tenancy): add sessionEpoch to Account model to support session revocation (#182)",
+  "commit_body": "Added sessionEpoch to the Account model and updated getCurrentAccount to perform an epoch check against the database when a session token contains an epoch. Updated the password change and password reset routes to increment the session epoch and re-issue the caller's cookie, ensuring that changing the password effectively signs out all other existing sessions for that account.",
+  "tests_added": "Added a test in apps/web/src/lib/tenancy/accountSession.node.test.ts to verify that getCurrentAccount fails when the token's epoch does not match the database epoch. Also updated password change and reset route tests to mock the new sessionEpoch behavior.",
+  "notes_for_reviewer": "The DB connection and Account model dependencies are lazily loaded inside getCurrentAccount and bumpAccountSessionEpoch to keep accountSession.ts edge-safe where possible and maintain fast imports. Existing account sessions minted without an epoch will continue to be valid until a password change increments the epoch and re-mints a token with the new epoch.",
+  "blocked_reason": ""
+}

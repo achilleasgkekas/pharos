@@ -45,7 +45,11 @@ vi.mock('@/lib/db', () => ({ connectDB: connectDBMock }));
 vi.mock('@/models/Account', () => ({ Account: { findById: accountFindById } }));
 vi.mock('@/lib/auth', () => ({ hashPassword: hashPasswordMock, verifyPassword: verifyPasswordMock, assertCanWrite: vi.fn(async () => {}) }));
 vi.mock('@/lib/tenancy/accountProfile', () => ({ passwordChangeError: passwordChangeErrorMock }));
-vi.mock('@/lib/tenancy/accountSession', () => ({ getCurrentAccount: getCurrentAccountMock }));
+vi.mock('@/lib/tenancy/accountSession', () => ({
+  getCurrentAccount: getCurrentAccountMock,
+  bumpAccountSessionEpoch: vi.fn(async () => 1),
+  setAccountCookie: vi.fn(async () => {}),
+}));
 vi.mock('@/lib/tenancy/saasApi', async () => {
   // saasGuard is pure (try/catch + NextResponse.json, no DB/env reads) — run it for real so
   // the mid-handler-throw test exercises the actual production error-shaping logic.

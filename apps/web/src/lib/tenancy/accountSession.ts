@@ -44,14 +44,51 @@ export const verifyAccountSession = verifyAccountToken;
 /** Sign an account session token. Edge-safe implementation in accountToken.ts. */
 export const signAccountSession = signAccountToken;
 
-/** Read + verify the account cookie (token-only, no DB hit). Null when logged out. */
+async function currentAccountSessionEpoch(accountId: string): Promise<number> {
+  const { connectDB } = await import('../db');
+  const { Account } = await import('@/models/Account');
+  await connectDB();
+  const doc = (await Account.findById(accountId).select('sessionEpoch').lean()) as { sessionEpoch?: number } | null;
+  return Number(doc?.sessionEpoch) || 0;
+}
+
+export async function bumpAccountSessionEpoch(accountId: string): Promise<number> {
+  const { connectDB } = await import('../db');
+  const { Account } = await import('@/models/Account');
+  await connectDB();
+  const doc = (await Account.findByIdAndUpdate(
+    accountId,
+    { $inc: { sessionEpoch: 1 } },
+    { new: true, projection: { sessionEpoch: 1 } }
+  ).lean()) as { sessionEpoch?: number } | null;
+  return Number(doc?.sessionEpoch) || 0;
+}
+
+/** Read + verify the account cookie (token-only EXCEPT when checking the P182 epoch). Null when logged out. */
 export async function getCurrentAccount(): Promise<AccountClaims | null> {
   const store = await cookies();
-  return verifyAccountSession(store.get(ACCOUNT_COOKIE)?.value);
+  const claims = await verifyAccountSession(store.get(ACCOUNT_COOKIE)?.value);
+  if (!claims) return null;
+  if (claims.epoch !== undefined) {
+    try {
+      if ((await currentAccountSessionEpoch(claims.sub)) !== claims.epoch) return null;
+    } catch {
+      /* DB hiccup → fail open; the signature + expiry were already checked */
+    }
+  }
+  return claims;
 }
 
 export async function setAccountCookie(claims: AccountClaims): Promise<void> {
-  const token = await signAccountSession(claims);
+  let epoch = claims.epoch;
+  if (epoch === undefined) {
+    try {
+      epoch = await currentAccountSessionEpoch(claims.sub);
+    } catch {
+      /* DB hiccup → mint a token without an epoch rather than refusing login */
+    }
+  }
+  const token = await signAccountSession({ ...claims, epoch });
   const store = await cookies();
   store.set(ACCOUNT_COOKIE, token, accountCookieOptions());
 }

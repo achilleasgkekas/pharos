@@ -36,6 +36,8 @@ const AccountSchema = new Schema(
     mfaSecretEnc: { type: String, default: null },
     mfaPendingSecretEnc: { type: String, default: null },
     mfaRecoveryHashes: { type: [String], default: [] },
+    // "Sign out everywhere" epoch (P182). Embedded in session JWT and compared on read.
+    sessionEpoch: { type: Number, default: 0 },
   },
   { timestamps: true }
 );
