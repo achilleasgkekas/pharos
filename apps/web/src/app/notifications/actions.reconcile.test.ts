@@ -149,11 +149,11 @@ describe('generateNotifications — deal alert kind', () => {
 });
 
 describe('generateNotifications — warranty alert kind', () => {
-  it('fires for a warranty expiring within the configured window', async () => {
+  it('fires for a warranty expiring within the configured window, with expiry date in dedupeKey', async () => {
     state.items = [{ _id: 'i2', title: 'Apple Watch', warrantyUntil: '2026-08-10' }]; // 21 days out, window is 90
     await generateNotifications();
     expect(notificationInsertMany).toHaveBeenCalledWith([
-      expect.objectContaining({ dedupeKey: 'warranty:i2', kind: 'warranty', title: 'Apple Watch', body: '21', href: '/items?open=i2' }),
+      expect.objectContaining({ dedupeKey: 'warranty:i2:2026-08-10', kind: 'warranty', title: 'Apple Watch', body: '21', href: '/items?open=i2' }),
     ]);
   });
 
