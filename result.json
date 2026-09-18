@@ -1,0 +1,9 @@
+{
+  "status": "done",
+  "summary": "Fixed SaaS settings cache invalidation bug where cache.delete wiped the host's default cache instead of the specific tenant cache.",
+  "commit_subject": "fix(tenancy): pass explicit tenantId to invalidateAppSettings",
+  "commit_body": "saveDefaults and other settings savers run `invalidateAppSettings()` after the ambient context from `withRequestTenant` is already closed, which caused it to fall back to `currentTenant()` (the default tenant) and wrongly wipe the host's cache instead of the SaaS tenant's.\n\nModified `invalidateAppSettings` to accept an explicit `tenantId`, and updated all `actions.ts` callers to pass `(await softRequestTenant()).tenantId`.",
+  "tests_added": "Modified apps/web/src/app/settings/actions.tenant.test.ts to add a test proving saveDefaults invalidates the correct tenant cache.",
+  "notes_for_reviewer": "The fix was applied uniformly across all 14 callers of `invalidateAppSettings` in `actions.ts`. The implementation of `invalidateAppSettings` was updated to handle `explicitTenantId` properly.",
+  "blocked_reason": ""
+}

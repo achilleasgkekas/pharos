@@ -277,7 +277,12 @@ export async function getAppSettings(): Promise<AppSettings> {
 }
 
 /** Clear the settings cache. No arg → only the CURRENT tenant; `all` → every tenant. */
-export function invalidateAppSettings(all = false): void {
-  if (all) cache.clear();
-  else cache.delete(tenantKey());
+export function invalidateAppSettings(all = false, explicitTenantId?: string | null): void {
+  if (all) {
+    cache.clear();
+  } else if (explicitTenantId !== undefined) {
+    cache.delete(keyFor({ isDefault: !explicitTenantId, tenantId: explicitTenantId }));
+  } else {
+    cache.delete(tenantKey());
+  }
 }
