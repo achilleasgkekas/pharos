@@ -259,6 +259,8 @@ describe('saveDefaults', () => {
       trialAlertDays: 0,
       giftCardAlertDays: 0,
       billAlertDays: 0,
+      documentAlertDays: 0, // blank form → 0, same explicit-zero rule as siblings (P42)
+      specialDateAlertDays: 0, // same explicit-zero rule (P50)
       maintenanceAlertDays: 0, // blank form → 0, same explicit-zero rule as the siblings (P41)
       lendingAlertDays: 0, // same explicit-zero rule (P47)
       staleClaimDays: 0, // same explicit-zero rule (P44 phase 2): zero silence = nudge off
@@ -318,6 +320,22 @@ describe('saveDefaults', () => {
     expect((appConfigUpdateOne.mock.calls[0][1] as Record<string, { billAlertDays: number }>).$set.billAlertDays).toBe(0);
     await saveDefaults(formData({ billAlertDays: '365' }));
     expect((appConfigUpdateOne.mock.calls[1][1] as Record<string, { billAlertDays: number }>).$set.billAlertDays).toBe(90);
+  });
+
+  it('documentAlertDays deliberately allows an explicit 0 and clamps to [0,180]', async () => {
+    // Note: this mock relies on the order. We are clearing mocks before each test,
+    // so the index starts at 0 again.
+    await saveDefaults(formData({ documentAlertDays: '0' }));
+    expect((appConfigUpdateOne.mock.calls[0][1] as Record<string, { documentAlertDays: number }>).$set.documentAlertDays).toBe(0);
+    await saveDefaults(formData({ documentAlertDays: '365' }));
+    expect((appConfigUpdateOne.mock.calls[1][1] as Record<string, { documentAlertDays: number }>).$set.documentAlertDays).toBe(180);
+  });
+
+  it('specialDateAlertDays deliberately allows an explicit 0 and clamps to [0,180]', async () => {
+    await saveDefaults(formData({ specialDateAlertDays: '0' }));
+    expect((appConfigUpdateOne.mock.calls[0][1] as Record<string, { specialDateAlertDays: number }>).$set.specialDateAlertDays).toBe(0);
+    await saveDefaults(formData({ specialDateAlertDays: '365' }));
+    expect((appConfigUpdateOne.mock.calls[1][1] as Record<string, { specialDateAlertDays: number }>).$set.specialDateAlertDays).toBe(180);
   });
 
   it('autoAddStores and multiCurrency are true only on the exact string "true"', async () => {

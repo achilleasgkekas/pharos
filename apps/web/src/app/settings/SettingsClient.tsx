@@ -2172,6 +2172,8 @@ function DefaultsManager({ settings }: { settings: AppSettings }) {
   const [trialDays, setTrialDays] = useState(String(settings.trialAlertDays));
   const [giftDays, setGiftDays] = useState(String(settings.giftCardAlertDays));
   const [billDays, setBillDays] = useState(String(settings.billAlertDays));
+  const [docDays, setDocDays] = useState(String(settings.documentAlertDays));
+  const [specialDays, setSpecialDays] = useState(String(settings.specialDateAlertDays));
   const [maintDays, setMaintDays] = useState(String(settings.maintenanceAlertDays));
   const [lendDays, setLendDays] = useState(String(settings.lendingAlertDays));
   const [claimStaleDays, setClaimStaleDays] = useState(String(settings.staleClaimDays));
@@ -2192,6 +2194,8 @@ function DefaultsManager({ settings }: { settings: AppSettings }) {
     fd.set('trialAlertDays', trialDays);
     fd.set('giftCardAlertDays', giftDays);
     fd.set('billAlertDays', billDays);
+    fd.set('documentAlertDays', docDays);
+    fd.set('specialDateAlertDays', specialDays);
     fd.set('maintenanceAlertDays', maintDays);
     fd.set('lendingAlertDays', lendDays);
     fd.set('staleClaimDays', claimStaleDays);
@@ -2258,6 +2262,14 @@ function DefaultsManager({ settings }: { settings: AppSettings }) {
         <label className="block">
           <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.billAlert')}</span>
           <input type="number" min="0" max="90" value={billDays} onChange={(e) => setBillDays(e.target.value)} className={inputClass} />
+        </label>
+        <label className="block">
+          <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.documentAlert')}</span>
+          <input type="number" min="0" max="180" value={docDays} onChange={(e) => setDocDays(e.target.value)} className={inputClass} />
+        </label>
+        <label className="block">
+          <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.specialDateAlert')}</span>
+          <input type="number" min="0" max="180" value={specialDays} onChange={(e) => setSpecialDays(e.target.value)} className={inputClass} />
         </label>
         <label className="block">
           <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.maintenanceAlert')}</span>

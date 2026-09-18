@@ -1056,6 +1056,8 @@ export const en = {
   'set.trialAlert': 'Free-trial alert · days before charge',
   'set.giftCardAlert': 'Gift-card expiry alert · days ahead',
   'set.billAlert': 'Bill due alert · days ahead',
+  'set.documentAlert': 'Document expiry alert · days ahead',
+  'set.specialDateAlert': 'Special date alert · days ahead',
   'set.maintenanceAlert': 'Maintenance due alert · days ahead',
   'set.lendingAlert': 'Lent item due-back alert · days ahead',
   'set.claimStaleAlert': 'Warranty claim gone quiet · days of silence',

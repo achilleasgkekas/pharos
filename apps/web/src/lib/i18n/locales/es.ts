@@ -378,6 +378,8 @@ export const es: Partial<Dict> = {
   'set.trialAlert': 'Aviso de prueba gratis · días antes del cargo',
   'set.giftCardAlert': 'Aviso de caducidad de tarjeta regalo · días de antelación',
   'set.billAlert': 'Aviso de factura pendiente · días de antelación',
+  'set.documentAlert': 'Aviso de caducidad de documento · días de antelación',
+  'set.specialDateAlert': 'Aviso de fecha especial · días de antelación',
   'set.maintenanceAlert': 'Aviso de mantenimiento · días de antelación',
   'set.lendingAlert': 'Aviso de devolución de artículo prestado · días de antelación',
   'set.claimStaleAlert': 'Reclamación de garantía parada · días de silencio',
