@@ -2,8 +2,7 @@
 
 import { useEffect } from 'react';
 import { PharosMark } from './components/PharosMark';
-
-const GITHUB_URL = 'https://github.com/achilleasgkekas/pharos';
+import { GithubLink } from './components/GithubLink';
 
 /**
  * Root-level error boundary. Unlike app/error.tsx, this fires when the root
@@ -140,10 +139,11 @@ export default function GlobalError({
             >
               Back to home
             </a>
-            <a
-              href={GITHUB_URL}
-              target="_blank"
-              rel="noopener noreferrer"
+            {/* global-error replaces the whole document, so it cannot use the site's CSS classes
+                and carries its own inline styles; the link itself still goes through the shared
+                component, which hides it while the repo is private (#157). */}
+            <GithubLink
+              kind="button"
               style={{
                 fontFamily: font,
                 fontWeight: 600,
@@ -156,7 +156,7 @@ export default function GlobalError({
               }}
             >
               Self-host it free
-            </a>
+            </GithubLink>
           </div>
         </div>
       </body>

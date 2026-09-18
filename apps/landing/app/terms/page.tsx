@@ -1,8 +1,9 @@
 import type { Metadata } from 'next';
 import { PharosMark } from '../components/PharosMark';
+import { GithubLink } from '../components/GithubLink';
+import { GITHUB_URL } from '../site';
 
 const SITE_URL = 'https://ph-aros.com';
-const GITHUB_URL = 'https://github.com/achilleasgkekas/pharos';
 const CONTACT = 'hello@ph-aros.com';
 
 // BreadcrumbList so crawlers and AI answer engines place this page under the
@@ -120,12 +121,11 @@ export default function TermsOfService() {
         <Section id="self-host" title="1. Self-hosted PHAROS (open source)">
           <p>
             When you download and run PHAROS yourself from the{' '}
-            <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer" className="inline-link">
-              open-source project
-            </a>, your use is governed by the{' '}
-            <a href={`${GITHUB_URL}/blob/main/LICENSE`} target="_blank" rel="noopener noreferrer" className="inline-link">
+            <GithubLink kind="inline" className="inline-link">open-source project</GithubLink>, your use is
+            governed by the{' '}
+            <GithubLink kind="inline" href={`${GITHUB_URL}/blob/main/LICENSE`} className="inline-link">
               GNU AGPL-3.0 licence
-            </a>, not by these service terms. You are free to run, study, modify, and
+            </GithubLink>, not by these service terms. You are free to run, study, modify, and
             share the software under that licence, including its network-use and
             source-availability obligations. The software is provided as is, without
             warranty, to the extent the licence allows.
@@ -245,18 +245,16 @@ export default function TermsOfService() {
             Questions about these terms? Email{' '}
             <a href={`mailto:${CONTACT}`} className="inline-link">{CONTACT}</a>. For the
             open-source project, open an issue on{' '}
-            <a href={`${GITHUB_URL}/issues`} target="_blank" rel="noopener noreferrer" className="inline-link">
+            <GithubLink kind="inline" href={`${GITHUB_URL}/issues`} className="inline-link">
               GitHub
-            </a>.
+            </GithubLink>.
           </p>
         </Section>
 
         <div style={{ marginTop: 56, display: 'flex', gap: 14, flexWrap: 'wrap' }}>
           <a href="/" className="btn btn-primary">Back to home</a>
           <a href="/privacy" className="btn btn-ghost">Privacy Policy</a>
-          <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer" className="btn btn-ghost">
-            Self-host it free
-          </a>
+          <GithubLink kind="button" className="btn btn-ghost">Self-host it free</GithubLink>
         </div>
       </div>
     </main>

@@ -2,8 +2,7 @@
 
 import { useEffect } from 'react';
 import { PharosMark } from './components/PharosMark';
-
-const GITHUB_URL = 'https://github.com/achilleasgkekas/pharos';
+import { GithubLink } from './components/GithubLink';
 
 /**
  * Branded error boundary for the landing site. Next.js App Router requires this
@@ -83,9 +82,7 @@ export default function Error({
           <a href="/" className="btn btn-ghost">
             Back to home
           </a>
-          <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer" className="btn btn-ghost">
-            Self-host it free
-          </a>
+          <GithubLink kind="button" className="btn btn-ghost">Self-host it free</GithubLink>
         </div>
       </div>
     </main>

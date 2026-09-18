@@ -8,20 +8,14 @@ import { CopyButton } from './components/CopyButton';
 import { FaqDeepLink } from './components/FaqDeepLink';
 import { FaqCopyLink } from './components/FaqCopyLink';
 import { Pricing } from './components/Pricing';
-
-const GITHUB_URL = 'https://github.com/achilleasgkekas/pharos';
+import { GithubLink } from './components/GithubLink';
+import { GITHUB_URL, REPO_PUBLIC } from './site';
 
 // Where "Sign in" goes. The marketing site had no way into the product at all: a returning
 // customer landed on ph-aros.com and had to already know the app lives on another
 // subdomain. Env-overridable so a staging landing can point at a staging app.
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.ph-aros.com';
 const SITE_URL = 'https://ph-aros.com';
-
-// The repository is private during the private-beta phase and goes public right
-// before launch. While false, self-host CTAs carry a "coming soon" signal so
-// visitors are not surprised by a 404. Flip to true the moment the repo is
-// public and every badge/note below disappears automatically.
-const REPO_PUBLIC = false;
 
 // Hosted signup is closed while the beta is private: `SAAS_SIGNUP_CODES` is set on the
 // production app, so /account/signup asks for an invite code and creates nothing without
@@ -658,7 +652,8 @@ const JSON_LD = {
       logo: `${SITE_URL}/favicon.svg`,
       description:
         'PHAROS is a personal hub for overseeing everything you own, from a single private dashboard. Self-host it free under AGPL-3.0, or use the managed hosted service.',
-      sameAs: [GITHUB_URL],
+      // The repo is private until launch — declaring it here would hand crawlers a 404.
+      ...(REPO_PUBLIC ? { sameAs: [GITHUB_URL] } : {}),
     },
     {
       '@type': 'WebSite',
@@ -679,7 +674,8 @@ const JSON_LD = {
       author: { '@type': 'Person', name: 'Achilleas' },
       publisher: { '@id': `${SITE_URL}/#organization` },
       license: 'https://www.gnu.org/licenses/agpl-3.0.html',
-      softwareHelp: `${GITHUB_URL}/blob/main/README.md`,
+      // Same reasoning as `sameAs` above: no README URL to offer while the repo is private.
+      ...(REPO_PUBLIC ? { softwareHelp: `${GITHUB_URL}/blob/main/README.md` } : {}),
       // Per-plan Offers, one per priced tier (free self-host + the Pro/Dedicated hosted
       // plans defined in apps/web/src/lib/billing/plans.ts). There is no free hosted
       // offer: hosted starts on a 14-day trial and is paid after it.
@@ -806,19 +802,15 @@ export default function Home() {
             <a href="#compare" className="navlink nav-anchor">Compare</a>
             <a href="#roadmap" className="navlink nav-anchor">Roadmap</a>
             <a href="#faq" className="navlink nav-anchor">FAQ</a>
-            <a
-              href={GITHUB_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="navlink"
-            >
-              GitHub
-            </a>
+            {/* No nav entry at all while the repo is private: a menu item that degrades to text is
+                still a menu item people click. Same rule the footer's GitHub column already
+                follows (see the REPO_PUBLIC gate further down in this file). */}
+            {REPO_PUBLIC && <GithubLink kind="inline" className="navlink">GitHub</GithubLink>}
             <a href={`${APP_URL}/account/login`} className="nav-signin">
               Sign in
             </a>
           </nav>
-          <MobileNav githubUrl={GITHUB_URL} appUrl={APP_URL} />
+          <MobileNav appUrl={APP_URL} />
         </div>
       </header>
       <ScrollProgress />
@@ -867,10 +859,7 @@ export default function Home() {
 
           <div style={{ display: 'flex', gap: 14, justifyContent: 'center', flexWrap: 'wrap' }}>
             <a href="#pricing" className="btn btn-primary">Get started</a>
-            <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer" className="btn btn-ghost">
-              Self-host it free
-              {!REPO_PUBLIC && <span className="soon-badge">soon</span>}
-            </a>
+            <GithubLink kind="button" className="btn btn-ghost">Self-host it free</GithubLink>
           </div>
 
           <ul className="hero-assurance" aria-label="What you get">
@@ -1233,12 +1222,7 @@ export default function Home() {
             </p>
           </div>
 
-          <Pricing
-            tiers={TIERS}
-            repoPublic={REPO_PUBLIC}
-            githubUrl={GITHUB_URL}
-            inviteOnly={HOSTED_INVITE_ONLY}
-          />
+          <Pricing tiers={TIERS} inviteOnly={HOSTED_INVITE_ONLY} />
 
           {HOSTED_INVITE_ONLY && (
             <p className="repo-soon" style={{ marginTop: 30, marginBottom: 0 }}>
@@ -1334,9 +1318,9 @@ export default function Home() {
 
           <p style={{ textAlign: 'center', color: 'var(--text-faint)', fontSize: '0.85rem', marginTop: 32 }}>
             Priorities can shift. Open an issue on{' '}
-            <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)' }}>
+            <GithubLink kind="inline" href={`${GITHUB_URL}/issues`} style={{ color: 'var(--accent)' }}>
               GitHub
-            </a>{' '}
+            </GithubLink>{' '}
             to weigh in.
           </p>
         </div>
@@ -1357,10 +1341,7 @@ export default function Home() {
               </p>
               <div style={{ display: 'flex', gap: 14, justifyContent: 'center', flexWrap: 'wrap' }}>
                 <a href="#pricing" className="btn btn-primary">Get started</a>
-                <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer" className="btn btn-ghost">
-                  Self-host it free
-                  {!REPO_PUBLIC && <span className="soon-badge">soon</span>}
-                </a>
+                <GithubLink kind="button" className="btn btn-ghost">Self-host it free</GithubLink>
               </div>
             </div>
           </div>

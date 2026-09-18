@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import { PharosMark } from './components/PharosMark';
-
-const GITHUB_URL = 'https://github.com/achilleasgkekas/pharos';
+import { GithubLink } from './components/GithubLink';
 
 export const metadata: Metadata = {
   title: 'Page not found · PHAROS',
@@ -58,9 +57,7 @@ export default function NotFound() {
 
         <div style={{ display: 'flex', gap: 14, justifyContent: 'center', flexWrap: 'wrap' }}>
           <a href="/" className="btn btn-primary">Back to home</a>
-          <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer" className="btn btn-ghost">
-            Self-host it free
-          </a>
+          <GithubLink kind="button" className="btn btn-ghost">Self-host it free</GithubLink>
         </div>
       </div>
     </main>

@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import { Icon } from './Icon';
+import { GithubLink } from './GithubLink';
+import { GITHUB_URL } from '../site';
 
 export type PricingTier = {
   name: string;
@@ -27,13 +29,9 @@ const isHosted = (t: PricingTier): boolean =>
 
 export function Pricing({
   tiers,
-  repoPublic,
-  githubUrl,
   inviteOnly = false,
 }: {
   tiers: PricingTier[];
-  repoPublic: boolean;
-  githubUrl: string;
   /** Private beta: hosted signup needs an invite code, so the hosted CTAs say so. */
   inviteOnly?: boolean;
 }) {
@@ -117,21 +115,28 @@ export function Pricing({
                 {t.tagline}
               </p>
 
-              <a
-                href={t.ctaHref}
-                target={t.ctaHref.startsWith('http') ? '_blank' : undefined}
-                rel={t.ctaHref.startsWith('http') ? 'noopener noreferrer' : undefined}
-                className={`btn ${t.highlight ? 'btn-primary' : 'btn-ghost'}`}
-                style={{ width: '100%', marginBottom: 22 }}
-              >
-                {t.cta}
-                {!repoPublic && t.ctaHref === githubUrl && (
-                  <span className="soon-badge">soon</span>
-                )}
-                {inviteOnly && hosted && (
-                  <span className="soon-badge">invite only</span>
-                )}
-              </a>
+              {t.ctaHref === GITHUB_URL ? (
+                <GithubLink
+                  kind="button"
+                  className={`btn ${t.highlight ? 'btn-primary' : 'btn-ghost'}`}
+                  style={{ width: '100%', marginBottom: 22 }}
+                >
+                  {t.cta}
+                </GithubLink>
+              ) : (
+                <a
+                  href={t.ctaHref}
+                  target={t.ctaHref.startsWith('http') ? '_blank' : undefined}
+                  rel={t.ctaHref.startsWith('http') ? 'noopener noreferrer' : undefined}
+                  className={`btn ${t.highlight ? 'btn-primary' : 'btn-ghost'}`}
+                  style={{ width: '100%', marginBottom: 22 }}
+                >
+                  {t.cta}
+                  {inviteOnly && hosted && (
+                    <span className="soon-badge">invite only</span>
+                  )}
+                </a>
+              )}
 
               <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {t.features.map((feat) => (
