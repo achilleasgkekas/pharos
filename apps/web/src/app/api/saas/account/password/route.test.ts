@@ -47,7 +47,6 @@ vi.mock('@/lib/auth', () => ({ hashPassword: hashPasswordMock, verifyPassword: v
 vi.mock('@/lib/tenancy/accountProfile', () => ({ passwordChangeError: passwordChangeErrorMock }));
 vi.mock('@/lib/tenancy/accountSession', () => ({
   getCurrentAccount: getCurrentAccountMock,
-  bumpAccountSessionEpoch: vi.fn(async () => 1),
   setAccountCookie: vi.fn(async () => {}),
 }));
 vi.mock('@/lib/tenancy/saasApi', async () => {
@@ -68,6 +67,7 @@ function makeAccount(over: Record<string, unknown> = {}) {
   return {
     _id: 'acc1',
     passwordHash: 'old-hash',
+    sessionEpoch: 5,
     save: vi.fn(async function (this: Record<string, unknown>) {
       return this;
     }),
@@ -180,6 +180,7 @@ describe('success', () => {
     expect(hashPasswordMock).toHaveBeenCalledWith('brand-new-pw');
     expect(hashPasswordMock).not.toHaveBeenCalledWith('old-pw-1');
     expect(account.passwordHash).toBe('hashed:brand-new-pw');
+    expect(account.sessionEpoch).toBe(6);
     expect(account.save).toHaveBeenCalled();
     expect(res.status).toBe(200);
     const json = (await res.json()) as { ok: boolean };

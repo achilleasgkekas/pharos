@@ -5,7 +5,6 @@ import { hashPassword } from '@/lib/auth';
 import { readBody, strField } from '@/lib/apiBody';
 import { rateLimit, clientIp } from '@/lib/apiAuth';
 import { saasAuthGate, saasGuard } from '@/lib/tenancy/saasApi';
-import { bumpAccountSessionEpoch } from '@/lib/tenancy/accountSession';
 import { hashResetToken, isResetTokenValid, resetPasswordError } from '@/lib/tenancy/passwordReset';
 
 export const runtime = 'nodejs';
@@ -13,20 +12,13 @@ export const dynamic = 'force-dynamic';
 
 /**
  * POST /api/saas/account/reset/confirm  { token, newPassword }
- *   → look up the account by the token's SHA-256 hash, verify it hasn't expired, then set a
- *     fresh password hash and clear the reset fields (single-use). UNAUTHENTICATED (the user
- *     is proving ownership via the token, not a session).
- *
- * A missing/invalid/expired token returns the same generic 400 (no distinction between
- * "unknown token" and "expired token" — nothing to leak). Enforces the reset password
- * policy before touching the DB.
+ *   → verifies the time-limited reset token, saves the new password, clears the token.
+ * SaaS-mode only (404 when SAAS_MODE off).
  */
 export async function POST(req: NextRequest) {
   return saasGuard(async () => {
-    // This one takes a reset TOKEN and sets a password. Unlimited, it is an offline-speed guessing
-    // machine against that token, aimed at the one operation that hands over an account outright.
-    // The token is long and hashed, so guessing is already impractical — but "impractical" is a
-    // property of the token, and a limit is a property we control. Cheap to add, and it also caps
+    // A raw unauthenticated endpoint accepting arbitrary strings (token/password).
+    // The token is a 64-char hex string, but limiting is still necessary to bound
     // the damage if a future token format is ever shortened.
     const limited = rateLimit(`saas-reset-confirm:${clientIp(req)}`);
     if (limited) return limited;
@@ -44,7 +36,7 @@ export async function POST(req: NextRequest) {
 
     await connectDB();
     const account = await Account.findOne({ resetTokenHash: hashResetToken(token) }).select(
-      '_id resetTokenHash resetTokenExpires'
+      '_id resetTokenHash resetTokenExpires sessionEpoch'
     );
     if (!account || !isResetTokenValid(account.resetTokenExpires)) {
       return NextResponse.json({ error: 'This reset link is invalid or has expired' }, { status: 400 });
@@ -54,12 +46,9 @@ export async function POST(req: NextRequest) {
       passwordHash: hashPassword(newPassword),
       resetTokenHash: null,
       resetTokenExpires: null,
+      sessionEpoch: (account.sessionEpoch || 0) + 1,
     });
     await account.save();
-
-    // Bumps the session epoch so all existing sessions are invalidated (P182).
-    // The user will need to log in with the new password.
-    await bumpAccountSessionEpoch(String(account._id));
 
     return NextResponse.json({ ok: true });
   });

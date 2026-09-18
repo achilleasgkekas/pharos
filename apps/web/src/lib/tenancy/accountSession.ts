@@ -52,30 +52,20 @@ async function currentAccountSessionEpoch(accountId: string): Promise<number> {
   return Number(doc?.sessionEpoch) || 0;
 }
 
-export async function bumpAccountSessionEpoch(accountId: string): Promise<number> {
-  const { connectDB } = await import('../db');
-  const { Account } = await import('@/models/Account');
-  await connectDB();
-  const doc = (await Account.findByIdAndUpdate(
-    accountId,
-    { $inc: { sessionEpoch: 1 } },
-    { new: true, projection: { sessionEpoch: 1 } }
-  ).lean()) as { sessionEpoch?: number } | null;
-  return Number(doc?.sessionEpoch) || 0;
-}
-
 /** Read + verify the account cookie (token-only EXCEPT when checking the P182 epoch). Null when logged out. */
 export async function getCurrentAccount(): Promise<AccountClaims | null> {
   const store = await cookies();
   const claims = await verifyAccountSession(store.get(ACCOUNT_COOKIE)?.value);
   if (!claims) return null;
-  if (claims.epoch !== undefined) {
-    try {
-      if ((await currentAccountSessionEpoch(claims.sub)) !== claims.epoch) return null;
-    } catch {
-      /* DB hiccup → fail open; the signature + expiry were already checked */
-    }
+
+  try {
+    const dbEpoch = await currentAccountSessionEpoch(claims.sub);
+    const tokenEpoch = claims.epoch ?? 0;
+    if (dbEpoch !== tokenEpoch) return null;
+  } catch {
+    /* DB hiccup → fail open; the signature + expiry were already checked */
   }
+
   return claims;
 }
 

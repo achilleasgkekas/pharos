@@ -44,9 +44,7 @@ vi.mock('@/lib/apiAuth', () => ({
 vi.mock('@/lib/db', () => ({ connectDB: connectDBMock }));
 vi.mock('@/models/Account', () => ({ Account: { findOne: accountFindOneMock } }));
 vi.mock('@/lib/auth', () => ({ hashPassword: hashPasswordMock, assertCanWrite: vi.fn(async () => {}) }));
-vi.mock('@/lib/tenancy/accountSession', () => ({
-  bumpAccountSessionEpoch: vi.fn(async () => 1),
-}));
+vi.mock('@/lib/tenancy/accountSession', () => ({}));
 vi.mock('@/lib/tenancy/saasApi', async () => {
   // saasGuard is pure (try/catch + NextResponse.json) — run it for real so the mid-handler-throw
   // test exercises the actual production error-shaping logic.
@@ -75,6 +73,7 @@ function makeAccount(over: Record<string, unknown> = {}) {
     _id: 'acc1',
     resetTokenHash: hashResetToken(TOKEN),
     resetTokenExpires: future(),
+    sessionEpoch: 5,
     set: vi.fn(function (this: Record<string, unknown>, patch: Record<string, unknown>) {
       Object.assign(this, patch);
     }),
@@ -192,7 +191,7 @@ describe('POST /api/saas/account/reset/confirm — lookup', () => {
 
     await POST(makeReq({ token: TOKEN, newPassword: GOOD_PASSWORD }));
 
-    expect(accountFindOneSelect).toHaveBeenCalledWith('_id resetTokenHash resetTokenExpires');
+    expect(accountFindOneSelect).toHaveBeenCalledWith('_id resetTokenHash resetTokenExpires sessionEpoch');
   });
 
   it('returns the generic 400 for an UNKNOWN token, with no write', async () => {
@@ -261,6 +260,7 @@ describe('POST /api/saas/account/reset/confirm — consumption', () => {
       passwordHash: `hashed:${GOOD_PASSWORD}`,
       resetTokenHash: null,
       resetTokenExpires: null,
+      sessionEpoch: 6,
     });
     expect(doc.save).toHaveBeenCalledTimes(1);
     // The in-memory doc reflects the consumption, so a replay finds nothing to redeem.

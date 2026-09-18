@@ -4,7 +4,7 @@ import { Account } from '@/models/Account';
 import { hashPassword, verifyPassword } from '@/lib/auth';
 import { readBody, strField } from '@/lib/apiBody';
 import { saasAuthGate, saasGuard } from '@/lib/tenancy/saasApi';
-import { getCurrentAccount, bumpAccountSessionEpoch, setAccountCookie } from '@/lib/tenancy/accountSession';
+import { getCurrentAccount, setAccountCookie } from '@/lib/tenancy/accountSession';
 import { passwordChangeError } from '@/lib/tenancy/accountProfile';
 
 export const runtime = 'nodejs';
@@ -35,16 +35,17 @@ export async function POST(req: NextRequest) {
     if (policyError) return NextResponse.json({ error: policyError }, { status: 400 });
 
     await connectDB();
-    const account = await Account.findById(claims.sub).select('_id passwordHash email');
+    const account = await Account.findById(claims.sub).select('_id passwordHash email sessionEpoch');
     if (!account || !verifyPassword(current, account.passwordHash)) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
     }
 
     account.passwordHash = hashPassword(next);
+    account.sessionEpoch = (account.sessionEpoch || 0) + 1;
     await account.save();
 
     const accountId = String(account._id);
-    const epoch = await bumpAccountSessionEpoch(accountId);
+    const epoch = account.sessionEpoch;
     await setAccountCookie({ sub: accountId, email: account.email, epoch });
 
     return NextResponse.json({ ok: true });
