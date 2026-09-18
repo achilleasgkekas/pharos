@@ -802,7 +802,9 @@ export default function Home() {
             <a href="#compare" className="navlink nav-anchor">Compare</a>
             <a href="#roadmap" className="navlink nav-anchor">Roadmap</a>
             <a href="#faq" className="navlink nav-anchor">FAQ</a>
-            <GithubLink kind="inline" className="navlink">GitHub</GithubLink>
+            {/* No nav entry at all while the repo is private: a menu item that degrades to text
+                is still a menu item people click. The footer column does the same. */}
+            {REPO_PUBLIC && <GithubLink kind="inline" className="navlink">GitHub</GithubLink>}
             <a href={`${APP_URL}/account/login`} className="nav-signin">
               Sign in
             </a>

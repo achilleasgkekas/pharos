@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { GithubLink } from './GithubLink';
+import { REPO_PUBLIC } from '../site';
 
 type NavItem = { href: string; label: string; external?: boolean };
 
@@ -161,9 +162,13 @@ export function MobileNav({ appUrl }: { appUrl: string }) {
               {it.label}
             </a>
           ))}
-          <GithubLink kind="inline" className="drawer-link" onClick={() => setOpen(false)}>
-            GitHub ↗
-          </GithubLink>
+          {/* Same as the desktop nav: hidden entirely while the repo is private, so the drawer
+              never holds an entry that only closes the drawer. */}
+          {REPO_PUBLIC && (
+            <GithubLink kind="inline" className="drawer-link" onClick={() => setOpen(false)}>
+              GitHub ↗
+            </GithubLink>
+          )}
           <a
             href={`${appUrl}/account/login`}
             className="drawer-signin"
