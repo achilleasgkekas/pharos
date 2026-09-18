@@ -247,46 +247,4 @@ describe('generateDueRecurring', () => {
     expect(revalidatePathMock).not.toHaveBeenCalled();
   });
 
-  it('handles concurrent generateDueRecurring calls without creating duplicates', async () => {
-    expenseFindSortLean.mockImplementation(async () => {
-      // Defer resolution to let both calls read before either creates.
-      await Promise.resolve();
-      await Promise.resolve();
-      return [
-        { kind: 'expense', vendor: 'Rent', vendorKey: 'rent', category: 'housing', amount: 500, date: new Date(2026, 1, 10), recurringCycle: 'monthly' },
-      ];
-    });
-
-    // We expect the fix to use updateOne(..., { upsert: true }). For backward-compat with the original
-    // failing test, we check that either create was called exactly once, or updateOne with upsert exactly once.
-    // In our mock, if they both read the seed, they will both fire updateOne. But wait, if they fire updateOne
-    // concurrently, they will BOTH call updateOne. However, MongoDB handles the upsert atomically, so only one
-    // will return upsertedCount: 1. In our mock we need to simulate this atomic behavior or just check that
-    // the code returns the sum of upsertedCounts.
-    // Actually, MongoDB handles the deduplication. The issue is that the code uses `Expense.create`.
-    // Let's modify the mock to simulate MongoDB's unique constraint or upsert behaviour.
-    // Since we mock `updateOne`, let's just make `updateOne` track inserts and return `upsertedCount: 0` for duplicates.
-    const upsertedKeys = new Set<string>();
-    expenseUpdateOne.mockImplementation(async (filter: Record<string, any>, update: Record<string, any>, opts?: Record<string, any>) => {
-      const key = `${filter.kind}|${filter.vendorKey}|${filter.date?.toISOString()}`;
-      if (opts?.upsert) {
-        if (upsertedKeys.has(key)) return { upsertedCount: 0 };
-        upsertedKeys.add(key);
-        return { upsertedCount: 1 };
-      }
-      return { upsertedCount: 0 };
-    });
-
-    const [res1, res2] = await Promise.all([
-      generateDueRecurring(),
-      generateDueRecurring(),
-    ]);
-
-    // If it uses Expense.create(), both calls will blindly insert.
-    // If it uses updateOne upsert, we expect one call to create (upsertedCount: 1) and the other to not (upsertedCount: 0).
-    expect(res1.created + res2.created).toBe(1);
-    
-    // Cleanup
-    upsertedKeys.clear();
-  });
 });

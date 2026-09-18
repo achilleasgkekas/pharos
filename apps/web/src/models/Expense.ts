@@ -92,6 +92,8 @@ const ExpenseSchema = new Schema(
 );
 
 ExpenseSchema.index({ kind: 1, vendorKey: 1, date: -1 }); // series timeline per vendor
+// Unique index to prevent duplicate auto-generated recurring entries during concurrent cron runs.
+ExpenseSchema.index({ kind: 1, vendorKey: 1, date: 1, recurring: 1, aiModel: 1 }, { unique: true });
 // Incremental-sync cursor (lib/apiList withSince → updatedAt $gte) for GET /api/v1/expenses.
 ExpenseSchema.index({ updatedAt: -1 });
 
