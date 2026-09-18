@@ -91,6 +91,7 @@ vi.mock('next/cache', () => ({ revalidatePath: () => {} }));
 vi.mock('@/lib/appSettings', () => ({
   getAppSettings: async () => ({ currency: 'EUR' }),
   invalidateAppSettings: () => {},
+  invalidateAppSettingsForRequest: async () => {},
 }));
 
 import { setAiEnabled, saveBudgets, getTrash, restoreFromTrash, purgeTrashEntry, emptyTrash } from './actions';

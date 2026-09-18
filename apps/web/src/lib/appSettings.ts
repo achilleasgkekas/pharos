@@ -276,7 +276,22 @@ export async function getAppSettings(): Promise<AppSettings> {
   return v;
 }
 
-/** Clear the settings cache. No arg → only the CURRENT tenant; `all` → every tenant. */
+/**
+ * Clear the cache for the workspace THIS REQUEST belongs to (#162).
+ *
+ * The read side already learned this lesson: a settings server action reaches its models through a
+ * helper that opens and closes the tenant context per call, so by the time it invalidates there is
+ * no ambient tenant and `currentTenant()` answers "default". The write landed in the customer's
+ * database while the eviction hit the default slot — their old settings stayed visible for the rest
+ * of the TTL, and the self-hosted slot was dropped for nothing. Resolving the workspace the same
+ * way `getAppSettings` does keeps both sides on one answer, and `softRequestTenant` falls back to
+ * the default tenant outside SaaS, so the self-hosted path is untouched (and cannot throw).
+ */
+export async function invalidateAppSettingsForRequest(): Promise<void> {
+  cache.delete(keyFor(await softRequestTenant()));
+}
+
+/** Clear the settings cache from a NON-request context (cron, scripts): the ambient tenant, or all. */
 export function invalidateAppSettings(all = false): void {
   if (all) cache.clear();
   else cache.delete(tenantKey());

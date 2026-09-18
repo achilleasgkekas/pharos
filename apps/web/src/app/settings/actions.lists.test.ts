@@ -42,7 +42,7 @@ const {
   requireAdminMock: vi.fn(async () => ({ id: 'admin1', role: 'admin' as const, name: 'Admin' })),
   revalidatePathMock: vi.fn(),
   getAppSettingsMock: vi.fn(async () => ({} as Record<string, unknown>)),
-  invalidateAppSettingsMock: vi.fn(),
+  invalidateAppSettingsMock: vi.fn(async () => {}),
 }));
 
 vi.mock('@/lib/money', () => ({ cur: () => '€' }));
@@ -100,7 +100,9 @@ vi.mock('@/lib/budgetSuggest', () => ({ suggestBudgetsFromExpenses: vi.fn() }));
 vi.mock('@/lib/categoryRules', () => ({ resolveCategoryRules: vi.fn() }));
 vi.mock('@/lib/priceHike', () => ({ detectPriceHikes: vi.fn() }));
 vi.mock('@/lib/anthropic', () => ({ anthropicTest: vi.fn() }));
-vi.mock('@/lib/appSettings', () => ({ getAppSettings: getAppSettingsMock, invalidateAppSettings: invalidateAppSettingsMock }));
+vi.mock('@/lib/appSettings', () => ({ getAppSettings: getAppSettingsMock, invalidateAppSettings: vi.fn(),
+  // #162: the eviction these actions perform is the request-scoped one.
+  invalidateAppSettingsForRequest: invalidateAppSettingsMock}));
 vi.mock('@/lib/auth', () => ({ requireAdmin: requireAdminMock, assertCanWrite: vi.fn(async () => {}) }));
 vi.mock('@/lib/aiFeatures', () => ({ AI_FEATURE_KEYS: [] }));
 vi.mock('@/lib/aiModels', () => ({ PROVIDER_RECOMMEND: {}, priceForModel: vi.fn(), looksVisionModel: vi.fn() }));
@@ -158,7 +160,7 @@ beforeEach(() => {
     itemCategories: DEFAULT_ITEM_CATEGORIES,
     subscriptionCategories: DEFAULT_SUBSCRIPTION_CATEGORIES,
   }));
-  invalidateAppSettingsMock.mockImplementation(() => undefined);
+  invalidateAppSettingsMock.mockImplementation(async () => undefined);
 });
 
 describe('getListsForEditor', () => {

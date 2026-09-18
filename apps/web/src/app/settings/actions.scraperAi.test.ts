@@ -91,7 +91,7 @@ vi.mock('@/lib/budgetSuggest', () => ({ suggestBudgetsFromExpenses: vi.fn() }));
 vi.mock('@/lib/categoryRules', () => ({ resolveCategoryRules: vi.fn() }));
 vi.mock('@/lib/priceHike', () => ({ detectPriceHikes: vi.fn() }));
 vi.mock('@/lib/anthropic', () => ({ anthropicTest: vi.fn() }));
-vi.mock('@/lib/appSettings', () => ({ getAppSettings: vi.fn(), invalidateAppSettings: vi.fn() }));
+vi.mock('@/lib/appSettings', () => ({ getAppSettings: vi.fn(), invalidateAppSettings: vi.fn() , invalidateAppSettingsForRequest: vi.fn(async () => {})}));
 vi.mock('@/lib/auth', () => ({ requireAdmin: requireAdminMock, assertCanWrite: vi.fn(async () => {}) }));
 vi.mock('@/lib/aiFeatures', () => ({ AI_FEATURE_KEYS: [] }));
 vi.mock('@/lib/aiModels', () => ({ PROVIDER_RECOMMEND: {}, priceForModel: vi.fn(), looksVisionModel: vi.fn() }));

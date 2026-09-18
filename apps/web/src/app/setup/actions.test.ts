@@ -61,7 +61,7 @@ vi.mock('@/lib/auth', async (importOriginal) => {
   return { ...actual, setSessionCookie: setSessionCookieMock, requireAdmin: requireAdminMock };
 });
 vi.mock('@/lib/aiConfig', () => ({ invalidateAiConfigCache: invalidateAiConfigCacheMock }));
-vi.mock('@/lib/appSettings', () => ({ invalidateAppSettings: invalidateAppSettingsMock }));
+vi.mock('@/lib/appSettings', () => ({ invalidateAppSettings: invalidateAppSettingsMock , invalidateAppSettingsForRequest: vi.fn(async () => {})}));
 vi.mock('@/app/settings/actions', () => ({ saveAiConfig: saveAiConfigMock }));
 
 import { createFirstAdmin, saveSetupBasics, saveSetupAi, finishWithoutAi } from './actions';

@@ -75,7 +75,7 @@ vi.mock('@/models/Expense', () => ({ Expense: { find: expenseFind } }));
 vi.mock('@/models/AppConfig', () => ({ AppConfig: { updateOne: appConfigUpdateOne } }));
 vi.mock('@/lib/appSettings', () => ({
   getAppSettings: getAppSettingsMock,
-  invalidateAppSettings: invalidateMock,
+  invalidateAppSettings: invalidateMock, invalidateAppSettingsForRequest: vi.fn(async () => {}),
 }));
 
 import { GET, PATCH } from './route';
