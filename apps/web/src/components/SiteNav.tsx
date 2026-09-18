@@ -304,9 +304,9 @@ export function SiteNav({ aiReady = false, user, saas = false, operator = false,
                 href={productHref(productBaseUrl, link.href)}
                 prefetch={false}
                 onClick={() => setActivePanel('none')}
-                className={cn('flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-all', active ? 'bg-[color:var(--color-surface-2)] text-[color:var(--color-accent)]' : 'text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]')}
+                className={cn('flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-all min-w-0', active ? 'bg-[color:var(--color-surface-2)] text-[color:var(--color-accent)]' : 'text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]')}
               >
-                <Icon size={16} /> {t(link.key)}
+                <Icon size={16} className="shrink-0" /> <span className="truncate">{t(link.key)}</span>
               </Link>
             );
           })}
