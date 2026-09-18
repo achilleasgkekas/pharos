@@ -81,7 +81,8 @@ async function computeAlerts(): Promise<Alert[]> {
     const days = Math.ceil((new Date(i.warrantyUntil as string).getTime() - now) / 86400000);
     if (!isNaN(days) && days >= 0 && days <= s.warrantyAlertDays) {
       const id = String(i._id);
-      alerts.push({ dedupeKey: `warranty:${id}`, kind: 'warranty', title: i.title, body: `${days}`, href: `/items?open=${id}` });
+      const iso = new Date(i.warrantyUntil as string).toISOString().slice(0, 10);
+      alerts.push({ dedupeKey: `warranty:${id}:${iso}`, kind: 'warranty', title: i.title, body: `${days}`, href: `/items?open=${id}` });
     }
   }
 
