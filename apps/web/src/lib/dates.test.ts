@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { safeDate, safeDateOrNull } from './dates';
 
 // dates.ts parses receipt/statement dates that native `new Date()` mishandles.
@@ -120,3 +120,25 @@ describe('safeDateOrNull', () => {
     expect(safeDateOrNull(42)).toBeNull();
   });
 });
+
+import { todayLocal } from './dates';
+
+describe('todayLocal', () => {
+  it('returns the date in the local timezone, avoiding the UTC slice bug', () => {
+    // 2026-09-18 20:00:00 in New York is 2026-09-19 00:00:00 in UTC.
+    const originalEnv = process.env.TZ;
+    process.env.TZ = 'America/New_York';
+    
+    const d = new Date('2026-09-18T20:00:00-04:00');
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(d);
+    
+    // `.toISOString().slice(0, 10)` would return '2026-09-19'
+    // but `todayLocal()` should return '2026-09-18' because it's local time.
+    expect(todayLocal()).toBe('2026-09-18');
+    
+    vi.useRealTimers();
+    process.env.TZ = originalEnv;
+  });
+});
+

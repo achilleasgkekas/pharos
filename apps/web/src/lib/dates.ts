@@ -33,3 +33,8 @@ function parseFlexibleDate(value: unknown): Date | null {
   const d = new Date(s);
   return isNaN(d.getTime()) ? null : d;
 }
+
+/** Returns the current local date as an ISO string (YYYY-MM-DD), avoiding the UTC shift of `.toISOString()`. */
+export function todayLocal(): string {
+  return new Date().toLocaleDateString('en-CA');
+}

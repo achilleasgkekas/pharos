@@ -37,7 +37,7 @@ export function UtilitiesClient({ readings, spaces }: { readings: ReadingLike[];
           </h1>
           <p className="text-xs text-[color:var(--color-text-dim)] mt-1">{t('util.subtitle')}</p>
         </div>
-        <button onClick={() => setOpen(true)} className="flex items-center gap-1.5 rounded-lg bg-[color:var(--color-accent)] text-black px-3 py-2 text-sm font-semibold">
+        <button onClick={() => { setReadingAt(today()); setOpen(true); }} className="flex items-center gap-1.5 rounded-lg bg-[color:var(--color-accent)] text-black px-3 py-2 text-sm font-semibold">
           <Plus size={16} /> {t('util.add')}
         </button>
       </div>
