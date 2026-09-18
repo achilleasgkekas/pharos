@@ -57,6 +57,7 @@ vi.mock('@/lib/csvImport', () => ({ csvDedupeKey: vi.fn() }));
 vi.mock('next/cache', () => ({ revalidatePath: (p: string) => revalidatePathMock(p) }));
 
 import { generateDueRecurring } from './actions';
+import { recurringExpenseId } from '@/lib/recurringExpenseId';
 
 function localYmd(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -76,6 +77,37 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
+});
+
+describe('generateDueRecurring — one entry per slot, even under concurrency (#69)', () => {
+  it('gives every generated entry the id derived from its series and period', async () => {
+    expenseFindSortLean.mockResolvedValue([
+      { kind: 'expense', vendor: 'DEH', vendorKey: 'dei', category: 'utilities', amount: 50, date: new Date(Date.UTC(2026, 0, 10)), recurringCycle: 'monthly' },
+    ]);
+    await generateDueRecurring();
+    const ids = expenseCreate.mock.calls.map((c) => c[0]._id);
+    expect(ids.length).toBeGreaterThan(1);
+    expect(new Set(ids).size).toBe(ids.length); // one id per period, never repeated
+    expect(ids[0]).toBe(recurringExpenseId('expense', 'dei', expenseCreate.mock.calls[0][0].period));
+  });
+
+  it('a duplicate-key error means another run won the race: not counted, not thrown, loop continues', async () => {
+    expenseFindSortLean.mockResolvedValue([
+      { kind: 'expense', vendor: 'DEH', vendorKey: 'dei', category: 'utilities', amount: 50, date: new Date(Date.UTC(2026, 0, 10)), recurringCycle: 'monthly' },
+    ]);
+    expenseCreate.mockRejectedValueOnce(Object.assign(new Error('E11000 duplicate key'), { code: 11000 }));
+    const res = await generateDueRecurring();
+    expect(res.created).toBe(expenseCreate.mock.calls.length - 1);
+    expect(revalidatePathMock).toHaveBeenCalledWith('/expenses');
+  });
+
+  it('a REAL database failure still surfaces instead of being swallowed as a race', async () => {
+    expenseFindSortLean.mockResolvedValue([
+      { kind: 'expense', vendor: 'DEH', vendorKey: 'dei', category: 'utilities', amount: 50, date: new Date(Date.UTC(2026, 1, 10)), recurringCycle: 'monthly' },
+    ]);
+    expenseCreate.mockRejectedValueOnce(Object.assign(new Error('connection lost'), { code: 89 }));
+    await expect(generateDueRecurring()).rejects.toThrow('connection lost');
+  });
 });
 
 describe('generateDueRecurring', () => {
