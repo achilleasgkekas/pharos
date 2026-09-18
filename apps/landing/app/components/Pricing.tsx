@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Icon } from './Icon';
 import { GithubLink } from './GithubLink';
-import { GITHUB_URL, REPO_PUBLIC } from '../site';
+import { GITHUB_URL } from '../site';
 
 export type PricingTier = {
   name: string;
@@ -117,11 +117,11 @@ export function Pricing({
 
               {t.ctaHref === GITHUB_URL ? (
                 <GithubLink
+                  kind="button"
                   className={`btn ${t.highlight ? 'btn-primary' : 'btn-ghost'}`}
                   style={{ width: '100%', marginBottom: 22 }}
                 >
                   {t.cta}
-                  {!REPO_PUBLIC && <span className="soon-badge">soon</span>}
                 </GithubLink>
               ) : (
                 <a

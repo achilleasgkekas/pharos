@@ -122,7 +122,7 @@ export default function PrivacyPolicy() {
         <Section id="self-host" title="1. Self-hosted PHAROS (open source)">
           <p>
             When you run PHAROS yourself, from the{' '}
-            <GithubLink className="inline-link">open-source project</GithubLink>{' '}
+            <GithubLink kind="inline" className="inline-link">open-source project</GithubLink>{' '}
             under AGPL-3.0, we do not receive any of your data. Everything, receipts,
             expenses, statements, inventory, network state, lives on your own machine
             and in your own database.
@@ -283,7 +283,7 @@ export default function PrivacyPolicy() {
             Questions about privacy? Email{' '}
             <a href={`mailto:${CONTACT}`} className="inline-link">{CONTACT}</a>. For the
             open-source project, open an issue on{' '}
-            <GithubLink href={`${GITHUB_URL}/issues`} className="inline-link">
+            <GithubLink kind="inline" href={`${GITHUB_URL}/issues`} className="inline-link">
               GitHub
             </GithubLink>.
           </p>
@@ -292,7 +292,7 @@ export default function PrivacyPolicy() {
         <div style={{ marginTop: 56, display: 'flex', gap: 14, flexWrap: 'wrap' }}>
           <a href="/" className="btn btn-primary">Back to home</a>
           <a href="/terms" className="btn btn-ghost">Terms of Service</a>
-          <GithubLink className="btn btn-ghost">Self-host it free</GithubLink>
+          <GithubLink kind="button" className="btn btn-ghost">Self-host it free</GithubLink>
         </div>
       </div>
     </main>

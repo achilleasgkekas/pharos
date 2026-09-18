@@ -161,7 +161,7 @@ export function MobileNav({ appUrl }: { appUrl: string }) {
               {it.label}
             </a>
           ))}
-          <GithubLink className="drawer-link" onClick={() => setOpen(false)}>
+          <GithubLink kind="inline" className="drawer-link" onClick={() => setOpen(false)}>
             GitHub ↗
           </GithubLink>
           <a

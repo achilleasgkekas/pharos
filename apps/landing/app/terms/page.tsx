@@ -121,9 +121,9 @@ export default function TermsOfService() {
         <Section id="self-host" title="1. Self-hosted PHAROS (open source)">
           <p>
             When you download and run PHAROS yourself from the{' '}
-            <GithubLink className="inline-link">open-source project</GithubLink>, your use is
+            <GithubLink kind="inline" className="inline-link">open-source project</GithubLink>, your use is
             governed by the{' '}
-            <GithubLink href={`${GITHUB_URL}/blob/main/LICENSE`} className="inline-link">
+            <GithubLink kind="inline" href={`${GITHUB_URL}/blob/main/LICENSE`} className="inline-link">
               GNU AGPL-3.0 licence
             </GithubLink>, not by these service terms. You are free to run, study, modify, and
             share the software under that licence, including its network-use and
@@ -245,7 +245,7 @@ export default function TermsOfService() {
             Questions about these terms? Email{' '}
             <a href={`mailto:${CONTACT}`} className="inline-link">{CONTACT}</a>. For the
             open-source project, open an issue on{' '}
-            <GithubLink href={`${GITHUB_URL}/issues`} className="inline-link">
+            <GithubLink kind="inline" href={`${GITHUB_URL}/issues`} className="inline-link">
               GitHub
             </GithubLink>.
           </p>
@@ -254,7 +254,7 @@ export default function TermsOfService() {
         <div style={{ marginTop: 56, display: 'flex', gap: 14, flexWrap: 'wrap' }}>
           <a href="/" className="btn btn-primary">Back to home</a>
           <a href="/privacy" className="btn btn-ghost">Privacy Policy</a>
-          <GithubLink className="btn btn-ghost">Self-host it free</GithubLink>
+          <GithubLink kind="button" className="btn btn-ghost">Self-host it free</GithubLink>
         </div>
       </div>
     </main>

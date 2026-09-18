@@ -802,7 +802,7 @@ export default function Home() {
             <a href="#compare" className="navlink nav-anchor">Compare</a>
             <a href="#roadmap" className="navlink nav-anchor">Roadmap</a>
             <a href="#faq" className="navlink nav-anchor">FAQ</a>
-            <GithubLink className="navlink">GitHub</GithubLink>
+            <GithubLink kind="inline" className="navlink">GitHub</GithubLink>
             <a href={`${APP_URL}/account/login`} className="nav-signin">
               Sign in
             </a>
@@ -856,10 +856,7 @@ export default function Home() {
 
           <div style={{ display: 'flex', gap: 14, justifyContent: 'center', flexWrap: 'wrap' }}>
             <a href="#pricing" className="btn btn-primary">Get started</a>
-            <GithubLink className="btn btn-ghost">
-              Self-host it free
-              {!REPO_PUBLIC && <span className="soon-badge">soon</span>}
-            </GithubLink>
+            <GithubLink kind="button" className="btn btn-ghost">Self-host it free</GithubLink>
           </div>
 
           <ul className="hero-assurance" aria-label="What you get">
@@ -1318,7 +1315,7 @@ export default function Home() {
 
           <p style={{ textAlign: 'center', color: 'var(--text-faint)', fontSize: '0.85rem', marginTop: 32 }}>
             Priorities can shift. Open an issue on{' '}
-            <GithubLink href={`${GITHUB_URL}/issues`} style={{ color: 'var(--accent)' }}>
+            <GithubLink kind="inline" href={`${GITHUB_URL}/issues`} style={{ color: 'var(--accent)' }}>
               GitHub
             </GithubLink>{' '}
             to weigh in.
@@ -1341,10 +1338,7 @@ export default function Home() {
               </p>
               <div style={{ display: 'flex', gap: 14, justifyContent: 'center', flexWrap: 'wrap' }}>
                 <a href="#pricing" className="btn btn-primary">Get started</a>
-                <GithubLink className="btn btn-ghost">
-                  Self-host it free
-                  {!REPO_PUBLIC && <span className="soon-badge">soon</span>}
-                </GithubLink>
+                <GithubLink kind="button" className="btn btn-ghost">Self-host it free</GithubLink>
               </div>
             </div>
           </div>
