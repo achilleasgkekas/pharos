@@ -834,6 +834,12 @@ export async function mergeExpenses(
           keep.split = d.split;
           keep.markModified('split');
         }
+        // #168: how the purchase was PAID is part of the record too. Without this the survivor of a
+        // merge loses the payment split, and with it the link to the gift card the money came from.
+        if ((!keep.paymentSplits || keep.paymentSplits.length === 0) && d.paymentSplits?.length) {
+          keep.paymentSplits = d.paymentSplits;
+          keep.markModified('paymentSplits');
+        }
         // Foreign-currency provenance (P9): amount is already base currency and equal
         // across the group, but only one copy may carry what was printed on the document.
         if (!keep.fxRate && d.fxRate) {
@@ -858,6 +864,10 @@ export async function mergeExpenses(
 
       const now = new Date();
       for (const d of drops) {
+        // #168: a trashed copy no longer spends anything. Release its mirrored gift-card uses
+        // exactly as deleteExpense does — otherwise merging two copies of one purchase leaves the
+        // card charged twice, and the second charge belongs to a record nobody can see any more.
+        await syncGiftCardUses(String(d._id), [], now, '');
         const set: Record<string, unknown> = { deletedAt: now };
         // See the doc comment: the survivor now owns this file, so the trashed copy must
         // stop pointing at it before purge gets the chance to delete it.
@@ -869,6 +879,14 @@ export async function mergeExpenses(
         }
         await Expense.updateOne({ _id: d._id }, { $set: set });
       }
+      // …and the survivor re-states its own spend, so the card ends up charged exactly once, under
+      // the record that still exists (the split may have just been adopted from a dropped copy).
+      await syncGiftCardUses(
+        String(keep._id),
+        cleanPaymentSplits(keep.paymentSplits ?? []),
+        keep.date ? new Date(keep.date) : now,
+        keep.vendor || ''
+      );
 
       revalidatePath('/expenses');
       revalidatePath('/income');

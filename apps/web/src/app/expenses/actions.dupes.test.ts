@@ -35,6 +35,8 @@ const expenseModel = {
   updateOne: expenseUpdateOne,
 };
 
+const { syncGiftCardUsesMock } = vi.hoisted(() => ({ syncGiftCardUsesMock: vi.fn(async (..._a: unknown[]) => {}) }));
+vi.mock('@/lib/giftCardMirror', () => ({ syncGiftCardUses: syncGiftCardUsesMock }));
 vi.mock('@/lib/db', () => ({ connectDB: connectDBMock }));
 vi.mock('@/lib/tenancy/request', () => ({ withRequestTenant: async (fn: () => Promise<any>) => fn() }));
 vi.mock('@/lib/tenancy/connection', () => ({ currentModel: async () => expenseModel }));
@@ -56,6 +58,7 @@ import { findDuplicateExpenses, mergeExpenses } from './actions';
 function keepDoc(over: Record<string, any> = {}) {
   return {
     _id: 'keep1',
+    paymentSplits: [] as Array<Record<string, any>>,   // #168: the merge carries this over
     kind: 'expense',
     vendor: 'ΔΕΗ',
     vendorKey: 'dei',
@@ -88,6 +91,7 @@ function keepDoc(over: Record<string, any> = {}) {
 function dropDoc(over: Record<string, any> = {}) {
   return {
     _id: 'drop1',
+    paymentSplits: [] as Array<Record<string, any>>,
     kind: 'expense',
     vendor: 'ΔΕΗ',
     vendorKey: 'dei',
@@ -312,5 +316,48 @@ describe('mergeExpenses', () => {
   it('reports a database failure instead of throwing at the client', async () => {
     expenseFindByIdMock.mockRejectedValue(new Error('connection lost'));
     expect(await mergeExpenses('keep1', ['drop1'])).toEqual({ ok: false, merged: 0, error: 'connection lost' });
+  });
+});
+
+describe('mergeExpenses and the money it was paid with (#168)', () => {
+  const split = [{ method: 'giftcard', amount: 50, giftCardId: 'gc1' }];
+
+  it('adopts the payment split from a dropped copy when the survivor has none', async () => {
+    const keep = keepDoc({ paymentSplits: [] });
+    expenseFindByIdMock.mockResolvedValue(keep);
+    expenseFindDropsMock.mockResolvedValue([dropDoc({ paymentSplits: split })]);
+    await mergeExpenses('keep1', ['drop1']);
+    expect(keep.paymentSplits).toEqual(split);
+  });
+
+  it('never overwrites a split the survivor already has', async () => {
+    const own = [{ method: 'giftcard', amount: 20, giftCardId: 'gc9' }];
+    const keep = keepDoc({ paymentSplits: own });
+    expenseFindByIdMock.mockResolvedValue(keep);
+    expenseFindDropsMock.mockResolvedValue([dropDoc({ paymentSplits: split })]);
+    await mergeExpenses('keep1', ['drop1']);
+    expect(keep.paymentSplits).toEqual(own);
+  });
+
+  it('THE ONE THAT MATTERS: the card is charged once — the dropped copy releases, the survivor re-states', async () => {
+    const keep = keepDoc({ paymentSplits: [], vendor: 'Public', date: new Date('2026-08-28T00:00:00Z') });
+    expenseFindByIdMock.mockResolvedValue(keep);
+    expenseFindDropsMock.mockResolvedValue([dropDoc({ paymentSplits: split })]);
+    await mergeExpenses('keep1', ['drop1']);
+
+    const calls = syncGiftCardUsesMock.mock.calls as unknown as [string, { giftCardId: string; amount: number }[], Date, string][];
+    expect(calls[0][0]).toBe('drop1');           // the trashed copy first…
+    expect(calls[0][1]).toEqual([]);             // …spends nothing any more
+    expect(calls[1][0]).toBe('keep1');           // …then the survivor states the spend
+    expect(calls[1][1]).toEqual([expect.objectContaining({ giftCardId: 'gc1', amount: 50 })]);
+    expect(calls[1][3]).toBe('Public');
+  });
+
+  it('releases every dropped copy, not just the first', async () => {
+    expenseFindByIdMock.mockResolvedValue(keepDoc({ paymentSplits: [] }));
+    expenseFindDropsMock.mockResolvedValue([dropDoc({ _id: 'd1' }), dropDoc({ _id: 'd2' })]);
+    await mergeExpenses('keep1', ['d1', 'd2']);
+    const ids = syncGiftCardUsesMock.mock.calls.map((c) => c[0]);
+    expect(ids).toEqual(['d1', 'd2', 'keep1']);
   });
 });
