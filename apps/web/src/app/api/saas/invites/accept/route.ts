@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
 
     // Reuse the account if it exists (they may have signed up between invite and accept);
     // otherwise create it, which requires a password.
-    let account = await Account.findOne({ email }).select('_id email name');
+    let account = await Account.findOne({ email }).select('_id email name sessionEpoch');
     if (!account) {
       const password = strField(b, 'password');
       if (password.length < MIN_PASSWORD) {
@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
       } catch (e) {
         // Race: someone created the account concurrently — fall back to reusing it.
         if ((e as { code?: number }).code === 11000) {
-          account = await Account.findOne({ email }).select('_id email name');
+          account = await Account.findOne({ email }).select('_id email name sessionEpoch');
         } else {
           throw e;
         }
@@ -115,7 +115,7 @@ export async function POST(req: NextRequest) {
       meta: { role },
     });
 
-    await setAccountCookie({ sub: accountId, email });
+    await setAccountCookie({ sub: accountId, email, epoch: account.sessionEpoch || 0 });
 
     return NextResponse.json(
       {

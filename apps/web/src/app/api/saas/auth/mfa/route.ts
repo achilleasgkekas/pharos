@@ -59,14 +59,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: result.reason }, { status });
     }
 
-    const account = await Account.findById(accountId).select('_id name email');
+    const account = await Account.findById(accountId).select('_id name email sessionEpoch');
     if (!account) return NextResponse.json({ error: 'not_found' }, { status: 401 });
 
     account.lastLoginAt = new Date();
     await account.save();
 
     await clearMfaPendingCookie();
-    await setAccountCookie({ sub: accountId, email: account.email });
+    await setAccountCookie({ sub: accountId, email: account.email, epoch: account.sessionEpoch || 0 });
 
     return NextResponse.json({
       account: { id: accountId, email: account.email, name: account.name || '' },

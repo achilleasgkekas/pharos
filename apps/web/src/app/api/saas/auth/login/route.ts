@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
     }
 
     await connectDB();
-    const account = await Account.findOne({ email }).select('_id name email passwordHash mfaEnabled');
+    const account = await Account.findOne({ email }).select('_id name email passwordHash mfaEnabled sessionEpoch');
     if (!account || !verifyPassword(password, account.passwordHash)) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
     }
@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
     account.lastLoginAt = new Date();
     await account.save();
 
-    await setAccountCookie({ sub: accountId, email });
+    await setAccountCookie({ sub: accountId, email, epoch: account.sessionEpoch || 0 });
 
     return NextResponse.json({
       account: { id: accountId, email, name: account.name || '' },

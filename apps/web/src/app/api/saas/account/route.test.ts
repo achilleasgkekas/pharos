@@ -291,7 +291,7 @@ describe('PATCH', () => {
       expect(account.email).toBe('new@example.com');
       expect(account.emailVerified).toBe(false);
       expect(account.save).toHaveBeenCalled();
-      expect(setAccountCookieMock).toHaveBeenCalledWith({ sub: 'acc1', email: 'new@example.com' });
+      expect(setAccountCookieMock).toHaveBeenCalledWith({ sub: 'acc1', epoch: 0, email: 'new@example.com' });
       expect(res.status).toBe(200);
       const json = (await res.json()) as { account: Record<string, unknown>; tenants: unknown[] };
       expect(json.account).toEqual({ id: 'acc1', email: 'new@example.com', name: 'Jo' });

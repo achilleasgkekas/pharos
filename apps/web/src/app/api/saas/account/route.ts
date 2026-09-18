@@ -67,7 +67,7 @@ export async function PATCH(req: NextRequest) {
     }
 
     await connectDB();
-    const account = await Account.findById(claims.sub).select('_id email name emailVerified');
+    const account = await Account.findById(claims.sub).select('_id email name emailVerified sessionEpoch');
     if (!account) return NextResponse.json({ error: 'Account not found' }, { status: 404 });
 
     let emailChanged = false;
@@ -100,7 +100,7 @@ export async function PATCH(req: NextRequest) {
 
     const accountId = String(account._id);
     // If the email changed, refresh the session cookie so its `email` claim stays accurate.
-    if (emailChanged) await setAccountCookie({ sub: accountId, email: account.email });
+    if (emailChanged) await setAccountCookie({ sub: accountId, email: account.email, epoch: account.sessionEpoch || 0 });
 
     return NextResponse.json({
       account: { id: accountId, email: account.email, name: account.name || '' },

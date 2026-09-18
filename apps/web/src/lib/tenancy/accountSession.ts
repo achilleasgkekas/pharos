@@ -58,27 +58,15 @@ export async function getCurrentAccount(): Promise<AccountClaims | null> {
   const claims = await verifyAccountSession(store.get(ACCOUNT_COOKIE)?.value);
   if (!claims) return null;
 
-  try {
-    const dbEpoch = await currentAccountSessionEpoch(claims.sub);
-    const tokenEpoch = claims.epoch ?? 0;
-    if (dbEpoch !== tokenEpoch) return null;
-  } catch {
-    /* DB hiccup → fail open; the signature + expiry were already checked */
-  }
+  const dbEpoch = await currentAccountSessionEpoch(claims.sub);
+  const tokenEpoch = claims.epoch ?? 0;
+  if (dbEpoch !== tokenEpoch) return null;
 
   return claims;
 }
 
 export async function setAccountCookie(claims: AccountClaims): Promise<void> {
-  let epoch = claims.epoch;
-  if (epoch === undefined) {
-    try {
-      epoch = await currentAccountSessionEpoch(claims.sub);
-    } catch {
-      /* DB hiccup → mint a token without an epoch rather than refusing login */
-    }
-  }
-  const token = await signAccountSession({ ...claims, epoch });
+  const token = await signAccountSession(claims);
   const store = await cookies();
   store.set(ACCOUNT_COOKIE, token, accountCookieOptions());
 }

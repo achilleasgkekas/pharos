@@ -126,7 +126,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    await setAccountCookie({ sub: accountId, email });
+    await setAccountCookie({ sub: accountId, email, epoch: 0 });
 
     return NextResponse.json(
       {

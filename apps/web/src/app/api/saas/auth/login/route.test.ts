@@ -185,7 +185,7 @@ describe('mfaEnabled = false — direct login', () => {
 
     expect(account.save).toHaveBeenCalledTimes(1);
     expect(account.lastLoginAt).toBeInstanceOf(Date);
-    expect(setAccountCookieMock).toHaveBeenCalledWith({ sub: 'acc1', email: 'jo@example.com' });
+    expect(setAccountCookieMock).toHaveBeenCalledWith({ sub: 'acc1', epoch: 0, email: 'jo@example.com' });
     expect(setMfaPendingCookieMock).not.toHaveBeenCalled();
     expect(accountTenantsMock).toHaveBeenCalledWith('acc1');
     expect(res.status).toBe(200);

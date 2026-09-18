@@ -260,7 +260,7 @@ describe('success path', () => {
       passwordHash: 'hashed:secret123',
     });
     expect(provisionTenantMock).toHaveBeenCalledWith({ accountId: 'acc1', workspaceName: 'Jo Household', slugHint: 'jo-household' });
-    expect(setAccountCookieMock).toHaveBeenCalledWith({ sub: 'acc1', email: 'jo@example.com' });
+    expect(setAccountCookieMock).toHaveBeenCalledWith({ sub: 'acc1', epoch: 0, email: 'jo@example.com' });
     expect(accountTenantsMock).toHaveBeenCalledWith('acc1');
 
     expect(res.status).toBe(201);

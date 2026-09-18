@@ -187,7 +187,7 @@ describe('no existing account (fresh invitee)', () => {
       expect.objectContaining({ tenantId: 'tenant1' }),
       expect.objectContaining({ action: 'invite.accepted', actor: 'acc1', target: 'invitee@example.com' })
     );
-    expect(setAccountCookieMock).toHaveBeenCalledWith({ sub: 'acc1', email: 'invitee@example.com' });
+    expect(setAccountCookieMock).toHaveBeenCalledWith({ sub: 'acc1', epoch: 0, email: 'invitee@example.com' });
     expect(res.status).toBe(201);
     const json = (await res.json()) as { account: unknown; tenants: unknown };
     expect(json.account).toEqual({ id: 'acc1', email: 'invitee@example.com', name: 'Jo' });

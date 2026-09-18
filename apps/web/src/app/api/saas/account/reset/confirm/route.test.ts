@@ -44,7 +44,6 @@ vi.mock('@/lib/apiAuth', () => ({
 vi.mock('@/lib/db', () => ({ connectDB: connectDBMock }));
 vi.mock('@/models/Account', () => ({ Account: { findOne: accountFindOneMock } }));
 vi.mock('@/lib/auth', () => ({ hashPassword: hashPasswordMock, assertCanWrite: vi.fn(async () => {}) }));
-vi.mock('@/lib/tenancy/accountSession', () => ({}));
 vi.mock('@/lib/tenancy/saasApi', async () => {
   // saasGuard is pure (try/catch + NextResponse.json) — run it for real so the mid-handler-throw
   // test exercises the actual production error-shaping logic.
