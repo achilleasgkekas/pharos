@@ -4,30 +4,35 @@ import { GITHUB_URL, REPO_PUBLIC } from '../site';
 type GithubLinkProps = Omit<AnchorHTMLAttributes<HTMLAnchorElement>, 'href' | 'target' | 'rel'> & {
   href?: string;
   /**
-   * How this link is presented, and therefore what it must degrade INTO while the repo is private:
-   *  - `inline` sits inside a sentence, so it degrades to plain text and nothing else is needed;
-   *  - `button` looks clickable, so it degrades to an inert control that SAYS it is not ready yet.
+   * How this link is presented, and therefore what it degrades INTO while the repo is private:
+   *  - `inline` sits inside a sentence → plain text. Link styling (className/style) is DROPPED,
+   *    because text that still looks like a link is the bug this component exists to prevent;
+   *  - `button` looks clickable → keeps its button shape but carries a "soon" badge and
+   *    aria-disabled, so it reads as "not yet" rather than "broken".
    *
-   * Required on purpose. The first version left the "soon" badge to the caller, and the two buttons
-   * on /privacy and /terms shipped without it: a button that looks live and does nothing (review of
-   * PR #160). A required prop is a thing the compiler will not let the next caller forget.
+   * Required on purpose: the first version left the badge to the caller and two buttons shipped
+   * without it (reviews of PR #160). A required prop is what the next caller cannot forget.
    */
   kind: 'inline' | 'button';
   children: ReactNode;
 };
 
 /** A link to the repo once REPO_PUBLIC flips true; until then it never points at a 404 (#157). */
-export function GithubLink({ href = GITHUB_URL, kind, children, ...rest }: GithubLinkProps) {
+export function GithubLink({ href = GITHUB_URL, kind, children, className, style, ...rest }: GithubLinkProps) {
   if (!REPO_PUBLIC) {
+    if (kind === 'inline') {
+      // No className, no style, no onClick: the words stay, every affordance of a link goes.
+      return <span>{children}</span>;
+    }
     return (
-      <span {...rest} aria-disabled={kind === 'button' ? true : undefined}>
+      <span {...rest} className={className} style={style} aria-disabled>
         {children}
-        {kind === 'button' && <span className="soon-badge">soon</span>}
+        <span className="soon-badge">soon</span>
       </span>
     );
   }
   return (
-    <a href={href} target="_blank" rel="noopener noreferrer" {...rest}>
+    <a href={href} target="_blank" rel="noopener noreferrer" className={className} style={style} {...rest}>
       {children}
     </a>
   );
