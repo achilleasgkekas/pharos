@@ -107,6 +107,8 @@ vi.mock('@/lib/appSettings', () => ({ getAppSettings: vi.fn(async () => ({ curre
 vi.mock('next/cache', () => ({ revalidatePath: (p: string) => revalidatePathMock(p) }));
 
 import { findDuplicateItems, mergeItems } from './actions';
+import { MAX_CUSTOM_FIELDS } from '@/lib/customFields';
+import { MAX_WARRANTY_CLAIMS } from '@/lib/warrantyClaims';
 
 function rawItem(overrides: Partial<Record<string, any>> = {}) {
   return {
@@ -143,6 +145,20 @@ function makeItemDoc(overrides: Partial<Record<string, any>> = {}) {
     attachments: [] as any[],
     receiptIds: [] as string[],
     currentPrice: 0,
+    customFields: [] as { key: string; value: string }[],
+    warrantyClaims: [] as any[],
+    maintenanceIntervalDays: null as number | null,
+    lastMaintenanceAt: null as Date | null,
+    lentTo: '',
+    lentAt: null as Date | null,
+    expectedReturnAt: null as Date | null,
+    soldPrice: null as number | null,
+    soldAt: null as Date | null,
+    soldTo: '',
+    soldIncomeId: null as string | null,
+    trackingNumber: '',
+    carrier: '',
+    trackingUrl: '',
     save: vi.fn(async () => {}),
     markModified: vi.fn(),
     ...overrides,
@@ -408,14 +424,200 @@ describe('mergeItems', () => {
     expect(keepNoPrice.currentPrice).toBe(50); // untouched — no priced link to recompute from
   });
 
-  it('marks all six mutated array fields modified and saves exactly once', async () => {
+  // Issue #150: the merge loop knew only the pre-P40 shape of an item, so every field added
+  // by the later P-series features (custom fields, warranty claims, maintenance, loan, sale,
+  // tracking) was silently dropped when the older, richer duplicate lost the merge.
+  it('unions customFields, keeping the survivor value when a key collides (case-insensitive)', async () => {
+    const keep = makeItemDoc({ customFields: [{ key: 'MAC', value: 'aa:bb' }] });
+    itemFindById.mockResolvedValue(keep);
+    itemFind.mockReturnValue(
+      Promise.resolve([
+        { _id: DROP1_ID, customFields: [{ key: 'mac', value: 'cc:dd' }, { key: 'Firmware', value: '1.4' }] },
+      ]) as any
+    );
+
+    await mergeItems(KEEP_ID, [DROP1_ID]);
+
+    expect(keep.customFields).toEqual([
+      { key: 'MAC', value: 'aa:bb' },
+      { key: 'Firmware', value: '1.4' },
+    ]);
+  });
+
+  it('stops unioning customFields at MAX_CUSTOM_FIELDS', async () => {
+    const existing = Array.from({ length: MAX_CUSTOM_FIELDS - 1 }, (_, i) => ({ key: `k${i}`, value: 'v' }));
+    const keep = makeItemDoc({ customFields: existing });
+    itemFindById.mockResolvedValue(keep);
+    itemFind.mockReturnValue(
+      Promise.resolve([{ _id: DROP1_ID, customFields: [{ key: 'extra1', value: 'v' }, { key: 'extra2', value: 'v' }] }]) as any
+    );
+
+    await mergeItems(KEEP_ID, [DROP1_ID]);
+
+    expect(keep.customFields).toHaveLength(MAX_CUSTOM_FIELDS);
+    expect(keep.customFields.at(-1)).toEqual({ key: 'extra1', value: 'v' });
+  });
+
+  it('concatenates warrantyClaims as fresh plain objects, capped at MAX_WARRANTY_CLAIMS', async () => {
+    const keep = makeItemDoc({ warrantyClaims: [] });
+    const claim = {
+      ref: 'RMA-1',
+      status: 'sent',
+      reportedAt: new Date('2026-01-02T00:00:00Z'),
+      lastUpdateAt: null,
+      trackingNumber: 'TR1',
+      notes: 'fan dead',
+      toObject: () => ({ never: 'used' }),
+    };
+    itemFindById.mockResolvedValue(keep);
+    itemFind.mockReturnValue(Promise.resolve([{ _id: DROP1_ID, warrantyClaims: [claim] }]) as any);
+
+    await mergeItems(KEEP_ID, [DROP1_ID]);
+
+    expect(keep.warrantyClaims).toEqual([
+      {
+        ref: 'RMA-1',
+        status: 'sent',
+        reportedAt: claim.reportedAt,
+        lastUpdateAt: null,
+        trackingNumber: 'TR1',
+        notes: 'fan dead',
+      },
+    ]);
+    expect(keep.warrantyClaims[0]).not.toBe(claim);
+  });
+
+  it('never grows warrantyClaims past MAX_WARRANTY_CLAIMS', async () => {
+    const keep = makeItemDoc({
+      warrantyClaims: Array.from({ length: MAX_WARRANTY_CLAIMS }, () => ({ ref: 'old', status: 'closed' })),
+    });
+    itemFindById.mockResolvedValue(keep);
+    itemFind.mockReturnValue(Promise.resolve([{ _id: DROP1_ID, warrantyClaims: [{ ref: 'new', status: 'sent' }] }]) as any);
+
+    await mergeItems(KEEP_ID, [DROP1_ID]);
+
+    expect(keep.warrantyClaims).toHaveLength(MAX_WARRANTY_CLAIMS);
+    expect(keep.warrantyClaims.every((c: any) => c.ref === 'old')).toBe(true);
+  });
+
+  it('backfills the maintenance schedule only while the survivor has none', async () => {
+    const lastDone = new Date('2026-03-01T00:00:00Z');
+    const keep = makeItemDoc();
+    itemFindById.mockResolvedValue(keep);
+    itemFind.mockReturnValue(
+      Promise.resolve([{ _id: DROP1_ID, maintenanceIntervalDays: 90, lastMaintenanceAt: lastDone }]) as any
+    );
+
+    await mergeItems(KEEP_ID, [DROP1_ID]);
+
+    expect(keep.maintenanceIntervalDays).toBe(90);
+    expect(keep.lastMaintenanceAt).toBe(lastDone);
+
+    const keepOwn = makeItemDoc({ maintenanceIntervalDays: 30, lastMaintenanceAt: new Date('2026-05-05T00:00:00Z') });
+    itemFindById.mockResolvedValue(keepOwn);
+    await mergeItems(KEEP_ID, [DROP1_ID]);
+
+    expect(keepOwn.maintenanceIntervalDays).toBe(30);
+    expect(keepOwn.lastMaintenanceAt).toEqual(new Date('2026-05-05T00:00:00Z'));
+  });
+
+  it('copies the loan as one record, and only while the survivor is not itself lent out', async () => {
+    const lentAt = new Date('2026-04-01T00:00:00Z');
+    const back = new Date('2026-04-20T00:00:00Z');
+    const keep = makeItemDoc();
+    itemFindById.mockResolvedValue(keep);
+    itemFind.mockReturnValue(
+      Promise.resolve([{ _id: DROP1_ID, lentTo: 'Nikos', lentAt, expectedReturnAt: back }]) as any
+    );
+
+    await mergeItems(KEEP_ID, [DROP1_ID]);
+
+    expect(keep.lentTo).toBe('Nikos');
+    expect(keep.lentAt).toBe(lentAt);
+    expect(keep.expectedReturnAt).toBe(back);
+
+    const keepLent = makeItemDoc({ lentTo: 'Maria' });
+    itemFindById.mockResolvedValue(keepLent);
+    await mergeItems(KEEP_ID, [DROP1_ID]);
+
+    expect(keepLent.lentTo).toBe('Maria');
+    expect(keepLent.lentAt).toBeNull();
+    expect(keepLent.expectedReturnAt).toBeNull();
+  });
+
+  it('copies the sale together with its logged-income link, so the income cannot be booked twice', async () => {
+    const soldAt = new Date('2026-02-02T00:00:00Z');
+    const keep = makeItemDoc();
+    itemFindById.mockResolvedValue(keep);
+    itemFind.mockReturnValue(
+      Promise.resolve([
+        { _id: DROP1_ID, soldPrice: 320, soldAt, soldTo: 'Marketplace', soldIncomeId: '507f1f77bcf86cd799439099' },
+      ]) as any
+    );
+
+    await mergeItems(KEEP_ID, [DROP1_ID]);
+
+    expect(keep.soldPrice).toBe(320);
+    expect(keep.soldAt).toBe(soldAt);
+    expect(keep.soldTo).toBe('Marketplace');
+    expect(keep.soldIncomeId).toBe('507f1f77bcf86cd799439099');
+  });
+
+  it('never overwrites a sale the survivor already records', async () => {
+    const keep = makeItemDoc({ soldPrice: 100, soldTo: 'Kostas' });
+    itemFindById.mockResolvedValue(keep);
+    itemFind.mockReturnValue(
+      Promise.resolve([{ _id: DROP1_ID, soldPrice: 320, soldTo: 'Marketplace', soldIncomeId: 'x' }]) as any
+    );
+
+    await mergeItems(KEEP_ID, [DROP1_ID]);
+
+    expect(keep.soldPrice).toBe(100);
+    expect(keep.soldTo).toBe('Kostas');
+    expect(keep.soldIncomeId).toBeNull();
+  });
+
+  it('copies tracking number, carrier and manual URL together', async () => {
+    const keep = makeItemDoc();
+    itemFindById.mockResolvedValue(keep);
+    itemFind.mockReturnValue(
+      Promise.resolve([
+        { _id: DROP1_ID, trackingNumber: 'JD123', carrier: 'ACS', trackingUrl: 'https://acs.gr/t/JD123' },
+      ]) as any
+    );
+
+    await mergeItems(KEEP_ID, [DROP1_ID]);
+
+    expect(keep.trackingNumber).toBe('JD123');
+    expect(keep.carrier).toBe('ACS');
+    expect(keep.trackingUrl).toBe('https://acs.gr/t/JD123');
+
+    const keepTracked = makeItemDoc({ trackingNumber: 'OWN1', carrier: 'ELTA' });
+    itemFindById.mockResolvedValue(keepTracked);
+    await mergeItems(KEEP_ID, [DROP1_ID]);
+
+    expect(keepTracked.trackingNumber).toBe('OWN1');
+    expect(keepTracked.carrier).toBe('ELTA');
+    expect(keepTracked.trackingUrl).toBe('');
+  });
+
+  it('marks every mutated array field modified and saves exactly once', async () => {
     const keep = makeItemDoc();
     itemFindById.mockResolvedValue(keep);
     itemFind.mockReturnValue(Promise.resolve([{ _id: DROP1_ID }]) as any);
 
     await mergeItems(KEEP_ID, [DROP1_ID]);
 
-    for (const field of ['tags', 'links', 'priceHistory', 'photos', 'attachments', 'receiptIds']) {
+    for (const field of [
+      'tags',
+      'links',
+      'priceHistory',
+      'photos',
+      'attachments',
+      'receiptIds',
+      'customFields',
+      'warrantyClaims',
+    ]) {
       expect(keep.markModified).toHaveBeenCalledWith(field);
     }
     expect(keep.save).toHaveBeenCalledTimes(1);
