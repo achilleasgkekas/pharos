@@ -1,5 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+// #113 claimed the documents list shows soft-deleted records because page.tsx calls
+// `Document.find()` with no `{ deletedAt: null }` filter. It does not: `Document` carries
+// `softDeletePlugin` (models/Document.ts), whose pre-find hook narrows EVERY query to
+// non-trashed docs unless the caller opts out with `.setOptions({ withDeleted: true })` —
+// which the Trash does and this page must not. Adding an explicit filter here would be
+// redundant and would quietly suggest the plugin cannot be trusted.
+//
+// So this test pins the real contract instead of "fixing" a non-bug: the page queries with NO
+// filter of its own (the plugin owns that) and hands the client the rows plus the lead time.
+
 const { currentModelMock, documentFindMock, getAppSettingsMock } = vi.hoisted(() => {
   const documentFindMock = vi.fn();
   const getAppSettingsMock = vi.fn();

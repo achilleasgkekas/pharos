@@ -29,7 +29,7 @@ export type AppSettings = {
   trialAlertDays: number; // lead time (days) for free-trial "cancel before charge" alert (P33)
   giftCardAlertDays: number; // window (days) for "gift card expiring with balance" alert (P32); 0 = off
   billAlertDays: number; // lead-time (days) for "bill due / overdue" alert (P28); 0 = off
-  documentAlertDays: number; // lead-time (days) for the "document expiring / expired" alert (P42); 0 = off
+  documentAlertDays: number; // lead-time (days) for "document expiring / expired" alert (P42); 0 = off
   specialDateAlertDays: number; // lead-time (days) for "birthday / anniversary coming up" alert (P50); 0 = off
   maintenanceAlertDays: number; // lead-time (days) for the "maintenance due" alert (P41); overdue nags regardless
   lendingAlertDays: number; // lead-time (days) for the "lent item due back" alert (P47); overdue nags regardless
