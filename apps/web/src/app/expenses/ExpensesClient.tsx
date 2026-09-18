@@ -253,7 +253,7 @@ export function ExpensesClient({ kind, expenses, cards, giftCards, vendors, olla
           <h1 className="text-2xl md:text-3xl font-bold" style={{ fontFamily: 'var(--font-display)' }}>
             {label}<span className="ml-3 text-sm font-normal text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>{expenses.length}</span>
           </h1>
-          <div className="flex items-center gap-4 text-xs text-[color:var(--color-text-dim)]" style={{ fontFamily: 'var(--font-mono)' }}>
+          <div className="flex items-center gap-2 sm:gap-4 flex-wrap text-xs text-[color:var(--color-text-dim)]" style={{ fontFamily: 'var(--font-mono)' }}>
             <button onClick={() => setCreating(true)} className="flex items-center gap-1 text-[color:var(--color-accent)] hover:opacity-80"><Plus size={13} /> {t('common.add')}</button>
             <button onClick={() => setImportingCsv(true)} className="flex items-center gap-1 text-[color:var(--color-text-dim)] hover:text-[color:var(--color-accent)]" title={t('csv.title')}><FileSpreadsheet size={13} /> {t('csv.button')}</button>
             <button onClick={() => setFindingDupes(true)} className="flex items-center gap-1 text-[color:var(--color-text-dim)] hover:text-[color:var(--color-accent)]" title={t(isIncome ? 'exdup.titleIncome' : 'exdup.title')}><Copy size={13} /> {t('exdup.button')}</button>

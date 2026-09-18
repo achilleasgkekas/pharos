@@ -234,7 +234,7 @@ export function StatementsClient({
               {statements.length}
             </span>
           </h1>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
             {statements.length > 0 && (
               <div className="text-xs text-[color:var(--color-text-dim)]" style={{ fontFamily: 'var(--font-mono)' }}>
                 {balance < -0.001 ? t('st.credit') : t('st.outstanding')}{' '}
