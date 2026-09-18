@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { numMap, normalizeSettings } from './appSettings';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { numMap, normalizeSettings, APP_CONFIG_SELECT } from './appSettings';
 import {
   DEFAULT_EXPENSE_CATEGORIES,
   DEFAULT_ITEM_CATEGORIES,
@@ -167,5 +169,37 @@ describe('normalizeSettings', () => {
     expect(normalizeSettings({}).budgetRollover).toBe(false);
     expect(normalizeSettings({ budgetRollover: true }).budgetRollover).toBe(true);
     expect(normalizeSettings({ budgetRollover: undefined }).budgetRollover).toBe(false);
+  });
+});
+
+// The projection whitelist in getAppSettings() is the trap that shipped a no-op setting twice:
+// the field is in the model, the type and normalizeSettings, but not in `.select(...)`, so the
+// query never fetches it and the setting silently stays on its default. APP_CONFIG_SELECT is
+// now derived from a map that `satisfies Record<keyof RawAppConfigDoc, true>`, which makes the
+// gap a compile error. These tests read the source so the guard also survives a future edit
+// that drops the `satisfies` clause or goes back to a hand-written string.
+describe('APP_CONFIG_SELECT (settings projection)', () => {
+  const source = readFileSync(fileURLToPath(new URL('./appSettings.ts', import.meta.url)), 'utf8');
+  const projected = APP_CONFIG_SELECT.split(' ');
+
+  it('projects every RawAppConfigDoc field, and nothing else', () => {
+    const typeBlock = /export type RawAppConfigDoc = \{([\s\S]*?)\n\};/.exec(source);
+    expect(typeBlock).not.toBeNull();
+    const declared = [...typeBlock![1].matchAll(/^\s*(\w+)\?:/gm)].map((m) => m[1]);
+    expect(declared.length).toBeGreaterThan(20); // the regex still matches the real type
+    expect([...projected].sort()).toEqual([...declared].sort());
+  });
+
+  it('projects every field normalizeSettings actually reads', () => {
+    // A read of a field the query never fetched is the user-visible half of the bug: the
+    // setting looks wired end-to-end and still resolves to its hard default at runtime.
+    const read = [...source.matchAll(/doc\?\.(\w+)/g)].map((m) => m[1]);
+    expect(read.length).toBeGreaterThan(20);
+    expect([...new Set(read)].filter((f) => !projected.includes(f))).toEqual([]);
+  });
+
+  it('is a clean space-separated list with no duplicates', () => {
+    expect(APP_CONFIG_SELECT).not.toMatch(/\s{2,}|^\s|\s$/);
+    expect(new Set(projected).size).toBe(projected.length);
   });
 });

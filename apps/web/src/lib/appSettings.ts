@@ -91,6 +91,55 @@ export type RawAppConfigDoc = {
   quietHours?: unknown;
 };
 
+/**
+ * Every RawAppConfigDoc field, which is also exactly what `getAppSettings()` projects.
+ *
+ * The `satisfies Record<keyof RawAppConfigDoc, true>` is the whole point: Record demands
+ * EVERY key of the type, so adding a setting to RawAppConfigDoc without listing it here is
+ * a compile error instead of a setting that silently stays on its default. That failure mode
+ * shipped twice (P86, and again 2026-09-12) because the projection was a hand-written string
+ * that nobody remembered to extend. An excess key is rejected too, so a removed setting
+ * cannot leave a dead field behind in the projection.
+ *
+ * Deliberately narrow: AppConfig also stores AI/IMAP/storage/secret fields, and those stay
+ * out of the settings projection because other modules read them on their own.
+ */
+const APP_CONFIG_FIELDS = {
+  defaultItemView: true,
+  defaultWarrantyMonths: true,
+  warrantyAlertDays: true,
+  trialAlertDays: true,
+  giftCardAlertDays: true,
+  billAlertDays: true,
+  documentAlertDays: true,
+  specialDateAlertDays: true,
+  maintenanceAlertDays: true,
+  lendingAlertDays: true,
+  staleClaimDays: true,
+  syncStaleDays: true,
+  subscriptionReviewIntervalDays: true,
+  autoAddStores: true,
+  ntfyUrl: true,
+  ntfyEnabled: true,
+  currency: true,
+  multiCurrency: true,
+  defaultVatRate: true,
+  defaultReturnWindowDays: true,
+  lists: true,
+  spaces: true,
+  budgets: true,
+  budgetRollover: true,
+  assetAccounts: true,
+  depreciation: true,
+  categoryRules: true,
+  onboardingDismissed: true,
+  notifyTypes: true,
+  quietHours: true,
+} satisfies Record<keyof RawAppConfigDoc, true>;
+
+/** Mongoose projection for the settings singleton, derived from the field map above. */
+export const APP_CONFIG_SELECT = Object.keys(APP_CONFIG_FIELDS).join(' ');
+
 /** Coerce a Mixed map to { key: positiveNumber }. */
 export function numMap(raw: unknown): Record<string, number> {
   const out: Record<string, number> = {};
@@ -215,7 +264,7 @@ export async function getAppSettings(): Promise<AppSettings> {
     await connectDB();
     const Config = tenantModel(await tenantDb(ctx), AppConfig);
     doc = await Config.findOne({ key: 'singleton' })
-      .select('defaultItemView defaultWarrantyMonths warrantyAlertDays trialAlertDays giftCardAlertDays billAlertDays documentAlertDays specialDateAlertDays maintenanceAlertDays lendingAlertDays staleClaimDays syncStaleDays subscriptionReviewIntervalDays autoAddStores ntfyUrl ntfyEnabled currency multiCurrency defaultVatRate defaultReturnWindowDays lists spaces budgets budgetRollover assetAccounts depreciation categoryRules onboardingDismissed notifyTypes quietHours')
+      .select(APP_CONFIG_SELECT)
       .lean();
   } catch {
     /* DB down → hard defaults */
