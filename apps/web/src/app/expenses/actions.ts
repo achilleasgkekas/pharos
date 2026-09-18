@@ -17,6 +17,7 @@ import { cleanSplit } from '@/lib/split';
 import { cleanPaymentSplits } from '@/lib/paymentSplit';
 import { addCycleUTC, RECURRING_CYCLE_VALUES, type RecurringCycle } from '@/lib/billingCycle';
 import { syncGiftCardUses } from '@/lib/giftCardMirror';
+import { recurringExpenseId, isDuplicateKey } from '@/lib/recurringExpenseId';
 import { resolveFx, normalizeCurrency } from '@/lib/fx';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
@@ -161,27 +162,37 @@ export async function generateDueRecurring(): Promise<{ created: number }> {
     let guard = 0;
     while (next.getTime() <= now && guard < 36) {
       guard++;
-      await Expense.create({
-        kind: seed.kind,
-        vendor: seed.vendor,
-        vendorKey: seed.vendorKey,
-        category: seed.category,
-        space: seed.space || '',
-        taxDeductible: seed.taxDeductible || false,
-        taxCategory: seed.taxCategory || '',
-        // `amount` is base-denominated (lib/fx.ts), so a projection is base currency by
-        // definition; don't inherit the seed's printed foreign code/rate.
-        amount: seed.amount,
-        currency: base,
-        date: next,
-        period: periodFrom(next),
-        recurring: true,
-        recurringCycle: seed.recurringCycle,
-        aiModel: 'recurring-auto',
-        verified: false,
-        notes: 'Auto-generated from recurring series',
-      });
-      created++;
+      // #69: the id is derived from the series and the period, so a concurrent run that decided
+      // to create the same entry loses on the _id index instead of writing a second copy.
+      const period = periodFrom(next);
+      try {
+        await Expense.create({
+          _id: recurringExpenseId(String(seed.kind), String(seed.vendorKey), period),
+          kind: seed.kind,
+          vendor: seed.vendor,
+          vendorKey: seed.vendorKey,
+          category: seed.category,
+          space: seed.space || '',
+          taxDeductible: seed.taxDeductible || false,
+          taxCategory: seed.taxCategory || '',
+          // `amount` is base-denominated (lib/fx.ts), so a projection is base currency by
+          // definition; don't inherit the seed's printed foreign code/rate.
+          amount: seed.amount,
+          currency: base,
+          date: next,
+          period,
+          recurring: true,
+          recurringCycle: seed.recurringCycle,
+          aiModel: 'recurring-auto',
+          verified: false,
+          notes: 'Auto-generated from recurring series',
+        });
+        created++;
+      } catch (err) {
+        // Someone else got there first (or the user trashed this projection and it still owns its
+        // id): either way the slot is taken and re-creating it is exactly what #69 is about.
+        if (!isDuplicateKey(err)) throw err;
+      }
       next = addCycleUTC(next, cycle);
     }
   }
