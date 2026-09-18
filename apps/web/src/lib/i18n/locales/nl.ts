@@ -378,6 +378,8 @@ export const nl: Partial<Dict> = {
   'set.trialAlert': 'Proefperiode-waarschuwing · dagen vóór afschrijving',
   'set.giftCardAlert': 'Cadeaukaart-vervalwaarschuwing · dagen vooraf',
   'set.billAlert': 'Rekening-vervalwaarschuwing · dagen vooraf',
+  'set.documentAlert': 'Documentvervalwaarschuwing · dagen vooraf',
+  'set.specialDateAlert': 'Speciale datum · dagen vooraf',
   'set.maintenanceAlert': 'Onderhoudswaarschuwing · dagen vooraf',
   'set.lendingAlert': 'Retourwaarschuwing uitgeleend item · dagen vooraf',
   'set.claimStaleAlert': 'Garantieclaim zonder beweging · dagen stilte',

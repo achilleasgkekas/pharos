@@ -378,6 +378,8 @@ export const de: Partial<Dict> = {
   'set.trialAlert': 'Testphasen-Hinweis · Tage vor Abbuchung',
   'set.giftCardAlert': 'Geschenkkarten-Ablauf-Hinweis · Tage im Voraus',
   'set.billAlert': 'Rechnungsfälligkeits-Hinweis · Tage im Voraus',
+  'set.documentAlert': 'Dokumentablauf-Hinweis · Tage im Voraus',
+  'set.specialDateAlert': 'Termin-Hinweis · Tage im Voraus',
   'set.maintenanceAlert': 'Wartungsfälligkeits-Hinweis · Tage im Voraus',
   'set.lendingAlert': 'Rückgabe-Hinweis für verliehene Objekte · Tage im Voraus',
   'set.claimStaleAlert': 'Garantiefall ohne Bewegung · Tage Funkstille',

@@ -378,6 +378,8 @@ export const pt: Partial<Dict> = {
   'set.trialAlert': 'Alerta de avaliação gratuita · dias antes da cobrança',
   'set.giftCardAlert': 'Alerta de validade de cartão-presente · dias de antecedência',
   'set.billAlert': 'Alerta de fatura a vencer · dias de antecedência',
+  'set.documentAlert': 'Alerta de validade de documento · dias de antecedência',
+  'set.specialDateAlert': 'Alerta de data especial · dias de antecedência',
   'set.maintenanceAlert': 'Alerta de manutenção devida · dias de antecedência',
   'set.lendingAlert': 'Alerta de devolução de artigo emprestado · dias de antecedência',
   'set.claimStaleAlert': 'Processo de garantia parado · dias de silêncio',
