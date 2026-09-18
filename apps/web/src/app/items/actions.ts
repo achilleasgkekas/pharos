@@ -1762,7 +1762,14 @@ export async function bulkUpdateItems(
 
     const set: Record<string, unknown> = {};
     if (category) set.category = category;
-    if (status) set.status = status;
+    if (status) {
+      set.status = status;
+      if (!lendingApplies(status)) {
+        set.lentTo = '';
+        set.lentAt = null;
+        set.expectedReturnAt = null;
+      }
+    }
     const update: Record<string, unknown> = {};
     if (Object.keys(set).length) update.$set = set;
     if (addTags.length) update.$addToSet = { tags: { $each: addTags } };

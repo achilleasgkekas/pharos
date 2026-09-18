@@ -108,6 +108,14 @@ describe('bulkUpdateItems', () => {
     expect(update).toEqual({ $set: { status: 'received' } });
   });
 
+  it('clears lending fields if status changes to a non-lending state', async () => {
+    await bulkUpdateItems([ID1], { status: 'sold' });
+    const [, update] = itemUpdateMany.mock.calls[0];
+    expect(update).toEqual({
+      $set: { status: 'sold', lentTo: '', lentAt: null, expectedReturnAt: null },
+    });
+  });
+
   it('tags alone -> $addToSet with $each, no $set', async () => {
     await bulkUpdateItems([ID1], { addTags: ['gaming', 'ssd'] });
     const [, update] = itemUpdateMany.mock.calls[0];
