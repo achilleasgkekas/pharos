@@ -365,6 +365,12 @@ export async function saveDefaults(formData: FormData): Promise<{ ok: boolean }>
   // 0 is meaningful (bill due/overdue alerts off), so parse explicitly instead of `|| 5`.
   const billRaw = Number(formData.get('billAlertDays'));
   const billAlertDays = Number.isFinite(billRaw) ? Math.max(0, Math.min(90, Math.round(billRaw))) : 5;
+  // 0 is meaningful (document expiry alerts off), so parse explicitly instead of `|| 30`.
+  const docRaw = Number(formData.get('documentAlertDays'));
+  const documentAlertDays = Number.isFinite(docRaw) ? Math.max(0, Math.min(180, Math.round(docRaw))) : 30;
+  // 0 is meaningful (special date alerts off), so parse explicitly instead of `|| 7`.
+  const specialRaw = Number(formData.get('specialDateAlertDays'));
+  const specialDateAlertDays = Number.isFinite(specialRaw) ? Math.max(0, Math.min(180, Math.round(specialRaw))) : 7;
   // Lead time for the P41 maintenance chore. 0 is meaningful ("only once it is actually
   // due"), and an overdue chore nags past it either way, so parse explicitly.
   const maintRaw = Number(formData.get('maintenanceAlertDays'));
@@ -400,6 +406,8 @@ export async function saveDefaults(formData: FormData): Promise<{ ok: boolean }>
         trialAlertDays,
         giftCardAlertDays,
         billAlertDays,
+        documentAlertDays,
+        specialDateAlertDays,
         maintenanceAlertDays,
         lendingAlertDays,
         staleClaimDays,
