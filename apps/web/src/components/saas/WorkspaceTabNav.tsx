@@ -51,7 +51,7 @@ export function WorkspaceTabNav({ tabs }: { tabs: WorkspaceTab[] }) {
   if (!tabs || tabs.length === 0) return null;
 
   return (
-    <nav aria-label="Workspace" className="md:w-52 md:shrink-0">
+    <nav aria-label="Workspace" className="w-full min-w-0 md:w-52 md:shrink-0">
       <div
         ref={containerRef}
         className="flex md:flex-col gap-1.5 overflow-x-auto scroll-smooth md:overflow-visible md:sticky md:top-20 pb-1 md:pb-0 -mx-4 px-4 md:mx-0 md:px-0 [mask-image:linear-gradient(to_right,transparent,black_12px,black_calc(100%-12px),transparent)] md:[mask-image:none]"

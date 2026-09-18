@@ -454,7 +454,7 @@ export function ReceiptsClient({
             </span>
           </h1>
           <div
-            className="flex items-center gap-4 text-xs text-[color:var(--color-text-dim)]"
+            className="flex items-center gap-2 sm:gap-4 flex-wrap text-xs text-[color:var(--color-text-dim)]"
             style={{ fontFamily: 'var(--font-mono)' }}
           >
             <div className="flex bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg p-0.5">

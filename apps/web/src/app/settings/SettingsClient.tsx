@@ -190,7 +190,7 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
 
       <div className="flex flex-col md:flex-row gap-5">
         {/* Tab navigation — sidebar on desktop, scrollable pills on mobile */}
-        <nav className="md:w-52 md:shrink-0">
+        <nav className="w-full min-w-0 md:w-52 md:shrink-0">
           <div className="flex md:flex-col gap-1.5 overflow-x-auto md:overflow-visible md:sticky md:top-20 pb-1 md:pb-0 -mx-4 px-4 md:mx-0 md:px-0">
             {visibleTabs.map((tb) => (
               <button

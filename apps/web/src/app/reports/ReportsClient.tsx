@@ -237,7 +237,7 @@ function FxCurrencyGroup({ currency, rows, base }: { currency: string; rows: FxI
           {' · '}
           {money(total, currency)}
         </p>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 flex-wrap">
           <span className="text-[10px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
             {t('reports.fxRateHint', { code: currency, base })}
           </span>

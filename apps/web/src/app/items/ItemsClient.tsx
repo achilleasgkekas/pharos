@@ -664,7 +664,7 @@ export function ItemsClient({
               {items.length} {items.length === 1 ? t('it.item') : t('it.items')}
             </span>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             {items.length > 0 && view === 'shopping' && (
               <div className="text-xs text-[color:var(--color-text-dim)]" style={{ fontFamily: 'var(--font-mono)' }}>
                 {t('it.cost')}{' '}
@@ -682,7 +682,7 @@ export function ItemsClient({
               </button>
             )}
             {filtered.length > 0 && (
-              <div className="flex items-center gap-2" style={{ fontFamily: 'var(--font-mono)' }}>
+              <div className="flex items-center gap-2 flex-wrap" style={{ fontFamily: 'var(--font-mono)' }}>
                 {selectMode ? (
                   <>
                     {selectedIds.size > 0 && (
