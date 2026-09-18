@@ -17,6 +17,7 @@ import {
   GitMerge,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { DateInput } from '@/components/ui/DateInput';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
@@ -1200,6 +1201,7 @@ function AddTransactionForm({ statementId, onDone }: { statementId: string; onDo
   const t = useT();
   const [pending, startTransition] = useTransition();
   const [installment, setInstallment] = useState(false);
+  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -1213,7 +1215,9 @@ function AddTransactionForm({ statementId, onDone }: { statementId: string; onDo
   return (
     <form onSubmit={handleSubmit} className="bg-[color:var(--color-surface-2)] rounded-lg p-3 mb-2 space-y-2">
       <div className="flex gap-2">
-        <input name="date" type="date" required defaultValue={new Date().toISOString().slice(0, 10)} className={cn(inputClass, 'w-32')} />
+        <div className="w-32 shrink-0">
+          <DateInput name="date" required value={date} onValueChange={setDate} className={cn(inputClass, 'pr-8')} />
+        </div>
         <input name="description" placeholder={t('stm.description')} required className={cn(inputClass, 'flex-1')} />
         <input name="amount" type="number" step="0.01" placeholder={cur()} required className={cn(inputClass, 'w-20 text-right')} />
       </div>

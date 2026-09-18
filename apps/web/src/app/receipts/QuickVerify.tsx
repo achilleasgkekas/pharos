@@ -2,6 +2,7 @@
 import { useState, useEffect, useMemo, useTransition, useCallback } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
+import { DateInput } from '@/components/ui/DateInput';
 import { cur, currencySymbol } from '@/lib/money';
 import { isForeignCurrency, normalizeCurrency } from '@/lib/fx';
 import { FxBadge } from '@/components/FxBadge';
@@ -145,7 +146,7 @@ export function QuickVerify({
                 <div className="grid grid-cols-2 gap-3">
                   <label className="block">
                     <span className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>{t('ex.fDate')}</span>
-                    <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full text-sm px-3 py-2 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] focus:border-[color:var(--color-accent)] outline-none" />
+                    <DateInput value={date} onValueChange={setDate} />
                   </label>
                   <label className="block">
                     <span className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)] flex items-center gap-1.5" style={{ fontFamily: 'var(--font-mono)' }}>

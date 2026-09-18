@@ -2,6 +2,7 @@
 import { useState, useMemo, useTransition } from 'react';
 import { Plus, Trash2, Check, Archive, ArchiveRestore, Pencil, X, FileCheck2, IdCard } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { DateInput } from '@/components/ui/DateInput';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
@@ -189,10 +190,10 @@ export function DocumentsClient({ documents, leadDays }: { documents: Serialized
               <Input name="number" defaultValue={editing?.number || ''} />
             </Field>
             <Field label="Issued (optional)">
-              <input type="date" name="issuedAt" defaultValue={toInputDate(editing?.issuedAt ?? null)} className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} />
+              <DateInput name="issuedAt" value={toInputDate(editing?.issuedAt ?? null)} onValueChange={(v) => setEditing({ ...editing, issuedAt: v })} className={inputClass} />
             </Field>
             <Field label="Expires *">
-              <input type="date" name="expiryDate" defaultValue={toInputDate(editing?.expiryDate ?? null)} required className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} />
+              <DateInput name="expiryDate" required value={toInputDate(editing?.expiryDate ?? null)} onValueChange={(v) => setEditing({ ...editing, expiryDate: v })} className={inputClass} />
             </Field>
           </div>
           <Field label="Notes">
