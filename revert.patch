@@ -1,0 +1,20 @@
+--- apps/web/src/lib/tenantScoping.ts
++++ apps/web/src/lib/tenantScoping.ts
+@@ -77,7 +77,6 @@
+   'lib/tenancy/mfaStore.ts': 'Control plane: Account MFA secret store (registry DB).',
+   'lib/tenancy/provision.ts': 'Control plane: creates Tenant + Membership on provisioning (registry DB).',
+   'lib/tenancy/saasApi.ts': 'Control plane: shared Account/Tenant/Membership data access (registry DB).',
+-  'lib/tenancy/accountSession.ts': 'Control plane: Account session resolution/epoch check (registry DB).',
+   'lib/tenancy/superadmin.ts': 'Control plane: superadmin authz + reads (registry DB).',
+   'lib/tenancy/superadminPage.ts': 'Control plane: superadmin page data (registry DB).',
+   'lib/tenancy/workspaceSession.ts': 'Control plane: Account/workspace session resolution (registry DB).',
+--- apps/web/src/lib/tenantScoping.test.ts
++++ apps/web/src/lib/tenantScoping.test.ts
+@@ -42,7 +42,7 @@
+   const hits: string[] = [];
+   for (const file of walk(srcDir)) {
+     const src = readFileSync(file, 'utf8');
+-    if (!src.includes("from '@/models/") && !src.includes("import('@/models/")) continue;
++    if (!src.includes("from '@/models/")) continue;
+     if (!methodCall.test(src)) continue;
+     if (SCOPING_IDIOMS.some((idiom) => src.includes(idiom))) continue;
