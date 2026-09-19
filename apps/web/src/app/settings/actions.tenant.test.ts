@@ -88,13 +88,41 @@ vi.mock('@/lib/auth', () => ({
   assertCanWrite: async () => {},
 }));
 vi.mock('next/cache', () => ({ revalidatePath: () => {} }));
+// Backup/restore was the last raw-model hold-out in this file: `exportData` ran `find()` and
+// `importData` ran `updateOne()` on the IMPORTED model, so in SaaS mode a workspace's backup was
+// dumped FROM, and restored INTO, the shared default database (#194, #195). The stand-in registry
+// below is tagged `raw-import`: a query that reaches the imported model without going through
+// `scoped()` lands on that tag instead of the workspace's, which is the whole bug.
+//
+// READ THE TAGS CAREFULLY — `raw-import` is NOT the self-hosted database. Two different tags in
+// this file both mean "the base connection" in production, and only SaaS tells them apart:
+//   `default`    — what `scoped()` resolves to when no workspace is ambient. That IS self-hosted:
+//                  `resolveRequestTenant()` short-circuits to DEFAULT_TENANT with SAAS_MODE off
+//                  (lib/tenancy/request.ts), `dbNameFor` returns '', `getTenantConnection('')`
+//                  hands back the default connection unchanged, and `tenantModel` then returns
+//                  the original model untouched. Self-hosted is byte-for-byte what it was.
+//   `raw-import` — the imported model, never routed at all. In self-hosted that happens to be the
+//                  same physical database; in SaaS it is every OTHER tenant's data.
+// So `expect(reads.get('raw-import')).toBeUndefined()` asserts the bug is gone, NOT that the
+// self-hosted path was abandoned — the SELF-HOSTED PARITY test below pins that separately, and
+// it asserts the queries DO land on `default`.
+//
+// Getters keep the fake built at call time, after this module's own bindings exist.
+vi.mock('@/lib/backupModels', () => ({
+  get BACKUP_MODELS() {
+    return { items: fakeModel('raw-import') };
+  },
+  get BACKUP_KEYS() {
+    return ['items'];
+  },
+}));
 vi.mock('@/lib/appSettings', () => ({
   getAppSettings: async () => ({ currency: 'EUR' }),
   invalidateAppSettings: () => {},
   invalidateAppSettingsForRequest: async () => {},
 }));
 
-import { setAiEnabled, saveBudgets, getTrash, restoreFromTrash, purgeTrashEntry, emptyTrash } from './actions';
+import { setAiEnabled, saveBudgets, getTrash, restoreFromTrash, purgeTrashEntry, emptyTrash, exportData, importData } from './actions';
 
 const acme: TenantContext = {
   tenantId: '507f1f77bcf86cd799439011',
@@ -199,5 +227,101 @@ describe('the Trash acts on the CURRENT workspace only', () => {
     expect(r.purged).toBe(11);
     expect(writes.get('default')!.filter((w) => w.op === 'deleteOne')).toHaveLength(11);
     expect(writes.get('acme')).toBeUndefined();
+  });
+});
+
+// ── Backup and restore: the same bug, at its widest blast radius ───────────────────────────────
+//
+// The Trash could only destroy the wrong workspace's records. Backup is worse in both directions:
+// `exportData` handed a tenant a file full of SOMEBODY ELSE's receipts, items and financial
+// history (#194), and `importData` wrote their restore into the shared default database, so their
+// own data never reappeared and the base DB was polluted with it (#195). Both were the documented
+// partial bypass that lib/tenantScoping.ts cannot catch: this file scopes in sixty other places,
+// so at file granularity it looked clean.
+const ITEM_ID = '507f1f77bcf86cd799439044';
+const BACKUP_JSON = JSON.stringify({
+  app: 'homepage',
+  version: 1,
+  exportedAt: '2026-09-19T00:00:00.000Z',
+  collections: { items: [{ _id: ITEM_ID, name: 'restored item' }] },
+});
+
+describe('backup and restore stay inside the CURRENT workspace', () => {
+  it('exportData dumps the caller workspace, never the shared default', async () => {
+    trashDocs = [{ _id: ITEM_ID, name: 'an acme item' }];
+
+    const json = await withTenant(acme, () => exportData());
+
+    expect(reads.get('acme')).toEqual(['find']);
+    expect(reads.get('raw-import')).toBeUndefined();
+    // The file really carries what the scoped read returned, not an empty envelope.
+    expect(JSON.parse(json).collections.items).toHaveLength(1);
+  });
+
+  it('importData restores into the caller workspace, never the shared default', async () => {
+    const r = await withTenant(acme, () => importData(BACKUP_JSON));
+
+    expect(r.ok).toBe(true);
+    expect(r.restored).toBe(1);
+    expect(writes.get('acme')!.map((w) => w.op)).toEqual(['updateOne']);
+    expect(writes.get('acme')![0].doc.filter).toEqual({ _id: ITEM_ID });
+    expect(writes.get('raw-import')).toBeUndefined();
+  });
+
+  it('two workspaces never restore into each other, back to back in one process', async () => {
+    await withTenant(acme, () => importData(BACKUP_JSON));
+    await withTenant(globex, () => importData(BACKUP_JSON));
+
+    expect(writes.get('acme')).toHaveLength(1);
+    expect(writes.get('globex')).toHaveLength(1);
+    expect(writes.get('raw-import')).toBeUndefined();
+  });
+
+  // The one that answers "does scoping break the self-hosted install?". No workspace is established,
+  // which is the entire self-hosted app: `currentTenant()` yields DEFAULT_TENANT, so `scoped()`
+  // resolves to the base connection and both halves of backup still run against it. If routing ever
+  // sent self-hosted somewhere else, `default` would be empty here and this test would fail.
+  it('SELF-HOSTED PARITY: with no workspace established backup still uses the default connection', async () => {
+    trashDocs = [{ _id: ITEM_ID }];
+
+    await exportData();
+    await importData(BACKUP_JSON);
+
+    expect(reads.get('default')).toEqual(['find']);
+    expect(writes.get('default')!.map((w) => w.op)).toEqual(['updateOne']);
+    expect(reads.get('raw-import')).toBeUndefined();
+    expect(writes.get('raw-import')).toBeUndefined();
+  });
+});
+
+// ── Restoring an item that has since been trashed ──────────────────────────────────────────────
+//
+// `exportData` only dumps live documents (the soft-delete plugin hides trashed ones from `find`),
+// so every document in a backup was, by definition, NOT in the Trash when it was written. Restore
+// has to honour that even when the copy in the database has been trashed since — otherwise the
+// user restores a backup and the item is still missing from every page, sitting in a Trash it was
+// never in. `$set` alone cannot do it: a document written before the soft-delete plugin existed
+// carries no `deletedAt` key at all, so there is nothing for `$set` to overwrite.
+describe('restore takes a document out of the Trash', () => {
+  it('clears deletedAt when the backup copy was live', async () => {
+    await withTenant(acme, () => importData(BACKUP_JSON));
+
+    const { update } = writes.get('acme')![0].doc;
+    expect(update.$unset).toEqual({ deletedAt: '' });
+    expect(update.$set).not.toHaveProperty('deletedAt');
+  });
+
+  it('leaves deletedAt alone when the backup copy carries one', async () => {
+    const trashed = JSON.stringify({
+      app: 'homepage',
+      version: 1,
+      collections: { items: [{ _id: ITEM_ID, name: 'trashed item', deletedAt: '2026-09-01T00:00:00.000Z' }] },
+    });
+
+    await withTenant(acme, () => importData(trashed));
+
+    const { update } = writes.get('acme')![0].doc;
+    expect(update.$unset).toBeUndefined();
+    expect(update.$set.deletedAt).toBe('2026-09-01T00:00:00.000Z');
   });
 });
