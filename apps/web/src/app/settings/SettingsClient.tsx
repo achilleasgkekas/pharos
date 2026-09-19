@@ -16,7 +16,8 @@ import { YnabImportModal } from './YnabImportModal';
 import type { StoreLite } from '@/lib/storeService';
 import type { AppSettings } from '@/lib/appSettings';
 import { rateForCategory } from '@/lib/depreciation';
-import { saveDefaults, runAlertChecks, getNotifierChannels, saveNotifierChannels, getNotifyTypes, saveNotifyTypes, getQuietHours, saveQuietHours, testNotifierChannel, getDeliveryLogs, getWebhookSubscriptions, saveWebhookSubscriptions, testWebhookSubscription, savePrompt, resetPrompt, saveScraperAi, saveStorageConfig, testRemoteConnection, testSecondaryRemote, syncToRemote, getSyncManifest, syncOnedriveBatch, saveList, saveSpaces, getTrash, restoreFromTrash, purgeFromTrash, emptyTrash, startOnedriveAuth, pollOnedriveAuth, disconnectOnedriveAccount, testOnedriveConnection, saveImapConfigAction, testImapConnectionAction, checkImapInboxNow, type PromptEditorEntry, type ScraperAiConfig, type StorageInfo, type ListEditorEntry, type TrashRow, type ImapInfo } from './actions';
+import { saveDefaults, runAlertChecks, getNotifierChannels, saveNotifierChannels, getNotifyTypes, saveNotifyTypes, getQuietHours, saveQuietHours, testNotifierChannel, getDeliveryLogs, getWebhookSubscriptions, saveWebhookSubscriptions, testWebhookSubscription, savePrompt, resetPrompt, saveScraperAi, saveStorageConfig, testRemoteConnection, testSecondaryRemote, syncToRemote, saveList, saveSpaces, getTrash, restoreFromTrash, purgeFromTrash, emptyTrash, startOnedriveAuth, pollOnedriveAuth, disconnectOnedriveAccount, testOnedriveConnection, saveImapConfigAction, testImapConnectionAction, checkImapInboxNow, type PromptEditorEntry, type ScraperAiConfig, type StorageInfo, type ListEditorEntry, type TrashRow, type ImapInfo } from './actions';
+import { enqueueOnedriveSync } from '@/app/jobActions';
 import { NOTIFIER_TYPES, type NotifierConfig, type NotifierType } from '@/lib/notifiers.shared';
 import { ALERT_TYPES, type AlertType, type NotifyTypes } from '@/lib/alertTypes';
 import { notifierLogKey, webhookLogKey, type DeliveryLogEntry } from '@/lib/deliveryLog.shared';
@@ -1423,7 +1424,6 @@ function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Inf
   const [secure, setSecure] = useState(storage.remoteSecure);
   const [msg, setMsg] = useState<string | null>(null);
   const [test, setTest] = useState<string | null>(null);
-  const [syncing, setSyncing] = useState(false);
   // The panel is server-rendered, so a sync that just succeeded would still show the
   // OLD "last synced" date until a reload. Flip it locally instead of forcing a refetch.
   const [syncedNow, setSyncedNow] = useState(false);
@@ -1504,32 +1504,19 @@ function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Inf
     });
   }
 
-  async function doSync() {
+  function doSync() {
     setTest(null);
-    // OneDrive: upload in chunks so the UI shows live progress and survives Graph
-    // throttling (a one-shot upload of hundreds of files silently dropped some).
+    // OneDrive: enqueue background job so it executes resiliently in the background queue.
     if (backend === 'onedrive') {
-      setSyncing(true);
-      setMsg('Preparing…');
-      const man = await getSyncManifest();
-      if (!man.ok) { setMsg(`✗ ${man.error}`); setSyncing(false); return; }
-      const items = man.items;
-      const total = items.length;
-      if (!total) { setMsg('Nothing to sync.'); setSyncing(false); return; }
-      let pushed = 0, failed = 0, skipped = 0;
-      const errs: string[] = [];
-      const CHUNK = 8;
-      for (let i = 0; i < total; i += CHUNK) {
-        const r = await syncOnedriveBatch(items.slice(i, i + CHUNK));
-        pushed += r.pushed;
-        failed += r.failed;
-        skipped += r.skipped;
-        if (errs.length < 3) errs.push(...r.errors.slice(0, 3 - errs.length));
-        setMsg(`Syncing ${Math.min(i + CHUNK, total)}/${total}… (${pushed} ok${failed ? `, ${failed} failed` : ''})`);
-      }
-      setMsg(`Synced ${pushed}/${total} ✓${skipped ? ` · ${skipped} skipped (missing locally)` : ''}${failed ? ` · ${failed} failed${errs[0] ? ` — ${errs[0]}` : ''}` : ''}`);
-      if (pushed > 0) setSyncedNow(true); // matches the server rule: only a real push counts
-      setSyncing(false);
+      setMsg('Enqueuing sync job…');
+      startTransition(async () => {
+        const r = await enqueueOnedriveSync();
+        if (r.ok) {
+          setMsg(`Sync job queued (${r.count} item${r.count === 1 ? '' : 's'}) ✓`);
+        } else {
+          setMsg(`✗ ${r.error || 'Failed to queue sync job'}`);
+        }
+      });
       return;
     }
     // SMB/FTP: single connection, one-shot.
@@ -1725,8 +1712,8 @@ function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Inf
           </button>
         )}
         {backend !== 'local' && (
-          <button type="button" onClick={doSync} disabled={pending || syncing} className={ghostBtn}>
-            {syncing ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />} {t('set.syncNow')}
+          <button type="button" onClick={doSync} disabled={pending} className={ghostBtn}>
+            {pending ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />} {t('set.syncNow')}
           </button>
         )}
         {test && (
