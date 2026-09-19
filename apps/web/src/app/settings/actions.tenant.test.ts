@@ -91,12 +91,26 @@ vi.mock('next/cache', () => ({ revalidatePath: () => {} }));
 // Backup/restore was the last raw-model hold-out in this file: `exportData` ran `find()` and
 // `importData` ran `updateOne()` on the IMPORTED model, so in SaaS mode a workspace's backup was
 // dumped FROM, and restored INTO, the shared default database (#194, #195). The stand-in registry
-// below is tagged `unscoped` because that is what raw access really is — the base connection — so
-// a query that skips `scoped()` shows up on that tag instead of the workspace's. Getters keep the
-// fake built at call time, after this module's own bindings exist.
+// below is tagged `raw-import`: a query that reaches the imported model without going through
+// `scoped()` lands on that tag instead of the workspace's, which is the whole bug.
+//
+// READ THE TAGS CAREFULLY — `raw-import` is NOT the self-hosted database. Two different tags in
+// this file both mean "the base connection" in production, and only SaaS tells them apart:
+//   `default`    — what `scoped()` resolves to when no workspace is ambient. That IS self-hosted:
+//                  `resolveRequestTenant()` short-circuits to DEFAULT_TENANT with SAAS_MODE off
+//                  (lib/tenancy/request.ts), `dbNameFor` returns '', `getTenantConnection('')`
+//                  hands back the default connection unchanged, and `tenantModel` then returns
+//                  the original model untouched. Self-hosted is byte-for-byte what it was.
+//   `raw-import` — the imported model, never routed at all. In self-hosted that happens to be the
+//                  same physical database; in SaaS it is every OTHER tenant's data.
+// So `expect(reads.get('raw-import')).toBeUndefined()` asserts the bug is gone, NOT that the
+// self-hosted path was abandoned — the SELF-HOSTED PARITY test below pins that separately, and
+// it asserts the queries DO land on `default`.
+//
+// Getters keep the fake built at call time, after this module's own bindings exist.
 vi.mock('@/lib/backupModels', () => ({
   get BACKUP_MODELS() {
-    return { items: fakeModel('unscoped') };
+    return { items: fakeModel('raw-import') };
   },
   get BACKUP_KEYS() {
     return ['items'];
@@ -239,7 +253,7 @@ describe('backup and restore stay inside the CURRENT workspace', () => {
     const json = await withTenant(acme, () => exportData());
 
     expect(reads.get('acme')).toEqual(['find']);
-    expect(reads.get('unscoped')).toBeUndefined();
+    expect(reads.get('raw-import')).toBeUndefined();
     // The file really carries what the scoped read returned, not an empty envelope.
     expect(JSON.parse(json).collections.items).toHaveLength(1);
   });
@@ -251,7 +265,7 @@ describe('backup and restore stay inside the CURRENT workspace', () => {
     expect(r.restored).toBe(1);
     expect(writes.get('acme')!.map((w) => w.op)).toEqual(['updateOne']);
     expect(writes.get('acme')![0].doc.filter).toEqual({ _id: ITEM_ID });
-    expect(writes.get('unscoped')).toBeUndefined();
+    expect(writes.get('raw-import')).toBeUndefined();
   });
 
   it('two workspaces never restore into each other, back to back in one process', async () => {
@@ -260,9 +274,13 @@ describe('backup and restore stay inside the CURRENT workspace', () => {
 
     expect(writes.get('acme')).toHaveLength(1);
     expect(writes.get('globex')).toHaveLength(1);
-    expect(writes.get('unscoped')).toBeUndefined();
+    expect(writes.get('raw-import')).toBeUndefined();
   });
 
+  // The one that answers "does scoping break the self-hosted install?". No workspace is established,
+  // which is the entire self-hosted app: `currentTenant()` yields DEFAULT_TENANT, so `scoped()`
+  // resolves to the base connection and both halves of backup still run against it. If routing ever
+  // sent self-hosted somewhere else, `default` would be empty here and this test would fail.
   it('SELF-HOSTED PARITY: with no workspace established backup still uses the default connection', async () => {
     trashDocs = [{ _id: ITEM_ID }];
 
@@ -271,8 +289,8 @@ describe('backup and restore stay inside the CURRENT workspace', () => {
 
     expect(reads.get('default')).toEqual(['find']);
     expect(writes.get('default')!.map((w) => w.op)).toEqual(['updateOne']);
-    expect(reads.get('unscoped')).toBeUndefined();
-    expect(writes.get('unscoped')).toBeUndefined();
+    expect(reads.get('raw-import')).toBeUndefined();
+    expect(writes.get('raw-import')).toBeUndefined();
   });
 });
 

@@ -118,6 +118,13 @@ import { currentModel } from '@/lib/tenancy/connection';
  * in the host cannot read or write its settings either. Self-hosted resolves to the default tenant
  * with zero work, so `scoped(X)` is exactly `X` there.
  *
+ * This IS the access path `lib/tenantScoping.ts` prescribes, not a wrapper around a raw one: the
+ * rule there is "reach a model through `currentModel()` / `tenantModel()` rather than importing and
+ * querying it directly", and that is literally the body below. Taking the class out of an import or
+ * out of the `BACKUP_MODELS` registry is not the bypass — QUERYING it without resolving it is, and
+ * nothing in this file does that any more. Replacing `scoped(X)` with a bare `currentModel(X)` would
+ * be the same query with the membership check removed.
+ *
  * Resolution is memoised per request (lib/tenancy/request), so calling this once per model inside
  * one action costs one lookup, not one each.
  */
