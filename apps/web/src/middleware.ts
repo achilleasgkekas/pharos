@@ -27,7 +27,7 @@ export const SAAS_LOGIN_PATH = '/account/login';
  *    account" on someone else's workspace.
  */
 export function isSaasPublicPath(pathname: string): boolean {
-  if (pathname.startsWith('/api/')) return true;
+  if (pathname.startsWith('/api/') && !pathname.startsWith('/api/files/')) return true;
   return (
     pathname === SAAS_LOGIN_PATH ||
     pathname === '/account/signup' ||
