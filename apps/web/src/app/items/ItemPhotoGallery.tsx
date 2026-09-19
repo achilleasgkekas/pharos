@@ -30,7 +30,7 @@ export function ItemPhotoGallery({ itemId, photos: initialPhotos, canFetch }: { 
     startTransition(async () => {
       const r = await fetchItemPhotos(itemId);
       setFetching(false);
-      setPhotos(r.photos);
+      if (r?.photos) setPhotos(r.photos);
       setMsg(r.ok ? `✓ Fetched ${r.added} image${r.added === 1 ? '' : 's'}` : (r.error ?? 'Failed'));
     });
   }
@@ -60,7 +60,7 @@ export function ItemPhotoGallery({ itemId, photos: initialPhotos, canFetch }: { 
       }
     }
     const r = await uploadItemPhotos(itemId, fd);
-    if (r.photos.length) setPhotos(r.photos);
+    if (r.photos?.length) setPhotos(r.photos);
     setUploading(false);
     if (inputRef.current) inputRef.current.value = '';
   }
@@ -71,7 +71,7 @@ export function ItemPhotoGallery({ itemId, photos: initialPhotos, canFetch }: { 
       startTransition(async () => {
         setActive(0);
         const r = await deleteItemPhoto(itemId, p);
-        setPhotos(r.photos);
+        if (r?.photos) setPhotos(r.photos);
       });
   }
 
@@ -147,7 +147,7 @@ export function ItemPhotoGallery({ itemId, photos: initialPhotos, canFetch }: { 
         {/* Per-photo actions */}
         <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity">
           {active !== 0 && (
-            <button type="button" title={t('it.setCover')} onClick={() => startTransition(async () => { const r = await setItemCover(itemId, hero); setPhotos(r.photos); setActive(0); })} disabled={pending} className="w-7 h-7 rounded-full bg-black/55 text-white flex items-center justify-center hover:bg-black/75">
+            <button type="button" title={t('it.setCover')} onClick={() => startTransition(async () => { const r = await setItemCover(itemId, hero); if (r?.photos) { setPhotos(r.photos); setActive(0); } })} disabled={pending} className="w-7 h-7 rounded-full bg-black/55 text-white flex items-center justify-center hover:bg-black/75">
               <Star size={13} />
             </button>
           )}

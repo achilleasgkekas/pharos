@@ -41,7 +41,7 @@ export function ItemDocuments({ itemId, attachments: initial }: { itemId: string
     const fd = new FormData();
     for (const f of Array.from(files)) fd.append('files', f);
     const r = await uploadItemAttachments(itemId, fd);
-    if (r.attachments.length) setAttachments(r.attachments);
+    if (r.attachments?.length) setAttachments(r.attachments);
     setUploading(false);
     if (!r.ok && r.error) setMsg(r.error);
     if (inputRef.current) inputRef.current.value = '';
@@ -52,7 +52,7 @@ export function ItemDocuments({ itemId, attachments: initial }: { itemId: string
     if (!ok) return;
     startTransition(async () => {
       const r = await deleteItemAttachment(itemId, path);
-      setAttachments(r.attachments);
+      if (r?.attachments) setAttachments(r.attachments);
     });
   }
 
