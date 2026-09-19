@@ -1,5 +1,6 @@
 'use client';
 import { cur, currencySymbol, CURRENCIES } from "@/lib/money";
+import { todayLocal } from "@/lib/dates";
 import { useState, useTransition, useMemo, useRef } from 'react';
 import {
   Plus,
@@ -1201,7 +1202,7 @@ function AddTransactionForm({ statementId, onDone }: { statementId: string; onDo
   const t = useT();
   const [pending, startTransition] = useTransition();
   const [installment, setInstallment] = useState(false);
-  const [date, setDate] = useState(() => new Date().toLocaleDateString('en-CA'));
+  const [date, setDate] = useState(() => todayLocal());
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -1281,8 +1282,8 @@ function StatementForm({
   const printed = (v: number | undefined) => (v == null ? '' : String(toPrinted(v, storedRate)));
   const [form, setForm] = useState({
     card: statement?.card ?? (cards[0] ? cardLabel(cards[0]) : ''),
-    period: statement?.period ?? new Date().toLocaleDateString('en-CA').slice(0, 7),
-    statementDate: statement?.statementDate ? statement.statementDate.slice(0, 10) : new Date().toLocaleDateString('en-CA'),
+    period: statement?.period ?? todayLocal().slice(0, 7),
+    statementDate: statement?.statementDate ? statement.statementDate.slice(0, 10) : todayLocal(),
     dueDate: statement?.dueDate ? statement.dueDate.slice(0, 10) : '',
     // The headline total keeps its exact printed value in origAmount; the rest is backed out.
     totalAmount: ((wasForeign ? statement?.origAmount || statement?.totalAmount : statement?.totalAmount) ?? '').toString(),

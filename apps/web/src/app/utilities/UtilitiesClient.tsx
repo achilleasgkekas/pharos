@@ -6,14 +6,14 @@ import { useT } from '@/components/LocaleProvider';
 import { withConsumption, type ReadingLike } from '@/lib/meterReadings';
 import { DateInput } from '@/components/ui/DateInput';
 import { createMeterReading, deleteMeterReading } from './actions';
+import { todayLocal } from '@/lib/dates';
 
 const input = 'w-full bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[color:var(--color-accent)]';
-const today = () => new Date().toLocaleDateString('en-CA');
 
 export function UtilitiesClient({ readings, spaces }: { readings: ReadingLike[]; spaces: string[] }) {
   const t = useT();
   const [open, setOpen] = useState(false);
-  const [readingAt, setReadingAt] = useState(() => today());
+  const [readingAt, setReadingAt] = useState('');
   const [error, setError] = useState('');
   const [pending, startTransition] = useTransition();
   const rows = useMemo(() => withConsumption(readings), [readings]);
@@ -37,7 +37,7 @@ export function UtilitiesClient({ readings, spaces }: { readings: ReadingLike[];
           </h1>
           <p className="text-xs text-[color:var(--color-text-dim)] mt-1">{t('util.subtitle')}</p>
         </div>
-        <button onClick={() => { setReadingAt(today()); setOpen(true); }} className="flex items-center gap-1.5 rounded-lg bg-[color:var(--color-accent)] text-black px-3 py-2 text-sm font-semibold">
+        <button onClick={() => { setReadingAt(todayLocal()); setOpen(true); }} className="flex items-center gap-1.5 rounded-lg bg-[color:var(--color-accent)] text-black px-3 py-2 text-sm font-semibold">
           <Plus size={16} /> {t('util.add')}
         </button>
       </div>

@@ -190,10 +190,10 @@ export function DocumentsClient({ documents, leadDays }: { documents: Serialized
               <Input name="number" defaultValue={editing?.number || ''} />
             </Field>
             <Field label="Issued (optional)">
-              <DateInput name="issuedAt" value={toInputDate(editing?.issuedAt ?? null)} onValueChange={(v) => setEditing({ ...editing, issuedAt: v })} className={inputClass} />
+              <DateInput name="issuedAt" value={toInputDate(editing?.issuedAt ?? null)} onValueChange={(v) => setEditing(prev => prev ? { ...prev, issuedAt: v } : prev)} className={inputClass} />
             </Field>
             <Field label="Expires *">
-              <DateInput name="expiryDate" required value={toInputDate(editing?.expiryDate ?? null)} onValueChange={(v) => setEditing({ ...editing, expiryDate: v })} className={inputClass} />
+              <DateInput name="expiryDate" required value={toInputDate(editing?.expiryDate ?? null)} onValueChange={(v) => setEditing(prev => prev ? { ...prev, expiryDate: v } : prev)} className={inputClass} />
             </Field>
           </div>
           <Field label="Notes">
