@@ -5,6 +5,7 @@ import { cur } from '@/lib/money';
 import { Plus, TrendingDown, TrendingUp, Check, Loader2, ChevronDown, ExternalLink, Target, Pencil, Search, RefreshCw, ArrowDown, ArrowUp, AlertTriangle } from 'lucide-react';
 import type { SerializedItem } from '@/types';
 import { logItemPrice, setItemTarget, refreshItemPrices, type PriceRefresh } from '@/app/items/actions';
+import { calculatePriceTrend } from '@/lib/priceTrend';
 import { getBulkAiGuard } from '@/app/jobActions';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { useLocale, useT } from '@/components/LocaleProvider';
@@ -41,7 +42,8 @@ function priceStatus(item: SerializedItem) {
   const lowestEver = hist.length ? hist.reduce((lo, h) => (h.price < lo.price ? h : lo), hist[0]) : null;
   const lo = prices.length ? Math.min(...prices) : null;
   const hi = prices.length ? Math.max(...prices) : null;
-  const trend = hist.length >= 2 && hist[hist.length - 1].price !== hist[hist.length - 2].price ? hist[hist.length - 1].price - hist[hist.length - 2].price : 0;
+  const rawTrend = calculatePriceTrend(item.priceHistory, bestNow);
+  const trend = rawTrend ?? 0;
 
   const target = item.targetPrice && item.targetPrice > 0 ? item.targetPrice : null;
 
