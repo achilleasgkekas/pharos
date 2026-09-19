@@ -1,7 +1,0 @@
---- apps/web/src/middleware.ts
-+++ apps/web/src/middleware.ts
-@@ -29,3 +29,3 @@
- export function isSaasPublicPath(pathname: string): boolean {
--  if (pathname.startsWith('/api/')) return true;
-+  if (pathname.startsWith('/api/') && !pathname.startsWith('/api/files/')) return true;
-   return (

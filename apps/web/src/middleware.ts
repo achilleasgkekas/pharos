@@ -27,7 +27,7 @@ export const SAAS_LOGIN_PATH = '/account/login';
  *    account" on someone else's workspace.
  */
 export function isSaasPublicPath(pathname: string): boolean {
-  if (pathname.startsWith('/api/')) return true;
+  if (pathname.startsWith('/api/') && !pathname.startsWith('/api/files/')) return true;
   return (
     pathname === SAAS_LOGIN_PATH ||
     pathname === '/account/signup' ||
@@ -93,7 +93,14 @@ export async function middleware(req: NextRequest) {
       return res;
     }
     // Same shape as the self-hosted branch: APIs get a status, humans get the login page.
-    if (pathname.startsWith('/api/')) return new NextResponse('Unauthorized', { status: 401 });
+    if (pathname.startsWith('/api/')) {
+      // API clients fetch /api/files with a Bearer token (they have no session cookie).
+      // Let those through; the route itself validates the token (Node runtime — the edge
+      // can't reach Mongo). Everything else without a session stays 401.
+      const hasBearer = /^Bearer\s+/i.test(req.headers.get('authorization') || '');
+      if (hasBearer && pathname.startsWith('/api/files/')) return pass();
+      return new NextResponse('Unauthorized', { status: 401 });
+    }
     const url = new URL(SAAS_LOGIN_PATH, req.url);
     url.searchParams.set('next', pathname + search);
     return NextResponse.redirect(url);

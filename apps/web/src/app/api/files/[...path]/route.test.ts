@@ -55,4 +55,48 @@ describe('GET /api/files/[...path]', () => {
     const res = await GET(req, { params });
     expect(res.status).toBe(200);
   });
+
+  it('allows SaaS API client with bearer token', async () => {
+    saasModeMock.mockReturnValue(true);
+    bearerUserMock.mockResolvedValue({ id: 'u1' });
+    resolveRequestTenantOrNullMock.mockResolvedValue(null);
+
+    const req = new NextRequest('http://localhost/api/files/test.jpg');
+    const params = Promise.resolve({ path: ['test.jpg'] });
+    const res = await GET(req, { params });
+    expect(res.status).toBe(200);
+  });
+
+  it('rejects self-hosted user lacking auth', async () => {
+    saasModeMock.mockReturnValue(false);
+    verifySessionMock.mockResolvedValue(null);
+    bearerUserMock.mockResolvedValue(null);
+
+    const req = new NextRequest('http://localhost/api/files/test.jpg');
+    const params = Promise.resolve({ path: ['test.jpg'] });
+    const res = await GET(req, { params });
+    expect(res.status).toBe(401);
+  });
+
+  it('allows self-hosted user with session cookie', async () => {
+    saasModeMock.mockReturnValue(false);
+    verifySessionMock.mockResolvedValue({ id: 'u1' });
+    bearerUserMock.mockResolvedValue(null);
+
+    const req = new NextRequest('http://localhost/api/files/test.jpg');
+    const params = Promise.resolve({ path: ['test.jpg'] });
+    const res = await GET(req, { params });
+    expect(res.status).toBe(200);
+  });
+
+  it('allows self-hosted user with bearer token', async () => {
+    saasModeMock.mockReturnValue(false);
+    verifySessionMock.mockResolvedValue(null);
+    bearerUserMock.mockResolvedValue({ id: 'u1' });
+
+    const req = new NextRequest('http://localhost/api/files/test.jpg');
+    const params = Promise.resolve({ path: ['test.jpg'] });
+    const res = await GET(req, { params });
+    expect(res.status).toBe(200);
+  });
 });

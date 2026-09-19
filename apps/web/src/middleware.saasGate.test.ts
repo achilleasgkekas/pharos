@@ -50,7 +50,7 @@ describe('isSaasPublicPath — what a signed-out visitor may still reach', () =>
     expect(isSaasPublicPath('/api/saas/invites/accept')).toBe(true);
     expect(isSaasPublicPath('/api/v1/items')).toBe(true);
     expect(isSaasPublicPath('/api/cron/alerts')).toBe(true);
-    expect(isSaasPublicPath('/api/files/receipt.pdf')).toBe(true);
+    expect(isSaasPublicPath('/api/files/receipt.pdf')).toBe(false);
   });
 
   it('gates the product itself — the actual reported hole', () => {
