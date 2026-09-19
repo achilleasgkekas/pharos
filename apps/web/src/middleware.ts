@@ -98,7 +98,8 @@ export async function middleware(req: NextRequest) {
       // Let those through; the route itself validates the token (Node runtime — the edge
       // can't reach Mongo). Everything else without a session stays 401.
       const hasBearer = /^Bearer\s+/i.test(req.headers.get('authorization') || '');
-      if (hasBearer && pathname.startsWith('/api/files/')) return pass();
+      const hasAccountCookie = req.cookies.has(ACCOUNT_COOKIE);
+      if (hasBearer && !hasAccountCookie && pathname.startsWith('/api/files/')) return pass();
       return new NextResponse('Unauthorized', { status: 401 });
     }
     const url = new URL(SAAS_LOGIN_PATH, req.url);
@@ -128,7 +129,8 @@ export async function middleware(req: NextRequest) {
     // Let those through; the route itself validates the token (Node runtime — the edge
     // can't reach Mongo). Everything else without a session stays 401.
     const hasBearer = /^Bearer\s+/i.test(req.headers.get('authorization') || '');
-    if (hasBearer && pathname.startsWith('/api/files/')) return pass();
+    const hasSessionCookie = req.cookies.has(SESSION_COOKIE);
+    if (hasBearer && !hasSessionCookie && pathname.startsWith('/api/files/')) return pass();
     return new NextResponse('Unauthorized', { status: 401 });
   }
   const loginUrl = new URL('/login', req.url);

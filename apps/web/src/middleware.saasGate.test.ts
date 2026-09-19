@@ -170,6 +170,28 @@ describe('SaaS middleware sliding refresh & revocation checks', () => {
     expect(res.headers.get('set-cookie')).toBeNull();
   });
 
+  it('does NOT bypass middleware for /api/files/ if a revoked account cookie is present alongside a Bearer token', async () => {
+    const foreignSecret = new TextEncoder().encode('different-secret-that-is-16-chars');
+    const token = await new SignJWT({ email: 'user@example.com' })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setSubject('acc-1')
+      .setIssuedAt()
+      .setExpirationTime('12h')
+      .sign(foreignSecret);
+
+    const req = new NextRequest('https://app.ph-aros.com/api/files/test.pdf', {
+      headers: {
+        cookie: `${ACCOUNT_COOKIE}=${token}`,
+        authorization: 'Bearer fake-token',
+      },
+    });
+
+    const res = await middleware(req);
+    // Since it's an API path, it should return 401 Unauthorized instead of redirecting
+    expect(res.status).toBe(401);
+  });
+
+
   it('does NOT re-issue and rejects when session age exceeds absolute maximum duration (30 days)', async () => {
     const now = Math.floor(Date.now() / 1000);
     // auth_time is 31 days ago
