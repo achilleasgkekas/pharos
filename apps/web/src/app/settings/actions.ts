@@ -1690,8 +1690,14 @@ export async function mergeStores(
 export async function exportData(): Promise<string> {
   await requireAdmin();
   await connectDB();
+  // `scoped()` per model, not the raw import: without it the dump ran against the base
+  // connection, so in SaaS mode a workspace downloaded the DEFAULT database's receipts,
+  // items and financial history instead of its own — a cross-tenant leak handed to the
+  // user as a file (#194). Self-hosted resolves to the default tenant, so nothing changes.
   const entries = await Promise.all(
-    Object.entries(BACKUP_MODELS).map(async ([key, Model]) => [key, await (Model as typeof Item).find().lean()] as const)
+    Object.entries(BACKUP_MODELS).map(
+      async ([key, Model]) => [key, await (await scoped(Model as typeof Item)).find().lean()] as const
+    )
   );
   const collections: Record<string, unknown[]> = {};
   for (const [key, docs] of entries) collections[key] = docs as unknown[];
@@ -2080,6 +2086,12 @@ export async function importData(json: string): Promise<{ ok: boolean; restored:
   for (const [key, Model] of Object.entries(BACKUP_MODELS)) {
     const docs = cols[key];
     if (!Array.isArray(docs)) continue;
+    // The mirror of the export bug (#195), and the destructive half: restoring through the
+    // raw import upserted the tenant's own backup into the DEFAULT database, so their data
+    // never reappeared in their workspace and the base DB was polluted with it. Resolved
+    // once per collection rather than per document — the lookup is memoised per request,
+    // but a backup can carry tens of thousands of documents.
+    const ScopedModel = await scoped(Model as typeof Item);
     for (const raw of docs) {
       if (!raw || typeof raw !== 'object') continue;
       const { _id, __v, createdAt, updatedAt, ...rest } = raw as Record<string, unknown>;
@@ -2098,8 +2110,8 @@ export async function importData(json: string): Promise<{ ok: boolean; restored:
         );
       }
       try {
-        if (_id) await (Model as typeof Item).updateOne({ _id }, { $set: rest }, { upsert: true }).setOptions({ withDeleted: true });
-        else await (Model as typeof Item).create(rest);
+        if (_id) await ScopedModel.updateOne({ _id }, { $set: rest }, { upsert: true }).setOptions({ withDeleted: true });
+        else await ScopedModel.create(rest);
         restored++;
       } catch {
         /* skip a doc that won't validate */

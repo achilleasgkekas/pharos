@@ -88,13 +88,27 @@ vi.mock('@/lib/auth', () => ({
   assertCanWrite: async () => {},
 }));
 vi.mock('next/cache', () => ({ revalidatePath: () => {} }));
+// Backup/restore was the last raw-model hold-out in this file: `exportData` ran `find()` and
+// `importData` ran `updateOne()` on the IMPORTED model, so in SaaS mode a workspace's backup was
+// dumped FROM, and restored INTO, the shared default database (#194, #195). The stand-in registry
+// below is tagged `unscoped` because that is what raw access really is — the base connection — so
+// a query that skips `scoped()` shows up on that tag instead of the workspace's. Getters keep the
+// fake built at call time, after this module's own bindings exist.
+vi.mock('@/lib/backupModels', () => ({
+  get BACKUP_MODELS() {
+    return { items: fakeModel('unscoped') };
+  },
+  get BACKUP_KEYS() {
+    return ['items'];
+  },
+}));
 vi.mock('@/lib/appSettings', () => ({
   getAppSettings: async () => ({ currency: 'EUR' }),
   invalidateAppSettings: () => {},
   invalidateAppSettingsForRequest: async () => {},
 }));
 
-import { setAiEnabled, saveBudgets, getTrash, restoreFromTrash, purgeTrashEntry, emptyTrash } from './actions';
+import { setAiEnabled, saveBudgets, getTrash, restoreFromTrash, purgeTrashEntry, emptyTrash, exportData, importData } from './actions';
 
 const acme: TenantContext = {
   tenantId: '507f1f77bcf86cd799439011',
@@ -199,5 +213,65 @@ describe('the Trash acts on the CURRENT workspace only', () => {
     expect(r.purged).toBe(11);
     expect(writes.get('default')!.filter((w) => w.op === 'deleteOne')).toHaveLength(11);
     expect(writes.get('acme')).toBeUndefined();
+  });
+});
+
+// ── Backup and restore: the same bug, at its widest blast radius ───────────────────────────────
+//
+// The Trash could only destroy the wrong workspace's records. Backup is worse in both directions:
+// `exportData` handed a tenant a file full of SOMEBODY ELSE's receipts, items and financial
+// history (#194), and `importData` wrote their restore into the shared default database, so their
+// own data never reappeared and the base DB was polluted with it (#195). Both were the documented
+// partial bypass that lib/tenantScoping.ts cannot catch: this file scopes in sixty other places,
+// so at file granularity it looked clean.
+const ITEM_ID = '507f1f77bcf86cd799439044';
+const BACKUP_JSON = JSON.stringify({
+  app: 'homepage',
+  version: 1,
+  exportedAt: '2026-09-19T00:00:00.000Z',
+  collections: { items: [{ _id: ITEM_ID, name: 'restored item' }] },
+});
+
+describe('backup and restore stay inside the CURRENT workspace', () => {
+  it('exportData dumps the caller workspace, never the shared default', async () => {
+    trashDocs = [{ _id: ITEM_ID, name: 'an acme item' }];
+
+    const json = await withTenant(acme, () => exportData());
+
+    expect(reads.get('acme')).toEqual(['find']);
+    expect(reads.get('unscoped')).toBeUndefined();
+    // The file really carries what the scoped read returned, not an empty envelope.
+    expect(JSON.parse(json).collections.items).toHaveLength(1);
+  });
+
+  it('importData restores into the caller workspace, never the shared default', async () => {
+    const r = await withTenant(acme, () => importData(BACKUP_JSON));
+
+    expect(r.ok).toBe(true);
+    expect(r.restored).toBe(1);
+    expect(writes.get('acme')!.map((w) => w.op)).toEqual(['updateOne']);
+    expect(writes.get('acme')![0].doc.filter).toEqual({ _id: ITEM_ID });
+    expect(writes.get('unscoped')).toBeUndefined();
+  });
+
+  it('two workspaces never restore into each other, back to back in one process', async () => {
+    await withTenant(acme, () => importData(BACKUP_JSON));
+    await withTenant(globex, () => importData(BACKUP_JSON));
+
+    expect(writes.get('acme')).toHaveLength(1);
+    expect(writes.get('globex')).toHaveLength(1);
+    expect(writes.get('unscoped')).toBeUndefined();
+  });
+
+  it('SELF-HOSTED PARITY: with no workspace established backup still uses the default connection', async () => {
+    trashDocs = [{ _id: ITEM_ID }];
+
+    await exportData();
+    await importData(BACKUP_JSON);
+
+    expect(reads.get('default')).toEqual(['find']);
+    expect(writes.get('default')!.map((w) => w.op)).toEqual(['updateOne']);
+    expect(reads.get('unscoped')).toBeUndefined();
+    expect(writes.get('unscoped')).toBeUndefined();
   });
 });
