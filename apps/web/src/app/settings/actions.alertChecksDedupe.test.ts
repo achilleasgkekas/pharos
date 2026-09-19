@@ -274,7 +274,7 @@ describe('runAlertChecks · dedupe on, nothing previously sent', () => {
       .mockReturnValueOnce(chainSelectLean([{ _id: 'i1', title: 'U7 Pro', targetPrice: 300, currentPrice: 284 }]))
       .mockReturnValueOnce(chainSelectLean([]));
     await runAlertChecks({ dedupe: true });
-    expect(appConfigUpdateOneMock).toHaveBeenCalledWith({ key: 'singleton' }, { $set: { alertDispatchKeys: ['deal:i1'] } }, { upsert: true });
+    expect(appConfigUpdateOneMock).toHaveBeenCalledWith({ key: 'singleton' }, { $set: { alertDispatchKeys: ['deal:i1:284'] } }, { upsert: true });
   });
 });
 
@@ -334,7 +334,7 @@ describe('runAlertChecks · dedupe on, failed delivery must not advance the base
 
 describe('runAlertChecks · dedupe on, the bell and event webhooks are unaffected', () => {
   it('still runs generateNotifications and event webhooks with the full undeduped data', async () => {
-    mockDispatchKeys(['deal:i1']); // already-sent, so the outbound summary omits it
+    mockDispatchKeys(['deal:i1:284']); // already-sent, so the outbound summary omits it
     itemFind.mockReset();
     itemFind.mockReturnValue(chainSelectLean([])); // backstop for queries this case doesn't set
     itemFind

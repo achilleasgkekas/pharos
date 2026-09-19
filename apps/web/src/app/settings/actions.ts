@@ -814,7 +814,11 @@ export async function runAlertChecks(opts: { dedupe?: boolean } = {}): Promise<{
   // everything", so a doc written before P103 keeps behaving exactly as it did.
   const nt = resolveNotifyTypes(s.notifyTypes);
   const period = new Date(now).toISOString().slice(0, 7); // YYYY-MM, same bucket the bell uses for installments
-  const dealsSplit = splitFreshAlerts(nt.deals ? deals : [], (d) => `deal:${String(d._id)}`, previouslySent);
+  const dealsSplit = splitFreshAlerts(nt.deals ? deals : [], (d) => {
+    let lo = (d.currentPrice ?? 0) > 0 ? (d.currentPrice as number) : Infinity;
+    for (const l of d.links ?? []) if (l.price && l.price > 0) lo = Math.min(lo, l.price);
+    return `deal:${String(d._id)}:${lo}`;
+  }, previouslySent);
   const expiringSplit = splitFreshAlerts(nt.warranty ? expiring : [], (w) => `warranty:${String(w._id)}`, previouslySent);
   const returnsSplit = splitFreshAlerts(nt.returns ? returnsClosing : [], (r) => `return:${String(r._id)}`, previouslySent);
   const hikesSplit = splitFreshAlerts(nt.priceHikes ? hikes : [], (h) => `pricehike:${h.vendorKey}:${h.curr}`, previouslySent);

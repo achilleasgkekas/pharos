@@ -137,7 +137,7 @@ describe('generateNotifications — deal alert kind', () => {
     ];
     await generateNotifications();
     expect(notificationInsertMany).toHaveBeenCalledWith([
-      expect.objectContaining({ dedupeKey: 'deal:i1', kind: 'deal', title: 'RTX 5080', body: '899|900', href: '/shopping?open=i1', read: false }),
+      expect.objectContaining({ dedupeKey: 'deal:i1:899', kind: 'deal', title: 'RTX 5080', body: '899|900', href: '/shopping?open=i1', read: false }),
     ]);
   });
 
@@ -145,6 +145,18 @@ describe('generateNotifications — deal alert kind', () => {
     state.items = [{ _id: 'i1', title: 'RTX 5080', targetPrice: 900, currentPrice: 950, links: [{ price: 920 }] }];
     await generateNotifications();
     expect(notificationInsertMany).not.toHaveBeenCalled();
+  });
+
+  it('re-triggers a new alert when price drops further even if previous deal notification was dismissed', async () => {
+    // Previous deal alert at 899 was dismissed (soft-deleted). Now price drops to 850.
+    state.existingNotifications = [{ dedupeKey: 'deal:i1:899' }];
+    state.items = [
+      { _id: 'i1', title: 'RTX 5080', targetPrice: 900, currentPrice: 850, links: [] },
+    ];
+    await generateNotifications();
+    expect(notificationInsertMany).toHaveBeenCalledWith([
+      expect.objectContaining({ dedupeKey: 'deal:i1:850', kind: 'deal', title: 'RTX 5080', body: '850|900', href: '/shopping?open=i1', read: false }),
+    ]);
   });
 });
 
@@ -309,24 +321,24 @@ describe('generateNotifications — reconcile shape (insert / refresh / auto-exp
     state.existingNotifications = [];
     await generateNotifications();
     expect(notificationInsertMany).toHaveBeenCalledTimes(1);
-    expect(notificationInsertMany.mock.calls[0][0]).toEqual([expect.objectContaining({ dedupeKey: 'deal:i1', read: false })]);
+    expect(notificationInsertMany.mock.calls[0][0]).toEqual([expect.objectContaining({ dedupeKey: 'deal:i1:890', read: false })]);
   });
 
   it('refreshes title/body/href of a still-active alert instead of re-inserting it', async () => {
-    state.items = [{ _id: 'i1', title: 'RTX 5080 (new price)', targetPrice: 900, currentPrice: 850, links: [] }];
-    state.existingNotifications = [{ dedupeKey: 'deal:i1' }];
+    state.items = [{ _id: 'i1', title: 'RTX 5080 (new title)', targetPrice: 900, currentPrice: 850, links: [] }];
+    state.existingNotifications = [{ dedupeKey: 'deal:i1:850' }];
     await generateNotifications();
     expect(notificationInsertMany).not.toHaveBeenCalled();
     expect(notificationUpdateOne).toHaveBeenCalledWith(
-      { dedupeKey: 'deal:i1' },
-      { $set: { title: 'RTX 5080 (new price)', body: '850|900', href: '/shopping?open=i1' } }
+      { dedupeKey: 'deal:i1:850' },
+      { $set: { title: 'RTX 5080 (new title)', body: '850|900', href: '/shopping?open=i1' } }
     );
   });
 
   it('auto-expires (soft-deletes) a previously-active alert once it no longer appears live', async () => {
-    // No live deal this run at all — the previously-stored deal:i1 has resolved (price rose back up).
+    // No live deal this run at all — the previously-stored deal:i1:890 has resolved (price rose back up).
     state.items = [];
-    state.existingNotifications = [{ dedupeKey: 'deal:i1' }];
+    state.existingNotifications = [{ dedupeKey: 'deal:i1:890' }];
     await generateNotifications();
     expect(notificationUpdateMany).toHaveBeenCalledWith(
       { kind: { $in: ['deal', 'installment', 'warranty', 'pricehike', 'trialend', 'subreview', 'giftcard', 'bill', 'maintenance', 'lending', 'claim'] }, dedupeKey: { $nin: [] } },
@@ -338,7 +350,7 @@ describe('generateNotifications — reconcile shape (insert / refresh / auto-exp
     // generateNotifications queries Notification WITH withDeleted, so a dismissed
     // (soft-deleted) row still counts as "existing" and must not be re-inserted.
     state.items = [{ _id: 'i1', title: 'RTX 5080', targetPrice: 900, currentPrice: 890, links: [] }];
-    state.existingNotifications = [{ dedupeKey: 'deal:i1' }]; // simulates a dismissed row still matched by withDeleted
+    state.existingNotifications = [{ dedupeKey: 'deal:i1:890' }]; // simulates a dismissed row still matched by withDeleted
     await generateNotifications();
     expect(notificationInsertMany).not.toHaveBeenCalled();
     // Confirms the query actually asked for soft-deleted rows too.

@@ -69,7 +69,7 @@ async function computeAlerts(): Promise<Alert[]> {
     if (lo < Infinity && lo <= (i.targetPrice ?? 0)) {
       const id = String(i._id);
       // body = "<bestPrice>|<target>" (raw numbers; the bell formats with the symbol)
-      alerts.push({ dedupeKey: `deal:${id}`, kind: 'deal', title: i.title, body: `${lo}|${i.targetPrice ?? 0}`, href: `/shopping?open=${id}` });
+      alerts.push({ dedupeKey: `deal:${id}:${lo}`, kind: 'deal', title: i.title, body: `${lo}|${i.targetPrice ?? 0}`, href: `/shopping?open=${id}` });
     }
   }
 
