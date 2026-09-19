@@ -2109,8 +2109,14 @@ export async function importData(json: string): Promise<{ ok: boolean; restored:
           (a) => a && typeof a === 'object' && isSafeStoredPath((a as Record<string, unknown>).path)
         );
       }
+      // `exportData` only dumps live documents, so anything in a backup was NOT in the Trash when
+      // it was written. If the copy in the database has been trashed since, `$set` alone cannot
+      // undo that: a document from before the soft-delete plugin carries no `deletedAt` key for it
+      // to overwrite, and the restore would leave the item invisible, in a Trash it was never in.
+      const update: Record<string, unknown> = { $set: rest };
+      if (!('deletedAt' in rest)) update.$unset = { deletedAt: '' };
       try {
-        if (_id) await ScopedModel.updateOne({ _id }, { $set: rest }, { upsert: true }).setOptions({ withDeleted: true });
+        if (_id) await ScopedModel.updateOne({ _id }, update, { upsert: true }).setOptions({ withDeleted: true });
         else await ScopedModel.create(rest);
         restored++;
       } catch {

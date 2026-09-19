@@ -275,3 +275,35 @@ describe('backup and restore stay inside the CURRENT workspace', () => {
     expect(writes.get('unscoped')).toBeUndefined();
   });
 });
+
+// ── Restoring an item that has since been trashed ──────────────────────────────────────────────
+//
+// `exportData` only dumps live documents (the soft-delete plugin hides trashed ones from `find`),
+// so every document in a backup was, by definition, NOT in the Trash when it was written. Restore
+// has to honour that even when the copy in the database has been trashed since — otherwise the
+// user restores a backup and the item is still missing from every page, sitting in a Trash it was
+// never in. `$set` alone cannot do it: a document written before the soft-delete plugin existed
+// carries no `deletedAt` key at all, so there is nothing for `$set` to overwrite.
+describe('restore takes a document out of the Trash', () => {
+  it('clears deletedAt when the backup copy was live', async () => {
+    await withTenant(acme, () => importData(BACKUP_JSON));
+
+    const { update } = writes.get('acme')![0].doc;
+    expect(update.$unset).toEqual({ deletedAt: '' });
+    expect(update.$set).not.toHaveProperty('deletedAt');
+  });
+
+  it('leaves deletedAt alone when the backup copy carries one', async () => {
+    const trashed = JSON.stringify({
+      app: 'homepage',
+      version: 1,
+      collections: { items: [{ _id: ITEM_ID, name: 'trashed item', deletedAt: '2026-09-01T00:00:00.000Z' }] },
+    });
+
+    await withTenant(acme, () => importData(trashed));
+
+    const { update } = writes.get('acme')![0].doc;
+    expect(update.$unset).toBeUndefined();
+    expect(update.$set.deletedAt).toBe('2026-09-01T00:00:00.000Z');
+  });
+});

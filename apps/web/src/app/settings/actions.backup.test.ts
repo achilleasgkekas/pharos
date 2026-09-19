@@ -641,7 +641,13 @@ describe('importData', () => {
 
     expect(result.ok).toBe(true);
     expect(result.restored).toBe(1);
-    expect(itemUpdateOneMock).toHaveBeenCalledWith({ _id: 'i1' }, { $set: { title: 'Mouse' } }, { upsert: true });
+    // The `$unset` rides along because this backup document carries no `deletedAt`: an export only
+    // ever contains live documents, so a restore must pull the copy here back out of the Trash.
+    expect(itemUpdateOneMock).toHaveBeenCalledWith(
+      { _id: 'i1' },
+      { $set: { title: 'Mouse' }, $unset: { deletedAt: '' } },
+      { upsert: true }
+    );
     expect(setOptionsMock).toHaveBeenCalledWith({ withDeleted: true });
     expect(itemCreateMock).not.toHaveBeenCalled();
     // The payload carries no `receipts` key, so the restore correctly warns that the
@@ -774,8 +780,13 @@ describe('exportDataEncrypted / importDataEncrypted (P54)', () => {
     expect(result).toEqual({ ok: true, restored: 2 });
     const { _id: itemId, ...itemRest } = itemDoc;
     const { _id: receiptId, ...receiptRest } = receiptDoc;
-    expect(itemUpdateOneMock).toHaveBeenCalledWith({ _id: itemId }, { $set: itemRest }, { upsert: true });
-    expect(receiptUpdateOneMock).toHaveBeenCalledWith({ _id: receiptId }, { $set: receiptRest }, { upsert: true });
+    const untrash = { deletedAt: '' };
+    expect(itemUpdateOneMock).toHaveBeenCalledWith({ _id: itemId }, { $set: itemRest, $unset: untrash }, { upsert: true });
+    expect(receiptUpdateOneMock).toHaveBeenCalledWith(
+      { _id: receiptId },
+      { $set: receiptRest, $unset: untrash },
+      { upsert: true }
+    );
     expect(itemCreateMock).not.toHaveBeenCalled();
     expect(receiptCreateMock).not.toHaveBeenCalled();
   });
