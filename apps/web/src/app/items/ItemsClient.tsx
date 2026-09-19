@@ -1277,10 +1277,9 @@ function bestLinkPrice(item: SerializedItem): { price: number; store: string } |
 }
 
 /** Lowest known price across the current price + every store-link. */
-function lowestKnown(item: SerializedItem): number | null {
-  let lo = item.currentPrice > 0 ? item.currentPrice : Infinity;
-  for (const l of item.links ?? []) if (l.price && l.price > 0) lo = Math.min(lo, l.price);
-  return lo < Infinity ? lo : null;
+export function lowestKnown(item: SerializedItem): number | null {
+  const best = bestLinkPrice(item);
+  return best ? best.price : (item.currentPrice > 0 ? item.currentPrice : null);
 }
 
 /** Signed change between the two most recent price-history points (latest − prev). */
@@ -1295,7 +1294,7 @@ function priceTrend(item: SerializedItem): number | null {
 }
 
 /** True when a target is set and the lowest known price has reached it. */
-function isDeal(item: SerializedItem): boolean {
+export function isDeal(item: SerializedItem): boolean {
   if (!item.targetPrice || item.targetPrice <= 0) return false;
   const lo = lowestKnown(item);
   return lo != null && lo <= item.targetPrice;
