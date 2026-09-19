@@ -20,9 +20,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 //    vendorKey/cleanSplit/safeDate are left un-mocked (pure/deterministic, already pinned in
 //    their own test files) so real normalization is exercised end-to-end.
 //  - addExpense: category resolution chain is explicit-category > vendor rule > inherited
-//    series > 'other' (explicit only counts when it's not the form default 'other'); same
-//    priority chain for recurring/recurringCycle; space/taxDeductible/taxCategory fall back to
-//    the inherited series when the form left them blank/false. Always creates verified:true.
+//    series > 'other' (explicit only counts when it's not the form default 'other');
+//    space/taxCategory fall back to the inherited series when left blank; recurring/taxDeductible
+//    respect explicit payload values directly. Always creates verified:true.
 //  - deleteExpense: soft delete ($set deletedAt), never hard-deletes.
 //  - settlePerson: marks every unsettled split entry matching the name (case-insensitive,
 //    trimmed) as settled across ALL expenses; a bulkWrite only fires when something actually
@@ -247,9 +247,6 @@ describe('addExpense', () => {
     await addExpense({ date: '2026-06-15', vendor: 'ΔΕΗ', category: 'other' } as any);
     const doc = expenseCreate.mock.calls[0][0];
     expect(doc.category).toBe('utilities');
-    // the rule also forces recurring:true/monthly even though the form left it unchecked
-    expect(doc.recurring).toBe(true);
-    expect(doc.recurringCycle).toBe('monthly');
   });
 
   it('falls back to the inherited series category when no rule matches', async () => {
@@ -257,10 +254,7 @@ describe('addExpense', () => {
     await addExpense({ date: '2026-06-15', vendor: 'Unknown Vendor', category: 'other' } as any);
     const doc = expenseCreate.mock.calls[0][0];
     expect(doc.category).toBe('utilities-inherited');
-    expect(doc.recurring).toBe(true);
-    expect(doc.recurringCycle).toBe('quarterly');
     expect(doc.space).toBe('cottage');
-    expect(doc.taxDeductible).toBe(true);
     expect(doc.taxCategory).toBe('medical');
   });
 
@@ -275,6 +269,16 @@ describe('addExpense', () => {
     const doc = expenseCreate.mock.calls[0][0];
     expect(doc.space).toBe('main house');
     expect(doc.taxCategory).toBe('utilities-tax');
+  });
+
+  it('respects explicit recurring: false and taxDeductible: false from user payload despite existing recurring/tax-deductible series or rule', async () => {
+    getAppSettingsMock.mockResolvedValue({ categoryRules: [RULE_DEI] });
+    expenseFindOneSortLean.mockResolvedValue({ category: 'utilities-inherited', recurring: true, recurringCycle: 'monthly', space: 'cottage', taxDeductible: true, taxCategory: 'medical' });
+    await addExpense({ date: '2026-06-15', vendor: 'ΔΕΗ', recurring: false, recurringCycle: '', taxDeductible: false } as any);
+    const doc = expenseCreate.mock.calls[0][0];
+    expect(doc.recurring).toBe(false);
+    expect(doc.recurringCycle).toBe('');
+    expect(doc.taxDeductible).toBe(false);
   });
 
   it('returns a friendly error when the DB write throws', async () => {
