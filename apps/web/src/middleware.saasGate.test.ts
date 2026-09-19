@@ -50,6 +50,7 @@ describe('isSaasPublicPath — what a signed-out visitor may still reach', () =>
     expect(isSaasPublicPath('/api/saas/invites/accept')).toBe(true);
     expect(isSaasPublicPath('/api/v1/items')).toBe(true);
     expect(isSaasPublicPath('/api/cron/alerts')).toBe(true);
+    expect(isSaasPublicPath('/api/files/receipt.pdf')).toBe(true);
   });
 
   it('gates the product itself — the actual reported hole', () => {
@@ -139,6 +140,15 @@ describe('SaaS middleware sliding refresh & revocation checks', () => {
     const res = await middleware(req);
     expect(res.status).toBe(200);
     expect(res.headers.get('set-cookie')).toBeNull();
+  });
+
+  it('allows API clients with Bearer tokens to reach /api/files/ in SaaS mode without an account cookie', async () => {
+    const req = new NextRequest('https://app.ph-aros.com/api/files/test.pdf', {
+      headers: { authorization: 'Bearer some-api-token' },
+    });
+    // This goes through the middleware, and since it's an API path it should just pass
+    const res = await middleware(req);
+    expect(res.status).toBe(200);
   });
 
   it('does NOT re-issue and redirects to login when token is revoked / invalid signature', async () => {
