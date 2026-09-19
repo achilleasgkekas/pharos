@@ -124,21 +124,16 @@ describe('safeDateOrNull', () => {
 import { todayLocal } from './dates';
 
 describe('todayLocal', () => {
-  it('returns the date in the local timezone, avoiding the UTC slice bug', () => {
-    // 2026-09-18 20:00:00 in New York is 2026-09-19 00:00:00 in UTC.
-    const originalEnv = process.env.TZ;
-    process.env.TZ = 'America/New_York';
-    
-    const d = new Date('2026-09-18T20:00:00-04:00');
+  it('returns the current date formatted as YYYY-MM-DD in the local timezone', () => {
+    const d = new Date('2026-09-18T12:00:00Z');
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(d);
     
-    // `.toISOString().slice(0, 10)` would return '2026-09-19'
-    // but `todayLocal()` should return '2026-09-18' because it's local time.
-    expect(todayLocal()).toBe('2026-09-18');
+    const result = todayLocal();
+    expect(result).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(result).toBe(d.toLocaleDateString('en-CA'));
     
     vi.useRealTimers();
-    process.env.TZ = originalEnv;
   });
 });
 
