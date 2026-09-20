@@ -565,6 +565,31 @@ describe('P9 multi-currency', () => {
     expect(doc.fxRate).toBe(0);
   });
 
+  // #230 — the test above passed for the wrong reason: the schema defaulted the missing field to
+  // 'EUR', which happens to equal the base currency used here. With any other base, that default
+  // declared the bill FOREIGN with no rate, so the printed amount was stored untouched and
+  // flagged `needsRate` — a bill that quietly stopped being comparable with the rest of the
+  // ledger. The picker is only rendered when multi-currency is ON, so "no currency field" is the
+  // NORMAL case for a single-currency deployment, not an edge one.
+  it('a missing currency is the BASE currency, whatever the base happens to be', async () => {
+    getAppSettingsMock.mockImplementation(async () => ({ currency: 'GBP' }));
+    await createBill(formData({ title: 'Council tax', dueDate: '15/07/2026', amount: '120' }));
+    const doc = billCreate.mock.calls[0][0];
+    expect(doc.amount).toBe(120);      // stored as base, not held back as un-converted foreign
+    expect(doc.currency).toBe('GBP');
+    expect(doc.origAmount).toBe(0);    // nothing "printed in another currency" to remember
+    expect(doc.fxRate).toBe(0);
+  });
+
+  it('still treats an explicitly foreign currency as foreign under a non-euro base', async () => {
+    getAppSettingsMock.mockImplementation(async () => ({ currency: 'GBP' }));
+    await createBill(formData({ title: 'AWS', dueDate: '15/07/2026', amount: '50', currency: 'EUR', fxRate: '0.85' }));
+    const doc = billCreate.mock.calls[0][0];
+    expect(doc.currency).toBe('EUR');
+    expect(doc.origAmount).toBe(50);
+    expect(doc.fxRate).toBe(0.85);
+  });
+
   it('a foreign bill with a rate stores base currency in amount and the printed figure in origAmount', async () => {
     await createBill(formData({ title: 'AWS', dueDate: '15/07/2026', amount: '88', currency: 'USD', fxRate: '0.92' }));
     const doc = billCreate.mock.calls[0][0];
@@ -809,6 +834,27 @@ describe('removeBillPayment', () => {
       .mockResolvedValueOnce({ _id: 'b1', amount: 300, paidAt: new Date(), payments: [{ amount: 200 }] });
     await removeBillPayment('b1', 'p2');
     expect(billUpdateOne).toHaveBeenCalledTimes(2);
+    expect(billUpdateOne.mock.calls[1][1]).toEqual({ $set: { paidAt: null } });
+  });
+
+  // #203 — the case the old `payments.length > 0` guard could not express: ONE instalment that
+  // covered the whole bill, then removed. The count drops to 0, so the guard failed and the bill
+  // stayed marked paid with nothing paid against it. What separates this from the test below is
+  // not the number of payments left but whether the payments THEMSELVES settled the bill.
+  it('rolls back a settlement made by a single instalment when that instalment is removed', async () => {
+    billFindById
+      .mockResolvedValueOnce({ _id: 'b1', amount: 300, paidAt: new Date(), payments: [{ amount: 300 }] })
+      .mockResolvedValueOnce({ _id: 'b1', amount: 300, paidAt: new Date(), payments: [] });
+    await removeBillPayment('b1', 'p1');
+    expect(billUpdateOne).toHaveBeenCalledTimes(2);
+    expect(billUpdateOne.mock.calls[1][1]).toEqual({ $set: { paidAt: null } });
+  });
+
+  it('an overpaying single instalment is treated the same way', async () => {
+    billFindById
+      .mockResolvedValueOnce({ _id: 'b1', amount: 300, paidAt: new Date(), payments: [{ amount: 320 }] })
+      .mockResolvedValueOnce({ _id: 'b1', amount: 300, paidAt: new Date(), payments: [] });
+    await removeBillPayment('b1', 'p1');
     expect(billUpdateOne.mock.calls[1][1]).toEqual({ $set: { paidAt: null } });
   });
 
