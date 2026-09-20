@@ -5,6 +5,7 @@ import { iso } from '@/lib/apiList';
 import { connectDB } from '@/lib/db';
 import { getAppSettings } from '@/lib/appSettings';
 import { resolveItemPrices, isForeignCurrency, toPrinted } from '@/lib/fx';
+import { calculatePriceTrend } from '@/lib/priceTrend';
 import { Item as ItemModel, ITEM_STATUSES } from '@/models/Item';
 import { currentModel } from '@/lib/tenancy/connection';
 
@@ -40,7 +41,8 @@ function priceStatus(item: { currentPrice: number; targetPrice?: number | null; 
   if (bestNow) prices.push(bestNow.price);
   const lo = prices.length ? Math.min(...prices) : null;
   const hi = prices.length ? Math.max(...prices) : null;
-  const trend = hist.length >= 2 && hist[hist.length - 1].price !== hist[hist.length - 2].price ? hist[hist.length - 1].price - hist[hist.length - 2].price : 0;
+  const rawTrend = calculatePriceTrend(item.priceHistory, bestNow);
+  const trend = rawTrend ?? 0;
   const target = item.targetPrice && item.targetPrice > 0 ? item.targetPrice : null;
 
   let verdict: 'deal' | 'dropping' | 'rising' | 'good' | 'high' | 'none' = 'none';

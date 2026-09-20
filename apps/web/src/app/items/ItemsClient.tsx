@@ -1310,15 +1310,12 @@ function lowestKnown(item: SerializedItem): number | null {
   return lo < Infinity ? lo : null;
 }
 
-/** Signed change between the two most recent price-history points (latest − prev). */
+import { calculatePriceTrend } from '@/lib/priceTrend';
+
+/** Signed change between the two most recent price-history points for the best store link (latest − prev). */
 function priceTrend(item: SerializedItem): number | null {
-  const hist = [...(item.priceHistory ?? [])]
-    .filter((h) => h.price > 0)
-    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  if (hist.length < 2) return null;
-  const latest = hist[hist.length - 1].price;
-  const prev = hist[hist.length - 2].price;
-  return latest === prev ? null : latest - prev;
+  const best = bestLinkPrice(item);
+  return calculatePriceTrend(item.priceHistory, best);
 }
 
 /** True when a target is set and the lowest known price has reached it. */
