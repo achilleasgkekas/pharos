@@ -53,6 +53,25 @@ describe('renderStoragePath — path-injection prevention', () => {
     expect(out).not.toContain('/../');
   });
 
+  // The tests above all cover a traversal arriving through a TOKEN VALUE, which sanitizeSegment
+  // has always handled. The literal template text was never sanitized at all (#196), so a folder
+  // template typed with a stray `../` climbed out of the folder the user configured — and the
+  // remote backends have no equivalent of the local `resolveWithinStorage` check to stop it.
+  it('drops traversal segments written into the TEMPLATE itself, not just into a token', () => {
+    expect(renderStoragePath('../../elsewhere', '{id}', base)).toBe('elsewhere/a1b2.pdf');
+    expect(renderStoragePath('{kind}/../../..', '{id}', base)).toBe('receipts/a1b2.pdf');
+    expect(renderStoragePath('..', '{id}', base)).toBe('a1b2.pdf');
+  });
+
+  it('drops a bare `.` segment too, which would otherwise become a literal folder named "."', () => {
+    expect(renderStoragePath('./{kind}/./{year}', '{id}', { ...base, date: '2026-06-04' })).toBe('receipts/2026/a1b2.pdf');
+  });
+
+  it('leaves a name that merely CONTAINS dots alone — only whole `.`/`..` segments go', () => {
+    expect(renderStoragePath('{kind}/..archive', '{id}', base)).toBe('receipts/..archive/a1b2.pdf');
+    expect(renderStoragePath('{kind}/v1.2', '{id}', base)).toBe('receipts/v1.2/a1b2.pdf');
+  });
+
   it('keeps the file name a single segment even if a token holds a slash', () => {
     const out = renderStoragePath('{kind}', '{store}', { ...base, store: 'foo/bar' });
     // store sanitized to foo_bar before it ever reaches the name assembly.

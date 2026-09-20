@@ -77,12 +77,23 @@ function fill(template: string, t: StorageTokens): string {
  * Build a remote-relative path like "receipts/2026/06/2026-06-04_Skroutz_a1b2.pdf".
  * Folder template '/' chars act as directory separators; token values are sanitized
  * so they can never inject extra path segments. The name is always a single segment.
+ *
+ * The LITERAL text of the template was never sanitized, only the values substituted into it, so a
+ * folder template of `../../elsewhere` produced a path that climbed out of the configured remote
+ * folder (#196). Nobody else can set that template — it is an admin editing their own storage
+ * settings, pointed at their own NAS — so this guards against a typo and a slash in the wrong
+ * place, not against an attacker. But a path that leaves the folder the user chose is wrong
+ * whoever typed it, and the remote backends (SMB/FTP/OneDrive) have no equivalent of the local
+ * `resolveWithinStorage` check to catch it.
  */
 export function renderStoragePath(folderTemplate: string, nameTemplate: string, t: StorageTokens): string {
   const folder = fill(folderTemplate || DEFAULT_FOLDER_TEMPLATE, t)
     .split('/')
     .map((seg) => seg.trim())
-    .filter(Boolean)
+    // Drop `.` and `..` outright rather than rewriting them: there is no sensible path a person
+    // meant by "the parent of my receipts folder", and silently relocating their files somewhere
+    // else on the share is worse than ignoring the segment.
+    .filter((seg) => seg && seg !== '.' && seg !== '..')
     .join('/');
 
   let name = fill(nameTemplate || DEFAULT_NAME_TEMPLATE, t).replace(/\//g, '_');
