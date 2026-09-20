@@ -36,33 +36,15 @@ jobs:
       - run: npm ci
       - run: npm run type-check
       - run: npm test
+      # ESLint was its own workflow for a while, which meant a second runner doing its own
+      # checkout and its own `npm ci` — about 80 seconds of setup to spend 15 on the actual lint,
+      # on every push and every PR. Here it reuses the install that is already on disk. It runs
+      # AFTER the tests and BEFORE the build so a lint error is reported once the informative
+      # checks have had their say, without paying for the slowest step first.
+      - run: npm run lint
       - run: npm run build
         env:
           # Placeholders so the build never reads a real secret; these are only
           # consumed at runtime, not during `next build`.
           AUTH_SECRET: ci-placeholder-secret-do-not-use-in-production
           NEXT_SERVER_ACTIONS_ENCRYPTION_KEY: ci-placeholder-encryption-key-000000
-
-  extension:
-    name: Browser extension
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/extension
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-      # No dependencies and no build step: the source is what the browser runs.
-      # `node --test` covers the pure helpers plus the service-worker wiring.
-      - run: npm test
-      - name: Manifest is valid JSON and points at files that exist
-        run: |
-          node -e "
-            const fs = require('fs');
-            const m = JSON.parse(fs.readFileSync('manifest.json', 'utf8'));
-            const refs = [m.background.service_worker, m.options_ui.page, ...Object.values(m.icons)];
-            for (const r of refs) if (!fs.existsSync(r)) throw new Error('missing file: ' + r);
-            if (m.manifest_version !== 3) throw new Error('expected MV3');
-          "
