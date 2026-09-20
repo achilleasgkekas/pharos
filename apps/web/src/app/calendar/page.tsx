@@ -17,6 +17,7 @@ import { CalendarClient, type Entry, type MonthBlock } from './CalendarClient';
 import { getServerT } from '@/lib/i18n/server';
 import type { TFunc, TKey } from '@/lib/i18n';
 import { intlTag } from '@/lib/i18n/format';
+import { ymd } from '@/lib/calendarDay';
 
 // Money calendar — everything money-related coming up in the next 3 months:
 // subscription renewals, card installments, recurring bills/income, open bills
@@ -25,6 +26,8 @@ import { intlTag } from '@/lib/i18n/format';
 export const dynamic = 'force-dynamic';
 
 const mk = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+
+
 
 async function getAgenda(t: TFunc, intlTag: string): Promise<{ months: MonthBlock[]; dueThisMonth: number }> {
   return withRequestTenant(async () => {
@@ -72,7 +75,7 @@ async function getAgenda(t: TFunc, intlTag: string): Promise<{ months: MonthBloc
   const push = (date: Date, e: Omit<Entry, 'date'>) => {
     const m = byKey.get(mk(date));
     if (!m) return;
-    m.entries.push({ ...e, date: date.toISOString() });
+    m.entries.push({ ...e, date: ymd(date) });
     if (e.amount != null) {
       if (e.kind === 'income') m.inc += e.amount;
       else m.out += e.amount;
