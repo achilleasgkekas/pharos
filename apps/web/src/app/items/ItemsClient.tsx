@@ -1,6 +1,6 @@
 'use client';
 import { cur } from "@/lib/money";
-import { useState, useTransition, useMemo } from 'react';
+import { createContext, useContext, useState, useTransition, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Search,
@@ -102,15 +102,35 @@ const CATEGORIES = [
   { value: 'other', label: 'Other' },
 ];
 
-// Built-in labels + an editable category list. ItemsClient sets `_itemCats` from
-// Settings (getAppSettings.itemCategories) so custom categories show in the form
-// dropdown; ItemForm reads it via itemCategoryOptions (module-var pattern, like cur()).
+// Built-in labels + the workspace's editable category list (Settings → itemCategories), which
+// ItemsClient receives as a prop and hands down through this context.
+//
+// It used to be a module-level `let _itemCats`, assigned during render "like cur()". That is safe
+// for `cur()` only because lib/money.ts keys its value per tenant on the server; here nothing did.
+// A 'use client' component still RENDERS on the server, where module scope is shared by every
+// concurrent request in the process — so one workspace's custom categories could appear in
+// another workspace's dropdown, for whichever render read the variable after someone else's
+// write (#211).
+//
+// A context is per-render by construction, so there is no shared slot left to leak through. Its
+// default is the built-in list, which is what a tree without a provider should show.
 const CATEGORY_LABELS: Record<string, string> = Object.fromEntries(CATEGORIES.map((c) => [c.value, c.label]));
-let _itemCats: string[] = CATEGORIES.map((c) => c.value);
-function itemCategoryOptions(current?: string): { value: string; label: string }[] {
-  const list = _itemCats.slice();
-  if (current && !list.includes(current)) list.unshift(current);
-  return list.map((v) => ({ value: v, label: CATEGORY_LABELS[v] || v.charAt(0).toUpperCase() + v.slice(1) }));
+const BUILTIN_CATEGORY_VALUES = CATEGORIES.map((c) => c.value);
+const ItemCategoriesContext = createContext<string[]>(BUILTIN_CATEGORY_VALUES);
+
+/** The category dropdown's options for a given list. `current` is prepended when the item already
+ *  carries a value that is no longer on the list, so editing an item never silently
+ *  re-categorises it. */
+function categoryOptionsFrom(list: string[], current?: string): { value: string; label: string }[] {
+  const out = list.slice();
+  if (current && !out.includes(current)) out.unshift(current);
+  return out.map((v) => ({ value: v, label: CATEGORY_LABELS[v] || v.charAt(0).toUpperCase() + v.slice(1) }));
+}
+
+/** Same, for the components BELOW the provider (the form, the detail modal), which do not receive
+ *  the list as a prop. */
+function useItemCategoryOptions(current?: string): { value: string; label: string }[] {
+  return categoryOptionsFrom(useContext(ItemCategoriesContext), current);
 }
 
 const STATUSES = [
@@ -257,7 +277,12 @@ export function ItemsClient({
   multiCurrency?: boolean;
 }) {
   const locale = useLocale();
-  if (categoryList.length) _itemCats = categoryList;
+  // The workspace's configured list, handed down instead of parked in module scope — see the
+  // ItemCategoriesContext note above for why that mattered.
+  const configuredCategories = categoryList.length ? categoryList : BUILTIN_CATEGORY_VALUES;
+  // This dropdown lives in the same component that PROVIDES the list, so it reads it directly —
+  // a hook here would see the context default, not the value being provided.
+  const bulkCategoryOptions = categoryOptionsFrom(configuredCategories);
   const fx: FxCtx = { base: baseCurrency, enabled: multiCurrency };
   const t = useT();
   const cfg = VIEW_CONFIG[view];
@@ -646,6 +671,7 @@ export function ItemsClient({
   );
 
   return (
+    <ItemCategoriesContext.Provider value={configuredCategories}>
     <main className="max-w-[1400px] mx-auto px-4 py-6 pb-24">
       {/* Page header */}
       <div className="mb-6 pb-4 border-b border-[color:var(--color-border)]">
@@ -906,7 +932,7 @@ export function ItemsClient({
           <Field label={t('common.category')}>
             <select value={bulkCategory} onChange={(e) => setBulkCategory(e.target.value)} className={selectClass}>
               <option value="">{t('common.noChange')}</option>
-              {itemCategoryOptions().map((c) => (
+              {bulkCategoryOptions.map((c) => (
                 <option key={c.value} value={c.value}>
                   {c.label}
                 </option>
@@ -947,6 +973,7 @@ export function ItemsClient({
         <CompareItemsTable items={compareItems} t={t} truncated={selectedIds.size > compareItems.length} />
       </Modal>
     </main>
+    </ItemCategoriesContext.Provider>
   );
 }
 
@@ -2506,6 +2533,7 @@ function ItemForm({
     lentAt: item?.lentAt ? item.lentAt.slice(0, 10) : '',
     expectedReturnAt: item?.expectedReturnAt ? item.expectedReturnAt.slice(0, 10) : '',
   });
+  const categoryOptions = useItemCategoryOptions(form.category);
   const [links, setLinks] = useState<{ label: string; url: string; price: string }[]>(
     item?.links?.length
       ? item.links.map((l) => ({ label: l.label, url: l.url, price: l.price != null ? String(l.price) : '' }))
@@ -2609,7 +2637,7 @@ function ItemForm({
       {/* Category + Status */}
       <Field label={t('common.category')}>
         <select value={form.category} onChange={set('category')} className={selectClass}>
-          {itemCategoryOptions(form.category).map((c) => (
+          {categoryOptions.map((c) => (
             <option key={c.value} value={c.value}>
               {c.label}
             </option>
