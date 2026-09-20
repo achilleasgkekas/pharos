@@ -1,4 +1,4 @@
-function normUrl(u?: string): string {
+function normUrl(u?: string | null): string {
   if (!u) return '';
   try {
     const url = new URL(u);
@@ -8,13 +8,16 @@ function normUrl(u?: string): string {
   }
 }
 
-function normStore(s?: string): string {
+function normStore(s?: string | null): string {
   return (s ?? '').trim().toLowerCase();
 }
 
 export function calculatePriceTrend(
   priceHistory?: { price: number; store?: string; url?: string; date: string | Date }[],
-  targetStore?: { store?: string; url?: string } | null
+  // `url` accepts null as well as undefined: callers build this from a link row where an absent
+  // URL is stored as null (see the /api/v1/items route), and forcing every one of them to
+  // normalise first would just move the same `?? undefined` to three call sites.
+  targetStore?: { store?: string | null; url?: string | null } | null
 ): number | null {
   const hist = [...(priceHistory ?? [])]
     .filter((h) => typeof h.price === 'number' && h.price > 0)
