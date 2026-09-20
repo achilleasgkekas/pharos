@@ -118,6 +118,28 @@ describe('detectPriceHikes', () => {
     expect(detectPriceHikes(rows, { minPct: 5, minAbs: 20 })).toHaveLength(1);
   });
 
+  // The other half of the same rule: a foreign charge and a base-currency charge are not two
+  // prices to compare, they are two different units. A series that switches billing currency
+  // would otherwise report the conversion itself as a hike.
+  it('says nothing when the two most recent charges are in different frames', () => {
+    const switched = [
+      e('vps', 9.1, '2026-04-01', { origAmount: 10 }),   // $10, printed
+      e('vps', 10, '2026-05-01'),                        // €10, base — no origAmount
+    ];
+    expect(detectPriceHikes(switched)).toEqual([]);
+  });
+
+  it('resumes reporting once the series is comparing like with like again', () => {
+    const backToBase = [
+      e('vps', 9.1, '2026-04-01', { origAmount: 10 }),
+      e('vps', 10, '2026-05-01'),
+      e('vps', 12, '2026-06-01'),
+    ];
+    const hikes = detectPriceHikes(backToBase);
+    expect(hikes).toHaveLength(1);
+    expect(hikes[0]).toMatchObject({ prev: 10, curr: 12, deltaPct: 20 });
+  });
+
   it('uses origAmount when present to avoid FX rate fluctuation false positives', () => {
     // $10 USD billed monthly, base EUR amount fluctuates due to exchange rate changes (€9.10 -> €9.60).
     const fxFluctuating = [
