@@ -21,6 +21,7 @@ export const dynamic = 'force-dynamic';
  *   - not signed in        → 401
  *   - not owner/admin      → 403
  *   - bad/free plan        → 400
+ *   - live subscription    → 409 (already paying; changing plan is the portal's job)
  *   - Stripe not configured→ 503 (keys deferred by Achilleas; degrade gracefully)
  *   - upstream Stripe error→ 502
  * On success: `{ url }` — the hosted checkout URL to redirect the browser to. NEVER
@@ -39,6 +40,27 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: 'plan must be a paid plan (shared or dedicated)' },
         { status: 400 }
+      );
+    }
+
+    // A workspace that is already paying must go through the Billing Portal, never through a
+    // second Checkout: Stripe does NOT refuse a second subscription on the same customer, and
+    // the webhook's onSubscriptionActive overwrites billingSubscriptionId with whichever one
+    // it hears about last. The first subscription is then orphaned — invisible in Pharos but
+    // still charging the card every cycle, with no UI anywhere that can cancel it.
+    //
+    // The condition reads BOTH fields on purpose, because neither is sufficient alone:
+    //   - billingSubscriptionId alone would lock out returning customers: onSubscriptionCanceled
+    //     sets plan='free' but deliberately leaves the id on the doc as history.
+    //   - plan alone would lock out comped workspaces: /api/saas/billing/activate grants a paid
+    //     plan by redeeming a code and never creates a Stripe subscription, so there is nothing
+    //     to double-bill and they must still be able to start paying.
+    // A paid plan AND an id together is the one state that means "live in Stripe" — including
+    // past_due/unpaid, which the webhook maps to status 'suspended' without cancelling anything.
+    if (session.tenant.plan !== 'free' && session.tenant.billingSubscriptionId) {
+      return NextResponse.json(
+        { error: 'this workspace already has an active subscription; use the billing portal to change plans' },
+        { status: 409 }
       );
     }
 

@@ -78,3 +78,28 @@ export function planCards(opts: {
     };
   });
 }
+
+/**
+ * Turn a failed billing API response into something a person can act on.
+ *
+ * `action` matters because BOTH billing routes answer 409 and they mean OPPOSITE things:
+ * the portal refuses a workspace with NO Stripe customer to manage, while checkout refuses
+ * one that ALREADY has a live subscription (#221). A single shared 409 message told the
+ * second group "no active subscription to manage, start a plan first" — the exact inverse
+ * of their situation, and an invitation to keep retrying the thing that was just blocked.
+ */
+export function billingErrorMessage(
+  action: 'checkout' | 'portal',
+  status: number,
+  apiError: string | undefined
+): string {
+  if (status === 503) return 'Billing is not configured on this deployment yet.';
+  if (status === 409) {
+    return action === 'checkout'
+      ? 'This workspace already has an active subscription. Use "Manage billing" to change or cancel your plan.'
+      : 'No active subscription to manage. Start a plan first.';
+  }
+  if (status === 502) return 'The billing provider is temporarily unavailable. Try again shortly.';
+  if (status === 403) return 'Only owners and admins can change billing.';
+  return apiError || 'Something went wrong. Please try again.';
+}

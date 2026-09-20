@@ -14,7 +14,11 @@ import type { NextRequest } from 'next/server';
 //   - a missing/free/unknown plan → 400, never calls Stripe,
 //   - Stripe not-configured → 503, any other Stripe failure → 502, neither audits,
 //   - success → 200 with { url, id }, audits billing.checkout_started with the whitelisted
-//     meta, and SAAS_PUBLIC_URL takes priority over the request origin for redirect URLs.
+//     meta, and SAAS_PUBLIC_URL takes priority over the request origin for redirect URLs,
+//   - a workspace that ALREADY has a live subscription → 409, never calls Stripe (#221):
+//     Stripe happily opens a second subscription on the same customer, the webhook
+//     overwrites billingSubscriptionId with the new one, and the first keeps charging
+//     forever with nothing in Pharos pointing at it.
 
 const { resolveBillingSessionMock, createCheckoutSessionMock, recordAuditMock } = vi.hoisted(() => ({
   resolveBillingSessionMock: vi.fn(),
@@ -44,6 +48,13 @@ const SESSION = {
     tenant: { slug: 'acme', billingCustomerId: null },
   },
 };
+
+/** Same session, with only the tenant billing fields the duplicate-subscription guard reads. */
+function sessionWithTenant(over: Record<string, unknown>) {
+  return {
+    session: { ...SESSION.session, tenant: { ...SESSION.session.tenant, ...over } },
+  };
+}
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -152,5 +163,67 @@ describe('Stripe call + response shaping', () => {
         meta: { plan: 'shared', checkoutId: 'cs_123' },
       })
     );
+  });
+});
+
+describe('duplicate subscription guard (#221)', () => {
+  it('workspace already on a paid plan with a live subscription → 409, never calls Stripe', async () => {
+    // The double-billing path: an owner on `shared` hits checkout again to "upgrade".
+    // Without the guard Stripe opens a SECOND subscription for the same customer and the
+    // webhook repoints billingSubscriptionId at it, orphaning the first one — which keeps
+    // charging the card with nothing in Pharos referring to it any more.
+    resolveBillingSessionMock.mockResolvedValueOnce(
+      sessionWithTenant({ plan: 'shared', billingCustomerId: 'cus_123', billingSubscriptionId: 'sub_123' })
+    );
+
+    const res = await POST(makeReq({ plan: 'dedicated' }));
+
+    expect(res.status).toBe(409);
+    expect(createCheckoutSessionMock).not.toHaveBeenCalled();
+    expect(recordAuditMock).not.toHaveBeenCalled();
+  });
+
+  it('past-due workspace still has the subscription in Stripe → 409, never calls Stripe', async () => {
+    // `past_due`/`unpaid` map to status 'suspended' in the webhook but do NOT cancel the
+    // subscription, so a second checkout here stacks a second charge on the same customer.
+    // The fix for a failed payment is the billing portal, not another subscription.
+    resolveBillingSessionMock.mockResolvedValueOnce(
+      sessionWithTenant({ plan: 'shared', billingCustomerId: 'cus_123', billingSubscriptionId: 'sub_123' })
+    );
+
+    const res = await POST(makeReq({ plan: 'shared' }));
+
+    expect(res.status).toBe(409);
+    expect(createCheckoutSessionMock).not.toHaveBeenCalled();
+  });
+
+  it('canceled workspace can subscribe again, even though the old subscription id is still on the doc', async () => {
+    // onSubscriptionCanceled sets plan='free' but deliberately does NOT clear
+    // billingSubscriptionId, so a guard keyed on the id alone would lock a returning
+    // customer out of paying us for good. plan==='free' is the marker that it is dead.
+    resolveBillingSessionMock.mockResolvedValueOnce(
+      sessionWithTenant({ plan: 'free', billingCustomerId: 'cus_123', billingSubscriptionId: 'sub_dead' })
+    );
+
+    const res = await POST(makeReq({ plan: 'shared' }));
+
+    expect(res.status).toBe(200);
+    expect(createCheckoutSessionMock).toHaveBeenCalledWith(
+      expect.objectContaining({ customerId: 'cus_123' })
+    );
+  });
+
+  it('comped paid workspace with no Stripe subscription can still check out', async () => {
+    // /api/saas/billing/activate puts a workspace on a paid plan by redeeming a code and
+    // never creates a Stripe subscription. There is nothing to double-bill, so guarding on
+    // the plan alone would wrongly stop a comped workspace from ever starting to pay.
+    resolveBillingSessionMock.mockResolvedValueOnce(
+      sessionWithTenant({ plan: 'shared', billingCustomerId: null, billingSubscriptionId: null })
+    );
+
+    const res = await POST(makeReq({ plan: 'shared' }));
+
+    expect(res.status).toBe(200);
+    expect(createCheckoutSessionMock).toHaveBeenCalled();
   });
 });

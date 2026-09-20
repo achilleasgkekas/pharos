@@ -5,6 +5,7 @@ import {
   storageLabel,
   seatsLabel,
   planCards,
+  billingErrorMessage,
 } from './billingView';
 
 describe('billingView labels', () => {
@@ -68,5 +69,48 @@ describe('planCards', () => {
     const cards = planCards({ currentPlan: 'shared', canManage: true, hasSubscription: false });
     expect(cards.find((c) => c.key === 'shared')?.checkoutable).toBe(false);
     expect(cards.find((c) => c.key === 'dedicated')?.checkoutable).toBe(true);
+  });
+});
+
+describe('billingErrorMessage', () => {
+  it('409 from checkout says the workspace ALREADY subscribes and points at the portal (#221)', () => {
+    const msg = billingErrorMessage('checkout', 409, 'this workspace already has an active subscription');
+    expect(msg).toContain('already has an active subscription');
+    expect(msg).toContain('Manage billing');
+  });
+
+  it('409 from the portal still says there is NOTHING to manage', () => {
+    expect(billingErrorMessage('portal', 409, undefined)).toBe(
+      'No active subscription to manage. Start a plan first.'
+    );
+  });
+
+  it('the two 409 messages are not the same text, which is the whole point of the action arg', () => {
+    expect(billingErrorMessage('checkout', 409, undefined)).not.toBe(
+      billingErrorMessage('portal', 409, undefined)
+    );
+  });
+
+  it('shared statuses read the same whichever route was called', () => {
+    for (const action of ['checkout', 'portal'] as const) {
+      expect(billingErrorMessage(action, 503, undefined)).toBe(
+        'Billing is not configured on this deployment yet.'
+      );
+      expect(billingErrorMessage(action, 502, undefined)).toBe(
+        'The billing provider is temporarily unavailable. Try again shortly.'
+      );
+      expect(billingErrorMessage(action, 403, undefined)).toBe(
+        'Only owners and admins can change billing.'
+      );
+    }
+  });
+
+  it('an unmapped status falls back to the API error, then to a generic line', () => {
+    expect(billingErrorMessage('checkout', 400, 'plan must be a paid plan')).toBe(
+      'plan must be a paid plan'
+    );
+    expect(billingErrorMessage('checkout', 500, undefined)).toBe(
+      'Something went wrong. Please try again.'
+    );
   });
 });

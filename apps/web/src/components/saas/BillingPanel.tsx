@@ -10,7 +10,7 @@
 // SAAS_MODE-gated (saas) segment. A plain member (canManage false) sees the plans read-only.
 import { useState } from 'react';
 import { Pill } from './StatusBadge';
-import { planCards, seatsLabel, type PlanCard } from './billingView';
+import { billingErrorMessage, planCards, seatsLabel, type PlanCard } from './billingView';
 import type { PlanKey } from '@/lib/billing/plans';
 
 type Props = {
@@ -24,14 +24,6 @@ type Props = {
 };
 
 /** Friendlier text for the JSON `{ error }` bodies the action routes return by status. */
-function friendlyError(status: number, apiError: string | undefined): string {
-  if (status === 503) return 'Billing is not configured on this deployment yet.';
-  if (status === 409) return 'No active subscription to manage. Start a plan first.';
-  if (status === 502) return 'The billing provider is temporarily unavailable. Try again shortly.';
-  if (status === 403) return 'Only owners and admins can change billing.';
-  return apiError || 'Something went wrong. Please try again.';
-}
-
 /**
  * Redeem an activation code.
  *
@@ -155,7 +147,9 @@ export function BillingPanel({
     }
     if (!res.ok || typeof data.url !== 'string') {
       setBusy(null);
-      setError(friendlyError(res.status, typeof data.error === 'string' ? data.error : undefined));
+      // The two routes' 409s mean opposite things, so the message is keyed on which one we called.
+      const action = path === '/api/saas/billing/checkout' ? 'checkout' : 'portal';
+      setError(billingErrorMessage(action, res.status, typeof data.error === 'string' ? data.error : undefined));
       return;
     }
     // Success: leave `busy` set (the button stays disabled) and navigate off-origin to Stripe.
