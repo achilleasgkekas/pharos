@@ -70,7 +70,7 @@ const {
   };
 });
 
-const expenseModel = {
+const expenseModel = { exists: vi.fn(async () => false),
   find: expenseFind,
   findOne: expenseFindOne,
   insertMany: expenseInsertMany,

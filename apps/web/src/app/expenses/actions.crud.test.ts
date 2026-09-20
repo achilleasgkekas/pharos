@@ -34,6 +34,7 @@ const {
   expenseUpdateOne,
   expenseFindOneSortLean,
   expenseFindSelectLean,
+  expenseExists,
   expenseBulkWrite,
   getAppSettingsMock,
   revalidatePathMock,
@@ -43,6 +44,7 @@ const {
   expenseUpdateOne: vi.fn(async (_filter: Record<string, any>, _update: Record<string, any>) => ({})),
   expenseFindOneSortLean: vi.fn(async () => null as Record<string, any> | null),
   expenseFindSelectLean: vi.fn(async () => [] as Array<Record<string, any>>),
+  expenseExists: vi.fn(async () => false),
   expenseBulkWrite: vi.fn(async (_ops: any) => ({})),
   getAppSettingsMock: vi.fn(async () => ({ categoryRules: [] as any[] })),
   revalidatePathMock: vi.fn(),
@@ -53,7 +55,8 @@ const expenseModel = {
   updateOne: expenseUpdateOne,
   findOne: () => ({ sort: () => ({ lean: expenseFindOneSortLean }), lean: expenseFindOneSortLean }),
   findById: () => ({ lean: expenseFindOneSortLean }),
-  find: () => ({ select: () => ({ lean: expenseFindSelectLean }) }),
+  find: () => ({ select: () => ({ lean: expenseFindSelectLean }), lean: expenseFindSelectLean }),
+  exists: expenseExists,
   bulkWrite: expenseBulkWrite,
 };
 
@@ -286,6 +289,35 @@ describe('addExpense', () => {
     const doc = expenseCreate.mock.calls[0][0];
     expect(doc.recurring).toBe(true);
     expect(doc.seriesId).toBe('');
+  });
+
+  it('leaves seriesId blank when amount differs but prior purchase was non-recurring (fixes inconsistent UUID generation)', async () => {
+    // The previous purchase is non-recurring (amount 50).
+    // The new one is recurring, amount 60.
+    expenseFindOneSortLean.mockResolvedValueOnce({ vendorKey: 'steam', amount: 50, recurring: false });
+    // exists check for any recurring series returns false
+    expenseExists.mockResolvedValueOnce(false);
+    
+    await addExpense({ date: '2026-06-15', vendor: 'Steam', amount: 60, recurring: true, category: 'other' } as any);
+    const doc = expenseCreate.mock.calls[0][0];
+    expect(doc.recurring).toBe(true);
+    expect(doc.seriesId).toBe('');
+  });
+
+  it('generates a new seriesId when amount differs and a prior recurring series exists (parallel series)', async () => {
+    expenseFindOneSortLean.mockResolvedValueOnce({ vendorKey: 'steam', amount: 50, recurring: true, seriesId: 'past-series-id' });
+    // The exact match query for amount 60 returns null
+    expenseFindOneSortLean.mockResolvedValueOnce(null);
+    // exists check for any recurring series returns true
+    expenseExists.mockResolvedValueOnce(true);
+    
+    await addExpense({ date: '2026-06-15', vendor: 'Steam', amount: 60, recurring: true, category: 'other' } as any);
+    const doc = expenseCreate.mock.calls[0][0];
+    expect(doc.recurring).toBe(true);
+    // It should generate a new UUID since it's branching off an existing recurring series
+    expect(doc.seriesId).not.toBe('');
+    expect(doc.seriesId).not.toBe('past-series-id');
+    expect(doc.seriesId.length).toBe(24);
   });
 
   it('defaults to "other" when there is neither a rule nor a prior series', async () => {

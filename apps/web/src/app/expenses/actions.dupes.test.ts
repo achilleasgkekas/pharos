@@ -24,7 +24,7 @@ const { connectDBMock, expenseFindSelectLean, expenseFindByIdMock, expenseFindDr
     revalidatePathMock: vi.fn(),
   }));
 
-const expenseModel = {
+const expenseModel = { exists: vi.fn(async () => false),
   // `find` is used two ways: as a chain (.select().lean()) when listing candidates, and
   // awaited directly when loading the drops to merge. Route on the filter shape.
   find: (filter: Record<string, any>) =>

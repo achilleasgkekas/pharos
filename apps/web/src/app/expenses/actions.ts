@@ -1,5 +1,5 @@
-import { randomUUID } from 'node:crypto';
 'use server';
+import { randomUUID } from 'node:crypto';
 import { connectDB } from '@/lib/db';
 import { Expense as ExpenseModel } from '@/models/Expense';
 import { withRequestTenant } from '@/lib/tenancy/request';
@@ -126,8 +126,14 @@ async function inheritFromSeries(kind: Kind, vKey: string, amount?: number): Pro
       if (exactMatch) {
         seriesId = exactMatch.seriesId;
       } else {
-        // Did not match any existing series amount. Create a new parallel series id.
-        seriesId = randomUUID().replace(/-/g, '').slice(0, 24);
+        // Did not match any existing series amount. Create a new parallel series id
+        // only if there is already another recurring series for this vendor.
+        const anyRecurring = await Expense.exists({ kind, vendorKey: vKey, recurring: true });
+        if (anyRecurring) {
+          seriesId = randomUUID().replace(/-/g, '').slice(0, 24);
+        } else {
+          seriesId = '';
+        }
       }
     }
   }

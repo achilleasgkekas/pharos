@@ -37,7 +37,7 @@ const {
   revalidatePathMock: vi.fn(),
 }));
 
-const expenseModel = {
+const expenseModel = { exists: vi.fn(async () => false),
   create: expenseCreate,
   updateOne: expenseUpdateOne,
   findOne: () => ({ sort: () => ({ lean: expenseFindOneSortLean }) }),

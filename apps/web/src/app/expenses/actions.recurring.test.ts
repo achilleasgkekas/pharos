@@ -33,7 +33,7 @@ const {
 }));
 
 const findFilterCalls: Array<Record<string, any>> = [];
-const expenseModel = {
+const expenseModel = { exists: vi.fn(async () => false),
   create: expenseCreate,
   find: (filter: Record<string, any>) => {
     findFilterCalls.push(filter);

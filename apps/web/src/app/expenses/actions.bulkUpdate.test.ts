@@ -23,7 +23,7 @@ const { connectDBMock, expenseUpdateMany, revalidatePathMock } = vi.hoisted(() =
   revalidatePathMock: vi.fn(),
 }));
 
-const expenseModel = { updateMany: expenseUpdateMany };
+const expenseModel = { exists: vi.fn(async () => false), updateMany: expenseUpdateMany };
 
 vi.mock('@/lib/db', () => ({ connectDB: connectDBMock }));
 vi.mock('@/lib/tenancy/request', () => ({ withRequestTenant: async (fn: () => Promise<any>) => fn() }));
