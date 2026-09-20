@@ -189,7 +189,7 @@ describe('POST /api/saas/account/reset/confirm — lookup', () => {
 
     await POST(makeReq({ token: TOKEN, newPassword: GOOD_PASSWORD }));
 
-    expect(accountFindOneSelect).toHaveBeenCalledWith('_id resetTokenHash resetTokenExpires');
+    expect(accountFindOneSelect).toHaveBeenCalledWith('_id resetTokenHash resetTokenExpires sessionEpoch');
   });
 
   it('returns the generic 400 for an UNKNOWN token, with no write', async () => {
@@ -258,6 +258,9 @@ describe('POST /api/saas/account/reset/confirm — consumption', () => {
       passwordHash: `hashed:${GOOD_PASSWORD}`,
       resetTokenHash: null,
       resetTokenExpires: null,
+      // One patch, one save: the new password, the spent token and the revocation of every
+      // session that existed before it all land together or not at all (#193).
+      sessionEpoch: 1,
     });
     expect(doc.save).toHaveBeenCalledTimes(1);
     // The in-memory doc reflects the consumption, so a replay finds nothing to redeem.
@@ -337,5 +340,31 @@ describe('rate limiting', () => {
     const key = rateLimitMock.mock.calls[0][0];
     expect(key).toContain('1.2.3.4');
     expect(key).toMatch(/^saas-reset-confirm:/);
+  });
+});
+
+// #193 — a reset is the flow where you must assume someone else is holding a live session; that
+// is usually WHY it is being used. Before the epoch bump, the attacker's cookie kept working
+// against the account whose password had just been changed to lock them out.
+describe('POST /api/saas/account/reset/confirm — session revocation', () => {
+  it('bumps the session epoch, invalidating every session minted before the reset', async () => {
+    const doc = makeAccount({ sessionEpoch: 7 });
+    accountFindOneSelect.mockResolvedValue(doc);
+
+    const res = await POST(makeReq({ token: TOKEN, newPassword: GOOD_PASSWORD }));
+
+    expect(res.status).toBe(200);
+    expect(doc.set.mock.calls[0][0]).toMatchObject({ sessionEpoch: 8 });
+  });
+
+  it('does not bump it for an expired or unknown token — nothing is written at all', async () => {
+    accountFindOneSelect.mockResolvedValue(null);
+    expect((await POST(makeReq({ token: TOKEN, newPassword: GOOD_PASSWORD }))).status).toBe(400);
+
+    const expired = makeAccount({ resetTokenExpires: new Date(Date.now() - 60_000) });
+    accountFindOneSelect.mockResolvedValue(expired);
+    expect((await POST(makeReq({ token: TOKEN, newPassword: GOOD_PASSWORD }))).status).toBe(400);
+    expect(expired.set).not.toHaveBeenCalled();
+    expect(expired.save).not.toHaveBeenCalled();
   });
 });

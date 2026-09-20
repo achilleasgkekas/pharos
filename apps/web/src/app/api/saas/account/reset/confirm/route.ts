@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
 
     await connectDB();
     const account = await Account.findOne({ resetTokenHash: hashResetToken(token) }).select(
-      '_id resetTokenHash resetTokenExpires'
+      '_id resetTokenHash resetTokenExpires sessionEpoch'
     );
     if (!account || !isResetTokenValid(account.resetTokenExpires)) {
       return NextResponse.json({ error: 'This reset link is invalid or has expired' }, { status: 400 });
@@ -53,11 +53,15 @@ export async function POST(req: NextRequest) {
       passwordHash: hashPassword(newPassword),
       resetTokenHash: null,
       resetTokenExpires: null,
+      // Every existing session dies here (#193). A reset is the one flow where you must assume
+      // someone else is holding a live cookie — that is usually WHY it is being used — so
+      // leaving those sessions valid handed the account back to them, new password and all.
+      // No cookie is re-minted: this request is unauthenticated (the token is the proof, not a
+      // session), so the person is sent to the login page to use the password they just chose.
+      sessionEpoch: (Number(account.sessionEpoch) || 0) + 1,
     });
     await account.save();
 
-    // Existing account sessions are not force-expired here (consistent with the password-change
-    // route); the new hash takes effect on the next login.
     return NextResponse.json({ ok: true });
   });
 }

@@ -6,6 +6,7 @@
 // Signing/verifying uses `jose` (Web Crypto) so the token half is edge-safe; the cookie
 // set/clear/read helpers use next/headers and are NODE-ONLY (call them from SaaS route
 // handlers only, never from middleware). Reuses the existing AUTH_SECRET — no new config.
+import { cache } from 'react';
 import { cookies } from 'next/headers';
 import { SignJWT, jwtVerify } from 'jose';
 import {
@@ -44,14 +45,85 @@ export const verifyAccountSession = verifyAccountToken;
 /** Sign an account session token. Edge-safe implementation in accountToken.ts. */
 export const signAccountSession = signAccountToken;
 
-/** Read + verify the account cookie (token-only, no DB hit). Null when logged out. */
+/**
+ * The account's current "sign out everywhere" counter (#182). Node-only: imported lazily so this
+ * module's import graph — and the edge-safe token half above — stay as they were.
+ *
+ * `cache()` dedupes it within one render: the layout, the page and the tenant gate each ask who
+ * is signed in, and without this that is three identical queries per page view.
+ */
+const currentAccountEpoch = cache(async function currentAccountEpoch(accountId: string): Promise<number> {
+  const { connectDB } = await import('../db');
+  const { Account } = await import('@/models/Account');
+  // The retry lives INSIDE the cached function, not around it: `cache()` memoises the rejected
+  // promise too, so a loop on the outside would be handed the same failure again and again
+  // without ever reaching the database a second time.
+  let last: unknown;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      await connectDB();
+      const doc = (await Account.findById(accountId).select('sessionEpoch').lean()) as { sessionEpoch?: number } | null;
+      return Number(doc?.sessionEpoch) || 0;
+    } catch (err) {
+      last = err;
+    }
+  }
+  throw last;
+});
+
+/**
+ * Read + verify the account cookie. Null when logged out.
+ *
+ * The token is still the whole authentication; the one DB read is what makes a hosted session
+ * REVOCABLE (#182, #193). Without it a password change or a password RESET — the thing you do
+ * precisely because someone else may hold your session — left every stolen cookie working until
+ * it expired on its own, which for the account cookie is days.
+ *
+ * A token minted before this shipped carries no epoch, which reads as 0 and matches the stored
+ * default: those sessions keep working until something bumps the counter, and are revoked by the
+ * first bump like any other. That is the point — the pre-existing sessions are exactly the ones a
+ * reset is meant to kill.
+ *
+ * FAILS CLOSED, after one retry. This is deliberately the opposite of the self-hosted
+ * `getCurrentUser`, which fails open so a local Mongo hiccup cannot lock the owner out of their
+ * own house. Here the control plane is already load-bearing for the same request —
+ * `saasSessionUser` resolves the workspace membership through it and denies after one retry too —
+ * so failing open would not keep anyone working during an outage; it would only mean that during
+ * one, revoked sessions come back to life.
+ */
 export async function getCurrentAccount(): Promise<AccountClaims | null> {
   const store = await cookies();
-  return verifyAccountSession(store.get(ACCOUNT_COOKIE)?.value);
+  const claims = await verifyAccountSession(store.get(ACCOUNT_COOKIE)?.value);
+  if (!claims) return null;
+
+  try {
+    return (await currentAccountEpoch(claims.sub)) === (claims.epoch ?? 0) ? claims : null;
+  } catch {
+    return null;
+  }
 }
 
+/**
+ * Mint the account cookie. When the caller does not state an epoch, the account's current one is
+ * embedded, so every fresh session is bound to the counter as it stands — callers keep passing
+ * just { sub, email }. A route that just bumped the counter passes the NEW value explicitly, which
+ * is what keeps the device that changed the password signed in while every other one is dropped.
+ *
+ * A DB error here mints a token with no epoch rather than refusing the login. Such a token reads
+ * as epoch 0, so it is valid only while the account has never revoked anything — and the very
+ * next bump invalidates it. Failing the login instead would turn a control-plane blip into "no
+ * one can sign in", for a token that is revocable either way.
+ */
 export async function setAccountCookie(claims: AccountClaims): Promise<void> {
-  const token = await signAccountSession(claims);
+  let epoch = claims.epoch;
+  if (epoch === undefined) {
+    try {
+      epoch = await currentAccountEpoch(claims.sub);
+    } catch {
+      /* control-plane hiccup → mint without an epoch; still a valid, revocable session */
+    }
+  }
+  const token = await signAccountSession({ ...claims, epoch });
   const store = await cookies();
   store.set(ACCOUNT_COOKIE, token, accountCookieOptions());
 }

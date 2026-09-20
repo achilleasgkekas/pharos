@@ -24,6 +24,7 @@ const {
   accountFindById,
   accountFindByIdSelect,
   getCurrentAccountMock,
+  setAccountCookieMock,
   hashPasswordMock,
   verifyPasswordMock,
   passwordChangeErrorMock,
@@ -35,6 +36,7 @@ const {
     accountFindById: vi.fn(() => ({ select: accountFindByIdSelect })),
     accountFindByIdSelect,
     getCurrentAccountMock: vi.fn(async () => null as { sub: string; email: string } | null),
+    setAccountCookieMock: vi.fn(async (_claims: { sub: string; email: string; epoch?: number }) => {}),
     hashPasswordMock: vi.fn((plain: string) => `hashed:${plain}`),
     verifyPasswordMock: vi.fn(() => true),
     passwordChangeErrorMock: vi.fn(() => null as string | null),
@@ -45,7 +47,10 @@ vi.mock('@/lib/db', () => ({ connectDB: connectDBMock }));
 vi.mock('@/models/Account', () => ({ Account: { findById: accountFindById } }));
 vi.mock('@/lib/auth', () => ({ hashPassword: hashPasswordMock, verifyPassword: verifyPasswordMock, assertCanWrite: vi.fn(async () => {}) }));
 vi.mock('@/lib/tenancy/accountProfile', () => ({ passwordChangeError: passwordChangeErrorMock }));
-vi.mock('@/lib/tenancy/accountSession', () => ({ getCurrentAccount: getCurrentAccountMock }));
+vi.mock('@/lib/tenancy/accountSession', () => ({
+  getCurrentAccount: getCurrentAccountMock,
+  setAccountCookie: setAccountCookieMock,
+}));
 vi.mock('@/lib/tenancy/saasApi', async () => {
   // saasGuard is pure (try/catch + NextResponse.json, no DB/env reads) — run it for real so
   // the mid-handler-throw test exercises the actual production error-shaping logic.
@@ -63,7 +68,9 @@ function makeReq(body: unknown): NextRequest {
 function makeAccount(over: Record<string, unknown> = {}) {
   return {
     _id: 'acc1',
+    email: 'a@example.com',
     passwordHash: 'old-hash',
+    sessionEpoch: 3,
     save: vi.fn(async function (this: Record<string, unknown>) {
       return this;
     }),
@@ -197,5 +204,48 @@ describe('errors', () => {
     expect(res.status).toBe(500);
     const json = (await res.json()) as { error: string };
     expect(json.error).toBe('mongo blip');
+  });
+});
+
+// #182/#193 — a hosted session is only revocable if the password routes move the counter that
+// `getCurrentAccount` compares against. Without the bump, a password change left every other
+// device signed in, which is the opposite of what the person just asked for.
+describe('session revocation', () => {
+  it('bumps the account session epoch and re-mints THIS device\'s cookie with the new value', async () => {
+    getCurrentAccountMock.mockResolvedValue({ sub: 'acc1', email: 'a@example.com' });
+    const account = makeAccount({ sessionEpoch: 3 });
+    accountFindByIdSelect.mockResolvedValue(account);
+
+    const res = await POST(makeReq({ currentPassword: 'old-pw-1', newPassword: 'brand-new-pw' }));
+
+    expect(res.status).toBe(200);
+    expect(account.sessionEpoch).toBe(4);
+    expect(account.save).toHaveBeenCalled();
+    // The new cookie names the epoch that was just STORED — never a stale one, or the person who
+    // changed their password would sign themselves out.
+    expect(setAccountCookieMock).toHaveBeenCalledWith({ sub: 'acc1', email: 'a@example.com', epoch: 4 });
+  });
+
+  it('starts from 0 for an account that has never revoked anything', async () => {
+    getCurrentAccountMock.mockResolvedValue({ sub: 'acc1', email: 'a@example.com' });
+    const account = makeAccount({ sessionEpoch: undefined });
+    accountFindByIdSelect.mockResolvedValue(account);
+
+    await POST(makeReq({ currentPassword: 'old-pw-1', newPassword: 'brand-new-pw' }));
+
+    expect(account.sessionEpoch).toBe(1);
+  });
+
+  it('does not touch the epoch when the current password is wrong', async () => {
+    getCurrentAccountMock.mockResolvedValue({ sub: 'acc1', email: 'a@example.com' });
+    const account = makeAccount({ sessionEpoch: 3 });
+    accountFindByIdSelect.mockResolvedValue(account);
+    verifyPasswordMock.mockReturnValueOnce(false);
+
+    const res = await POST(makeReq({ currentPassword: 'wrong', newPassword: 'brand-new-pw' }));
+
+    expect(res.status).toBe(401);
+    expect(account.sessionEpoch).toBe(3);
+    expect(setAccountCookieMock).not.toHaveBeenCalled();
   });
 });

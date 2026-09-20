@@ -36,6 +36,12 @@ const AccountSchema = new Schema(
     mfaSecretEnc: { type: String, default: null },
     mfaPendingSecretEnc: { type: String, default: null },
     mfaRecoveryHashes: { type: [String], default: [] },
+    // "Sign out everywhere" counter (#182), the hosted twin of `User.sessionEpoch` (P91). Every
+    // account session token carries the value it was minted with; `getCurrentAccount` compares
+    // the two, so bumping this here invalidates every token already out there. A password change
+    // and a password reset both bump it — a reset is the case where someone else may be holding
+    // a live session, and leaving it valid was the point of #193.
+    sessionEpoch: { type: Number, default: 0 },
   },
   { timestamps: true }
 );
