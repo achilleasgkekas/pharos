@@ -8,6 +8,7 @@
 
 import { detectBudgetExceeded, type BudgetAlertRow, type BudgetExceeded } from './budgetAlert';
 import { detectPriceHikes, type HikeEntry, type PriceHike, type DetectHikesOptions } from './priceHike';
+import { monthKeyOfDate } from './reportWindow';
 
 export type MonthReviewRow = BudgetAlertRow & HikeEntry & { period?: string | null };
 
@@ -41,11 +42,10 @@ export type BuildMonthReviewOptions = {
   hikeOpts?: DetectHikesOptions;
 };
 
+/** The stored date's own month, in the frame it was written in (#242). `null` rather than ''
+ *  because the callers below branch on "no month at all". */
 function monthKeyOf(d: string | Date | null | undefined): string | null {
-  if (d == null) return null;
-  const t = d instanceof Date ? d : new Date(d);
-  if (isNaN(t.getTime())) return null;
-  return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}`;
+  return monthKeyOfDate(d) || null;
 }
 
 function prevMonthKeyOf(monthKey: string): string {

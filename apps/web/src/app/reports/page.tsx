@@ -57,7 +57,12 @@ type LeanItem = {
 };
 type LeanSub = { amount?: number; billingCycle?: string; category?: string; space?: string };
 
-function monthKey(d: Date): string {
+// The month AXIS: the run of months the page draws, built from the server's own clock and so
+// read in local time. Deliberately NOT the frame a stored date is keyed in — that one is
+// `monthKeyOfDate`, which reads UTC because that is how the dates were written (#242). Keeping
+// the two under one name is what let a record drift out of its own month on servers west of
+// UTC, so they are named apart on purpose.
+function axisMonthKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 function monthLabel(d: Date, locale = 'en'): string {
@@ -102,7 +107,7 @@ async function getReports(monthsBack = 12, locale = 'en') {
   const months: { key: string; label: string; total: number; count: number }[] = [];
   for (let i = monthsBack - 1; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    months.push({ key: monthKey(d), label: monthLabel(d, locale), total: 0, count: 0 });
+    months.push({ key: axisMonthKey(d), label: monthLabel(d, locale), total: 0, count: 0 });
   }
   const mIdx = new Map(months.map((m, i) => [m.key, i]));
   let receiptsTotal = 0;
@@ -111,9 +116,7 @@ async function getReports(monthsBack = 12, locale = 'en') {
     receiptsTotal += r.total || 0;
     receiptsVat += r.vatAmount || 0;
     if (!r.date) continue;
-    const d = new Date(r.date);
-    if (isNaN(d.getTime())) continue;
-    const idx = mIdx.get(monthKey(d));
+    const idx = mIdx.get(monthKeyOfDate(r.date));
     if (idx != null) {
       months[idx].total += r.total || 0;
       months[idx].count += 1;
@@ -135,7 +138,7 @@ async function getReports(monthsBack = 12, locale = 'en') {
   }[];
   const ie = months.map((m) => ({ key: m.key, label: m.label, income: 0, expense: 0 }));
   const ieIdx = new Map(ie.map((m, i) => [m.key, i]));
-  const thisMonthKey = monthKey(now);
+  const thisMonthKey = axisMonthKey(now);
   const thisYear = now.getFullYear();
   let incomeYear = 0;
   let expenseYear = 0;
@@ -155,10 +158,7 @@ async function getReports(monthsBack = 12, locale = 'en') {
     const cat = e.category || 'other';
     // Bucket by period (YYYY-MM) if present, else by date.
     let mk = e.period && /^\d{4}-\d{2}$/.test(e.period) ? e.period : '';
-    if (!mk && e.date) {
-      const d = new Date(e.date);
-      if (!isNaN(d.getTime())) mk = monthKey(d);
-    }
+    if (!mk && e.date) mk = monthKeyOfDate(e.date);
     if (!mk) continue;
     if (!isIncome && inReportWindow(mk, windowStart)) {
       expCatMap.set(cat, (expCatMap.get(cat) ?? 0) + amt);
@@ -226,7 +226,7 @@ async function getReports(monthsBack = 12, locale = 'en') {
   if (appSettings.budgetRollover) {
     for (let n = 1; n <= ROLLOVER_WINDOW; n++) {
       const d = new Date(now.getFullYear(), now.getMonth() - n, 1);
-      const mk = monthKey(d);
+      const mk = axisMonthKey(d);
       if ((totalByMonth.get(mk) ?? 0) > 0) rolloverMonthKeys.push(mk);
     }
   }
