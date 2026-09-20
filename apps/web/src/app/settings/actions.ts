@@ -2021,7 +2021,11 @@ export async function saveAssetAccounts(accounts: Record<string, number>): Promi
   const clean: Record<string, number> = {};
   for (const [k, v] of Object.entries(accounts || {})) {
     const n = Number(v);
-    if (k.trim() && Number.isFinite(n) && n > 0) clean[k.trim().slice(0, 60)] = Math.round(n * 100) / 100;
+    // `>= 0`, not `> 0`: a zero balance is a real state (an emptied cash envelope, a closed-out
+    // account kept for the record), and dropping it here deleted the account behind the user's
+    // back — the same bug the editor had on the client side. Removal is the X button, and it
+    // sends the account absent from the map, which this loop still honours.
+    if (k.trim() && Number.isFinite(n) && n >= 0) clean[k.trim().slice(0, 60)] = Math.round(n * 100) / 100;
   }
   await (await scoped(AppConfig)).updateOne({ key: 'singleton' }, { $set: { assetAccounts: clean } }, { upsert: true });
   await invalidateAppSettingsForRequest();

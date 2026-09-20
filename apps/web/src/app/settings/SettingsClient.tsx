@@ -2028,7 +2028,14 @@ function AssetAccountsManager({ settings }: { settings: AppSettings }) {
     const out: Record<string, number> = {};
     for (const r of rows) {
       const n = Number(r.balance);
-      if (r.name.trim() && n > 0) out[r.name.trim()] = n;
+      // A named account is saved whatever its balance — including ZERO. The old condition was
+      // `n > 0`, which meant draining an account and typing 0 silently DELETED it: the row was
+      // dropped from the payload, the list on screen still showed it until the next reload, and
+      // the account was gone. Emptying an account is the normal life of a cash envelope, and the
+      // X button is the only way to remove one. Only a blank name skips a row (the trailing empty
+      // row the editor always keeps), and a typo that is not a number saves as 0 rather than
+      // vanishing.
+      if (r.name.trim()) out[r.name.trim()] = Number.isFinite(n) ? Math.max(0, n) : 0;
     }
     startTransition(async () => {
       await saveAssetAccounts(out);
