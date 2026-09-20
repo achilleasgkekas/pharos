@@ -11,6 +11,7 @@ export type HikeEntry = {
   vendor?: string | null;
   vendorKey?: string | null;
   amount?: number | null;
+  origAmount?: number | null;
   date?: string | Date | null;
   recurring?: boolean | null;
   kind?: string | null;
@@ -76,7 +77,8 @@ export function detectPriceHikes(
   for (const r of rows ?? []) {
     if (r.kind === 'income') continue;
     const key = (r.vendorKey || '').trim();
-    const amount = Number(r.amount ?? 0);
+    const origAmount = Number(r.origAmount ?? 0);
+    const amount = origAmount > 0 ? origAmount : Number(r.amount ?? 0);
     const t = ts(r.date);
     if (!key || !(amount > 0) || t == null) continue;
     const arr = byKey.get(key) ?? [];
