@@ -29,10 +29,17 @@ import type { NextRequest } from 'next/server';
 
 // storage.ts freezes STORAGE_ROOT at module load, so the temp volume has to exist in the
 // environment before ANY import runs — hence a hoisted block rather than beforeAll.
+//
+// `require` rather than the file's own imports, and the disable rather than a rewrite: Vitest
+// hoists this callback ABOVE every `import`, so the bindings those imports create do not exist
+// yet when it runs. Node's builtins are the only modules reachable from here, and this is the
+// one block in the file that may use them this way.
 const { STORAGE_ROOT } = vi.hoisted(() => {
+  /* eslint-disable @typescript-eslint/no-require-imports */
   const os = require('node:os') as typeof import('node:os');
   const path = require('node:path') as typeof import('node:path');
   const fs = require('node:fs') as typeof import('node:fs');
+  /* eslint-enable @typescript-eslint/no-require-imports */
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'pharos-files-idor-'));
   process.env.STORAGE_ROOT = root;
   return { STORAGE_ROOT: root };
