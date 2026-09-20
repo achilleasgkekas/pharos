@@ -1,9 +1,6 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { currentTenant } from './tenancy/current';
-import { tenantStorageRoot } from './billing/fileStorage';
-import { assertStorageQuota, recordStorageDelta } from './billing/storageMeter';
 
 const STORAGE_ROOT = process.env.STORAGE_ROOT ?? path.join(process.cwd(), 'storage');
 
@@ -12,17 +9,15 @@ const STORAGE_ROOT = process.env.STORAGE_ROOT ?? path.join(process.cwd(), 'stora
 export type StorageBucket = 'receipts' | 'statements' | 'equipment' | 'expenses' | 'share';
 
 /**
- * The root this call should read/write under: the ambient tenant's own subtree
- * (STORAGE_ROOT/<dbName>) for a real SaaS tenant, or the flat STORAGE_ROOT for the self-hosted
- * default tenant — `tenantStorageRoot()` already returns null for that case, which is exactly
- * today's behavior, unchanged. Every caller of saveFile/readFile/deleteFile already runs inside
- * `withRequestTenant`/`withTenant` for the tenant that owns the file, same as `currentModel()`
- * scopes Mongo access — so re-deriving the root here from `currentTenant()` at call time is
- * always correct without threading it through 13+ call sites' signatures.
+ * The root every read and write resolves under.
+ *
+ * This used to ask the ambient tenant for its own subtree and fall back to `STORAGE_ROOT`. With
+ * the SaaS retired there is one installation and one root, so the question has one answer — but
+ * the function stays, because `resolveWithinStorage` below is the traversal guard and it must
+ * keep having a single, named thing to guard against.
  */
-// Exported for the share-inbox sweeper (#123), which walks the `share` bucket directly.
 export function activeStorageRoot(): string {
-  return tenantStorageRoot(currentTenant()) ?? STORAGE_ROOT;
+  return STORAGE_ROOT;
 }
 
 /**
@@ -46,10 +41,6 @@ export async function saveFile(
   buffer: Buffer,
   extension: string
 ): Promise<{ filePath: string; relativePath: string }> {
-  // Gate BEFORE touching the filesystem — an over-quota tenant never gets a partial write.
-  // No-op (zero DB access) for the self-hosted default tenant / SAAS_MODE off.
-  await assertStorageQuota(buffer.length);
-
   const root = activeStorageRoot();
   const now = new Date();
   const year = String(now.getFullYear());
@@ -65,11 +56,9 @@ export async function saveFile(
 
   const filePath = path.join(dir, filename);
   await fs.writeFile(filePath, buffer);
-  await recordStorageDelta(buffer.length);
 
-  // Bucket-relative, NOT prefixed with the tenant subtree — readFile/deleteFile re-derive the
-  // tenant root from the ambient current tenant at call time, same convention as Mongo's
-  // currentModel() (the tenant is ambient context, never encoded into the stored value).
+  // Stored bucket-relative, never as an absolute path: `readFile`/`deleteFile` resolve it under
+  // the root at call time, so moving the storage volume is a config change and not a migration.
   const relativePath = path.relative(root, filePath);
   return { filePath, relativePath };
 }
@@ -79,15 +68,38 @@ export async function readFile(relativePath: string): Promise<Buffer> {
 }
 
 export async function deleteFile(relativePath: string): Promise<void> {
-  const full = resolveWithinStorage(relativePath);
-  // Best-effort size lookup for the ledger — a stat failure (already gone, race with another
-  // delete) must never block the actual unlink below.
-  let size = 0;
+  await fs.unlink(resolveWithinStorage(relativePath));
+}
+
+/**
+ * Recursively sum the byte size of every regular file under `dir`. A missing directory → 0.
+ * Symlinks are not followed (`Dirent.isFile` is false for them). A per-entry error is skipped so
+ * one unreadable file does not abort the whole walk.
+ *
+ * Moved here from `lib/billing/fileStorage.ts` when the SaaS was retired: it was written to
+ * measure a tenant's quota, but it is plain filesystem arithmetic and the self-hosted
+ * Settings → System panel is now its only caller.
+ */
+export async function measureDir(dir: string): Promise<number> {
+  let entries: import('node:fs').Dirent[];
   try {
-    size = (await fs.stat(full)).size;
+    entries = await fs.readdir(dir, { withFileTypes: true });
   } catch {
-    /* unreadable/missing — proceed with the delete anyway, ledger delta stays 0 */
+    return 0; // ENOENT or unreadable directory → treat as empty
   }
-  await fs.unlink(full);
-  if (size > 0) await recordStorageDelta(-size);
+  let total = 0;
+  for (const entry of entries) {
+    const full = path.join(dir, entry.name);
+    try {
+      if (entry.isDirectory()) {
+        total += await measureDir(full);
+      } else if (entry.isFile()) {
+        const st = await fs.stat(full);
+        total += Math.max(0, st.size);
+      }
+    } catch {
+      // skip an unreadable entry (permission / race with deletion)
+    }
+  }
+  return total;
 }

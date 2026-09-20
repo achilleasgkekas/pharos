@@ -8,7 +8,6 @@ import { getAppSettings } from '@/lib/appSettings';
 import { currencySymbol } from '@/lib/money';
 import { isAiReady } from '@/lib/ollama';
 import { getSessionUser } from '@/lib/auth';
-import { saasUiEnabled } from '@/lib/tenancy/saasPage';
 import { assertKnownWorkspaceHost } from '@/lib/tenancy/request';
 import { getAiConfig } from '@/lib/aiConfig';
 import { AiOnboardingBanner } from '@/components/AiOnboardingBanner';
@@ -69,52 +68,6 @@ export default async function RootLayout({
   const symbol = currencySymbol(currency);
   // Navbar dot = EFFECTIVE AI state (master switch on AND a provider is reachable).
   // Onboarding nudge: show when signed in, AI isn't usable, and not yet dismissed.
-  // Is this an operator (superadmin allowlist)? Decides whether the account menu offers the
-  // console at all. The console re-checks for itself and 404s otherwise, so this is only
-  // about not advertising a door that will not open.
-  let operator = false;
-  // SiteNav renders globally now, including on hosts with no tenant at all (app.<domain> —
-  // /admin, /account/*). Its product-scoped links (Settings, Stuff/Money/Plan/Activity, the
-  // logo) are plain relative paths that only resolve on a TENANT host — clicking one from here
-  // hits the same no_tenant gate a real product page fetch does and bounces back to
-  // /account/workspace. Confirmed live (2026-08-05): the account menu's Settings link, clicked
-  // from /account/workspace, landed right back on /account/workspace.
-  //
-  // So when we're NOT on a tenant host, resolve the account's home workspace (same "first
-  // membership" default the account pages themselves use) and hand its absolute subdomain URL
-  // down as `productBaseUrl` — SiteNav/AiOnboardingBanner prefix their product-scoped hrefs
-  // with it instead of leaving them relative. `undefined` (the tenant-host case) means "stay
-  // relative", unchanged from before.
-  let productBaseUrl: string | undefined;
-  if (user && saasUiEnabled()) {
-    const [
-      { getCurrentAccount },
-      { superadminAllowlist, isSuperadminEmail },
-      { parseTenantSlug },
-      { TENANT_HOST_HEADER },
-      { accountTenants },
-      { pickWorkspace },
-      { workspaceUrl },
-    ] = await Promise.all([
-      import('@/lib/tenancy/accountSession'),
-      import('@/lib/tenancy/superadmin'),
-      import('@/lib/tenancy/host'),
-      import('@/lib/tenancy/request'),
-      import('@/lib/tenancy/saasApi'),
-      import('@/components/saas/chooseWorkspace'),
-      import('@/components/saas/workspaceUrl'),
-    ]);
-    const account = await getCurrentAccount().catch(() => null);
-    operator = !!account && isSuperadminEmail(account.email, superadminAllowlist());
-
-    const h = await headers();
-    const host = h.get(TENANT_HOST_HEADER) || h.get('x-forwarded-host') || h.get('host');
-    if (account && !parseTenantSlug(host)) {
-      const tenants = await accountTenants(account.sub).catch(() => []);
-      const home = pickWorkspace(tenants, null);
-      if (home) productBaseUrl = workspaceUrl(home.slug, process.env.SAAS_PUBLIC_URL) || undefined;
-    }
-  }
   let aiReady = false;
   let banner: 'off' | 'no-provider' | null = null;
   if (user) {
@@ -156,8 +109,8 @@ export default async function RootLayout({
               state or route doesn't remount the page subtree and reset client state. */}
           {user && (
             <ChromeGate>
-              <SiteNav aiReady={aiReady} saas={saasUiEnabled()} operator={operator} user={{ name: user.name || 'account', role: user.role }} productBaseUrl={productBaseUrl} />
-              {banner && <AiOnboardingBanner reason={banner} productBaseUrl={productBaseUrl} />}
+              <SiteNav aiReady={aiReady} user={{ name: user.name || 'account', role: user.role }} />
+              {banner && <AiOnboardingBanner reason={banner} />}
               <FirstRunTour />
             </ChromeGate>
           )}

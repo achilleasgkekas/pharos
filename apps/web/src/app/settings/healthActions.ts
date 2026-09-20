@@ -11,10 +11,10 @@ import { getStorageConfig } from '@/lib/storageConfig';
 import { getLastRemoteSync } from '@/lib/syncState';
 import { detectSyncStaleness } from '@/lib/syncStaleness';
 import { getAppSettings } from '@/lib/appSettings';
-import { measureDir } from '@/lib/billing/fileStorage';
+import { measureDir } from '@/lib/storage';
 import { testRemote } from '@/lib/remoteStorage';
 import { testOnedrive } from '@/lib/onedrive';
-import { formatBytes } from '@/components/saas/format';
+import { formatBytes } from '@/lib/bytes';
 import {
   databaseLevel,
   diskLevel,

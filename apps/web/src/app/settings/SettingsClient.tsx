@@ -38,7 +38,7 @@ import {
   type UserRow,
 } from './users.actions';
 import type { MfaStatus } from '@/lib/userMfaStore';
-import { mfaCodeReady, mfaPasswordReady, describeMfaError } from '@/components/saas/mfaSettings';
+import { mfaCodeReady, mfaPasswordReady, describeMfaError } from '@/lib/mfaSettings';
 import { QrCode } from '@/components/QrCode';
 import { McpManager } from './McpManager';
 import { CalendarFeedManager } from './CalendarFeedManager';
