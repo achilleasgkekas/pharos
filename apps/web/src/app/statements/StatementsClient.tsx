@@ -1,5 +1,6 @@
 'use client';
 import { cur, currencySymbol, CURRENCIES } from "@/lib/money";
+import { todayLocal } from "@/lib/dates";
 import { useState, useTransition, useMemo, useRef } from 'react';
 import {
   Plus,
@@ -17,6 +18,7 @@ import {
   GitMerge,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { DateInput } from '@/components/ui/DateInput';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
@@ -1200,6 +1202,7 @@ function AddTransactionForm({ statementId, onDone }: { statementId: string; onDo
   const t = useT();
   const [pending, startTransition] = useTransition();
   const [installment, setInstallment] = useState(false);
+  const [date, setDate] = useState(() => todayLocal());
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -1213,7 +1216,9 @@ function AddTransactionForm({ statementId, onDone }: { statementId: string; onDo
   return (
     <form onSubmit={handleSubmit} className="bg-[color:var(--color-surface-2)] rounded-lg p-3 mb-2 space-y-2">
       <div className="flex gap-2">
-        <input name="date" type="date" required defaultValue={new Date().toISOString().slice(0, 10)} className={cn(inputClass, 'w-32')} />
+        <div className="w-32 shrink-0">
+          <DateInput name="date" required value={date} onValueChange={setDate} className={cn(inputClass, 'pr-8')} />
+        </div>
         <input name="description" placeholder={t('stm.description')} required className={cn(inputClass, 'flex-1')} />
         <input name="amount" type="number" step="0.01" placeholder={cur()} required className={cn(inputClass, 'w-20 text-right')} />
       </div>
@@ -1277,8 +1282,8 @@ function StatementForm({
   const printed = (v: number | undefined) => (v == null ? '' : String(toPrinted(v, storedRate)));
   const [form, setForm] = useState({
     card: statement?.card ?? (cards[0] ? cardLabel(cards[0]) : ''),
-    period: statement?.period ?? new Date().toISOString().slice(0, 7),
-    statementDate: statement?.statementDate ? statement.statementDate.slice(0, 10) : new Date().toISOString().slice(0, 10),
+    period: statement?.period ?? todayLocal().slice(0, 7),
+    statementDate: statement?.statementDate ? statement.statementDate.slice(0, 10) : todayLocal(),
     dueDate: statement?.dueDate ? statement.dueDate.slice(0, 10) : '',
     // The headline total keeps its exact printed value in origAmount; the rest is backed out.
     totalAmount: ((wasForeign ? statement?.origAmount || statement?.totalAmount : statement?.totalAmount) ?? '').toString(),

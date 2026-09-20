@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { safeDate, safeDateOrNull } from './dates';
 
 // dates.ts parses receipt/statement dates that native `new Date()` mishandles.
@@ -120,3 +120,20 @@ describe('safeDateOrNull', () => {
     expect(safeDateOrNull(42)).toBeNull();
   });
 });
+
+import { todayLocal } from './dates';
+
+describe('todayLocal', () => {
+  it('returns the current date formatted as YYYY-MM-DD in the local timezone', () => {
+    const d = new Date('2026-09-18T12:00:00Z');
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(d);
+    
+    const result = todayLocal();
+    expect(result).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(result).toBe(d.toLocaleDateString('en-CA'));
+    
+    vi.useRealTimers();
+  });
+});
+

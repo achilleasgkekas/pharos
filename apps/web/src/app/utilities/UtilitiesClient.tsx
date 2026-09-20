@@ -4,14 +4,16 @@ import { Gauge, Plus, Trash2, X } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { useT } from '@/components/LocaleProvider';
 import { withConsumption, type ReadingLike } from '@/lib/meterReadings';
+import { DateInput } from '@/components/ui/DateInput';
 import { createMeterReading, deleteMeterReading } from './actions';
+import { todayLocal } from '@/lib/dates';
 
 const input = 'w-full bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[color:var(--color-accent)]';
-const today = () => new Date().toLocaleDateString('en-CA');
 
 export function UtilitiesClient({ readings, spaces }: { readings: ReadingLike[]; spaces: string[] }) {
   const t = useT();
   const [open, setOpen] = useState(false);
+  const [readingAt, setReadingAt] = useState('');
   const [error, setError] = useState('');
   const [pending, startTransition] = useTransition();
   const rows = useMemo(() => withConsumption(readings), [readings]);
@@ -35,7 +37,7 @@ export function UtilitiesClient({ readings, spaces }: { readings: ReadingLike[];
           </h1>
           <p className="text-xs text-[color:var(--color-text-dim)] mt-1">{t('util.subtitle')}</p>
         </div>
-        <button onClick={() => setOpen(true)} className="flex items-center gap-1.5 rounded-lg bg-[color:var(--color-accent)] text-black px-3 py-2 text-sm font-semibold">
+        <button onClick={() => { setReadingAt(todayLocal()); setOpen(true); }} className="flex items-center gap-1.5 rounded-lg bg-[color:var(--color-accent)] text-black px-3 py-2 text-sm font-semibold">
           <Plus size={16} /> {t('util.add')}
         </button>
       </div>
@@ -75,7 +77,7 @@ export function UtilitiesClient({ readings, spaces }: { readings: ReadingLike[];
           <div className="grid grid-cols-2 gap-3">
             <label className="block text-xs">{t('util.type')}<input name="utilityType" required className={input} placeholder={t('util.typeHint')} /></label>
             <label className="block text-xs">{t('util.unit')}<input name="unit" required className={input} placeholder="kWh / m³" /></label>
-            <label className="block text-xs">{t('util.date')}<input name="readingAt" type="date" defaultValue={today()} required className={input} /></label>
+            <label className="block text-xs">{t('util.date')}<DateInput name="readingAt" required value={readingAt} onValueChange={setReadingAt} className={input} /></label>
             <label className="block text-xs">{t('util.reading')}<input name="value" type="number" min="0" step="any" required className={input} /></label>
           </div>
           <label className="block text-xs">{t('util.space')}<input name="space" list="utility-spaces" className={input} /><datalist id="utility-spaces">{spaces.map((s) => <option key={s} value={s} />)}</datalist></label>

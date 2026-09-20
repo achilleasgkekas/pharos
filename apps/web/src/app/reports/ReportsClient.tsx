@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { cur } from "@/lib/money";
 import { useLocale, useT, useMoney } from '@/components/LocaleProvider';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
+import { DateInput } from '@/components/ui/DateInput';
 import {
   ResponsiveContainer,
   AreaChart,
@@ -954,6 +955,7 @@ function NewGoalForm({ onDone }: { onDone: () => void }) {
   const t = useT();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [targetDate, setTargetDate] = useState('');
 
   function submit(formData: FormData) {
     setError(null);
@@ -976,7 +978,7 @@ function NewGoalForm({ onDone }: { onDone: () => void }) {
       </div>
       <div className="w-36">
         <label className="block text-[10px] text-[color:var(--color-text-faint)] mb-1">{t('reports.gDeadline')}</label>
-        <input name="targetDate" type="date" className="w-full bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-lg px-2.5 py-1.5 text-xs text-[color:var(--color-text)] focus:outline-none focus:border-[color:var(--color-accent)]" />
+        <DateInput name="targetDate" value={targetDate} onValueChange={setTargetDate} className="!text-xs !py-1.5 pr-8" />
       </div>
       <button type="submit" disabled={pending} className="text-xs px-3 py-1.5 rounded-lg bg-[color:var(--color-accent)] text-black font-semibold hover:opacity-90 disabled:opacity-50">
         {pending ? t('common.saving') : t('common.save')}
