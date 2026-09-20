@@ -34,7 +34,7 @@ export type ConversationRow = {
 /** Newest-first list of saved AI command-bar conversations (capped). */
 export async function getConversations(): Promise<ConversationRow[]> {
   await connectDB();
-  const docs = await (await scoped()).find({}).sort({ updatedAt: -1 }).limit(200).lean();
+  const docs = await (await scoped()).find({ deletedAt: null }).sort({ updatedAt: -1 }).limit(200).lean();
   return docs.map((d) => {
     const messages: ConversationMsg[] = (d.messages || []).map((m) => ({
       role: m.role as 'user' | 'assistant',
