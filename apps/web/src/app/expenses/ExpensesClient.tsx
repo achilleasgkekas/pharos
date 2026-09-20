@@ -729,8 +729,13 @@ function FormFields({ form, set, cards, giftCards, vendors, categories, spaces, 
       {form.kind !== 'income' && (
         <SplitEditor split={form.split} amount={baseAmount} baseCurrency={fx.base} onChange={(split) => set({ split })} />
       )}
+      {/* `baseAmount`, exactly like SplitEditor above — and for a sharper reason. `form.amount` is
+          what the PAPER says; a payment split is stored in base currency and a gift card's balance
+          IS base currency, so handing the printed figure here made the editor allocate 1000
+          against a ¥1000 purchase, and `syncGiftCardUses` then took €1000 off the card instead of
+          ~€6 (#205). The per-person split was fixed for this once; the line below it was missed. */}
       {form.kind !== 'income' && (
-        <PaymentSplitEditor splits={form.paymentSplits} amount={Number(form.amount) || 0} giftCards={giftCards} onChange={(paymentSplits) => set({ paymentSplits })} />
+        <PaymentSplitEditor splits={form.paymentSplits} amount={baseAmount} giftCards={giftCards} onChange={(paymentSplits) => set({ paymentSplits })} />
       )}
     </div>
   );
