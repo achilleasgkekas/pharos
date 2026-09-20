@@ -6,8 +6,12 @@ import { CalendarClock, Layers, ShieldCheck, Ticket, Wallet, Banknote, Receipt, 
 import { cur } from '@/lib/money';
 import { cn } from '@/components/ui/cn';
 import { formatDate, formatTime, formatDateTime } from '@/lib/i18n/format';
+import { dayOf } from '@/lib/calendarDay';
 
 export type Kind = 'renewal' | 'installments' | 'bill' | 'payable' | 'income' | 'goal' | 'warranty' | 'voucher';
+/** `date` is `YYYY-MM-DD` in the SERVER's frame — the calendar day this entry belongs to, not an
+ *  instant. Keep it that way: the moment it becomes a timestamp again, the grid and the labels
+ *  start disagreeing with the month block the entry is in. */
 export type Entry = { date: string; pinned?: boolean; kind: Kind; label: string; sub: string; amount: number | null };
 export type MonthBlock = { key: string; label: string; entries: Entry[]; out: number; inc: number };
 
@@ -33,7 +37,14 @@ const VIEWS: { id: View; label: string; icon: React.ReactNode }[] = [
 ];
 
 const fmt = (n: number) => `${cur()}${n.toLocaleString('en-GB')}`;
-const dayMonth = (iso: string, locale: string) => formatDate(iso, locale, { day: 'numeric', month: 'short' });
+// `date` is a plain `YYYY-MM-DD` the SERVER chose (see `ymd` in page.tsx) — not an instant.
+// `new Date('2026-05-01')` parses it as UTC midnight, so it must be formatted in UTC as well;
+// without the timeZone it would be re-read in the viewer's zone and shift back a day for
+// everyone west of Greenwich, which is the bug this pair of changes closes.
+const dayMonth = (value: string, locale: string) =>
+  formatDate(value, locale, { day: 'numeric', month: 'short', timeZone: 'UTC' });
+
+
 
 function Amount({ e }: { e: Entry }) {
   if (e.amount == null) return null;
@@ -82,7 +93,7 @@ function MonthGrid({ month }: { month: MonthBlock }) {
   const byDay = new Map<number, Entry[]>();
   for (const e of month.entries) {
     if (e.pinned) continue;
-    const day = new Date(e.date).getDate();
+    const day = dayOf(e.date);
     if (!byDay.has(day)) byDay.set(day, []);
     byDay.get(day)!.push(e);
   }
@@ -169,7 +180,9 @@ export function CalendarClient({ months, dueThisMonth }: { months: MonthBlock[];
   const empty = months.every((m) => m.entries.length === 0);
   const m = months[monthIdx];
   // Flat chronological list (List view): every dated entry across the window.
-  const flat = months.flatMap((mb) => mb.entries.filter((e) => !e.pinned)).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  // `YYYY-MM-DD` sorts correctly as text, and unlike `new Date(...).getTime()` it cannot be
+  // nudged across a boundary by the viewer's timezone.
+  const flat = months.flatMap((mb) => mb.entries.filter((e) => !e.pinned)).sort((a, b) => a.date.localeCompare(b.date));
   const recurringPinned = months[0].entries.filter((e) => e.pinned);
 
   return (

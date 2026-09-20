@@ -317,13 +317,22 @@ describe('saveAssetAccounts', () => {
     expect(connectDBMock).not.toHaveBeenCalled();
   });
 
-  it('drops non-finite/zero/negative entries and rounds to 2 decimals, same rule as saveBudgets', async () => {
-    await saveAssetAccounts({ savings: 1234.567, empty: 0, debt: -100 });
+  // Unlike a budget, a zero here is a REAL state — an emptied cash envelope, an account kept on
+  // the books at nil. Dropping it deleted the account behind the user's back (#199), which is why
+  // this no longer shares saveBudgets' rule. Removal is an absent key, which still works.
+  it('keeps a zero balance and rounds to 2 decimals; drops only non-finite and negative entries', async () => {
+    await saveAssetAccounts({ savings: 1234.567, empty: 0, debt: -100, junk: Number.NaN });
     expect(appConfigUpdateOneMock).toHaveBeenCalledWith(
       { key: 'singleton' },
-      { $set: { assetAccounts: { savings: 1234.57 } } },
+      { $set: { assetAccounts: { savings: 1234.57, empty: 0 } } },
       { upsert: true },
     );
+  });
+
+  it('removes an account only when it is absent from the map — that is what the X button sends', async () => {
+    await saveAssetAccounts({ savings: 10 });
+    const call = appConfigUpdateOneMock.mock.calls[0][1] as { $set: { assetAccounts: Record<string, number> } };
+    expect(Object.keys(call.$set.assetAccounts)).toEqual(['savings']);
   });
 
   it('caps an overly long account name to 60 characters', async () => {
