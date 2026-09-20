@@ -182,9 +182,12 @@ export const softRequestTenant = cache(async function softRequestTenant(): Promi
  *
  * Skipping the re-check is safe because in a USER REQUEST an ambient tenant only ever comes
  * from a gate that already resolved AND authorised: `withAuth` (bearer), this function
- * (cookie), or `getNotifications` via `resolveRequestTenantOrNull` (cookie + membership).
- * Those are the only three request-path `withTenant` call sites; a fourth in a user path that
- * skipped authorisation would break this invariant, so it must not be added.
+ * (cookie), `getNotifications` via `resolveRequestTenantOrNull` (cookie + membership), and the
+ * two doors that establish the tenant from the HOST via `apiTenant()` and then authorise inside
+ * it — `/api/mcp` (bearer) and `/api/files/[...path]` (bearer, `pharos_session` confirmed
+ * against this workspace's `users`, or a membership-checked hosted Account). Those are the only
+ * request-path `withTenant` call sites, and every one of them authorises; one that did not
+ * would break this invariant, so it must not be added.
  *
  * The one call site OUTSIDE a user request is the SaaS cron fan-out
  * (`runPriceScrapeAllTenants`, and future sweeps like it): it establishes each tenant from the

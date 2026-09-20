@@ -2,7 +2,12 @@ import { readFile } from '@/lib/storage';
 import { recacheByPath } from '@/lib/mirror';
 import { NextRequest, NextResponse } from 'next/server';
 import { SESSION_COOKIE, verifySession } from '@/lib/session';
-import { bearerUser } from '@/lib/apiAuth';
+import { apiTenant, bearerUser } from '@/lib/apiAuth';
+import { connectDB } from '@/lib/db';
+import { User as UserModel } from '@/models/User';
+import { currentModel } from '@/lib/tenancy/connection';
+import { withTenant } from '@/lib/tenancy/current';
+import { saasMode } from '@/lib/tenancy/saasMode';
 
 export const runtime = 'nodejs';
 
@@ -20,14 +25,80 @@ const CONTENT_TYPES: Record<string, string> = {
   htm: 'text/html; charset=utf-8',
 };
 
+/**
+ * Is this caller allowed to read files from the AMBIENT workspace? Runs inside `withTenant`, so
+ * every lookup below lands in that workspace's own database.
+ *
+ * Three credentials, one rule (the one `lib/apiAuth.ts` states for /api/v1): the HOST decides
+ * WHICH workspace, and the credential is then resolved INSIDE it, so a credential minted
+ * elsewhere is simply not found rather than being trusted on its signature alone.
+ *
+ *  - Bearer token → `bearerUser` reads this workspace's `users` collection.
+ *  - `pharos_session` cookie → the JWT is signed with a FLEET-WIDE secret, so on its own it only
+ *    proves "some valid Pharos user" and would let anyone holding one read any workspace (#190).
+ *    In SaaS the claim is therefore confirmed against this workspace's `users`. Self-hosted has
+ *    exactly one database and one user set, so the signature already is the whole answer and no
+ *    query is made — the single-user install pays nothing for this.
+ *  - `pharos_account` cookie → a hosted customer has no `User` at all; `saasSessionUser()` is the
+ *    bridge and already returns null unless the account has a membership in the host's workspace.
+ */
+async function authorizedForCurrentTenant(req: NextRequest): Promise<boolean> {
+  if (await bearerUser(req)) return true;
+
+  const claims = await verifySession(req.cookies.get(SESSION_COOKIE)?.value);
+  if (claims) {
+    if (!saasMode()) return true;
+    try {
+      await connectDB();
+      const User = await currentModel(UserModel);
+      if (await User.exists({ _id: claims.sub })) return true;
+    } catch {
+      // A malformed `sub` (CastError) or a control-plane hiccup must FAIL CLOSED here: this is
+      // the check that stops one workspace reading another's files, so "could not verify"
+      // cannot be allowed to mean "allowed".
+    }
+  }
+
+  if (saasMode()) {
+    const { saasSessionUser } = await import('@/lib/tenancy/saasIdentity');
+    if (await saasSessionUser()) return true;
+  }
+  return false;
+}
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ path: string[] }> }
 ) {
+  // WHICH workspace, before anything else. `readFile` resolves its argument under
+  // `activeStorageRoot()`, which is derived from the AMBIENT tenant exactly as `currentModel()`
+  // picks the database — so a handler that never established one read from the FLAT
+  // STORAGE_ROOT. For a hosted workspace that is the parent of every tenant subtree, which made
+  // `/api/files/<other-workspace-db>/receipts/…` resolve cleanly and serve someone else's file
+  // (#190); the traversal guard could not catch it, because with the root one level too high
+  // the foreign path never escapes. Pinning the root here is what makes that guard load-bearing.
+  //
+  // `apiTenant()` (host-only, no cookie) rather than `withRequestTenant()`, for the same reason
+  // /api/v1 uses it: this door also accepts bearer tokens, and the cookie gate answers failure
+  // with a redirect, which would turn every API file fetch into a 307 to the login page.
+  const tenant = await apiTenant();
+  // Discriminate on `error`, not on `status`: a real TenantContext carries its own `status`
+  // (the workspace lifecycle), so `'status' in tenant` is true for BOTH arms.
+  if ('error' in tenant) {
+    return new NextResponse(tenant.error, { status: tenant.status });
+  }
+  return withTenant(tenant, () => serveFile(req, params));
+}
+
+async function serveFile(
+  req: NextRequest,
+  params: Promise<{ path: string[] }>
+): Promise<NextResponse> {
   // Auth: a browser sends the session cookie; an API client sends a Bearer token.
   // The middleware lets bearer /api/files requests through, so the route is the guard.
-  const ok = (await verifySession(req.cookies.get(SESSION_COOKIE)?.value)) || (await bearerUser(req));
-  if (!ok) return new NextResponse('Unauthorized', { status: 401 });
+  if (!(await authorizedForCurrentTenant(req))) {
+    return new NextResponse('Unauthorized', { status: 401 });
+  }
 
   const { path } = await params;
 
