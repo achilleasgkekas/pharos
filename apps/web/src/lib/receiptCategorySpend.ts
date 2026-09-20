@@ -14,6 +14,8 @@
  * χωρίς setting.
  */
 
+import { monthKeyOfDate } from './reportWindow';
+
 export type CategorizedLine = {
   qty?: number | null;
   price?: number | null;
@@ -56,14 +58,6 @@ export function lineGrossAmount(li: CategorizedLine | null | undefined): number 
   return qty * price * (1 + vatRate / 100);
 }
 
-/** 'YYYY-MM' από ημερομηνία απόδειξης· '' όταν λείπει ή δεν διαβάζεται. */
-function monthKeyOf(d: string | Date | null | undefined): string {
-  if (!d) return '';
-  const parsed = d instanceof Date ? d : new Date(d);
-  if (isNaN(parsed.getTime())) return '';
-  return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}`;
-}
-
 /** Ρίχνει τις categorized γραμμές των αποδείξεων σε αθροίσματα ανά κατηγορία/μήνα. */
 export function receiptCategorySpend(
   receipts: readonly CategorizedReceipt[] | null | undefined
@@ -74,7 +68,7 @@ export function receiptCategorySpend(
   for (const r of receipts ?? []) {
     const lines = r?.lineItems;
     if (!Array.isArray(lines) || lines.length === 0) continue;
-    const mk = monthKeyOf(r?.date);
+    const mk = monthKeyOfDate(r?.date);
     for (const li of lines) {
       const cat = (li?.category || '').trim();
       if (!cat) continue; // untagged → ακριβώς η προ-P64 συμπεριφορά
