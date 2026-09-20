@@ -4,18 +4,37 @@ import { connectDB } from '@/lib/db';
 import { User as UserModel } from '@/models/User';
 import { currentModel } from '@/lib/tenancy/connection';
 import { verifyPassword } from '@/lib/auth';
-import { rateLimit, apiError, clientIp } from '@/lib/apiAuth';
+import { rateLimit, apiError, apiTenant, clientIp } from '@/lib/apiAuth';
+import { withTenant } from '@/lib/tenancy/current';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 /** POST /api/v1/auth/login  { username, password } → { token, user }
  *  The token is the user's bearer apiToken (created on first login); send it as
- *  `Authorization: Bearer <token>` on every other /api/v1 request. */
+ *  `Authorization: Bearer <token>` on every other /api/v1 request.
+ *
+ *  This is the one /api/v1 route that cannot use `withAuth` — it is where the token comes
+ *  FROM — and that is how it ended up as the only door with no workspace behind it (#210).
+ *  `currentModel(User)` with no ambient tenant resolves to the DEFAULT connection, so on a
+ *  hosted workspace's subdomain the credentials were checked against the registry database
+ *  rather than that workspace's `users`: every hosted customer's API login failed, and any
+ *  account that did live in the default database got a token minted on the wrong host.
+ *
+ *  So it establishes the tenant the same way `withAuth` does, from the HOST alone — the one
+ *  rule that works before a credential exists. Self-hosted returns the default tenant with no
+ *  extra work, exactly as before. */
 export async function POST(req: NextRequest) {
   const limited = rateLimit(`login:${clientIp(req)}`);
   if (limited) return limited;
 
+  const tenant = await apiTenant();
+  if ('error' in tenant) return apiError(tenant.error, tenant.status);
+
+  // Inline rather than a `login(req)` helper on purpose: `openapi.request.test.ts` detects spec
+  // drift by scanning the EXPORTED handler's own body for the fields it reads, so moving the
+  // body parsing into a helper makes this route look like it accepts nothing at all.
+  return withTenant(tenant, async () => {
   let body: { username?: string; password?: string };
   try {
     body = await req.json();
@@ -43,5 +62,6 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({
     token,
     user: { id: String(user._id), name: user.name || user.username, username: user.username, role: user.role },
+  });
   });
 }
