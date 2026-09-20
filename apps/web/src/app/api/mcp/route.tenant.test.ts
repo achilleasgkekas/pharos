@@ -33,7 +33,11 @@ vi.mock('@/lib/tenancy/connection', () => ({
   },
 }));
 vi.mock('@/app/aiTools', () => ({
-  TOOLS: [{ name: 'add_task', description: 'd', input_schema: {} }],
+  TOOLS: [
+    { name: 'add_task', description: 'd', input_schema: {} },
+    { name: 'get_overview', description: 'd', input_schema: {} },
+  ],
+  toolWrites: (name: string) => name === 'add_task',
   execute: async (name: string, args: Record<string, unknown>) => {
     const { currentTenant } = await import('@/lib/tenancy/current');
     const ctx = currentTenant();
@@ -68,7 +72,8 @@ function req(body: unknown, token = 'tok-acme'): NextRequest {
   } as unknown as NextRequest;
 }
 
-const foundUser = { select: () => ({ lean: async () => ({ _id: 'u1' }) }) };
+const userWithRole = (role: string) => ({ select: () => ({ lean: async () => ({ _id: 'u1', role }) }) });
+const foundUser = userWithRole('member');
 const noUser = { select: () => ({ lean: async () => null }) };
 
 beforeEach(() => {
@@ -123,5 +128,49 @@ describe('/api/mcp — the second bearer door resolves its workspace like /api/v
     expect(res.status).toBe(200);
     expect(seenTenantAtLookup).toEqual(['default']);
     expect(seenTenantAtExecute).toEqual(['default']);
+  });
+});
+
+// P31 — the read-only role has to be enforced at THIS door. The tools call server actions whose
+// `assertCanWrite()` resolves the session from cookies and passes silently when there is none
+// (so cron and background jobs can write); an MCP request has a bearer token and no cookie, so
+// every one of those guards saw "no session" and let the write through (#192).
+describe('/api/mcp — a read-only token may query but not change anything', () => {
+  it('refuses a write tool for a viewer, before the tool runs', async () => {
+    findOneMock.mockReturnValue(userWithRole('viewer'));
+    const res = await POST(req({ jsonrpc: '2.0', id: 10, method: 'tools/call', params: { name: 'add_task', arguments: { title: 't' } } }));
+    const body = await res.json();
+    expect(body.error.message).toBe('Your account has read-only access');
+    expect(executeMock).not.toHaveBeenCalled();
+    expect(seenTenantAtExecute).toEqual([]);
+  });
+
+  it('still lets that viewer run a read tool', async () => {
+    findOneMock.mockReturnValue(userWithRole('viewer'));
+    const res = await POST(req({ jsonrpc: '2.0', id: 11, method: 'tools/call', params: { name: 'get_overview', arguments: {} } }));
+    const body = await res.json();
+    expect(body.error).toBeUndefined();
+    expect(executeMock).toHaveBeenCalledWith('get_overview', {});
+  });
+
+  it('members and admins write exactly as before', async () => {
+    for (const role of ['member', 'admin']) {
+      executeMock.mockClear();
+      findOneMock.mockReturnValue(userWithRole(role));
+      await POST(req({ jsonrpc: '2.0', id: 12, method: 'tools/call', params: { name: 'add_task', arguments: { title: 't' } } }));
+      expect(executeMock, role).toHaveBeenCalled();
+    }
+  });
+
+  // A stored role we cannot interpret must lose privileges, never gain them — the same rule
+  // `verifySession` follows for a token's claim.
+  it('treats an unknown or missing stored role as a viewer', async () => {
+    for (const role of ['superuser', '', undefined as unknown as string]) {
+      executeMock.mockClear();
+      findOneMock.mockReturnValue(userWithRole(role));
+      const res = await POST(req({ jsonrpc: '2.0', id: 13, method: 'tools/call', params: { name: 'add_task', arguments: {} } }));
+      expect((await res.json()).error.message, String(role)).toBe('Your account has read-only access');
+      expect(executeMock).not.toHaveBeenCalled();
+    }
   });
 });

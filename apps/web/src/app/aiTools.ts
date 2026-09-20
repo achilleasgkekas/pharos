@@ -232,6 +232,38 @@ export const TOOLS: AnthropicTool[] = [
   },
 ];
 
+/**
+ * Which tools CHANGE something. The read-only role (P31) is decided by the caller's identity,
+ * which only the entry point knows — `execute()` itself runs with whatever credential got it
+ * there — so each door consults this set before dispatching.
+ *
+ * It is a deny-list of names rather than a flag on the tool objects because `AnthropicTool` is
+ * the SDK's type and carries no room for one. `everyToolIsClassified` in the test file pins the
+ * gap that would otherwise open: a new tool added to `TOOLS` and forgotten here would read as a
+ * harmless query and be handed to viewers.
+ *
+ * `assertCanWrite()` cannot cover this on its own. It resolves the session from cookies and
+ * passes silently when there is none — deliberately, so background jobs and cron keep working —
+ * and an MCP call carries a bearer token and no cookie, so every write guard downstream saw
+ * "no session" and waved it through.
+ */
+export const WRITE_TOOLS: ReadonlySet<string> = new Set([
+  'add_expense',
+  'add_income',
+  'add_subscription',
+  'add_task',
+  'add_to_list',
+  'add_item',
+  'log_price',
+  'update_record',
+  'delete_record',
+]);
+
+/** Read-only tools: everything the registry offers that is not in `WRITE_TOOLS`. */
+export function toolWrites(name: string): boolean {
+  return WRITE_TOOLS.has(name);
+}
+
 function s(input: Record<string, unknown>, key: string): string {
   const v = input[key];
   return typeof v === 'string' ? v : '';

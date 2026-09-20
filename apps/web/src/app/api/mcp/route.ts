@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectDB } from '@/lib/db';
 import { User as UserModel } from '@/models/User';
-import { TOOLS, execute } from '@/app/aiTools';
+import { TOOLS, execute, toolWrites } from '@/app/aiTools';
 import { apiTenant } from '@/lib/apiAuth';
+import { canWrite, parseRole, READ_ONLY_MESSAGE, type Role } from '@/lib/roles';
 import { currentModel } from '@/lib/tenancy/connection';
 import { withTenant } from '@/lib/tenancy/current';
 
@@ -26,15 +27,26 @@ const SERVER_INFO = { name: 'pharos', version: '1.0.0' };
 const PROTOCOL_VERSION = '2025-06-18';
 
 /** Runs inside the ambient tenant established by `POST`, so the token is looked up in THAT
- *  workspace's `users` collection. A token minted in workspace A does not exist in B's database. */
-async function authed(req: NextRequest): Promise<boolean> {
+ *  workspace's `users` collection. A token minted in workspace A does not exist in B's database.
+ *
+ *  Returns the token's ROLE, not just yes/no: this door has to decide P31 read-only access by
+ *  itself. `assertCanWrite()`, which guards every server action the tools call, resolves the
+ *  session from COOKIES and passes silently when there is none — on purpose, so background jobs
+ *  and cron can write — and an MCP request carries a bearer token and no cookie. So every write
+ *  guard downstream saw "no session" and waved the call through, and a read-only account's token
+ *  could add, edit and delete records (#192). The role the token belongs to is the only thing
+ *  that can answer that here, so it is read together with the token. */
+async function authed(req: NextRequest): Promise<Role | null> {
   const m = (req.headers.get('authorization') || '').match(/^Bearer\s+(.+)$/i);
   const token = m?.[1]?.trim();
-  if (!token) return false;
+  if (!token) return null;
   await connectDB();
   const User = await currentModel(UserModel);
-  const u = await User.findOne({ apiToken: token }).select('_id').lean();
-  return !!u;
+  const u = (await User.findOne({ apiToken: token }).select('role').lean()) as { role?: string } | null;
+  if (!u) return null;
+  // An unknown/missing stored role reads as `viewer`, the least privileged — same rule as
+  // `verifySession`: a value we cannot interpret may only ever lose privileges.
+  return parseRole(u.role) ?? 'viewer';
 }
 
 function rpc(id: unknown, result: unknown) {
@@ -59,7 +71,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 }
 
 async function handle(req: NextRequest): Promise<NextResponse> {
-  if (!(await authed(req))) {
+  const role = await authed(req);
+  if (!role) {
     return NextResponse.json({ jsonrpc: '2.0', id: null, error: { code: -32001, message: 'Unauthorized' } }, { status: 401 });
   }
 
@@ -87,6 +100,9 @@ async function handle(req: NextRequest): Promise<NextResponse> {
       const name = typeof params?.name === 'string' ? params.name : '';
       const args = (params?.arguments && typeof params.arguments === 'object' ? params.arguments : {}) as Record<string, unknown>;
       if (!TOOLS.some((t) => t.name === name)) return rpcError(id, -32602, `Unknown tool: ${name}`);
+      // P31: a read-only token may query, never change. Refused HERE rather than inside the
+      // tools, because the cookie-based guard they use cannot see a bearer caller at all.
+      if (toolWrites(name) && !canWrite(role)) return rpcError(id, -32001, READ_ONLY_MESSAGE);
       const r = await execute(name, args);
       return rpc(id, { content: [{ type: 'text', text: `${r.summary ? r.summary + ' — ' : ''}${r.content}` }] });
     }

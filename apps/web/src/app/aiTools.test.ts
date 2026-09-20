@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { TOOLS, today } from './aiTools';
+import { TOOLS, WRITE_TOOLS, today, toolWrites } from './aiTools';
 
 // aiTools.ts is the shared AI tool registry: both the chat command bar (runAiCommand) and the
 // MCP route dispatch against this exact `TOOLS` array, and Anthropic tool-calling validates the
@@ -11,6 +11,10 @@ import { TOOLS, today } from './aiTools';
 
 // Canonical tool-name set (mirrors the source). Adding/removing/renaming a tool must update this
 // list too — that is the point: the registry is a contract the command bar + MCP clients depend on.
+// The other half of the classification: tools that only read. Kept explicit so that neither
+// list can absorb a new tool by default.
+const READ_ONLY_NAMES = ['get_overview', 'search_data'];
+
 const EXPECTED_NAMES = [
   'add_expense',
   'add_income',
@@ -121,5 +125,32 @@ describe('today()', () => {
 
   it('matches the current UTC date (the ISO date slice)', () => {
     expect(today()).toBe(new Date().toISOString().slice(0, 10));
+  });
+});
+
+// P31: the MCP door asks `toolWrites(name)` to decide whether a read-only token may run a tool.
+// The classification lives beside the registry rather than on the tool objects (AnthropicTool is
+// the SDK's type), which leaves one gap worth pinning: a tool added to TOOLS and forgotten here
+// would read as a harmless query and be handed to viewers. Fail on that, loudly, at commit time.
+describe('every tool is classified as reading or writing', () => {
+  it('no tool in the registry is unclassified', () => {
+    const unclassified = TOOLS.map((t) => t.name).filter(
+      (name) => !WRITE_TOOLS.has(name) && !READ_ONLY_NAMES.includes(name),
+    );
+    expect(unclassified, 'add each new tool to WRITE_TOOLS or to READ_ONLY_NAMES in this test').toEqual([]);
+  });
+
+  it('WRITE_TOOLS names only tools that exist', () => {
+    const names = TOOLS.map((t) => t.name);
+    expect([...WRITE_TOOLS].filter((n) => !names.includes(n))).toEqual([]);
+  });
+
+  it('classifies the mutating verbs as writes and the queries as reads', () => {
+    expect(toolWrites('add_expense')).toBe(true);
+    expect(toolWrites('update_record')).toBe(true);
+    expect(toolWrites('delete_record')).toBe(true);
+    expect(toolWrites('get_overview')).toBe(false);
+    expect(toolWrites('search_data')).toBe(false);
+    expect(toolWrites('no_such_tool')).toBe(false);
   });
 });
