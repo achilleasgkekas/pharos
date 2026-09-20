@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { equalSplit } from '@/lib/split';
+import { paymentSplitRemainder, paymentSplitsBalance } from '@/lib/paymentSplit';
 import { convertToBase } from '@/lib/fx';
 
 const {
@@ -113,5 +114,31 @@ describe('equal splitting foreign-currency expenses', () => {
     expect(set.amount).toBe(170); // 170 EUR
     expect(set.split[0].share).toBe(56.66);
     expect(set.split[1].share).toBe(56.66);
+  });
+});
+
+// #205 — the SAME mistake as above, one line further down the form. The per-person split was
+// taught to work in base currency; the PAYMENT split (which method paid, and from which gift
+// card) kept receiving the printed foreign figure. It matters more here than for a per-person
+// share, because a gift card's balance is real stored money in base currency: `syncGiftCardUses`
+// deducts the split amount straight off the card.
+describe('payment splits are allocated against the BASE amount', () => {
+  const printedAmount = 1000;   // ¥1000
+  const rate = 0.0061;          // EUR per JPY
+  const baseAmount = convertToBase(printedAmount, rate); // ≈ €6.10
+
+  it('a split that covers the purchase balances against the base amount, not the printed one', () => {
+    const splits = [{ method: 'Gift card', amount: baseAmount, giftCardId: 'g1' }];
+    expect(paymentSplitsBalance(baseAmount, splits)).toBe(true);
+    // Judged against the printed figure, the very same full payment looks like a ¥993 shortfall —
+    // which is what the editor showed, and what the pre-filled "rest" row then offered to charge.
+    expect(paymentSplitsBalance(printedAmount, splits)).toBe(false);
+  });
+
+  it('the remainder a fresh row pre-fills is the base amount left, not the printed amount left', () => {
+    expect(paymentSplitRemainder(baseAmount, [])).toBeCloseTo(6.1, 2);
+    // The old behaviour: a new row arrived pre-filled with 1000, and accepting it drained €1000
+    // off a card holding euros.
+    expect(paymentSplitRemainder(printedAmount, [])).toBe(1000);
   });
 });
