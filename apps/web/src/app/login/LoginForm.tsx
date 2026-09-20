@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { PharosMark } from '@/components/PharosMark';
 import { useT } from '@/components/LocaleProvider';
-import { mfaLoginCodeReady } from '@/components/saas/mfaSettings';
+import { mfaLoginCodeReady } from '@/lib/mfaSettings';
 
 // Only follow same-origin paths, never protocol-relative (//evil.com) or absolute URLs.
 function safeNext(next: string | null): string {

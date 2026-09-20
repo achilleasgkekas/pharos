@@ -9,7 +9,35 @@
 // Matched by SUBSTRING on the model id, most-specific first, so a dated id like
 // `claude-sonnet-4-5-20250929` still resolves. Unknown models fall back to a Sonnet-class
 // estimate rather than 0, so an untabled model is never treated as free.
-import { estimateCostMicros, type AiRate } from './billing/aiCost';
+/**
+ * Per-million-token rate, in currency micros: `inputPerMTok` is the price of one MILLION input
+ * tokens expressed in micros (e.g. $3 per 1M tokens → 3_000_000). Micros are integers, so a
+ * running total never drifts the way summed floats do.
+ *
+ * This and `estimateCostMicros` below lived in `lib/billing/aiCost.ts`, written for per-tenant
+ * metering. That folder went with the SaaS; this file was its only remaining caller, so the two
+ * pieces moved in rather than keeping a module alive for them.
+ */
+export type AiRate = { inputPerMTok: number; outputPerMTok: number };
+
+/** Coerce one field to a non-negative integer; non-finite/negative/non-number → `fallback`. */
+function nonNegInt(value: unknown, fallback: number): number {
+  const n = Number(value);
+  return Number.isFinite(n) && n >= 0 ? Math.floor(n) : fallback;
+}
+
+/**
+ * Estimate the cost of a call in currency micros from its token counts and a rate. Returns an
+ * integer (floored); garbage or negative token counts are clamped to 0 rather than producing a
+ * negative charge.
+ */
+export function estimateCostMicros(inputTokens: number, outputTokens: number, rate: AiRate): number {
+  const inTok = nonNegInt(inputTokens, 0);
+  const outTok = nonNegInt(outputTokens, 0);
+  const micros = (inTok * nonNegInt(rate?.inputPerMTok, 0)) / 1_000_000
+    + (outTok * nonNegInt(rate?.outputPerMTok, 0)) / 1_000_000;
+  return Math.max(0, Math.floor(micros));
+}
 
 const M = 1_000_000;
 
