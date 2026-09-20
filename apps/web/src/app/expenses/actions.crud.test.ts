@@ -160,6 +160,20 @@ describe('updateExpense', () => {
     const res = await updateExpense('e1', { date: '2026-06-15' } as any);
     expect(res).toEqual({ ok: false, error: 'connection lost' });
   });
+
+  it('preserves existing seriesId when updating a recurring expense', async () => {
+    expenseFindOneSortLean.mockResolvedValueOnce({ recurring: true, seriesId: 'past-series-id' });
+    await updateExpense('e1', { date: '2026-06-15', recurring: true } as any);
+    const set = expenseUpdateOne.mock.calls[0][1].$set;
+    expect(set.seriesId).toBe('past-series-id');
+  });
+
+  it('leaves seriesId blank when making a non-recurring expense recurring', async () => {
+    expenseFindOneSortLean.mockResolvedValueOnce({ recurring: false });
+    await updateExpense('e1', { date: '2026-06-15', recurring: true } as any);
+    const set = expenseUpdateOne.mock.calls[0][1].$set;
+    expect(set.seriesId).toBe('');
+  });
 });
 
 // Multi-currency (P9). The conversion rule itself is pinned in lib/fx.test.ts; what matters
@@ -254,7 +268,7 @@ describe('addExpense', () => {
   });
 
   it('falls back to the inherited series category when no rule matches', async () => {
-    expenseFindOneSortLean.mockResolvedValue({ category: 'utilities-inherited', recurring: true, recurringCycle: 'quarterly', space: 'cottage', taxDeductible: true, taxCategory: 'medical' });
+    expenseFindOneSortLean.mockResolvedValue({ category: 'utilities-inherited', recurring: true, recurringCycle: 'quarterly', space: 'cottage', taxDeductible: true, taxCategory: 'medical', seriesId: 'past-series-id' });
     await addExpense({ date: '2026-06-15', vendor: 'Unknown Vendor', category: 'other' } as any);
     const doc = expenseCreate.mock.calls[0][0];
     expect(doc.category).toBe('utilities-inherited');
@@ -263,6 +277,15 @@ describe('addExpense', () => {
     expect(doc.space).toBe('cottage');
     expect(doc.taxDeductible).toBe(true);
     expect(doc.taxCategory).toBe('medical');
+    expect(doc.seriesId).toBe('past-series-id');
+  });
+
+  it('leaves seriesId blank for a new recurring series (to group natively by kind|vendorKey without breaking projections)', async () => {
+    getAppSettingsMock.mockResolvedValue({ categoryRules: [{ ...RULE_DEI, recurring: true, recurringCycle: 'monthly' }] });
+    await addExpense({ date: '2026-06-15', vendor: 'ΔΕΗ', category: 'other' } as any);
+    const doc = expenseCreate.mock.calls[0][0];
+    expect(doc.recurring).toBe(true);
+    expect(doc.seriesId).toBe('');
   });
 
   it('defaults to "other" when there is neither a rule nor a prior series', async () => {

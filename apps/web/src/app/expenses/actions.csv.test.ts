@@ -344,6 +344,23 @@ describe('importExpensesCsv — category/recurring resolution chain', () => {
     expect(doc.category).toBe('other');
     expect(doc.recurring).toBe(false);
     expect(doc.recurringCycle).toBe('');
+    expect(doc.seriesId).toBe('');
+  });
+
+  it('inherits seriesId from a prior recurring series if it exists (so existing parallel series keep their identity)', async () => {
+    expenseFindOneLean.mockResolvedValue({ recurring: true, recurringCycle: 'monthly', seriesId: 'past-series-id' });
+    await importExpensesCsv([row({ vendor: 'Apple', category: '' })], { kind: 'expense', signSplit: false });
+    const doc = expenseInsertMany.mock.calls[0][0][0];
+    expect(doc.recurring).toBe(true);
+    expect(doc.seriesId).toBe('past-series-id');
+  });
+
+  it('leaves seriesId blank for a new recurring series (to group natively by kind|vendorKey without breaking projections)', async () => {
+    getAppSettingsMock.mockResolvedValue({ categoryRules: [RULE_DEI], currency: 'EUR' });
+    await importExpensesCsv([row({ vendor: 'ΔΕΗ', category: '' })], { kind: 'expense', signSplit: false });
+    const doc = expenseInsertMany.mock.calls[0][0][0];
+    expect(doc.recurring).toBe(true);
+    expect(doc.seriesId).toBe('');
   });
 
   it('caches the inherited-series lookup per unique kind+vendorKey (one findOne for two same-vendor rows)', async () => {

@@ -1,6 +1,5 @@
 'use server';
 import { connectDB } from '@/lib/db';
-import { randomUUID } from 'node:crypto';
 import { Expense as ExpenseModel } from '@/models/Expense';
 import { withRequestTenant } from '@/lib/tenancy/request';
 import { currentModel } from '@/lib/tenancy/connection';
@@ -110,12 +109,12 @@ export async function scanExpenseImage(formData: FormData): Promise<ScanExpenseR
 
 /** Inherit category / recurring from an existing record of the same vendor (the
  *  "continuity" the user asked for: a new ΔΕΗ bill joins the existing ΔΕΗ series). */
-async function inheritFromSeries(kind: Kind, vKey: string): Promise<{ category?: string; recurring?: boolean; recurringCycle?: string; space?: string; taxDeductible?: boolean; taxCategory?: string } | null> {
+async function inheritFromSeries(kind: Kind, vKey: string): Promise<{ category?: string; recurring?: boolean; recurringCycle?: string; space?: string; taxDeductible?: boolean; taxCategory?: string; seriesId?: string } | null> {
   if (!vKey) return null;
   const Expense = await currentModel(ExpenseModel);
   const prev = await Expense.findOne({ kind, vendorKey: vKey }).sort({ date: -1 }).lean();
   if (!prev) return null;
-  return { category: prev.category, recurring: prev.recurring, recurringCycle: prev.recurringCycle, space: prev.space, taxDeductible: prev.taxDeductible, taxCategory: prev.taxCategory };
+  return { category: prev.category, recurring: prev.recurring, recurringCycle: prev.recurringCycle, space: prev.space, taxDeductible: prev.taxDeductible, taxCategory: prev.taxCategory, seriesId: prev.seriesId };
 }
 
 function periodFrom(date: Date, parsedPeriod?: string): string {
@@ -275,7 +274,7 @@ export async function uploadExpense(formData: FormData): Promise<UploadExpenseRe
       period: periodFrom(date, parsed?.period),
       recurring: rule?.recurring || inherited?.recurring || false,
       recurringCycle: (rule?.recurringCycle || parsed?.recurringCycle || inherited?.recurringCycle || '') as RecurringCycle,
-      seriesId: (rule?.recurring || inherited?.recurring) ? randomUUID() : '',
+      seriesId: (rule?.recurring || inherited?.recurring) ? (inherited?.seriesId || '') : '',
       paymentMethod: parsed?.paymentMethod || '',
       filePath: relativePath,
       fileType: file.type || (isPdf ? 'application/pdf' : `image/${ext}`),
@@ -360,7 +359,7 @@ export async function updateExpense(id: string, data: z.input<typeof UpdateSchem
     const fx = resolveFx({ amount: d.amount, currency: d.currency, fxRate: d.fxRate }, (await getAppSettings()).currency);
     
     const seriesId = d.recurring
-      ? (existing?.recurring ? existing.seriesId : randomUUID())
+      ? (existing?.recurring ? existing.seriesId : '')
       : '';
       
     await Expense.updateOne(
@@ -436,7 +435,7 @@ export async function addExpense(data: z.input<typeof UpdateSchema>): Promise<{ 
       period: d.period || periodFrom(date),
       recurring: d.recurring || rule?.recurring || inherited?.recurring || false,
       recurringCycle: d.recurringCycle || rule?.recurringCycle || (inherited?.recurringCycle as typeof d.recurringCycle) || '',
-      seriesId: (d.recurring || rule?.recurring || inherited?.recurring) ? randomUUID() : '',
+      seriesId: (d.recurring || rule?.recurring || inherited?.recurring) ? (inherited?.seriesId || '') : '',
       paymentMethod: d.paymentMethod,
       notes: d.notes,
       split: cleanSplit(d.split),
@@ -647,7 +646,7 @@ export async function importExpensesCsv(
           period: periodFrom(date),
           recurring: rule?.recurring || inh?.recurring || false,
           recurringCycle: (rule?.recurringCycle || inh?.recurringCycle || '') as RecurringCycle,
-          seriesId: (rule?.recurring || inh?.recurring) ? randomUUID() : '',
+          seriesId: (rule?.recurring || inh?.recurring) ? (inh?.seriesId || '') : '',
           notes: r.notes,
           aiModel: 'csv-import',
           verified: true, // deterministic bank data, not an AI guess — no review queue
