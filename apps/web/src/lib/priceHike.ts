@@ -11,6 +11,7 @@ export type HikeEntry = {
   vendor?: string | null;
   vendorKey?: string | null;
   amount?: number | null;
+  origAmount?: number | null;
   date?: string | Date | null;
   recurring?: boolean | null;
   kind?: string | null;
@@ -71,17 +72,22 @@ export function detectPriceHikes(
   const minAbs = opts.minAbs != null && opts.minAbs >= 0 ? opts.minAbs : 1;
   const minEntries = Math.max(2, Math.floor(opts.minEntries ?? 3));
 
-  type Row = { amount: number; t: number; date: string; vendor: string; recurring: boolean };
+  // `printed` records WHICH figure `amount` holds: the foreign figure off the paper
+  // (`origAmount`) or the base-currency one. Two charges are only comparable when they are the
+  // same kind of number — see the guard below.
+  type Row = { amount: number; printed: boolean; t: number; date: string; vendor: string; recurring: boolean };
   const byKey = new Map<string, Row[]>();
   for (const r of rows ?? []) {
     if (r.kind === 'income') continue;
     const key = (r.vendorKey || '').trim();
-    const amount = Number(r.amount ?? 0);
+    const origAmount = Number(r.origAmount ?? 0);
+    const amount = origAmount > 0 ? origAmount : Number(r.amount ?? 0);
     const t = ts(r.date);
     if (!key || !(amount > 0) || t == null) continue;
     const arr = byKey.get(key) ?? [];
     arr.push({
       amount,
+      printed: origAmount > 0,
       t,
       date: new Date(t).toISOString(),
       vendor: (r.vendor || '').trim(),
@@ -100,6 +106,11 @@ export function detectPriceHikes(
     const curr = arr[arr.length - 1];
     const prev = arr[arr.length - 2];
     if (!(prev.amount > 0)) continue;
+    // One charge in the currency the vendor prints and the other in base currency are not two
+    // prices, they are two different units. A series that switches billing currency would
+    // otherwise report the conversion as a hike — the very class of false positive this change
+    // is about. Say nothing until the series is back to comparing like with like.
+    if (curr.printed !== prev.printed) continue;
 
     const deltaAbs = curr.amount - prev.amount;
     const deltaPct = Math.round((deltaAbs / prev.amount) * 100);
