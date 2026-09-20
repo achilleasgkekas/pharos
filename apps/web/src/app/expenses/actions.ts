@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 'use server';
 import { connectDB } from '@/lib/db';
 import { Expense as ExpenseModel } from '@/models/Expense';
@@ -109,12 +110,29 @@ export async function scanExpenseImage(formData: FormData): Promise<ScanExpenseR
 
 /** Inherit category / recurring from an existing record of the same vendor (the
  *  "continuity" the user asked for: a new ΔΕΗ bill joins the existing ΔΕΗ series). */
-async function inheritFromSeries(kind: Kind, vKey: string): Promise<{ category?: string; recurring?: boolean; recurringCycle?: string; space?: string; taxDeductible?: boolean; taxCategory?: string; seriesId?: string } | null> {
+async function inheritFromSeries(kind: Kind, vKey: string, amount?: number): Promise<{ category?: string; recurring?: boolean; recurringCycle?: string; space?: string; taxDeductible?: boolean; taxCategory?: string; seriesId?: string } | null> {
   if (!vKey) return null;
   const Expense = await currentModel(ExpenseModel);
   const prev = await Expense.findOne({ kind, vendorKey: vKey }).sort({ date: -1 }).lean();
   if (!prev) return null;
-  return { category: prev.category, recurring: prev.recurring, recurringCycle: prev.recurringCycle, space: prev.space, taxDeductible: prev.taxDeductible, taxCategory: prev.taxCategory, seriesId: prev.seriesId };
+
+  let seriesId = prev.seriesId;
+
+  if (amount !== undefined && amount > 0) {
+    if (prev.amount === amount) {
+      seriesId = prev.seriesId;
+    } else {
+      const exactMatch = await Expense.findOne({ kind, vendorKey: vKey, amount, recurring: true }).sort({ date: -1 }).lean();
+      if (exactMatch) {
+        seriesId = exactMatch.seriesId;
+      } else {
+        // Did not match any existing series amount. Create a new parallel series id.
+        seriesId = randomUUID().replace(/-/g, '').slice(0, 24);
+      }
+    }
+  }
+
+  return { category: prev.category, recurring: prev.recurring, recurringCycle: prev.recurringCycle, space: prev.space, taxDeductible: prev.taxDeductible, taxCategory: prev.taxCategory, seriesId };
 }
 
 function periodFrom(date: Date, parsedPeriod?: string): string {
@@ -248,7 +266,7 @@ export async function uploadExpense(formData: FormData): Promise<UploadExpenseRe
     const date = safeDate(parsed?.date);
     const vendor = parsed?.vendor || '';
     const vKey = vendorKey(vendor);
-    const inherited = await inheritFromSeries(kind, vKey);
+    const inherited = await inheritFromSeries(kind, vKey, parsed?.amount);
     // Deterministic vendor→category auto-rule (P15). A user-defined rule is an explicit
     // instruction, so it wins over the AI guess and any inherited series category.
     const settings = await getAppSettings();
@@ -412,7 +430,7 @@ export async function addExpense(data: z.input<typeof UpdateSchema>): Promise<{ 
     const Expense = await currentModel(ExpenseModel);
     const date = safeDate(d.date);
     const splits = cleanPaymentSplits(d.paymentSplits);
-    const inherited = await inheritFromSeries(d.kind, vendorKey(d.vendor));
+    const inherited = await inheritFromSeries(d.kind, vendorKey(d.vendor), d.amount);
     // Apply a vendor→category auto-rule (P15) only when the user did NOT pick a category
     // (the form defaults to 'other'); an explicit choice always wins.
     const explicit = d.category && d.category !== 'other' ? d.category : '';
@@ -613,9 +631,9 @@ export async function importExpensesCsv(
 
       // Series inheritance (category/recurring) per vendor — one query per unique key.
       const inheritCache = new Map<string, Awaited<ReturnType<typeof inheritFromSeries>>>();
-      async function inherited(rowKind: Kind, vKey: string) {
-        const k = `${rowKind}|${vKey}`;
-        if (!inheritCache.has(k)) inheritCache.set(k, await inheritFromSeries(rowKind, vKey));
+      async function inherited(rowKind: Kind, vKey: string, amount: number) {
+        const k = `${rowKind}|${vKey}|${amount}`;
+        if (!inheritCache.has(k)) inheritCache.set(k, await inheritFromSeries(rowKind, vKey, amount));
         return inheritCache.get(k) ?? null;
       }
 
@@ -630,7 +648,7 @@ export async function importExpensesCsv(
         if (seen.has(r.key)) { skippedDupes++; continue; }
         seen.add(r.key); // intra-batch dedupe too
         if (r.fx.needsRate) needsRate++;
-        const inh = r.category ? null : await inherited(r.kind, r.vKey);
+        const inh = r.category ? null : await inherited(r.kind, r.vKey, r.amount);
         const rule = r.category ? null : matchCategoryRule(categoryRules, { vendor: r.vendor, description: r.notes });
         const date = new Date(`${r.date}T00:00:00Z`);
         docs.push({
