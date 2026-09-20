@@ -24,7 +24,16 @@ const BillFormSchema = z.object({
   vendor: z.string().default(''),
   // P9: read as the PRINTED figure. resolveFx() converts it to base currency below.
   amount: z.coerce.number().min(0).default(0),
-  currency: z.string().default('EUR'),
+  // Blank, not 'EUR'. The form only renders a currency picker when multi-currency is ON, so with
+  // it off the field never arrives — and a hardcoded 'EUR' default then declared the bill FOREIGN
+  // for anyone whose base currency is not the euro. `resolveFx` saw EUR ≠ GBP with no rate, so it
+  // stored the printed amount untouched, flagged `needsRate`, and the bill quietly stopped being
+  // comparable with everything else in the ledger (#230).
+  //
+  // A blank currency is the codebase's word for "not foreign" (see `isForeignCurrency`), which is
+  // exactly what a single-currency deployment means, and it is what the expense schema already
+  // defaults to. Nothing changes for a euro base, or for any form that does send a currency.
+  currency: z.string().default(''),
   // Base units per 1 unit of `currency`; 0/absent = single-currency form (or rate still unknown).
   fxRate: z.coerce.number().min(0).default(0),
   dueDate: z.string().min(1, 'Due date required'),
@@ -309,10 +318,21 @@ export async function removeBillPayment(id: string, paymentId: string): Promise<
     const bill = await Bill.findById(id).lean();
     if (!bill) return { ok: false, error: 'Bill not found' };
 
+    // Whether the instalments THEMSELVES covered the bill before this removal. That is the only
+    // thing that distinguishes the two ways a bill gets a `paidAt`: an automatic settlement, which
+    // this function is allowed to roll back, and a deliberate "Mark paid" click, which it is not —
+    // removing a stray instalment must never quietly un-pay a bill the user said was paid.
+    const wasSettledByPayments = billIsSettledByPayments(bill.amount, bill.payments);
+
     await Bill.updateOne({ _id: id }, { $pull: { payments: { _id: paymentId } } });
 
+    // The guard used to be `after.payments.length > 0`, which reached for the same distinction and
+    // missed the one case that matters most: removing the LAST payment, i.e. undoing a settlement
+    // made by a single instalment that covered the whole bill. The count dropped to 0, the
+    // condition failed, and the bill stayed marked paid with nothing paid against it — the exact
+    // opposite of what this function's own comment promises (#203).
     const after = await Bill.findById(id).lean();
-    if (after?.paidAt && (after.payments?.length ?? 0) > 0 && !billIsSettledByPayments(after.amount, after.payments)) {
+    if (after?.paidAt && wasSettledByPayments && !billIsSettledByPayments(after.amount, after.payments)) {
       await Bill.updateOne({ _id: id }, { $set: { paidAt: null } });
     }
     revalidatePath('/bills');
