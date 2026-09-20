@@ -1424,8 +1424,12 @@ function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Inf
   const [secure, setSecure] = useState(storage.remoteSecure);
   const [msg, setMsg] = useState<string | null>(null);
   const [test, setTest] = useState<string | null>(null);
-  // The panel is server-rendered, so a sync that just succeeded would still show the
-  // OLD "last synced" date until a reload. Flip it locally instead of forcing a refetch.
+  // The panel is server-rendered, so a sync that just succeeded would still show the OLD
+  // "last synced" date until a reload. Flip it locally instead of forcing a refetch.
+  //
+  // SMB/FTP only, since those finish inside this request and we know the outcome here. A
+  // OneDrive sync is now a background job: it is still running when this function returns, so
+  // there is nothing truthful to flip yet — /jobs is where its progress and result live.
   const [syncedNow, setSyncedNow] = useState(false);
   // P99: the optional second remote mirror (FTP/SMB only).
   const [m2Backend, setM2Backend] = useState<'' | 'ftp' | 'smb'>(storage.mirror2Backend);
