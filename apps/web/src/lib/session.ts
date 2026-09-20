@@ -6,7 +6,7 @@ import { SignJWT, jwtVerify } from 'jose';
 // One role table for the whole app (lib/roles.ts is pure, so importing it keeps this
 // module edge-safe). Re-exported because middleware and auth already import Role here.
 export type { Role } from './roles';
-import type { Role } from './roles';
+import { parseRole, type Role } from './roles';
 // `epoch` is the "sign out everywhere" counter (P91), embedded so the server-side auth
 // check can compare it to the user's current User.sessionEpoch. Optional: a token minted
 // before P91 (or by a caller that doesn't set it) carries none, and the check is skipped
@@ -70,7 +70,13 @@ export async function verifySession(token: string | undefined | null): Promise<S
     const { payload } = await jwtVerify(token, secret, { algorithms: ['HS256'] });
     const sub = typeof payload.sub === 'string' ? payload.sub : '';
     if (!sub) return null;
-    const role: Role = payload.role === 'admin' ? 'admin' : 'member';
+    // Read the role through the same table the write guards use. The old expression here was
+    // `payload.role === 'admin' ? 'admin' : 'member'`, which collapsed the THREE roles into two:
+    // every `viewer` token came back as a `member`, so `canWrite` said yes and the read-only role
+    // was a label with nothing behind it — exactly the failure lib/roles.ts warns about in its own
+    // header. `parseRole` keeps a known role as it is and turns anything else (missing, renamed,
+    // corrupt) into `viewer`, the least privileged: a bad token can only ever lose privileges.
+    const role: Role = parseRole(payload.role) ?? 'viewer';
     const name = typeof payload.name === 'string' ? payload.name : '';
     return {
       sub,

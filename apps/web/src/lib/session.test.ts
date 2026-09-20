@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { SignJWT } from 'jose';
+import { canWrite } from './roles';
 import {
   SESSION_COOKIE,
   SESSION_MAX_AGE,
@@ -195,7 +196,10 @@ describe('verifySession', () => {
     expect(await verifySession(token)).toBeNull();
   });
 
-  it('defaults an unknown / missing role to member (never silently admin)', async () => {
+  // A token's role decides whether `canWrite` says yes, so an unrecognised one has to fall to
+  // the LEAST privileged role, not the middle one. This assertion used to read `member`, and
+  // that is precisely how the viewer hole below survived: the test agreed with the bug.
+  it('defaults an unknown / missing role to viewer (never silently admin, never a writer)', async () => {
     const secret = new TextEncoder().encode(SECRET);
     const token = await new SignJWT({ role: 'superuser', name: 'A' })
       .setProtectedHeader({ alg: 'HS256' })
@@ -204,7 +208,23 @@ describe('verifySession', () => {
       .setExpirationTime('12h')
       .sign(secret);
     const out = await verifySession(token);
-    expect(out!.role).toBe('member');
+    expect(out!.role).toBe('viewer');
+  });
+
+  // The P31 read-only role only exists if it survives the round trip. `verifySession` used to
+  // ask `payload.role === 'admin' ? 'admin' : 'member'`, which handed every viewer a member's
+  // session — `canWrite('member')` is true, so a read-only account could write everything.
+  it('keeps a viewer a viewer, so the read-only role is actually read-only', async () => {
+    const token = await signSession({ sub: 'u', role: 'viewer', name: 'Guest' });
+    const out = await verifySession(token);
+    expect(out!.role).toBe('viewer');
+    expect(canWrite(out!.role)).toBe(false);
+  });
+
+  it('keeps each of the three roles distinct through sign → verify', async () => {
+    for (const role of ['viewer', 'member', 'admin'] as const) {
+      expect((await verifySession(await signSession({ sub: 'u', role, name: 'N' })))!.role).toBe(role);
+    }
   });
 
   it('tolerates a missing name (empty string, not undefined)', async () => {
