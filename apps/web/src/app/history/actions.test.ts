@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // app/history/actions.ts backs the /history page — the saved AI command-bar
 // conversation log. Behaviour pinned:
-//  - getConversations: Conversation.find({}).sort({updatedAt:-1}).limit(200).lean(),
+//  - getConversations: Conversation.find({ deletedAt: null }).sort({updatedAt:-1}).limit(200).lean(),
 //    mapped into ConversationRow — title/turns default when falsy ('Conversation'/0),
 //    updatedAt.toISOString(), messages default content/actions when missing, and
 //    `preview` is the LAST assistant message's content (searching from the end, not
@@ -47,10 +47,10 @@ beforeEach(() => {
 });
 
 describe('getConversations', () => {
-  it('queries newest-first, capped at 200, via connectDB → find({}).sort().limit(200).lean()', async () => {
+  it('queries newest-first, excluding soft-deleted, capped at 200, via connectDB → find({ deletedAt: null }).sort().limit(200).lean()', async () => {
     await getConversations();
     expect(connectDBMock).toHaveBeenCalledTimes(1);
-    expect(convFind).toHaveBeenCalledWith({});
+    expect(convFind).toHaveBeenCalledWith({ deletedAt: null });
     expect(findQuery.sort).toHaveBeenCalledWith({ updatedAt: -1 });
     expect(findQuery.limit).toHaveBeenCalledWith(200);
   });
