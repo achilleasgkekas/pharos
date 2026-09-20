@@ -51,7 +51,8 @@ const {
 const expenseModel = {
   create: expenseCreate,
   updateOne: expenseUpdateOne,
-  findOne: () => ({ sort: () => ({ lean: expenseFindOneSortLean }) }),
+  findOne: () => ({ sort: () => ({ lean: expenseFindOneSortLean }), lean: expenseFindOneSortLean }),
+  findById: () => ({ lean: expenseFindOneSortLean }),
   find: () => ({ select: () => ({ lean: expenseFindSelectLean }) }),
   bulkWrite: expenseBulkWrite,
 };

@@ -16,7 +16,13 @@ import { createHash } from 'node:crypto';
  * Deterministic in the series identity + the period, never the amount or the wording, so an edited
  * projection still occupies its slot.
  */
-export function recurringExpenseId(kind: string, vendorKey: string, period: string): string {
+export function recurringExpenseId(kind: string, vendorKey: string, period: string, seriesId?: string): string {
+  if (seriesId) {
+    return createHash('sha256')
+      .update(`recurring-expense:series:${seriesId}|${period}`)
+      .digest('hex')
+      .slice(0, 24);
+  }
   return createHash('sha256')
     .update(`recurring-expense:${kind}|${vendorKey}|${period}`)
     .digest('hex')

@@ -1,5 +1,6 @@
 'use server';
 import { connectDB } from '@/lib/db';
+import { randomUUID } from 'node:crypto';
 import { Expense as ExpenseModel } from '@/models/Expense';
 import { withRequestTenant } from '@/lib/tenancy/request';
 import { currentModel } from '@/lib/tenancy/connection';
@@ -143,12 +144,13 @@ export async function generateDueRecurring(): Promise<{ created: number }> {
     .sort({ date: -1 })
     .lean();
 
-  // Latest entry per series (kind|vendorKey); skip series with no vendorKey.
+  // Latest entry per series; prefer seriesId, fallback to kind|vendorKey.
+  // Skip series with no vendorKey unless they have a seriesId.
   const seen = new Set<string>();
   const seeds: typeof recurring = [];
   for (const e of recurring) {
-    const k = `${e.kind}|${e.vendorKey}`;
-    if (!e.vendorKey || seen.has(k)) continue;
+    const k = e.seriesId ? `series|${e.seriesId}` : `${e.kind}|${e.vendorKey}`;
+    if ((!e.vendorKey && !e.seriesId) || seen.has(k)) continue;
     seen.add(k);
     seeds.push(e);
   }
@@ -167,7 +169,7 @@ export async function generateDueRecurring(): Promise<{ created: number }> {
       const period = periodFrom(next);
       try {
         await Expense.create({
-          _id: recurringExpenseId(String(seed.kind), String(seed.vendorKey), period),
+          _id: recurringExpenseId(String(seed.kind), String(seed.vendorKey), period, seed.seriesId),
           kind: seed.kind,
           vendor: seed.vendor,
           vendorKey: seed.vendorKey,
@@ -183,6 +185,7 @@ export async function generateDueRecurring(): Promise<{ created: number }> {
           period,
           recurring: true,
           recurringCycle: seed.recurringCycle,
+          seriesId: seed.seriesId || '',
           aiModel: 'recurring-auto',
           verified: false,
           notes: 'Auto-generated from recurring series',
@@ -272,6 +275,7 @@ export async function uploadExpense(formData: FormData): Promise<UploadExpenseRe
       period: periodFrom(date, parsed?.period),
       recurring: rule?.recurring || inherited?.recurring || false,
       recurringCycle: (rule?.recurringCycle || parsed?.recurringCycle || inherited?.recurringCycle || '') as RecurringCycle,
+      seriesId: (rule?.recurring || inherited?.recurring) ? randomUUID() : '',
       paymentMethod: parsed?.paymentMethod || '',
       filePath: relativePath,
       fileType: file.type || (isPdf ? 'application/pdf' : `image/${ext}`),
@@ -349,9 +353,16 @@ export async function updateExpense(id: string, data: z.input<typeof UpdateSchem
   try {
     await connectDB();
     const Expense = await currentModel(ExpenseModel);
+    const existing = await Expense.findOne({ _id: id }).sort({ date: -1 }).lean();
+    
     const date = safeDate(d.date);
     const splits = cleanPaymentSplits(d.paymentSplits);
     const fx = resolveFx({ amount: d.amount, currency: d.currency, fxRate: d.fxRate }, (await getAppSettings()).currency);
+    
+    const seriesId = d.recurring
+      ? (existing?.recurring ? existing.seriesId : randomUUID())
+      : '';
+      
     await Expense.updateOne(
       { _id: id },
       {
@@ -371,6 +382,7 @@ export async function updateExpense(id: string, data: z.input<typeof UpdateSchem
           period: d.period || periodFrom(date),
           recurring: d.recurring,
           recurringCycle: d.recurringCycle,
+          seriesId,
           paymentMethod: d.paymentMethod,
           notes: d.notes,
           split: cleanSplit(d.split),
@@ -424,6 +436,7 @@ export async function addExpense(data: z.input<typeof UpdateSchema>): Promise<{ 
       period: d.period || periodFrom(date),
       recurring: d.recurring || rule?.recurring || inherited?.recurring || false,
       recurringCycle: d.recurringCycle || rule?.recurringCycle || (inherited?.recurringCycle as typeof d.recurringCycle) || '',
+      seriesId: (d.recurring || rule?.recurring || inherited?.recurring) ? randomUUID() : '',
       paymentMethod: d.paymentMethod,
       notes: d.notes,
       split: cleanSplit(d.split),
@@ -634,6 +647,7 @@ export async function importExpensesCsv(
           period: periodFrom(date),
           recurring: rule?.recurring || inh?.recurring || false,
           recurringCycle: (rule?.recurringCycle || inh?.recurringCycle || '') as RecurringCycle,
+          seriesId: (rule?.recurring || inh?.recurring) ? randomUUID() : '',
           notes: r.notes,
           aiModel: 'csv-import',
           verified: true, // deterministic bank data, not an AI guess — no review queue

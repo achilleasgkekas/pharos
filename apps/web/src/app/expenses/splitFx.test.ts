@@ -20,6 +20,7 @@ const {
 const expenseModel = {
   create: expenseCreate,
   updateOne: expenseUpdateOne,
+  findOne: () => ({ sort: () => ({ lean: vi.fn().mockResolvedValue(null) }) }),
 };
 
 vi.mock('@/lib/db', () => ({ connectDB: connectDBMock }));

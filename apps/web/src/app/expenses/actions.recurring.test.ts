@@ -145,6 +145,16 @@ describe('generateDueRecurring', () => {
     expect(doc.category).toBe('utilities');
     expect(doc.amount).toBe(50);
   });
+  it('treats two series with the same vendorKey but distinct seriesIds as separate (e.g. two Apple subscriptions)', async () => {
+    expenseFindSortLean.mockResolvedValue([
+      { kind: 'expense', vendor: 'Apple', vendorKey: 'apple', category: 'software', amount: 2.99, date: new Date(2026, 1, 10), recurringCycle: 'monthly', seriesId: 'icloud-series' },
+      { kind: 'expense', vendor: 'Apple', vendorKey: 'apple', category: 'software', amount: 9.99, date: new Date(2026, 1, 12), recurringCycle: 'monthly', seriesId: 'appletv-series' },
+    ]);
+    const res = await generateDueRecurring();
+    expect(res).toEqual({ created: 2 });
+    const amounts = expenseCreate.mock.calls.map((c) => c[0].amount).sort();
+    expect(amounts).toEqual([2.99, 9.99]);
+  });
 
   it('treats income and expense series with the same vendorKey as distinct (kind is part of the dedupe key)', async () => {
     expenseFindSortLean.mockResolvedValue([
