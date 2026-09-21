@@ -42,11 +42,6 @@
  */
 export const SCOPING_EXEMPT_FILES: Record<string, string> = {
   // — 1. SaaS control plane: central registry DB, never a tenant connection —
-  'lib/tenancy/mfaStore.ts': 'Control plane: Account MFA secret store (registry DB).',
-  'lib/tenancy/saasApi.ts': 'Control plane: shared Account/Tenant/Membership data access (registry DB).',
-  'lib/tenancy/superadmin.ts': 'Control plane: superadmin authz + reads (registry DB).',
-  'lib/tenancy/superadminPage.ts': 'Control plane: superadmin page data (registry DB).',
-  'lib/tenancy/workspaceSession.ts': 'Control plane: Account/workspace session resolution (registry DB).',
 
   // — 2. Pre-tenant / self-host User identity (base-connection, not per-workspace data) —
   'app/login/actions.ts': 'Pre-tenant: self-host login runs before any tenant context; User is a base identity.',

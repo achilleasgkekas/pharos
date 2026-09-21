@@ -13,7 +13,7 @@ import { User } from '@/models/User';
 import { encryptSecret, decryptSecret, secretCryptoReady } from './tenancy/secretCrypto';
 import { generateTotpSecret, totpUri, verifyTotpCode } from './tenancy/totp';
 import { generateRecoveryCodes, hashRecoveryCodes, matchRecoveryCode } from './tenancy/recoveryCodes';
-import { planMfaEnrollStart, planMfaConfirm, planMfaDisable, mfaEnrollRequiresReauth } from './tenancy/mfaStore';
+import { planMfaEnrollStart, planMfaConfirm, planMfaDisable, mfaEnrollRequiresReauth } from './mfaPlan';
 
 export { mfaEnrollRequiresReauth };
 

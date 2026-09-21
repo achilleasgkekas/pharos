@@ -57,10 +57,7 @@ vi.mock('@/lib/appSettings', () => ({ getAppSettings: getAppSettingsMock }));
 vi.mock('@/lib/tenancy/connection', () => ({ currentModel: async (m: unknown) => m }));
 vi.mock('@/lib/tenancy/request', () => ({
   withRequestTenant: async (fn: () => Promise<unknown>) => fn(),
-  // getNotifications' non-denying seam (see resolveRequestTenantOrNull's doc comment): a
-  // truthy dummy context is enough — withTenant (real, unmocked) just stashes it in
-  // AsyncLocalStorage for the duration of the call, nothing here reads its fields.
-  resolveRequestTenantOrNull: async () => ({}),
+  resolveRequestTenantOrNull: async () => ({ isDefault: true, tenantId: null, dbName: '' }),
 }));
 
 import { markNotificationRead, markAllNotificationsRead, dismissNotification, clearAllNotifications } from './actions';
