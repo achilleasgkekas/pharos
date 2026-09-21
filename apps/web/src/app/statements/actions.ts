@@ -195,6 +195,7 @@ async function findOrCreateCard(
 
 const StatementFormSchema = z.object({
   card: z.string().min(1, 'Card required'),
+  cardId: z.string().regex(/^[a-f\d]{24}$/i).or(z.literal('')).optional(),
   period: z.string().regex(/^\d{4}-\d{2}$/, 'Format: YYYY-MM'),
   statementDate: z.string(),
   dueDate: z.string().optional().default(''),
@@ -207,6 +208,17 @@ const StatementFormSchema = z.object({
   fxRate: z.coerce.number().default(0),
   notes: z.string().default(''),
 });
+
+/** Resolve an explicit form selection within the caller's workspace. Legacy callers
+ * may omit cardId; new forms always send it so changing cards cannot retain an old link. */
+async function selectedStatementCard(raw: { card: string; cardId?: string }) {
+  if (raw.cardId === undefined) return {};
+  if (!raw.cardId) return { card: raw.card, cardId: null, last4: '' };
+  const Card = await currentModel(CardModel);
+  const card = await Card.findById(raw.cardId);
+  if (!card) throw new Error('Card not found');
+  return { card: buildCardLabel(card.name, card.last4), cardId: String(card._id), last4: normalizeLast4(card.last4) };
+}
 
 /**
  * P9: turn the PRINTED figures a statement carries into the stored base-currency ones.
@@ -235,6 +247,7 @@ export async function createStatement(formData: FormData) {
     const Statement = await currentModel(StatementModel);
     await Statement.create({
       card: raw.card,
+      ...await selectedStatementCard(raw),
       period: raw.period,
       statementDate: safeDate(raw.statementDate),
       dueDate: safeDateOrNull(raw.dueDate) ?? undefined,
@@ -266,6 +279,8 @@ export async function updateStatement(id: string, formData: FormData) {
     const money = await resolveStmtFx({ ...raw, txAmounts: printedTx });
     const update: Record<string, unknown> = {
       card: raw.card,
+      ...(raw.cardId === undefined && stmt && raw.card !== stmt.card ? { cardId: null, last4: '' } : {}),
+      ...await selectedStatementCard(raw),
       period: raw.period,
       statementDate: safeDate(raw.statementDate),
       dueDate: safeDateOrNull(raw.dueDate),

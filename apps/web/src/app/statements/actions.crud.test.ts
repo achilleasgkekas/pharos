@@ -24,6 +24,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const {
   connectDBMock,
+  cardFindById,
   statementCreate,
   statementFindByIdAndUpdate,
   statementFindById,
@@ -33,6 +34,7 @@ const {
   getAppSettingsMock,
 } = vi.hoisted(() => ({
   connectDBMock: vi.fn(async () => {}),
+  cardFindById: vi.fn(async (_id: string) => null as any),
   statementCreate: vi.fn(async (_doc: Record<string, any>) => ({})),
   statementFindByIdAndUpdate: vi.fn(async (_id: string, _update: Record<string, any>) => ({})),
   statementFindById: vi.fn(async (_id: string) => null as any),
@@ -57,7 +59,7 @@ vi.mock('@/models/Statement', () => ({
     findByIdAndDelete: statementFindByIdAndDelete,
   },
 }));
-vi.mock('@/models/Card', () => ({ Card: { findOne: vi.fn(), create: vi.fn() } }));
+vi.mock('@/models/Card', () => ({ Card: { findOne: vi.fn(), findById: cardFindById, create: vi.fn() } }));
 vi.mock('@/models/Receipt', () => ({ Receipt: { find: vi.fn() } }));
 vi.mock('@/lib/storage', () => ({
   saveFile: vi.fn(async () => ({ relativePath: 'statements/test.pdf' })),
@@ -100,6 +102,7 @@ const validStatementFields = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  cardFindById.mockResolvedValue(null);
   statementFindById.mockResolvedValue(null);
   getAppSettingsMock.mockResolvedValue({ currency: 'EUR' });
 });
@@ -330,5 +333,41 @@ describe('multi-currency (P9)', () => {
     await addTransaction('s1', formOf({ date: '2026-06-03', description: 'PLAISIO', amount: '39.47' }));
     const update = statementFindByIdAndUpdate.mock.calls[0][1];
     expect(update.$push.transactions.amount).toBe(39.47);
+  });
+});
+
+
+describe('statement card selection', () => {
+  const cardId = '507f1f77bcf86cd799439011';
+  const selected = { _id: cardId, name: 'Corrected Visa', last4: '4321' };
+
+  it('creates a manual statement linked to the selected managed card', async () => {
+    cardFindById.mockResolvedValue(selected);
+    await createStatement(formOf({ ...validStatementFields, cardId, card: 'outdated client label' }));
+    expect(statementCreate).toHaveBeenCalledWith(expect.objectContaining({ cardId, card: 'Corrected Visa 4321', last4: '4321' }));
+  });
+
+  it('changes the durable link and digits when a statement is assigned to another card', async () => {
+    statementFindById.mockResolvedValue({ card: 'Old card', cardId: 'old', transactions: [] });
+    cardFindById.mockResolvedValue(selected);
+    await updateStatement('s1', formOf({ ...validStatementFields, cardId }));
+    expect(statementFindByIdAndUpdate).toHaveBeenCalledWith('s1', expect.objectContaining({ cardId, card: 'Corrected Visa 4321', last4: '4321' }));
+  });
+
+  it('rejects a card unavailable in the current workspace without writing the statement', async () => {
+    await expect(updateStatement('s1', formOf({ ...validStatementFields, cardId }))).rejects.toThrow('Card not found');
+    expect(statementFindByIdAndUpdate).not.toHaveBeenCalled();
+  });
+
+  it('clears a stale link when a legacy caller changes the free-text card', async () => {
+    statementFindById.mockResolvedValue({ card: 'Old card', cardId: 'old', transactions: [] });
+    await updateStatement('s1', formOf(validStatementFields));
+    expect(statementFindByIdAndUpdate).toHaveBeenCalledWith('s1', expect.objectContaining({ cardId: null, last4: '' }));
+  });
+
+  it('preserves a link when a legacy caller leaves the stored label unchanged', async () => {
+    statementFindById.mockResolvedValue({ card: validStatementFields.card, cardId, transactions: [] });
+    await updateStatement('s1', formOf(validStatementFields));
+    expect(statementFindByIdAndUpdate.mock.calls[0][1]).not.toHaveProperty('cardId');
   });
 });
