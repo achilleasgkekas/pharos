@@ -140,41 +140,47 @@ export function StatementsClient({
     const total = list.length;
     setUploading(true);
 
-    let imported = 0;
-    let totalTx = 0;
-    let lastAiError: string | undefined;
-    const periods: string[] = [];
-    let replacedWarning = false;
-    for (let i = 0; i < total; i++) {
-      const base = ollamaUp ? t('st.readingPdf') : t('st.savingPdf');
-      setUploadMsg(total > 1 ? `${base} ${i + 1}/${total}...` : `${base}...`);
-      const fd = new FormData();
-      fd.set('file', list[i]);
-      const res = await importStatementPdf(fd);
-      if (!res.ok) {
-        setUploadMsg(`${t('st.error')}: ${res.error}`);
-        setUploading(false);
-        return;
+    try {
+      let imported = 0;
+      let totalTx = 0;
+      let lastAiError: string | undefined;
+      const periods: string[] = [];
+      let replacedWarning = false;
+      for (let i = 0; i < total; i++) {
+        const base = ollamaUp ? t('st.readingPdf') : t('st.savingPdf');
+        setUploadMsg(total > 1 ? `${base} ${i + 1}/${total}...` : `${base}...`);
+        const fd = new FormData();
+        fd.set('file', list[i]);
+        const res = await importStatementPdf(fd);
+        if (!res.ok) {
+          setUploadMsg(`${t('st.error')}: ${res.error}`);
+          setUploading(false);
+          return;
+        }
+        imported++;
+        totalTx += res.txCount;
+        if (res.aiError) lastAiError = res.aiError;
+        if (res.period) periods.push(res.period);
+        if (res.replacedExisting) replacedWarning = true;
       }
-      imported++;
-      totalTx += res.txCount;
-      if (res.aiError) lastAiError = res.aiError;
-      if (res.period) periods.push(res.period);
-      if (res.replacedExisting) replacedWarning = true;
-    }
 
-    setUploading(false);
-    const months = periods.join(', ');
-    setUploadMsg(
-      lastAiError
-        ? `${lastAiError}. ${t('st.savedManual')}`
-        : replacedWarning
-          ? t('st.importedReplaced', { months })
-          : total > 1
-            ? t('st.importedN', { n: imported, months, tx: totalTx })
-            : t('st.imported', { months, tx: totalTx })
-    );
-    if (fileInputRef.current) fileInputRef.current.value = '';
+      setUploading(false);
+      const months = periods.join(', ');
+      setUploadMsg(
+        lastAiError
+          ? `${lastAiError}. ${t('st.savedManual')}`
+          : replacedWarning
+            ? t('st.importedReplaced', { months })
+            : total > 1
+              ? t('st.importedN', { n: imported, months, tx: totalTx })
+              : t('st.imported', { months, tx: totalTx })
+      );
+    } catch (error) {
+      setUploadMsg(`${t('st.error')}: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   }
 
   // Distinct card labels present in statements (for the filter chips)
@@ -1278,6 +1284,7 @@ function StatementForm({
 }) {
   const t = useT();
   const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
   // P9: the form always holds PRINTED figures (what the statement says), never the stored
   // base-currency ones. The server converts on save, so re-saving an unchanged foreign
   // statement can never double-convert it.
@@ -1310,14 +1317,20 @@ function StatementForm({
     const fd = new FormData();
     Object.entries(form).forEach(([k, v]) => fd.set(k, v));
     startTransition(async () => {
-      if (statement) await updateStatement(statement._id, fd);
-      else await createStatement(fd);
-      onSuccess();
+      setError(null);
+      try {
+        if (statement) await updateStatement(statement._id, fd);
+        else await createStatement(fd);
+        onSuccess();
+      } catch (error) {
+        setError(error instanceof Error ? error.message : String(error));
+      }
     });
   }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
+      {error && <p role="alert" className="text-sm text-red-400">{t('st.error')}: {error}</p>}
       <Field label={t('stm.cardReq')}>
         {cards.length > 0 ? (
           <select value={form.cardId || form.card} onChange={(e) => {
