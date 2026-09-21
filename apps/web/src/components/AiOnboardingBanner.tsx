@@ -7,11 +7,8 @@ import { dismissAiOnboarding } from '@/app/settings/actions';
 
 /** Dismissible nudge shown app-wide when AI isn't set up. The app works fully
  *  without AI; this just points users to the optional features.
- *  `productBaseUrl`: set when rendering on a host with no active tenant (app.<domain> —
- *  /admin, /account/*) — prefixes the "Set up AI" link with the account's home workspace's
- *  own subdomain, since `/settings` is a product page that doesn't resolve on this host. See
- *  the root layout's comment for the full story. */
-export function AiOnboardingBanner({ reason, productBaseUrl }: { reason: 'off' | 'no-provider'; productBaseUrl?: string }) {
+ */
+export function AiOnboardingBanner({ reason }: { reason: 'off' | 'no-provider' }) {
   const pathname = usePathname();
   const [hidden, setHidden] = useState(false);
   const [, start] = useTransition();
@@ -39,7 +36,7 @@ export function AiOnboardingBanner({ reason, productBaseUrl }: { reason: 'off' |
         <Sparkles size={16} className="text-[color:var(--color-accent)] shrink-0" />
         <p className="text-sm text-[color:var(--color-text-dim)] flex-1 min-w-0">{text}</p>
         <Link
-          href={`${productBaseUrl ?? ''}/settings?tab=ai`}
+          href="/settings?tab=ai"
           className="flex items-center gap-1 text-sm font-semibold text-[color:var(--color-accent)] hover:underline shrink-0 whitespace-nowrap"
         >
           Set up AI <ArrowRight size={14} />

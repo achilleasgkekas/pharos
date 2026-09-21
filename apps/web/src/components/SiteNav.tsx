@@ -5,7 +5,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Package, ShoppingCart, ShoppingBasket, CheckSquare, Receipt as ReceiptIcon, CalendarClock, CreditCard,
   Menu, X, Sun, Moon, Settings, BarChart3, Ticket, Wallet, Banknote, ChevronDown, CalendarDays, PiggyBank,
-  LogOut, UserRound, Activity, MessageSquare, Trash2, FileText, Building2, ShieldCheck, IdCard, Cake, Gauge,
+  LogOut, UserRound, Activity, MessageSquare, Trash2, FileText, IdCard, Cake, Gauge,
 } from 'lucide-react';
 import { cn } from './ui/cn';
 import { useTheme } from './ThemeProvider';
@@ -65,16 +65,7 @@ function navActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(href + '/');
 }
 
-/** Product-scoped links are plain relative paths ('/items', '/settings', ...) that only
- *  resolve on a TENANT host. When SiteNav renders somewhere else (app.<domain> — /admin,
- *  /account/*, `productBaseUrl` set), prefix with the account's home workspace's own
- *  subdomain instead so the link actually goes somewhere, rather than bouncing through the
- *  no_tenant gate back to /account/workspace. See the root layout's comment for the story. */
-function productHref(base: string | undefined, path: string): string {
-  return base ? `${base}${path}` : path;
-}
-
-function NavGroup({ groupKey, links, base }: { groupKey: TKey; links: NavLink[]; base?: string }) {
+function NavGroup({ groupKey, links }: { groupKey: TKey; links: NavLink[] }) {
   const t = useT();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -107,7 +98,7 @@ function NavGroup({ groupKey, links, base }: { groupKey: TKey; links: NavLink[];
             return (
               <Link
                 key={l.href}
-                href={productHref(base, l.href)}
+                href={l.href}
                 prefetch={false}
                 onClick={() => setOpen(false)}
                 className={cn(
@@ -125,7 +116,7 @@ function NavGroup({ groupKey, links, base }: { groupKey: TKey; links: NavLink[];
   );
 }
 
-function UserMenu({ user, saas, operator, base }: { user: SessionUser; saas: boolean; operator: boolean; base?: string }) {
+function UserMenu({ user }: { user: SessionUser }) {
   const t = useT();
   const pathname = usePathname();
   const { theme, toggle } = useTheme();
@@ -161,7 +152,7 @@ function UserMenu({ user, saas, operator, base }: { user: SessionUser; saas: boo
               moved here so the bar itself stays uncluttered and these read as "about how I use
               Pharos" rather than competing with the product navigation for space. */}
           <Link
-            href={productHref(base, '/settings')}
+            href={'/settings'}
             prefetch={false}
             onClick={() => setOpen(false)}
             className={cn(menuRow, pathname.startsWith('/settings') && 'text-[color:var(--color-accent)]')}
@@ -176,43 +167,6 @@ function UserMenu({ user, saas, operator, base }: { user: SessionUser; saas: boo
             {theme === 'dark' ? t('nav.lightMode') : t('nav.darkMode')}
           </button>
 
-          {/* The way back out of a workspace.
-              A hosted customer lands straight inside their workspace after login (one
-              membership skips the chooser), and from there the product had no route to the
-              account area at all: no billing, no members, no other workspace, nothing.
-              Reported as "once I pick another page I do not know how to get back". The
-              account menu is where a user already looks for it. */}
-          {saas && (
-            <>
-              <div className="my-1 border-t border-[color:var(--color-border)]" />
-              {/* /account/workspace, NOT /account. `/account` is a post-login ROUTER, not a
-                  destination: with exactly one membership it redirects straight into the product
-                  subdomain (see (saas)/account/page.tsx, deliberate). Right after login, wrong
-                  from a menu — pressing "Workspaces & account" from inside the product bounced
-                  you back to the page you were already on, so the item read as dead. Reported
-                  live: "it gets me to the main page". /account/workspace is the real overview,
-                  and it carries its own workspace switcher when there is more than one, so the
-                  chooser is still one click away. */}
-              {/* One entry to the workspace; Billing is a tab inside it (workspaceTabs), so a
-                  second top-level Billing shortcut here was just the same destination twice. */}
-              <Link href="/account/workspace" prefetch={false} onClick={() => setOpen(false)} className={menuRow}>
-                <Building2 size={15} /> {t('nav.workspaces')}
-              </Link>
-              {/* Operator console. Only rendered for an account on the superadmin allowlist,
-                  and the page re-checks that itself — this link is convenience, not the gate.
-                  Without it the console was reachable only by typing /admin from memory. */}
-              {operator && (
-                <Link
-                  href="/admin"
-                  prefetch={false}
-                  onClick={() => setOpen(false)}
-                  className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm text-[color:var(--color-purple)] hover:bg-[color:var(--color-surface-2)] transition-colors"
-                >
-                  <ShieldCheck size={15} /> {t('nav.operator')}
-                </Link>
-              )}
-            </>
-          )}
           <div className="my-1 border-t border-[color:var(--color-border)]" />
           <form action={logoutAction}>
             <button
@@ -228,7 +182,7 @@ function UserMenu({ user, saas, operator, base }: { user: SessionUser; saas: boo
   );
 }
 
-export function SiteNav({ aiReady = false, user, saas = false, operator = false, productBaseUrl }: { aiReady?: boolean; user?: SessionUser; saas?: boolean; operator?: boolean; productBaseUrl?: string }) {
+export function SiteNav({ aiReady = false, user }: { aiReady?: boolean; user?: SessionUser }) {
   const t = useT();
   const pathname = usePathname();
   // Single source of truth for "which absolute-positioned panel is open" — the mobile hamburger
@@ -248,7 +202,7 @@ export function SiteNav({ aiReady = false, user, saas = false, operator = false,
     <header className="sticky top-0 z-40 border-b border-[color:var(--color-border)] bg-[color:var(--color-bg)]">
       <div className="max-w-[1400px] mx-auto px-4 py-2.5 flex items-center gap-3">
         {/* Logo */}
-        <Link href={productHref(productBaseUrl, '/')} prefetch={false} title="PHAROS · Personal Hub · Asset & Resource Oversight System" className="flex items-center gap-2 shrink-0 hover:opacity-80 transition-opacity">
+        <Link href={'/'} prefetch={false} title="PHAROS · Personal Hub · Asset & Resource Oversight System" className="flex items-center gap-2 shrink-0 hover:opacity-80 transition-opacity">
           <PharosMark size={22} className="text-[color:var(--color-accent)] shrink-0" />
           <span className="hidden sm:inline tracking-[0.14em] uppercase" style={{ fontFamily: 'var(--font-display)', fontWeight: 700 }}>
             Pharos
@@ -263,7 +217,7 @@ export function SiteNav({ aiReady = false, user, saas = false, operator = false,
         {/* Grouped links (desktop) */}
         <nav className="hidden lg:flex items-center gap-0.5 shrink-0">
           {GROUPS.map((g) => (
-            <NavGroup key={g.key} groupKey={g.key} links={g.links} base={productBaseUrl} />
+            <NavGroup key={g.key} groupKey={g.key} links={g.links} />
           ))}
         </nav>
 
@@ -278,7 +232,7 @@ export function SiteNav({ aiReady = false, user, saas = false, operator = false,
             {aiReady ? t('ai.online') : t('ai.offline')}
           </span>
           {user && <NotificationBell open={notifOpen} onOpenChange={setNotifOpen} />}
-          {user && <UserMenu user={user} saas={saas} operator={operator} base={productBaseUrl} />}
+          {user && <UserMenu user={user} />}
           <button onClick={toggleMobile} className="lg:hidden p-2 rounded-lg text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface)] transition-colors" aria-label="Menu">
             {mobileOpen ? <X size={18} /> : <Menu size={18} />}
           </button>
@@ -301,7 +255,7 @@ export function SiteNav({ aiReady = false, user, saas = false, operator = false,
             return (
               <Link
                 key={link.href}
-                href={productHref(productBaseUrl, link.href)}
+                href={link.href}
                 prefetch={false}
                 onClick={() => setActivePanel('none')}
                 className={cn('flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-all min-w-0', active ? 'bg-[color:var(--color-surface-2)] text-[color:var(--color-accent)]' : 'text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]')}
