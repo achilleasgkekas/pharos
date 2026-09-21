@@ -10,6 +10,8 @@ import { Subscription as SubscriptionModel } from '@/models/Subscription';
 import { GiftCard as GiftCardModel } from '@/models/GiftCard';
 import { Bill as BillModel } from '@/models/Bill';
 import { Notification as NotificationModel } from '@/models/Notification';
+import { Document as DocumentModel } from '@/models/Document';
+import { SpecialDate as SpecialDateModel } from '@/models/SpecialDate';
 import { withRequestTenant, resolveRequestTenantOrNull } from '@/lib/tenancy/request';
 import { currentModel } from '@/lib/tenancy/connection';
 import { currentTenant, withTenant } from '@/lib/tenancy/current';
@@ -23,8 +25,11 @@ import { detectPriceHikes, type HikeEntry } from '@/lib/priceHike';
 import type { SerializedStatement } from '@/types';
 import { assertCanWrite } from '@/lib/auth';
 import { collectSubscriptionReviews, type ReviewableSubscription } from '@/lib/subscriptionReview';
+import { collectExpiringDocuments, type ExpiringDocRow } from '@/lib/documentExpiry';
+import { collectUpcomingDates, type SpecialDateRow } from '@/lib/specialDates';
+import { AUTO_NOTIF_KINDS, type NotifKind } from '@/lib/notificationKinds';
 
-export type NotifKind = 'deal' | 'installment' | 'warranty' | 'pricehike' | 'trialend' | 'subreview' | 'giftcard' | 'bill' | 'maintenance' | 'lending' | 'claim' | 'system';
+export type { NotifKind };
 
 export type SerializedNotification = {
   _id: string;
@@ -37,7 +42,7 @@ export type SerializedNotification = {
 };
 
 type Alert = { dedupeKey: string; kind: NotifKind; title: string; body: string; href: string };
-const AUTO_KINDS = ['deal', 'installment', 'warranty', 'pricehike', 'trialend', 'subreview', 'giftcard', 'bill', 'maintenance', 'lending', 'claim'] as const;
+const AUTO_KINDS = AUTO_NOTIF_KINDS;
 
 /** Recompute the live alerts (deals / warranties / installments-due) — the same
  *  three the ntfy check uses, but as structured payloads the bell can localize.
@@ -50,13 +55,15 @@ async function computeAlerts(): Promise<Alert[]> {
   const s = await getAppSettings(); // also sets the currency symbol for cur()
   const now = Date.now();
   const alerts: Alert[] = [];
-  const [Item, Statement, Expense, Subscription, GiftCard, Bill] = await Promise.all([
+  const [Item, Statement, Expense, Subscription, GiftCard, Bill, DocumentM, SpecialDateM] = await Promise.all([
     currentModel(ItemModel),
     currentModel(StatementModel),
     currentModel(ExpenseModel),
     currentModel(SubscriptionModel),
     currentModel(GiftCardModel),
     currentModel(BillModel),
+    currentModel(DocumentModel),
+    currentModel(SpecialDateModel),
   ]);
 
   // Deals — a tracked item whose best price reached its target.
@@ -253,6 +260,46 @@ async function computeAlerts(): Promise<Alert[]> {
       title: c.title,
       body: `${c.days}|${c.ref}`,
       href: `/items?open=${String(c._id)}`,
+    });
+  }
+
+  // Personal documents expiring or already expired (P42, #197). Same query and collector as
+  // the push sweep in runAlertChecks, so the bell and the phone name the same passport. The
+  // dedupeKey carries the expiry date: renewing moves it, which retires this alert.
+  // Zero = off, and then the query is skipped rather than run and thrown away.
+  const docRows =
+    s.documentAlertDays > 0
+      ? ((await DocumentM.find({ archived: { $ne: true }, expiryDate: { $ne: null } })
+          .select('title type holder expiryDate')
+          .lean()) as ExpiringDocRow[])
+      : [];
+  for (const d of collectExpiringDocuments(docRows, s.documentAlertDays, now)) {
+    // body = "<days>" (raw; negative = expired, formatted in the bell)
+    alerts.push({ dedupeKey: `document:${String(d._id)}:${d.iso}`, kind: 'document', title: d.title, body: `${d.days}`, href: '/documents' });
+  }
+
+  // Birthdays / anniversaries within the lead window (P50, #197). The push keys these by id
+  // alone, which is fine for an outbound dedup ledger, but the bell remembers DISMISSALS
+  // forever: an id-only key would mean dismissing this year's birthday hides every future
+  // one. So the key carries the occurrence date, and next year is a fresh alert.
+  const dateRows =
+    s.specialDateAlertDays > 0
+      ? ((await SpecialDateM.find({ archived: { $ne: true } }).select('name type month day year').lean()) as SpecialDateRow[])
+      : [];
+  for (const d of collectUpcomingDates(dateRows, s.specialDateAlertDays, now)) {
+    // The collector counts in LOCAL calendar days (a birthday is a day where the user is),
+    // so the occurrence is today's local midnight plus that many days, read back locally.
+    const occ = new Date(now);
+    occ.setHours(0, 0, 0, 0);
+    occ.setDate(occ.getDate() + d.days);
+    const iso = `${occ.getFullYear()}-${String(occ.getMonth() + 1).padStart(2, '0')}-${String(occ.getDate()).padStart(2, '0')}`;
+    // body = "<days>|<years>": years is empty when the birth year is unknown.
+    alerts.push({
+      dedupeKey: `specialdate:${String(d._id)}:${iso}`,
+      kind: 'specialdate',
+      title: d.name,
+      body: `${d.days}|${d.years ?? ''}`,
+      href: '/special-dates',
     });
   }
 

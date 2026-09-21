@@ -1,7 +1,7 @@
 'use client';
 import { useState, useRef, useEffect, useCallback, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Bell, Tag, ShieldCheck, CreditCard, TrendingUp, AlarmClock, Wallet, FileText, Wrench, Handshake, PackageOpen, X } from 'lucide-react';
+import { Bell, Tag, ShieldCheck, CreditCard, TrendingUp, AlarmClock, Wallet, FileText, Wrench, Handshake, PackageOpen, IdCard, Cake, X } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import { cur } from '@/lib/money';
 import { useT } from '@/components/LocaleProvider';
@@ -16,7 +16,7 @@ import {
   type NotifKind,
 } from '@/app/notifications/actions';
 
-const KIND_ICON: Record<NotifKind, typeof Bell> = { deal: Tag, warranty: ShieldCheck, installment: CreditCard, pricehike: TrendingUp, trialend: AlarmClock, subreview: AlarmClock, giftcard: Wallet, bill: FileText, maintenance: Wrench, lending: Handshake, claim: PackageOpen, system: Bell };
+const KIND_ICON: Record<NotifKind, typeof Bell> = { deal: Tag, warranty: ShieldCheck, installment: CreditCard, pricehike: TrendingUp, trialend: AlarmClock, subreview: AlarmClock, giftcard: Wallet, bill: FileText, maintenance: Wrench, lending: Handshake, claim: PackageOpen, document: IdCard, specialdate: Cake, system: Bell };
 const KIND_COLOR: Record<NotifKind, string> = {
   deal: 'var(--color-accent)',
   warranty: 'var(--color-gold)',
@@ -29,6 +29,8 @@ const KIND_COLOR: Record<NotifKind, string> = {
   maintenance: 'var(--color-cyan)',
   lending: 'var(--color-purple)',
   claim: 'var(--color-orange)',
+  document: 'var(--color-gold)',
+  specialdate: 'var(--color-purple)',
   system: 'var(--color-text-dim)',
 };
 
@@ -144,6 +146,21 @@ export function NotificationBell({ open, onOpenChange }: { open: boolean; onOpen
       const ref = bar < 0 ? '' : n.body.slice(bar + 1);
       const key = ref ? 'notif.claimStaleSub' : 'notif.claimStaleNoRefSub';
       return { heading: n.title, sub: t(key, { days, ref }) };
+    }
+    if (n.kind === 'document') {
+      const d = Number(n.body);
+      const key = d < 0 ? 'notif.documentExpiredSub' : d === 0 ? 'notif.documentTodaySub' : 'notif.documentSub';
+      return { heading: n.title, sub: t(key, { days: Math.abs(d) }) };
+    }
+    if (n.kind === 'specialdate') {
+      // body = "<days>|<years>"; years is empty when the year is unknown, and then the
+      // line says nothing about age rather than guessing one.
+      const [days, years] = n.body.split('|');
+      const today = Number(days) === 0;
+      const key = years
+        ? today ? 'notif.specialDateTodayYearsSub' : 'notif.specialDateYearsSub'
+        : today ? 'notif.specialDateTodaySub' : 'notif.specialDateSub';
+      return { heading: n.title, sub: t(key, { days, years: years ?? '' }) };
     }
     return { heading: n.title, sub: n.body };
   }
