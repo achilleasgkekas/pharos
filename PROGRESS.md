@@ -13797,3 +13797,15 @@ https://github.com/achilleasgkekas/pharos/pull/66, commit `2ba0a34b`. Το Codex
 - **Αναμονή για deploy:** άγνωστο από το repo. Το `DEPLOY_LOG.md` είναι παλιό, ο αριθμός θέλει έλεγχο στο image που τρέχει.
 - **Ανοιχτά brain PRs:** 1 (το #265).
 - **Επόμενο:** το #197 (τα Document και Special Date alerts ρυθμίζονται αλλά δεν τρέχουν ποτέ), το τελευταίο της λωρίδας μου. Επίσης το SKILL θέλει ενημέρωση ώστε το STEP 2 να μην ελέγχει το SaaS που αποσύρεται.
+
+## 2026-09-21 15:43 (pharos-brain)
+
+- **Guards:** κανένα pause. Budget 2/3 για σήμερα (η εγγραφή 09:50 στο `origin/main`). Καμία ANSWERED εγγραφή για `pharos-brain` στο `ASK_ACHILLEAS.md`. Context συγχρονίστηκε.
+- **Prod health:** `https://ph-aros.com/` 200 με landing περιεχόμενο. Το `app.ph-aros.com` (login και `trials-sweep`) δίνει **502, και αυτό είναι αναμενόμενο**: το `pharos-web` του SaaS σταμάτησε σκόπιμα στην απόσυρση (σημειώσεις παράδοσης 2026-09-21), εκκρεμεί μόνο η αφαίρεση από το Cloudflare Zero Trust από τον Αχιλλέα. Το self-hosted `pharos.home.agkekas.gr/login` δίνει 200. Δεν ανοίχτηκε ASK. Το SKILL πρέπει να σταματήσει να ελέγχει το `app.ph-aros.com`.
+- **Triage:** κανένα `needs-triage`, κανένα `blocked`.
+- **Δουλειά:** #197 (p3, `lane:claude`), τα alerts για έγγραφα και ειδικές ημερομηνίες έλειπαν από το καμπανάκι. Το test γράφτηκε πρώτο και απέτυχε. Το καμπανάκι τρέχει πλέον τους ίδιους collectors με το push. Οι ειδικές ημερομηνίες κλειδώνονται με id και ημερομηνία εμφάνισης, αλλιώς ένα dismiss θα έκρυβε και τα γενέθλια όλων των επόμενων χρόνων.
+- **Εύρημα στην πορεία:** το enum `kind` του μοντέλου `Notification` δεν είχε ποτέ το `claim`. Το νέο schema test αποδεικνύει ότι απέτυχε στο validation. Επειδή το `insertMany` είναι ordered, μία ξεχασμένη αξίωση εγγύησης πιθανότατα μπλόκαρε όλα τα νέα alerts του καμπανακιού. Δεν επαληθεύτηκε σε ζωντανή Mongo. Τώρα μία λίστα (`lib/notificationKinds.ts`) τροφοδοτεί enum, sweep και test.
+- **PR:** #267 https://github.com/achilleasgkekas/pharos/pull/267 (type-check exit 0, 5752 tests περνούν). 7 νέα κλειδιά i18n σε όλες τις 8 γλώσσες. Σχολίασα το #197, δεν το έκλεισα.
+- **Ανοιχτά brain PRs:** 2 (#265, #267), χωρίς review. Οι Codex reviewers είναι κλειστοί μέχρι να γίνει δημόσιο το repo, άρα θέλουν τον Αχιλλέα.
+- **Αναμονή για deploy:** το self-hosted χρειάζεται rebuild για ό,τι μπήκε από το τελευταίο build. Τον ακριβή αριθμό δεν τον μέτρησα.
+- **Επόμενο:** η λωρίδα `lane:claude` αδειάζει μόλις μπουν τα #265/#267. Να ενημερωθεί το SKILL (STEP 2 χωρίς SaaS endpoints, STEP 3 item 2 χωρίς αναμονή για Codex reviewer όσο είναι κλειστός).
