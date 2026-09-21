@@ -1,6 +1,33 @@
 // English is the SOURCE locale: it defines every translation key. Other locales
 // are Partial<Dict> and fall back to these strings for anything they omit.
 export const en = {
+  "payments.billed": "Billed installments",
+  "payments.fullyBilled": "Fully billed · check statement balance",
+  "payments.cashflow": "Estimated cash flow",
+  "payments.cashflowNote": "Known income minus scheduled bills; excludes cash on hand and untracked spending. This is not an available card limit.",
+
+  "payments.title": "Card payments",
+  "payments.due": "Still due",
+  "payments.credit": "Card credit",
+  "payments.forecast": "Next months · {n} months",
+  "payments.history": "Statement history",
+  "payments.opening": "Opening balance (calculated)",
+  "payments.charges": "Charges",
+  "payments.included": "Payments in PDF",
+  "payments.additional": "Additional payments",
+  "payments.remaining": "Remaining",
+  "payments.otherCredits": "Other credits / refunds",
+  "payments.closing": "Bank closing balance",
+  "payments.adjustment": "Bank balance / payment adjustment",
+  "payments.manage": "Manage product links",
+  "payments.confirmUnlink": "Remove these product links? Products and transactions will remain.",
+  "payments.confirmMerge": "Merge these installment groups? Only combine charges for the same purchase.",
+  "payments.reconcileHelp": "Match each card charge to its receipt to find missing receipts or check a purchase. This does not record a payment or change the card balance.",
+  "payments.paymentNote": "Payments printed in the PDF are already included in the bank balance. Enter only additional payments not included there.",
+  "payments.forecastNote": "Estimates from known installments and recorded balances, not future purchases, fees or interest. Linked products bought together share one amount. Months use the latest known due-date offset; without a due date they use the statement month.",
+  "payments.limitsNote": "Limit usage is an estimate from the latest statement, not live available credit. Pending purchases and unbilled installments may also use the limit.",
+  "payments.summaryNote": "Balances use the latest statement for each card. Credit stays on its own card. History follows statement months; opening balances are calculated from imported transactions.",
+
   // ── Navbar groups + links ───────────────────────────────────────────────
   'nav.stuff': 'Stuff',
   'nav.money': 'Money',

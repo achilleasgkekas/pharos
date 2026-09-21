@@ -104,11 +104,8 @@ describe('buildCardUtilization', () => {
     expect(byCardId.size).toBe(0);
   });
 
-  it('reads 0% for a card with a limit but no statements yet', () => {
-    const { byCardId } = buildCardUtilization([card()], []);
-    expect(byCardId.get('c1')!.outstanding).toBe(0);
-    expect(byCardId.get('c1')!.pct).toBe(0);
-    expect(byCardId.get('c1')!.level).toBe('ok');
+  it('omits unknown usage when no statement exists', () => {
+    expect(buildCardUtilization([card()], []).byCardId.size).toBe(0);
   });
 
   it('matches by label when the statement carries no cardId', () => {
@@ -151,8 +148,7 @@ describe('buildCardUtilization', () => {
     const { byCardId } = buildCardUtilization(cards, [
       stmt({ card: 'Visa', cardId: null, totalAmount: 2700 }),
     ]);
-    expect(byCardId.get('c1')!.outstanding).toBe(0);
-    expect(byCardId.get('c2')!.outstanding).toBe(0);
+    expect(byCardId.size).toBe(0);
   });
 
   it('prefers the cardId link over a label that says otherwise', () => {

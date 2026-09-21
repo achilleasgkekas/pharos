@@ -1,6 +1,33 @@
 import type { Dict } from './en';
 
 export const pt: Partial<Dict> = {
+  "payments.billed": "Prestações faturadas",
+  "payments.fullyBilled": "Tudo faturado · verificar saldo",
+  "payments.cashflow": "Fluxo de caixa estimado",
+  "payments.cashflowNote": "Receitas conhecidas menos faturas previstas, sem dinheiro disponível e despesas não registadas. Não é crédito disponível.",
+
+  "payments.title": "Pagamentos de cartões",
+  "payments.due": "Por pagar",
+  "payments.credit": "Crédito no cartão",
+  "payments.forecast": "Próximos meses · {n} meses",
+  "payments.history": "Histórico de extratos",
+  "payments.opening": "Saldo inicial (calculado)",
+  "payments.charges": "Débitos",
+  "payments.included": "Pagamentos no PDF",
+  "payments.additional": "Pagamentos adicionais",
+  "payments.remaining": "Restante",
+  "payments.otherCredits": "Outros créditos / reembolsos",
+  "payments.closing": "Saldo final do banco",
+  "payments.adjustment": "Ajuste de saldo / pagamentos",
+  "payments.manage": "Gerir produtos associados",
+  "payments.confirmUnlink": "Remover associações? Os produtos e transações serão mantidos.",
+  "payments.confirmMerge": "Unir grupos de prestações? Apenas débitos da mesma compra.",
+  "payments.reconcileHelp": "Associe débitos a recibos para encontrar recibos em falta. Não regista pagamentos nem altera o saldo.",
+  "payments.paymentNote": "Os pagamentos no PDF já estão incluídos no saldo bancário. Introduza apenas pagamentos adicionais não incluídos.",
+  "payments.forecastNote": "Estimativa de prestações e saldos conhecidos, sem compras futuras, taxas ou juros. Produtos comprados juntos partilham um valor. Usa-se o último intervalo de vencimento conhecido, senão o mês do extrato.",
+  "payments.limitsNote": "Utilização estimada pelo último extrato, não crédito disponível em tempo real. Compras pendentes e prestações não faturadas podem consumir o limite.",
+  "payments.summaryNote": "Último extrato de cada cartão. O crédito permanece no próprio cartão. Histórico por mês do extrato; saldo inicial calculado das transações importadas.",
+
   'nav.bills': 'Faturas',
   'nav.savings': 'Poupar',
   'nav.darkMode': 'Modo escuro',

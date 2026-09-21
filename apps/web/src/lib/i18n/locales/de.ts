@@ -1,6 +1,33 @@
 import type { Dict } from './en';
 
 export const de: Partial<Dict> = {
+  "payments.billed": "Abgerechnete Raten",
+  "payments.fullyBilled": "Vollständig abgerechnet · Saldo prüfen",
+  "payments.cashflow": "Geschätzter Geldfluss",
+  "payments.cashflowNote": "Bekannte Einnahmen minus geplante Rechnungen, ohne vorhandenes Geld und nicht erfasste Ausgaben. Kein verfügbarer Kreditrahmen.",
+
+  "payments.title": "Kartenzahlungen",
+  "payments.due": "Noch fällig",
+  "payments.credit": "Kartenguthaben",
+  "payments.forecast": "Nächste Monate · {n} Monate",
+  "payments.history": "Abrechnungsverlauf",
+  "payments.opening": "Anfangssaldo (berechnet)",
+  "payments.charges": "Belastungen",
+  "payments.included": "Zahlungen im PDF",
+  "payments.additional": "Zusätzliche Zahlungen",
+  "payments.remaining": "Restbetrag",
+  "payments.otherCredits": "Sonstige Gutschriften / Erstattungen",
+  "payments.closing": "Bankschlusssaldo",
+  "payments.adjustment": "Saldo- / Zahlungsanpassung",
+  "payments.manage": "Produktverknüpfungen verwalten",
+  "payments.confirmUnlink": "Produktverknüpfungen entfernen? Produkte und Buchungen bleiben erhalten.",
+  "payments.confirmMerge": "Ratengruppen zusammenführen? Nur Buchungen desselben Kaufs verbinden.",
+  "payments.reconcileHelp": "Kartenzahlungen mit Belegen abgleichen, um fehlende Belege zu finden. Dies erfasst keine Zahlung und ändert keinen Saldo.",
+  "payments.paymentNote": "Zahlungen im PDF sind bereits im Banksaldo enthalten. Nur zusätzliche, dort nicht enthaltene Zahlungen eintragen.",
+  "payments.forecastNote": "Schätzung aus bekannten Raten und Salden, ohne künftige Käufe, Gebühren oder Zinsen. Gemeinsam gekaufte Produkte teilen einen Betrag. Monate folgen dem letzten bekannten Fälligkeitsabstand, sonst dem Abrechnungsmonat.",
+  "payments.limitsNote": "Limitnutzung laut letzter Abrechnung, kein aktueller Kreditrahmen. Offene Käufe und ungebuchte Raten können das Limit ebenfalls belasten.",
+  "payments.summaryNote": "Je Karte gilt die letzte Abrechnung. Guthaben bleibt auf derselben Karte. Verlauf nach Abrechnungsmonat; Anfangssaldo aus importierten Buchungen berechnet.",
+
   'nav.bills': 'Rechnungen',
   'nav.savings': 'Sparen',
   'nav.darkMode': 'Dunkler Modus',

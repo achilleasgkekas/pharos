@@ -1,6 +1,33 @@
 import type { Dict } from './en';
 
 export const fr: Partial<Dict> = {
+  "payments.billed": "Échéances facturées",
+  "payments.fullyBilled": "Tout facturé · vérifier le solde",
+  "payments.cashflow": "Trésorerie estimée",
+  "payments.cashflowNote": "Revenus connus moins factures prévues, hors argent disponible et dépenses non saisies. Ce n’est pas le crédit disponible.",
+
+  "payments.title": "Paiements des cartes",
+  "payments.due": "Reste à payer",
+  "payments.credit": "Crédit sur la carte",
+  "payments.forecast": "Prochains mois · {n} mois",
+  "payments.history": "Historique des relevés",
+  "payments.opening": "Solde initial (calculé)",
+  "payments.charges": "Débits",
+  "payments.included": "Paiements dans le PDF",
+  "payments.additional": "Paiements supplémentaires",
+  "payments.remaining": "Restant",
+  "payments.otherCredits": "Autres crédits / remboursements",
+  "payments.closing": "Solde final bancaire",
+  "payments.adjustment": "Ajustement du solde / paiements",
+  "payments.manage": "Gérer les produits liés",
+  "payments.confirmUnlink": "Supprimer les liens ? Les produits et transactions seront conservés.",
+  "payments.confirmMerge": "Fusionner ces échéanciers ? Uniquement pour un même achat.",
+  "payments.reconcileHelp": "Associez les débits aux reçus pour repérer les reçus manquants. Cela ne crée aucun paiement et ne modifie pas le solde.",
+  "payments.paymentNote": "Les paiements du PDF sont déjà inclus dans le solde bancaire. Saisissez uniquement les paiements supplémentaires non inclus.",
+  "payments.forecastNote": "Estimation des échéances et soldes connus, hors achats futurs, frais et intérêts. Les produits achetés ensemble partagent un montant. Le dernier décalage de paiement connu est utilisé, sinon le mois du relevé.",
+  "payments.limitsNote": "Utilisation estimée selon le dernier relevé, pas le crédit disponible en temps réel. Les achats en attente et échéances non facturées peuvent utiliser le plafond.",
+  "payments.summaryNote": "Dernier relevé de chaque carte. Le crédit reste sur sa carte. Historique par mois de relevé ; solde initial calculé depuis les transactions importées.",
+
   'nav.bills': 'Factures',
   'nav.savings': 'Épargner',
   'nav.darkMode': 'Mode sombre',

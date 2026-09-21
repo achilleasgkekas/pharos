@@ -57,7 +57,8 @@ import { OWNED_STATUSES } from '@/lib/itemStatus';
 import { createCard, updateCard, deleteCard, toggleCardActive, scanCard } from './cards';
 import { CreditCard as CreditCardIcon, Wallet, Power, Camera, ScanLine } from 'lucide-react';
 import { shrinkImage } from '@/lib/clientImage';
-import { OpenInOneDriveButton } from '@/components/OpenInOneDriveButton';
+import { StatementPaymentReport } from '@/components/StatementPaymentReport';
+import { buildStatementPaymentReport, cardBalanceSummary, statementPaymentSummary } from '@/lib/statementPayments';
 import { useLocale, useT } from '@/components/LocaleProvider';
 import { FxBadge } from '@/components/FxBadge';
 import { FxRateButton } from '@/components/FxRateButton';
@@ -82,7 +83,7 @@ export type ItemOption = {
 };
 
 const inputClass =
-  'w-full bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-md px-2.5 py-1.5 text-xs text-[color:var(--color-text)] focus:outline-none focus:border-[color:var(--color-accent)]';
+  'w-full min-w-0 max-w-full bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-md px-2.5 py-1.5 text-xs text-[color:var(--color-text)] focus:outline-none focus:border-[color:var(--color-accent)]';
 
 function fileUrl(filePath: string) {
   return `/api/files/${filePath.split('/').map(encodeURIComponent).join('/')}`;
@@ -205,26 +206,16 @@ export function StatementsClient({
   }, [visible]);
 
   // Installment plans across all statements (for per-product payoff)
-  const plans = useMemo(() => computeInstallmentPlans(statements), [statements]);
+  const plans = useMemo(() => computeInstallmentPlans(visible), [visible]);
   const itemMap = useMemo(() => new Map(items.map((i) => [i._id, i])), [items]);
 
-  // Current debt = the LATEST statement per card (its total already rolls up the
-  // running balance) minus what's been paid on it. Summing every statement would
-  // double-count, since each statement's total IS the balance at that moment.
-  const balance = useMemo(() => {
-    const latest = new Map<string, SerializedStatement>();
-    for (const s of statements) {
-      const cur = latest.get(s.card);
-      if (!cur || s.period > cur.period) latest.set(s.card, s);
-    }
-    let total = 0;
-    for (const s of latest.values()) total += s.totalAmount - s.paidAmount;
-    return total;
-  }, [statements]);
+  const balances = useMemo(() => cardBalanceSummary(visible), [visible]);
+  const paymentReport = useMemo(() => buildStatementPaymentReport(visible,
+    new Map(items.map(i => [i._id, i.title])), new Date(), 6), [visible, items]);
   // P84: how much of each card's limit that same balance is using. Same source of
   // truth as `balance` above (latest statement per card), so the badge can never
   // contradict the outstanding figure printed next to it.
-  const utilization = useMemo(() => buildCardUtilization(cards, statements), [cards, statements]);
+  const utilization = useMemo(() => buildCardUtilization(cards, visible), [cards, visible]);
   const active = activeId ? statements.find((s) => s._id === activeId) ?? null : null;
 
   // Deep-link from global search
@@ -233,7 +224,7 @@ export function StatementsClient({
   });
 
   return (
-    <main className="max-w-[1400px] mx-auto px-4 py-6 pb-24">
+    <main className="min-w-0 max-w-[1400px] mx-auto px-4 py-6 pb-24">
       {/* Header */}
       <div className="mb-5">
         <div className="flex items-end justify-between gap-4 flex-wrap">
@@ -248,21 +239,14 @@ export function StatementsClient({
           </h1>
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
             {statements.length > 0 && (
-              <div className="text-xs text-[color:var(--color-text-dim)]" style={{ fontFamily: 'var(--font-mono)' }}>
-                {balance < -0.001 ? t('st.credit') : t('st.outstanding')}{' '}
-                <span
-                  className={cn(
-                    'font-semibold',
-                    balance < -0.001 ? 'text-[color:var(--color-accent)]' : 'text-[color:var(--color-red)]'
-                  )}
-                >
-                  {cur()}{Math.abs(balance).toFixed(2)}
-                </span>
+              <div className="flex flex-wrap gap-4 text-sm tabular-nums">
+                <span>{t('payments.due')}: <strong>{cur()}{balances.due.toFixed(2)}</strong></span>
+                {balances.credit > 0 && <span>{t('payments.credit')}: <strong>{cur()}{balances.credit.toFixed(2)}</strong></span>}
               </div>
             )}
             {statements.length > 0 && (
               <Button variant="secondary" size="sm" onClick={() => setShowReconcile(true)}>
-                <Link2 size={14} /> {t('rec.button')}
+                <Link2 size={14} /> {t('rec.title')}
               </Button>
             )}
             <Button variant="secondary" size="sm" onClick={() => setShowCards(true)}>
@@ -353,6 +337,9 @@ export function StatementsClient({
       )}
 
       {/* Full-screen detail */}
+      <div className="my-6"><StatementPaymentReport report={paymentReport} /></div>
+      <p className="mb-4 text-xs leading-relaxed text-[color:var(--color-text-dim)]">{t('payments.limitsNote')}</p>
+
       {active && (
         <Modal open onClose={() => setActiveId(null)} title={statementTitle(active)} size="xl">
           <StatementDetail
@@ -416,7 +403,7 @@ function UtilizationBadge({ u, className }: { u?: CardUtilization; className?: s
         limit: `${cur()}${u.creditLimit}`,
       })}
     >
-      {t('stm.utilPct', { pct: u.pct })}
+      ≈ {t('stm.utilPct', { pct: u.pct })}
     </span>
   );
 }
@@ -521,6 +508,7 @@ function PlanCardLinkable({
   compact?: boolean;
 }) {
   const t = useT();
+  const confirm = useConfirm();
   const [pending, startTransition] = useTransition();
   const [picking, setPicking] = useState(false);
   const [query, setQuery] = useState('');
@@ -555,21 +543,25 @@ function PlanCardLinkable({
       setQuery('');
     });
   }
-  function removeItem(itemId: string) {
+  async function removeItem(itemId: string) {
+    if (!(await confirm({ title: t('stm.removeProduct'), message: t('payments.confirmUnlink'), confirmLabel: t('common.delete'), danger: true }))) return;
     startTransition(async () => {
       await removeItemFromPlanByKey(plan.signature, itemId);
     });
   }
-  function clearAll() {
+  async function clearAll() {
+    if (!(await confirm({ title: t('stm.clearAll'), message: t('payments.confirmUnlink'), confirmLabel: t('common.delete'), danger: true }))) return;
     startTransition(async () => {
       await unlinkPlanByKey(plan.signature);
     });
   }
 
   return (
-    <div className={cn(compact && 'opacity-80')}>
+    <div className={cn("min-w-0", compact && 'opacity-80')}>
       <InstallmentPlanCard plan={plan} itemTitles={linkedItems.map((x) => x.title)} compact={compact} />
-      <div className="mt-1.5 px-1 space-y-1">
+      <details className="mt-3 min-w-0 rounded-lg border border-[color:var(--color-border)] p-3 [&_button]:min-h-11 [&_button]:px-3 [&_button]:text-xs">
+        <summary className="cursor-pointer py-2 text-sm">{t('payments.manage')}</summary>
+        <div className="mt-3 space-y-4">
         {/* Linked products — one removable chip each. A single charge can cover several. */}
         {linkedItems.length > 0 && (
           <div className="flex flex-wrap gap-1">
@@ -631,15 +623,14 @@ function PlanCardLinkable({
             >
               <Link2 size={10} className="inline" /> {linkedItems.length ? t('stm.addProduct') : suggestions.length ? t('stm.other') : t('stm.linkProduct')}
             </button>
-            {linkedItems.length > 0 && (
-              <button onClick={clearAll} disabled={pending} className="text-[10px] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)]" style={{ fontFamily: 'var(--font-mono)' }}>
-                {t('stm.clearAll')}
-              </button>
-            )}
           </div>
         )}
-        <PlanMergeControl plan={plan} allPlans={allPlans} />
-      </div>
+        <div className="border-t border-[color:var(--color-border)] pt-3"><PlanMergeControl plan={plan} allPlans={allPlans} /></div>
+        {linkedItems.length > 0 && <div className="border-t border-[color:var(--color-border)] pt-3">
+          <button onClick={clearAll} disabled={pending} className="w-full rounded-lg border border-[color:var(--color-red)]/40 text-[color:var(--color-red)]">{t('stm.clearAll')}</button>
+        </div>}
+        </div>
+      </details>
     </div>
   );
 }
@@ -648,6 +639,7 @@ function PlanCardLinkable({
  *  statements ("QUEST ONLINE" vs "QUEST ONLINE KALLITHEA") into one payoff plan. */
 function PlanMergeControl({ plan, allPlans }: { plan: InstallmentPlan; allPlans: InstallmentPlan[] }) {
   const t = useT();
+  const confirm = useConfirm();
   const [pending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState('');
@@ -658,14 +650,16 @@ function PlanMergeControl({ plan, allPlans }: { plan: InstallmentPlan; allPlans:
     return (query ? others.filter((p) => p.label.toLowerCase().includes(query)) : others).slice(0, 8);
   }, [allPlans, plan.key, q]);
 
-  function merge(targetKey: string) {
+  async function merge(targetKey: string) {
+    if (!(await confirm({ title: t('stm.mergeIntoBtn'), message: t('payments.confirmMerge'), confirmLabel: t('stm.mergeIntoBtn') }))) return;
     startTransition(async () => {
       await bindInstallmentGroup(plan.key, targetKey);
       setOpen(false);
       setQ('');
     });
   }
-  function unmerge() {
+  async function unmerge() {
+    if (!(await confirm({ title: t('stm.unmerge'), message: t('payments.confirmMerge'), confirmLabel: t('stm.unmerge') }))) return;
     startTransition(async () => {
       await unbindInstallmentGroup(plan.key);
     });
@@ -736,7 +730,7 @@ function StatementRow({
   onOpen: () => void;
 }) {
   const t = useT();
-  const credit = statement.totalAmount < -0.001;
+  const credit = statementPaymentSummary(statement).credit > 0;
   const remaining = statement.totalAmount - statement.paidAmount;
   const installmentCount = statement.transactions.filter((tx) => tx.installmentInfo).length;
 
@@ -812,7 +806,8 @@ function StatementDetail({
   const [rev, setRev] = useState(0);
   const [rescanMsg, setRescanMsg] = useState<string | null>(null);
 
-  const credit = current.totalAmount < -0.001;
+  const paymentSummary = statementPaymentSummary(current);
+  const credit = paymentSummary.credit > 0;
 
   // Re-run the AI parse on the stored PDF. OCR mode rasterizes + OCRs every page —
   // the fix for statements whose text layer dropped the "ΔΟΣΗ x/y" installment
@@ -822,7 +817,7 @@ function StatementDetail({
     startTransition(async () => {
       const r = await rescanStatement(current._id, useOcr);
       if (r.ok && r.statement) {
-        setCurrent(r.statement);
+        setCurrent(statementsWithCurrentCards([r.statement], cards)[0]);
         setRev((v) => v + 1);
         setRescanMsg(
           t('stm.rescanned', { tx: r.txCount ?? 0, inst: r.installmentsFound ?? 0 }) + (r.usedOcr ? ' (OCR)' : '')
@@ -844,14 +839,19 @@ function StatementDetail({
   }
 
   return (
-    <div className="space-y-5">
+    <div className="min-w-0 space-y-5 [&_input]:min-w-0 [&_input]:max-w-full [&_select]:min-w-0 [&_select]:max-w-full">
       {/* Overpaid highlight */}
       {credit && (
         <div className="flex items-center gap-2 text-xs px-3 py-2 rounded-lg bg-[#00ff8814] text-[color:var(--color-accent)] border border-[#00ff8833]" style={{ fontFamily: 'var(--font-mono)' }}>
-          {t('stm.creditBalance', { amount: `${cur()}${Math.abs(statement.totalAmount).toFixed(2)}` })}
+          {t('stm.creditBalance', { amount: `${cur()}${paymentSummary.credit.toFixed(2)}` })}
         </div>
       )}
 
+      <dl className="grid min-w-0 gap-3 rounded-lg bg-[color:var(--color-surface-2)] p-3 sm:grid-cols-3">
+        <div><dt className="text-xs text-[color:var(--color-text-dim)]">{t('payments.included')}</dt><dd className="mt-1 tabular-nums">{cur()}{paymentSummary.paymentsIncluded.toFixed(2)}</dd></div>
+        <div><dt className="text-xs text-[color:var(--color-text-dim)]">{t('payments.additional')}</dt><dd className="mt-1 tabular-nums">{cur()}{paymentSummary.additionalPaid.toFixed(2)}</dd></div>
+        <div><dt className="text-xs text-[color:var(--color-text-dim)]">{t('payments.due')}</dt><dd className="mt-1 tabular-nums font-semibold">{cur()}{paymentSummary.due.toFixed(2)}</dd></div>
+      </dl>
       {/* Editable statement fields — same form for reading and writing */}
       <StatementForm
         key={`form-${rev}`}
@@ -880,14 +880,13 @@ function StatementDetail({
           </button>
         )}
         {current.filePath && (
-          <span className="flex items-center gap-2">
+          <span className="flex flex-wrap items-center gap-3">
             <span className="flex items-center gap-1"><ScanLine size={12} /> {t('stm.rescanLabel')}</span>
             <button onClick={() => handleRescan(false)} disabled={pending} className="text-[color:var(--color-accent)] hover:opacity-80 disabled:opacity-50">{t('stm.text')}</button>
             <button onClick={() => handleRescan(true)} disabled={pending} title={t('stm.ocrTitle')} className="text-[color:var(--color-accent)] hover:opacity-80 disabled:opacity-50">{t('rc.ocr')}</button>
           </span>
         )}
         {rescanMsg && <span className="text-[color:var(--color-text-dim)] normal-case">{rescanMsg}</span>}
-        <OpenInOneDriveButton filePath={current.filePath} />
       </div>
 
       {/* PDF preview */}
@@ -1112,6 +1111,7 @@ function InstallmentLink({
   linkedItems?: ItemOption[];
 }) {
   const t = useT();
+  const confirm = useConfirm();
   const [pending, startTransition] = useTransition();
   const [picking, setPicking] = useState(false);
   const [query, setQuery] = useState('');
@@ -1138,7 +1138,8 @@ function InstallmentLink({
       if (r.ok) setMsg(t('stm.linkedCharges', { n: r.linked }));
     });
   }
-  function clearAll() {
+  async function clearAll() {
+    if (!(await confirm({ title: t('stm.unlinkAll'), message: t('payments.confirmUnlink'), confirmLabel: t('common.delete'), danger: true }))) return;
     startTransition(async () => {
       await unlinkInstallment(statementId, tx._id);
       setMsg(null);
@@ -1146,7 +1147,7 @@ function InstallmentLink({
   }
 
   return (
-    <div className="mt-1.5 ml-[42px] space-y-1">
+    <div className="mt-3 min-w-0 space-y-3 rounded-lg border border-[color:var(--color-border)] p-3 [&_button]:min-h-11 [&_button]:px-3 [&_button]:text-xs">
       {/* Linked products — a single charge can cover several bought on one receipt. */}
       {linked.length > 0 && (
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -1225,15 +1226,15 @@ function AddTransactionForm({ statementId, onDone }: { statementId: string; onDo
 
   return (
     <form onSubmit={handleSubmit} className="bg-[color:var(--color-surface-2)] rounded-lg p-3 mb-2 space-y-2">
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <div className="w-32 shrink-0">
           <DateInput name="date" required value={date} onValueChange={setDate} className={cn(inputClass, 'pr-8')} />
         </div>
-        <input name="description" placeholder={t('stm.description')} required className={cn(inputClass, 'flex-1')} />
+        <input name="description" placeholder={t('stm.description')} required className={cn(inputClass, 'min-w-0 flex-1')} />
         <input name="amount" type="number" step="0.01" placeholder={cur()} required className={cn(inputClass, 'w-20 text-right')} />
       </div>
       <div className="flex items-center gap-2">
-        <input name="category" placeholder={t('stm.category')} className={cn(inputClass, 'flex-1')} />
+        <input name="category" placeholder={t('stm.category')} className={cn(inputClass, 'min-w-0 flex-1')} />
         <label className="flex items-center gap-1.5 text-[10px] text-[color:var(--color-text-dim)] cursor-pointer" style={{ fontFamily: 'var(--font-mono)' }}>
           <input type="checkbox" checked={installment} onChange={(e) => setInstallment(e.target.checked)} className="accent-[color:var(--color-purple)]" />
           {t('stm.installment')}
@@ -1246,7 +1247,7 @@ function AddTransactionForm({ statementId, onDone }: { statementId: string; onDo
           <input name="totalInstallments" type="number" min="1" placeholder={t('stm.total')} className={cn(inputClass, 'w-24')} />
         </div>
       )}
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <Button type="submit" size="sm" variant="primary" disabled={pending}>
           {pending ? '...' : t('stm.addBtn')}
         </Button>
@@ -1265,7 +1266,7 @@ function cardLabel(c: SerializedCard) {
 }
 
 const selectClass =
-  'w-full bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-4 py-2 text-sm text-[color:var(--color-text)] focus:outline-none focus:border-[color:var(--color-accent)] transition-colors';
+  'w-full min-w-0 max-w-full bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-4 py-2 text-sm text-[color:var(--color-text)] focus:outline-none focus:border-[color:var(--color-accent)] transition-colors';
 
 function StatementForm({
   cards,
@@ -1329,7 +1330,7 @@ function StatementForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-3">
+    <form onSubmit={handleSubmit} className="min-w-0 space-y-4 [&_input]:min-w-0 [&_input]:max-w-full [&_select]:min-w-0 [&_select]:max-w-full">
       {error && <p role="alert" className="text-sm text-red-400">{t('st.error')}: {error}</p>}
       <Field label={t('stm.cardReq')}>
         {cards.length > 0 ? (
@@ -1351,7 +1352,7 @@ function StatementForm({
           <Input value={form.card} onChange={set('card')} required placeholder={t('stm.cardPlaceholder')} />
         )}
       </Field>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Field label={t('stm.periodReq')}>
           <Input value={form.period} onChange={set('period')} required placeholder="2026-06" />
         </Field>
@@ -1359,7 +1360,7 @@ function StatementForm({
           <Input type="date" value={form.statementDate} onChange={set('statementDate')} />
         </Field>
       </div>
-      <div className={cn('grid grid-cols-2 gap-3', fx.enabled && 'sm:grid-cols-3')}>
+      <div className={cn('grid grid-cols-1 sm:grid-cols-2 gap-3', fx.enabled && 'lg:grid-cols-3')}>
         <Field label={t('stm.paymentDue')}>
           <Input type="date" value={form.dueDate} onChange={set('dueDate')} />
         </Field>
@@ -1377,14 +1378,15 @@ function StatementForm({
         )}
       </div>
       {foreign && <StatementFxFields form={form} setRate={(v) => setForm((p) => ({ ...p, fxRate: v }))} base={fx.base} />}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Field label={t('stm.minPayment', { cur: fx.enabled ? currencySymbol(form.currency).trim() : cur() })}>
           <Input type="number" step="0.01" value={form.minimumPayment} onChange={set('minimumPayment')} />
         </Field>
-        <Field label={t('stm.paid', { cur: fx.enabled ? currencySymbol(form.currency).trim() : cur() })}>
-          <Input type="number" step="0.01" value={form.paidAmount} onChange={set('paidAmount')} />
+        <Field label={t('payments.additional')}>
+          <Input type="number" min="0" step="0.01" value={form.paidAmount} onChange={set('paidAmount')} />
         </Field>
       </div>
+      <p className="text-xs leading-relaxed text-[color:var(--color-text-dim)]">{t('payments.paymentNote')}</p>
       <Field label={t('v.fNotes')}>
         <textarea
           value={form.notes}
@@ -1428,7 +1430,7 @@ function StatementFxFields({
   const rate = Number(form.fxRate) || 0;
   const code = normalizeCurrency(form.currency);
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 items-end rounded-lg border border-[color:var(--color-purple)]/30 bg-[color:var(--color-surface-2)] p-3">
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end rounded-lg border border-[color:var(--color-purple)]/30 bg-[color:var(--color-surface-2)] p-3">
       <Field label={t('ex.fFxRate', { code, base })}>
         <Input
           type="number"

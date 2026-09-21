@@ -9,6 +9,7 @@ import { Goal as GoalModel } from '@/models/Goal';
 import { withRequestTenant } from '@/lib/tenancy/request';
 import { currentModel } from '@/lib/tenancy/connection';
 import { OWNED_STATUSES, SHOPPING_STATUSES } from '@/lib/itemStatus';
+import { buildStatementPaymentReport, cardBalanceSummary } from '@/lib/statementPayments';
 import { computeInstallmentPlans } from '@/lib/installments';
 import { getAppSettings } from '@/lib/appSettings';
 import { estimatedItemValue } from '@/lib/depreciation';
@@ -372,23 +373,8 @@ async function getReports(monthsBack = 12, locale = 'en') {
   const installmentsActive = allPlans.filter((p) => !p.done);
   const installmentsRemaining = installmentsActive.reduce((s, p) => s + p.remainingAmount, 0);
 
-  // ── Upcoming installment obligations (next 6 months) ─────────────────────
-  const upcomingInstallments = [1, 2, 3, 4, 5, 6].map((n) => {
-    const d = new Date(now.getFullYear(), now.getMonth() + n, 1);
-    const amount = installmentsActive
-      .filter((p) => p.remainingInstallments >= n)
-      .reduce((s, p) => s + p.perAmount, 0);
-    return { label: monthLabel(d, locale), amount: Math.round(amount) };
-  });
-
-  // ── Outstanding (last statement per card) + subscriptions ────────────────
-  const byCard = new Map<string, SerializedStatement>();
-  for (const st of serializedStatements) {
-    const k = st.last4 || st.card || st._id;
-    const cur = byCard.get(k);
-    if (!cur || new Date(st.period || st.statementDate) > new Date(cur.period || cur.statementDate)) byCard.set(k, st);
-  }
-  const outstanding = [...byCard.values()].reduce((s, st) => s + Math.max(0, (st.totalAmount || 0) - (st.paidAmount || 0)), 0);
+  const statementPayments = buildStatementPaymentReport(serializedStatements, titleById, now, monthsBack);
+  const outstanding = cardBalanceSummary(serializedStatements).due;
 
   const subsByCat = new Map<string, number>();
   let monthlySubs = 0;
@@ -459,7 +445,7 @@ async function getReports(monthsBack = 12, locale = 'en') {
     safeToSpend,
     monthReview,
     monthlySpend,
-    upcomingInstallments,
+    statementPayments,
     spendByStore,
     spendByCategory,
     subsByCategory,
