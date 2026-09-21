@@ -241,23 +241,23 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
 
               <DefaultsManager settings={info.settings} />
 
-              
+
               {(
                 <Section title={t('ics.title')} icon={<CalendarPlus size={15} />}>
                   <CalendarFeedManager />
                 </Section>
               )}
 
-              
+
               <SelfPasswordCard />
 
               <SelfMfaCard />
 
-              
+
 
               <Section title={t('set.about')}>
                 <UpdateChecker canEdit={isAdmin} />
-                
+
                 <Row label={t('set.privacy')}>
                   <span className="text-[color:var(--color-text-dim)]">
                     {info.ai.effectiveProvider === 'anthropic' ? t('set.privacyHybrid') : t('set.privacyLocal')}
@@ -277,7 +277,7 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
             </>
           )}
 
-          
+
           {tab === 'ai' && (
             <>
               <AiMasterAndFeatures ai={info.ai} canEdit={isAdmin} />
@@ -293,7 +293,7 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
 
           {tab === 'storage' && (
             <>
-              
+
               <StorageManager storage={info.storage} counts={info.counts} />
               <Section title={t('set.dataSection')} icon={<Database size={15} />}>
                 <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
@@ -331,7 +331,7 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
             </>
           )}
 
-          
+
           {tab === 'users' && isAdmin && <UsersManager currentUserId={currentUser.id} />}
 
           {tab === 'system' && isAdmin && (
@@ -994,7 +994,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
         </div>
       </div>
 
-      
+
       <div className="pt-3 border-t border-[color:var(--color-border)] mt-1">
         <Field label={t('set.aiBudget')}>
           <input
