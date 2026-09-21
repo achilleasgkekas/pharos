@@ -231,7 +231,7 @@ export async function updateItem(id: string, formData: FormData) {
  */
 export async function logSaleAsIncome(
   id: string
-): Promise<{ ok: boolean; expenseId?: string; error?: string }> {
+): Promise<{ ok: boolean; expenseId?: string; item?: SerializedItem; error?: string }> {
   await assertCanWrite();
   return withRequestTenant(async () => {
     await connectDB();
@@ -257,7 +257,8 @@ export async function logSaleAsIncome(
     await Item.updateOne({ _id: id }, { $set: { soldIncomeId: res.id } });
     revalidatePath('/items');
     revalidatePath('/income');
-    return { ok: true, expenseId: res.id };
+    const fresh = await Item.findById(id).lean();
+    return { ok: true, expenseId: res.id, item: fresh ? (JSON.parse(JSON.stringify(fresh)) as SerializedItem) : undefined };
   });
 }
 
@@ -270,7 +271,7 @@ export async function logSaleAsIncome(
  * and silently rewriting a `sold` or `installed` item back to `received` would lose state.
  * The tracking fields are deliberately KEPT — they are the record of how it got here.
  */
-export async function markItemArrived(id: string): Promise<{ ok: boolean; error?: string }> {
+export async function markItemArrived(id: string): Promise<{ ok: boolean; item?: SerializedItem; error?: string }> {
   await assertCanWrite();
   return withRequestTenant(async () => {
     await connectDB();
@@ -282,7 +283,8 @@ export async function markItemArrived(id: string): Promise<{ ok: boolean; error?
     if (!res.matchedCount) return { ok: false, error: 'This item is no longer marked as ordered' };
     revalidatePath('/items');
     revalidatePath('/shopping');
-    return { ok: true };
+    const fresh = await Item.findById(id).lean();
+    return { ok: true, item: fresh ? (JSON.parse(JSON.stringify(fresh)) as SerializedItem) : undefined };
   });
 }
 
@@ -296,7 +298,7 @@ export async function markItemArrived(id: string): Promise<{ ok: boolean; error?
  * markItemArrived() guards on `ordered`: a stale tab must not stamp a date onto an item
  * somebody already sold, or onto one whose schedule was just removed.
  */
-export async function markMaintenanceDone(id: string): Promise<{ ok: boolean; at?: string; error?: string }> {
+export async function markMaintenanceDone(id: string): Promise<{ ok: boolean; at?: string; item?: SerializedItem; error?: string }> {
   await assertCanWrite();
   return withRequestTenant(async () => {
     await connectDB();
@@ -310,7 +312,8 @@ export async function markMaintenanceDone(id: string): Promise<{ ok: boolean; at
     const at = new Date();
     await Item.updateOne({ _id: id }, { $set: { lastMaintenanceAt: at } });
     revalidatePath('/items');
-    return { ok: true, at: at.toISOString() };
+    const fresh = await Item.findById(id).lean();
+    return { ok: true, at: at.toISOString(), item: fresh ? (JSON.parse(JSON.stringify(fresh)) as SerializedItem) : undefined };
   });
 }
 
@@ -328,7 +331,7 @@ export async function markMaintenanceDone(id: string): Promise<{ ok: boolean; at
  * Guarded on the item still being out on loan, for the same reason markItemArrived guards
  * on `ordered`: a stale tab must not silently wipe fields somebody has just re-filled.
  */
-export async function markItemReturned(id: string): Promise<{ ok: boolean; error?: string }> {
+export async function markItemReturned(id: string): Promise<{ ok: boolean; item?: SerializedItem; error?: string }> {
   await assertCanWrite();
   return withRequestTenant(async () => {
     await connectDB();
@@ -338,7 +341,8 @@ export async function markItemReturned(id: string): Promise<{ ok: boolean; error
     if (!isLentOut(doc.status, doc.lentTo)) return { ok: false, error: 'This item is not out on loan' };
     await Item.updateOne({ _id: id }, { $set: { lentTo: '', lentAt: null, expectedReturnAt: null } });
     revalidatePath('/items');
-    return { ok: true };
+    const fresh = await Item.findById(id).lean();
+    return { ok: true, item: fresh ? (JSON.parse(JSON.stringify(fresh)) as SerializedItem) : undefined };
   });
 }
 
