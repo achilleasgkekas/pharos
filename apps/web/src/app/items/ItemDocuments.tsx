@@ -25,8 +25,21 @@ function iconFor(mime: string) {
 
 /** Document / manual vault (P21): manuals, warranty certs, serial-number photos —
  *  an ongoing per-item repository, distinct from the product photo gallery above. */
-export function ItemDocuments({ itemId, attachments: initial }: { itemId: string; attachments: SerializedAttachment[] }) {
-  const [attachments, setAttachments] = useState(initial);
+export function ItemDocuments({
+  itemId,
+  attachments: initial,
+  onChange,
+}: {
+  itemId: string;
+  attachments: SerializedAttachment[];
+  /** Reports every upload/delete to the parent, so a remount re-seeds from the new list (#245). */
+  onChange?: (attachments: SerializedAttachment[]) => void;
+}) {
+  const [attachments, setLocal] = useState(initial);
+  function setAttachments(next: SerializedAttachment[]) {
+    setLocal(next);
+    onChange?.(next);
+  }
   const [uploading, setUploading] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();

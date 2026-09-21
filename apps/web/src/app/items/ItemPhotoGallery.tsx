@@ -11,8 +11,23 @@ function fileUrl(p: string) {
 }
 
 /** Product photo gallery: hero + thumbnails, with upload / delete / set-cover / AI fetch. */
-export function ItemPhotoGallery({ itemId, photos: initialPhotos, canFetch }: { itemId: string; photos: string[]; canFetch: boolean }) {
-  const [photos, setPhotos] = useState<string[]>(initialPhotos);
+export function ItemPhotoGallery({
+  itemId,
+  photos: initialPhotos,
+  canFetch,
+  onChange,
+}: {
+  itemId: string;
+  photos: string[];
+  canFetch: boolean;
+  /** Reports every upload/delete/fetch/cover change to the parent, so a remount re-seeds from the new list (#245). */
+  onChange?: (photos: string[]) => void;
+}) {
+  const [photos, setLocal] = useState<string[]>(initialPhotos);
+  function setPhotos(next: string[]) {
+    setLocal(next);
+    onChange?.(next);
+  }
   const [active, setActive] = useState(0);
   const t = useT();
   const [pending, startTransition] = useTransition();
