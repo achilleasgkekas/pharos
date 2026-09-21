@@ -1,191 +1,99 @@
-<div align="center">
+# PHAROS
 
-<img src="docs/banner.png" alt="PHAROS - Personal Hub, Asset and Resource Oversight System" width="100%">
+**A self-hosted personal hub for everything you own and spend.**
 
-<p>
-  <a href="LICENSE"><img alt="License: AGPL-3.0" src="https://img.shields.io/badge/license-AGPL--3.0-00ff88"></a>
-  <img alt="Next.js 15" src="https://img.shields.io/badge/Next.js-15-000000?logo=next.js">
-  <img alt="MongoDB" src="https://img.shields.io/badge/MongoDB-7-13aa52?logo=mongodb&logoColor=white">
-  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white">
-  <img alt="Self-hosted" src="https://img.shields.io/badge/self--hosted-yes-a55eea">
-</p>
+Keep inventory, receipts, expenses, bills, subscriptions, documents and backups
+in one place. Run it for yourself or your household on your own server, with
+individual user accounts. AI is optional: every core workflow has a manual path.
 
-**One private dashboard for everything you own and spend.**
+## Screenshots
 
-*Inventory · receipts · expenses · credit-card installments · subscriptions · vouchers · tasks — with optional AI that reads your documents for you.*
+Screenshots are being prepared using demonstration data.
 
-</div>
+<!-- Screenshot placeholder: dashboard with sample inventory and upcoming payments. -->
+<!-- Screenshot placeholder: expenses list with fictional vendors and amounts. -->
+<!-- Screenshot placeholder: receipt review with a synthetic receipt and extracted fields. -->
 
----
+## Install with Docker Compose
 
-## What it is
+You need Docker with the Compose plugin, Git and OpenSSL. The default stack runs
+the web application, MongoDB and SearXNG. Ollama is separate and optional.
 
-PHAROS is a self-hosted personal hub. Drop in a receipt photo or a bank-statement
-PDF and (optionally) AI reads the vendor, amount, VAT, line items and installment
-plans. Track your gear, what you still want to buy (with multi-store price
-tracking), recurring bills, warranties — all on your own
-hardware, behind your own login.
-
-**AI is entirely optional.** Every feature has a manual path, and you choose whether
-to use AI at all, which provider, and even which individual features it powers — all
-from Settings. No provider configured? The app runs fine and gently points you to the
-setup when you're ready.
-
-## Highlights
-
-- **Login + multi-user** — a first-run wizard creates your admin account; add more
-  household members (admin / member roles) from Settings. A shared hub, one private gate.
-- **Optional AI document parsing** — drop a PDF/photo and AI extracts store, date,
-  total, net/VAT, line items and installment plans. OCR fallback with auto-rotation
-  for sideways phone photos. Turn it off per-feature or entirely.
-- **Inventory & shopping** — what you own vs. what you want, with multi-store price
-  tracking, target-price deal alerts, price-history charts, and URL import.
-- **Expenses & income** — recurring-series detection, statistical anomaly flags
-  (a bill 2× its usual gets a ⚠ badge), per-category monthly budgets.
-- **Statements & installments** — parses bank statements, correlates installment
-  plans to the products you bought, tracks payoff across months.
-- **Money calendar** — one 3-month agenda of renewals, installments, bills, and
-  warranty/voucher expiries.
-- **AI command bar** — "add a Netflix subscription", "show this month's stats" in
-  plain language (optional; needs a cloud provider).
-- **Built for safety** — soft-delete Trash (30-day recovery), backups, SMB/FTP
-  mirroring to a NAS, full data export/import.
-
-## Quick start
-
-```bash
-git clone https://github.com/youruser/pharos.git
+```sh
+git clone https://github.com/achilleasgkekas/pharos.git
 cd pharos
 cp .env.example .env
-# Generate the two required secrets and paste them into .env:
-#   openssl rand -base64 32   →  AUTH_SECRET
-#   openssl rand -base64 32   →  NEXT_SERVER_ACTIONS_ENCRYPTION_KEY
-#   openssl rand -base64 24   →  MONGO_PASS
-docker compose up -d          # web + mongo + searxng
 ```
 
-Open **http://localhost:3000** and the **first-run wizard** walks you through
-creating your admin account, basic preferences, and (optionally) an AI provider.
-That's it — no AI key required to get started.
+Edit `.env` before starting. Generate a **different** value for each secret:
 
-Optional profiles:
-
-```bash
-docker compose --profile scraper up -d              # + price scraper + FlareSolverr
-docker compose --profile tools up -d mongo-express  # DB admin UI on :8081
+```sh
+openssl rand -hex 24      # MONGO_PASS: URL-safe database password
+openssl rand -base64 32   # AUTH_SECRET: signs login sessions
+openssl rand -base64 32   # NEXT_SERVER_ACTIONS_ENCRYPTION_KEY: keep stable across updates
 ```
 
-Run from the prebuilt image (no source checkout):
+| Setting | What to configure |
+| --- | --- |
+| `MONGO_USER` | Database administrator username; `admin` matches the example. |
+| `MONGO_PASS` | Replace the example password with the generated hex value. |
+| `AUTH_SECRET` | Paste its generated value. |
+| `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` | Paste its separate generated value. |
+| `AUTH_COOKIE_SECURE` | Leave `false` for local HTTP; set `true` when served over HTTPS. |
+| `MONGO_URI` | Compose constructs this from `MONGO_USER`, `MONGO_PASS` and its Mongo service. For a native installation, set the full connection string explicitly. |
+| `STORAGE_ROOT` | Compose sets `/storage` and mounts `./data/storage` there. For a native installation, point this at a persistent directory. |
 
-```bash
-# Grab just docker-compose.prod.yml + .env onto the host, then:
-docker compose -f docker-compose.prod.yml pull   # pull ghcr.io/achilleasgkekas/pharos:latest
-docker compose -f docker-compose.prod.yml up -d   # web + mongo + searxng
+The default Compose file sets the container's `MONGO_URI` and `STORAGE_ROOT`
+directly: changing only those two entries in `.env` does not override the Compose
+configuration. Keep `.env`, database volumes and stored documents out of Git.
+
+```sh
+docker compose up -d --build
 ```
 
-Pin a version with `PHAROS_IMAGE=ghcr.io/achilleasgkekas/pharos:1.2.3` in `.env`.
-Update later with `pull && up -d`. The image is published to GHCR by the
-**Release image** workflow on every `v*.*.*` tag (`git tag v1.2.3 && git push --tags`).
+Open **http://localhost:3000** on the server, or its LAN address from another
+device. The first-run wizard creates the administrator account, then guides you
+through preferences and optional AI configuration. Add household users in Settings.
 
-📚 Full documentation lives in [docs/](docs/README.md) (start with the [self-hosting guide](docs/self-hosting.md)).
+The web port is published on the host. For remote access, configure your VPN or
+an HTTPS reverse proxy, for example `https://pharos.example.com`.
+See the [complete installation guide](docs/self-hosting.md) and
+[security guide](SECURITY.md).
 
-Local dev (outside Docker):
+### Data, backups and updates
 
-```bash
-cd apps/web
-npm install
-npm run dev         # http://localhost:3000
-npm run type-check  # tsc --noEmit
-```
+MongoDB uses the persistent `mongo-data` volume. Receipt images, statement PDFs
+and other files live in `./data/storage`. Back up **both** the database and files;
+keep a private copy of your configuration and secrets too. Do not remove volumes
+when updating an existing installation.
 
-## AI providers (optional)
+- [Backup and restore](docs/backup-and-restore.md)
+- [Updating and rollback](docs/updating.md)
+- [Troubleshooting](docs/troubleshooting.md)
 
-Pick one in **Settings → AI**, or skip it entirely:
+## Optional AI
 
-- **Ollama** — fully local, private, free (e.g. `qwen2.5vl:7b` vision + `qwen2.5:14b`
-  text). Configurable URL, so the model can run on another box.
-- **Anthropic** — Claude, the strongest parsing. Required for the AI command bar.
-- **OpenAI · Gemini · OpenRouter** — cloud, vision-capable.
-- **Custom** — any OpenAI-compatible server (LM Studio, Groq, Mistral, vLLM…).
+Pharos works without AI or any provider key. To enable local AI, run Ollama on
+your own host, install a suitable model and configure it in Settings → AI. Ollama
+uses no cloud API key; the default Docker configuration reaches the host at
+`host.docker.internal:11434`.
 
-A master switch turns AI on/off globally, and each feature (receipt scanning,
-statement parsing, product import, the command bar, …) has its own toggle. Every
-built-in prompt is editable from Settings.
+You may instead connect a supported cloud provider using your own key. Documents
+processed by a cloud provider are sent to that provider. The application offers
+an optional monthly budget based on estimated AI spend; also configure spending
+controls with your provider. You can switch AI off or enable it only for selected
+features.
 
-## Drive it from Claude (remote MCP)
+See [configuration](docs/configuration.md) for AI, storage mirrors and notifications.
 
-Pharos exposes a remote **MCP server** at `/api/mcp` (JSON-RPC over Streamable
-HTTP) so an external Claude — the mobile/desktop app, Claude Code, or MCP
-Inspector — can run the same commands as the in-app AI bar (add expense / income
-/ subscription / item / task, log a price, search, overview).
+## Documentation and integrations
 
-1. **Settings → AI → API / MCP → Generate token** (a per-user bearer token,
-   shown once).
-2. The endpoint is LAN/HTTP, so to reach it from your phone put it on **public
-   HTTPS** with a tunnel (Cloudflare Tunnel or Tailscale Funnel).
-3. Add it in Claude → Connectors → *Add custom connector* using the `https://…/api/mcp`
-   URL + the token. Custom connectors need a paid Claude plan; Claude.ai may
-   require OAuth for the URL (the token works today with MCP Inspector / Claude Code).
-
-Quick check with curl:
-
-```bash
-curl -s -X POST https://<host>/api/mcp \
-  -H "Authorization: Bearer <token>" -H 'Content-Type: application/json' \
-  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
-```
-
-## Tech stack
-
-| Layer | Choice |
-|---|---|
-| Framework | Next.js 15 (App Router, RSC, Server Actions, TypeScript strict) |
-| Database | MongoDB 7 + Mongoose 8 |
-| Auth | Session-cookie (`jose` JWT) + `node:crypto` scrypt password hashing — no external service |
-| UI | Tailwind CSS v4, Recharts, lucide-react |
-| AI | Pluggable: Ollama / Anthropic / OpenAI / Gemini / OpenRouter / any OpenAI-compatible |
-| Containers | Docker Compose (web + Mongo + SearXNG; scraper & tools opt-in) |
-
-## Security model
-
-- **App login required.** All routes — including served receipt/PDF files
-  (`/api/files`) — are gated by edge middleware. Unauthenticated requests are
-  redirected (pages) or get a 401 (files/API).
-- **Passwords** are hashed with `scrypt` (`node:crypto`, no native deps); sessions are
-  signed JWTs in an httpOnly cookie. Set `AUTH_COOKIE_SECURE=true` behind HTTPS.
-- **Secrets** (AI keys, remote passwords) are stored server-side and never sent to
-  the client.
-- **Untrusted email-HTML receipts** are served with `script-src 'none'` + `nosniff`.
-- Still best run behind a VPN / trusted reverse proxy — see [SECURITY.md](SECURITY.md).
-
-## Project structure
-
-```
-pharos/
-├── docker-compose.yml          # web + mongo + searxng (+ scraper/tools profiles)
-├── scripts/                    # backup.sh, migrate.ts, seed, mongo-init.js
-├── apps/web/src/
-│   ├── app/                    # routes + server actions (login, setup, settings, …)
-│   ├── components/             # UI primitives + SiteNav, AiCommandBar, banners
-│   ├── lib/                    # db, auth/session, ai providers, aiFeatures, ocr, …
-│   ├── models/                 # Mongoose schemas (User, Item, Receipt, …)
-│   └── middleware.ts           # the auth gate
-├── apps/extension/             # MV3 quick-capture browser extension (no build step)
-└── services/scraper/           # standalone price-scraper worker (cron)
-```
-
-## Contributing
-
-Issues and PRs welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) and our
-[Code of Conduct](CODE_OF_CONDUCT.md).
+- [Documentation index](docs/README.md)
+- [Features](docs/features.md)
+- [REST API and MCP](docs/api.md)
+- [Browser extension](apps/extension/README.md)
+- [Contributing](CONTRIBUTING.md) and [Code of Conduct](CODE_OF_CONDUCT.md)
 
 ## License
 
-[AGPL-3.0](LICENSE). You're free to self-host, study, and modify it; if you run a
-modified version as a network service, you must share your source under the same license.
-
----
-
-<div align="center">
-<sub>Built with Next.js, MongoDB, and a lighthouse. 🗼</sub>
-</div>
+Pharos is licensed under **AGPL-3.0-only**. See [LICENSE](LICENSE) for the complete terms.
