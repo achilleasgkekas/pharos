@@ -4,11 +4,12 @@
 #
 # This instance publishes NO ports (see docker-compose.prod.yml): only the `web` container
 # reaches it over the compose network. `secret_key` is therefore an internal signing key, not
-# an internet-facing secret; it may be rotated with `openssl rand -hex 32` but does not need to
-# be. `limiter: false` because the only caller is our own server-side code, not browsers.
+# an internet-facing secret. Replace the example value with a locally generated secret.
+# `limiter: false` because the only caller is our own server-side code, not browsers.
 use_default_settings: true
 server:
-  secret_key: "c712a3c832b9c2f1ef52cc682148582223336e00a2ffc916864e23d4d822c250"
+  # Generate a private value before deployment: openssl rand -hex 32
+  secret_key: "change-me-before-deployment"
   limiter: false
   image_proxy: false
 search:

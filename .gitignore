@@ -1,4 +1,5 @@
 # dependencies
+node_modules
 node_modules/
 .pnp
 .pnp.js
@@ -69,3 +70,29 @@ deploy/.deployed
 # real infrastructure code and stays tracked; only this runtime state is ignored, so nothing
 # here ever risks capturing live ban-queue data into git history.
 deploy/f2b/
+
+# Private operational journals and local agent configuration are not product source.
+CLOUD_GUARD.md
+DEPLOY_LOG.md
+MIGRATION_PROXMOX.md
+OSS_PROGRESS.md
+OWNER_DECISIONS.md
+PRODUCT_BACKLOG.md
+PROGRESS.md
+SAAS_PROGRESS.md
+STATUS.md
+TODO.md
+WEB_DEBT.md
+apps/landing/LANDING_PROGRESS.md
+apps/web/SAAS_PROGRESS.md
+docs/DOCS_PROGRESS.md
+.claude/launch.json
+# Environment secrets and personal exports (only examples may be published).
+.env.*
+!.env.example
+!**/.env.example
+!**/.env.*.example
+*.mbox
+*.p12
+*.pfx
+*.key
