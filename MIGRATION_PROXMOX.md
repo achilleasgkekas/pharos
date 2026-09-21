@@ -1,6 +1,6 @@
 # Μετακόμιση από Hetzner cloud σε self-hosted Proxmox
 
-> ✅ **ΟΛΟΚΛΗΡΩΘΗΚΕ (2026-08).** Η παραγωγή τρέχει πλέον στο apps VM **`10.0.1.11`** (Proxmox «flouda»),
+> ✅ **ΟΛΟΚΛΗΡΩΘΗΚΕ (2026-08).** Η παραγωγή τρέχει πλέον στο apps VM **`192.0.2.10`** (Proxmox «flouda»),
 > origin = **GitHub** (private, read-only deploy key `gh-pharos`), έκθεση μέσω Cloudflare Tunnel, Hetzner
 > τερματίστηκε. Deploy = `deploy/deploy-update.sh`. Το παρακάτω είναι το ιστορικό runbook — για την
 > τρέχουσα, authoritative κατάσταση δες το **`OWNER_DECISIONS.md` → «⚙️ Υποδομή & Deploy»**.
@@ -242,7 +242,7 @@ curl -s -X POST https://app.ph-aros.com/api/cron/saas/trials-sweep   # 401 unaut
    Box.~~ **ΕΓΙΝΕ 2026-08-28, αλλά ΟΧΙ στο Storage Box.** Το Hetzner Storage Box είχε ήδη πάψει να
    υπάρχει (το `u645343.your-storagebox.de` δεν αναλύεται, και το κλειδί `/root/.ssh/storagebox`
    δεν μεταφέρθηκε ποτέ στη VM), οπότε η υποψία του σημείου 4 παρακάτω ήταν λάθος: δεν είχε μείνει
-   τίποτα να μη σβήσουμε. Ο νέος προορισμός είναι το **NAS DS923+** (`//10.0.1.5/backups` μέσω SMB,
+   τίποτα να μη σβήσουμε. Ο νέος προορισμός είναι το **NAS DS923+** (`//192.0.2.10/backups` μέσω SMB,
    με `BACKUP_COPY_DIR`), το οποίο αναπαράγει στον **DS223** — επιβεβαιωμένο από τον Αχιλλέα ότι το
    share περιλαμβάνεται στο job, άρα ο δεύτερος κόμβος καλύπτεται. Άφιξη επαληθευμένη: τα αντίγραφα
    διαβάστηκαν πίσω από το share και το dump πέρασε **dry-run restore απευθείας από το NAS**.

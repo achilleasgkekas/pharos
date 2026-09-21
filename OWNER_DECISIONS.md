@@ -8,10 +8,10 @@
 
 **Η μετακόμιση από Hetzner ΟΛΟΚΛΗΡΩΘΗΚΕ.** Η παραγωγή τρέχει **self-hosted σε Proxmox** (node «flouda»). Τα routines ΠΡΕΠΕΙ να χρησιμοποιούν αυτά, όχι το παλιό Hetzner runbook:
 
-- **Host παραγωγής:** apps VM **`10.0.1.11`** (LAN, Proxmox «flouda»). Το παλιό Hetzner `128.140.126.136` **τερματίστηκε** — μην το χρησιμοποιείς.
+- **Host παραγωγής:** apps VM **`192.0.2.10`** (LAN, Proxmox «flouda»). Το παλιό Hetzner `128.140.126.136` **τερματίστηκε** — μην το χρησιμοποιείς.
 - **Repo στον server:** `/opt/pharos`. **Deploy:** `deploy/deploy-update.sh` (health → backup → `git fetch` + `--ff-only` origin/main → rebuild ΜΟΝΟ ό,τι άλλαξε → verify → **rollback σε αποτυχία**). Exit codes που διαβάζει το routine: `0` deployed+healthy, `1` refused, `2` rolled-back (νέα commits σπασμένα), `3` rollback failed / DOWN, `4` lock held. `deploy/deploy-update.sh --check` = health-only.
 - **Git origin = GitHub** (`github.com/achilleasgkekas/pharos`, **private**, branch **`main`**). Το **Gitea καταργήθηκε**. Ο server τραβά μέσω **read-only deploy key** (SSH alias `gh-pharos` στο `/root/.ssh/config`). Ο owner push-άρει στο GitHub — αυτό είναι το **source of truth**.
-- **Έκθεση:** Cloudflare Tunnel (`cloudflared`), **καμία ανοιχτή πόρτα**. Health URLs **ΑΜΕΤΑΒΛΗΤΑ**: `https://ph-aros.com` (landing) + `https://app.ph-aros.com` (app). Ο `pharos-deploy` / `pharos-cloud-guard` δείχνουν πλέον στο **10.0.1.11**.
+- **Έκθεση:** Cloudflare Tunnel (`cloudflared`), **καμία ανοιχτή πόρτα**. Health URLs **ΑΜΕΤΑΒΛΗΤΑ**: `https://ph-aros.com` (landing) + `https://app.ph-aros.com` (app). Ο `pharos-deploy` / `pharos-cloud-guard` δείχνουν πλέον στο **192.0.2.10**.
 - **Μυστικά:** `/opt/pharos/deploy/.env.prod` (mode 600, ΠΟΤΕ στο git). `AUTH_SECRET` + `MONGO_PASSWORD` αμετάβλητα. Offsite backup: Synology **DS223** (site-to-site) + το παλιό Storage Box.
 
 ---

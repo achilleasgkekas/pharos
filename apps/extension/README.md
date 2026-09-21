@@ -37,7 +37,7 @@ Chrome, Edge, Brave, Opera, Arc:
 1. Open `chrome://extensions` and turn on **Developer mode**.
 2. **Load unpacked** and pick this folder (`apps/extension`).
 3. The options page opens on first install. Enter your Pharos address, for example
-   `https://pharos.example.com` or `http://10.0.1.5:3000`, and press **Save**.
+   `https://pharos.example.com` or `http://192.0.2.10:3000`, and press **Save**.
 4. Sign in to Pharos once in the same browser. That is all the auth the extension needs.
 
 Firefox loads MV3 extensions too (`about:debugging` → **This Firefox** → **Load Temporary

@@ -12,7 +12,7 @@ assignees: ''
 
 **Πού**
 <!-- Άφησε μόνο αυτό που ισχύει -->
-- [ ] self-hosted (pharos.home.agkekas.gr)
+- [ ] self-hosted (pharos.example.com)
 - [ ] SaaS (app.ph-aros.com)
 - [ ] δεν ξέρω / και στα δύο
 
