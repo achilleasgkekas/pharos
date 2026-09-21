@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { saasMode } from '@/lib/tenancy/saasMode';
 import { checkCronAuth } from '@/lib/cronAuth';
 import { runPriceScrape } from '@/app/items/actions';
 import { recordCronRun } from '@/lib/cronHeartbeat';
@@ -21,20 +20,11 @@ export const dynamic = 'force-dynamic';
  * closes that gap; point a cron at it (see deploy/README.md — 0-star-slash-6 is the intended
  * cadence). Run it a little before the alert cron so deal/price-hike alerts read fresh prices.
  *
- * Self-host only (404 when SAAS_MODE is on), mirroring /api/cron/alerts for the same reason:
- * `runPriceScrape` reads the single shared database with no tenant scoping, so in a
- * multi-tenant deployment it would re-price the wrong data. Per-tenant scraping needs its own
- * fan-out and is not this.
- *
  * Protected by the shared CRON_SECRET bearer (fail-closed 500 when unset), not a session,
  * since a scheduler calls it. The response carries the per-run counts (scanned, itemsChanged,
  * linksChecked, drops, errors) so a crontab log can tell a healthy quiet pass from a crash.
  */
 export async function POST(req: Request) {
-  if (saasMode()) {
-    return NextResponse.json({ error: 'not found' }, { status: 404 });
-  }
-
   const fail = checkCronAuth(req);
   if (fail) {
     return NextResponse.json({ error: fail.error }, { status: fail.status });

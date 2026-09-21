@@ -5,8 +5,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // manual "Check & notify now" button in Settings — so an unattended instance never alerted at
 // all. That makes this route the thing standing between a configured user and silence, and its
 // gates are worth pinning:
-//   - SAAS_MODE on → 404, and it must NOT run the scan (runAlertChecks reads the single shared
-//     db with no tenant scoping, so running it multi-tenant would mail the wrong data out),
 //   - CRON_SECRET unset → 500 (fail CLOSED, never open-by-default), scan not run,
 //   - missing / malformed / wrong / different-length bearer → 401, scan not run (the
 //     constant-time compare must reject a shorter or longer token without throwing),
@@ -14,14 +12,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 //   - "nothing to report" (sent:false) is a SUCCESS, not an error — a crontab log has to be
 //     able to tell an all-clear apart from a failure,
 //   - a throwing scan becomes a clean 500 JSON carrying the reason, not an unhandled rejection.
-// Only the runAlertChecks seam and the saasMode flag are mocked; the real cronAuth runs.
+// Only the runAlertChecks seam are mocked; the real cronAuth runs.
 
-const { saasModeMock, runAlertChecksMock } = vi.hoisted(() => ({
-  saasModeMock: vi.fn(() => false),
+const { runAlertChecksMock } = vi.hoisted(() => ({
   runAlertChecksMock: vi.fn(async () => ({ ok: true, sent: false, summary: 'All clear — nothing to report.' })),
 }));
 
-vi.mock('@/lib/tenancy/saasMode', () => ({ saasMode: saasModeMock }));
 vi.mock('@/app/settings/actions', () => ({ runAlertChecks: runAlertChecksMock }));
 
 import { POST } from './route';
@@ -35,16 +31,7 @@ const ORIGINAL_ENV = { ...process.env };
 beforeEach(() => {
   vi.clearAllMocks();
   process.env = { ...ORIGINAL_ENV, CRON_SECRET: 'cron-secret-123', SAAS_MODE: '' };
-  saasModeMock.mockReturnValue(false);
   runAlertChecksMock.mockResolvedValue({ ok: true, sent: false, summary: 'All clear — nothing to report.' });
-});
-
-it('SAAS_MODE on → 404 and the scan never runs', async () => {
-  saasModeMock.mockReturnValue(true);
-  const res = await POST(makeReq({ authorization: 'Bearer cron-secret-123' }));
-
-  expect(res.status).toBe(404);
-  expect(runAlertChecksMock).not.toHaveBeenCalled();
 });
 
 it('CRON_SECRET unset → 500 (fail closed) and the scan never runs', async () => {

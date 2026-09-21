@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { saasMode } from '@/lib/tenancy/saasMode';
 import { checkCronAuth } from '@/lib/cronAuth';
 import { runAlertChecks } from '@/app/settings/actions';
 import { recordCronRun } from '@/lib/cronHeartbeat';
@@ -21,11 +20,6 @@ export const dynamic = 'force-dynamic';
  * matter how it was configured. This route closes that gap; the button stays exactly as it is
  * and simply stops being the only trigger.
  *
- * Self-host only (404 when SAAS_MODE is on). This mirrors, inverted, the gate on the SaaS cron
- * routes: `runAlertChecks` reads the single shared database with no tenant scoping, so in a
- * multi-tenant deployment it would scan the wrong data and mail one tenant's numbers to
- * whoever holds the secret. Per-tenant alert sweeps need their own fan-out and are not this.
- *
  * Protected by the shared CRON_SECRET bearer (fail-closed 500 when unset), not a session,
  * since a scheduler calls it. Cadence is the operator's, not ours: point any cron at it.
  *
@@ -36,10 +30,6 @@ export const dynamic = 'force-dynamic';
  * per-item memory; the button always calls runAlertChecks() with no args, i.e. dedupe off).
  */
 export async function POST(req: Request) {
-  if (saasMode()) {
-    return NextResponse.json({ error: 'not found' }, { status: 404 });
-  }
-
   const fail = checkCronAuth(req);
   if (fail) {
     return NextResponse.json({ error: fail.error }, { status: fail.status });
