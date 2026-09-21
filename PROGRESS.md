@@ -13783,3 +13783,17 @@ https://github.com/achilleasgkekas/pharos/pull/66, commit `2ba0a34b`. Το Codex
 - **Αναμονή για deploy:** το `DEPLOY_LOG.md` έχει τελευταίο το `1b88ca34` και το `origin/main` είναι **160 commits** μπροστά. Το ημερολόγιο είναι προφανώς παλιό· ο πραγματικός αριθμός θέλει έλεγχο στο image που τρέχει, όχι στο repo.
 - **Ανοιχτά brain PRs:** 1 (μόνο το #251), χωρίς review label ακόμα. 9 ανοιχτά PR συνολικά.
 - **Επόμενο:** το #245 (uploaded/deleted files εξαφανίζονται από το UI σε άσχετο item update) είναι το τελευταίο p1 της λωρίδας μου, αλλά θέλει προσοχή: η αιτία που περιγράφει το issue, ότι το `updatedAt` προκαλεί remount, είναι υπόθεση και πρέπει να επαληθευτεί πρώτα, γιατί remount χωρίς `key` prop δεν συμβαίνει από σκέτη αλλαγή prop. Εναλλακτικά το #197 (Document και Special Date alerts ρυθμίζονται αλλά δεν εκτελούνται ποτέ), p3 αλλά καθαρά επαληθεύσιμο.
+
+## 2026-09-21 09:50 (pharos-brain)
+
+- **Guards:** κανένα pause. Budget 0/3 για σήμερα, άρα αυτό είναι το πρώτο work-run της ημέρας. Καμία ANSWERED εγγραφή για `pharos-brain` στο `ASK_ACHILLEAS.md`. Το context συγχρονίστηκε.
+- **Prod health:** `https://ph-aros.com/` 200 με landing περιεχόμενο. `https://app.ph-aros.com/account/login` και `POST /api/cron/saas/trials-sweep` δίνουν **502**. Δεν το θεωρώ έκτακτο: το SaaS αποσύρεται (απόφαση 2026-09-20, στάδιο 1 στο `d9a0705b`/#257, όπου σβήστηκε και το ίδιο το `app/api/cron/saas/**`), και το `app.ph-aros.com` φεύγει. Δεν άνοιξα ASK. Τα health checks του SKILL για το SaaS πρέπει να αφαιρεθούν ή να αντικατασταθούν με το self-hosted.
+- **Triage:** κανένα `needs-triage`, κανένα `blocked`.
+- **Δουλειά:** #245 (p1, `lane:claude`), έγγραφα και φωτογραφίες εξαφανίζονται από το modal μετά από άσχετη ενέργεια. Επαλήθευσα την αιτία στον κώδικα πριν τη διόρθωση: `ItemDocuments`/`ItemPhotoGallery`/`ItemForm` έχουν key με `updatedAt`, τα vaults κρατούσαν τα uploads μόνο σε τοπικό state, και το `handlePhotoFetch` έκανε spread το captured `item`. Ένα PDF που μόλις ανέβηκε χανόταν στο remount, αν και ήταν αποθηκευμένο.
+- **Διόρθωση:** νέο `onChange` και στα δύο vaults, και merge πάνω στο ΤΡΕΧΟΝ item του γονιού με functional setState (`applyItemPatch`, νέο `items/itemPatch.ts`). Η αλλαγή που κάνει ένα παιδί στον εαυτό του δεν αλλάζει το key, άρα δεν κάνει remount. Re-key γίνεται μόνο στο fetch της toolbar.
+- **PR:** #265 https://github.com/achilleasgkekas/pharos/pull/265 (type-check exit 0, 5740 tests περνούν, 7 καινούρια). Σχολίασα τον σύνδεσμο στο #245 χωρίς να το κλείσω.
+- **Τι ΔΕΝ αποδεικνύεται:** δεν υπάρχει DOM test environment (το vitest τρέχει σε `node`), οπότε τα tests ελέγχουν τη μετάβαση state και όχι το render. Έλεγχος σε browser δεν έγινε.
+- **Προσοχή:** τα Actions minutes τελείωσαν και οι reviewers είναι κλειστοί (βλ. memory, 2026-09-21), οπότε το #265 θα μείνει χωρίς review μέχρι να επανέλθει ο στόλος.
+- **Αναμονή για deploy:** άγνωστο από το repo. Το `DEPLOY_LOG.md` είναι παλιό, ο αριθμός θέλει έλεγχο στο image που τρέχει.
+- **Ανοιχτά brain PRs:** 1 (το #265).
+- **Επόμενο:** το #197 (τα Document και Special Date alerts ρυθμίζονται αλλά δεν τρέχουν ποτέ), το τελευταίο της λωρίδας μου. Επίσης το SKILL θέλει ενημέρωση ώστε το STEP 2 να μην ελέγχει το SaaS που αποσύρεται.
