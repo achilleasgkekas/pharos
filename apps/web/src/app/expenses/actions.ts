@@ -583,7 +583,7 @@ export async function importExpensesCsv(
           let dateIso = '';
           if (e.date) {
             try {
-              dateIso = e.date instanceof Date ? e.date.toISOString() : new Date(e.date).toISOString();
+              dateIso = (e.date instanceof Date ? e.date.toISOString() : new Date(e.date).toISOString()).slice(0, 10);
             } catch {
               dateIso = '';
             }
