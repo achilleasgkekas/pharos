@@ -24,7 +24,8 @@ import { Modal } from '@/components/ui/Modal';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { cn } from '@/components/ui/cn';
 import type { SerializedStatement, SerializedTransaction, SerializedCard } from '@/types';
-import { periodLabel } from '@/lib/cards';
+import { periodLabel, buildCardLabel } from '@/lib/cards';
+import { statementsWithCurrentCards } from '@/lib/statementCards';
 import {
   buildCardUtilization,
   type CardUtilization,
@@ -106,7 +107,7 @@ function statementTitle(s: SerializedStatement): string {
 // ─── Main component ────────────────────────────────────────────────────────
 
 export function StatementsClient({
-  statements,
+  statements: storedStatements,
   cards,
   items,
   ollamaUp,
@@ -121,6 +122,7 @@ export function StatementsClient({
   multiCurrency?: boolean;
 }) {
   const t = useT();
+  const statements = useMemo(() => statementsWithCurrentCards(storedStatements, cards), [storedStatements, cards]);
   const fx: FxCtx = { base: baseCurrency, enabled: multiCurrency };
   const [showCreate, setShowCreate] = useState(false);
   const [showCards, setShowCards] = useState(false);
@@ -177,10 +179,12 @@ export function StatementsClient({
 
   // Distinct card labels present in statements (for the filter chips)
   const cardLabels = useMemo(() => [...new Set(statements.map((s) => s.card))].sort(), [statements]);
+  // A rename can invalidate a selected label while the card editor is open.
+  const effectiveCardFilter = cardLabels.includes(cardFilter) ? cardFilter : 'all';
 
   const visible = useMemo(
-    () => (cardFilter === 'all' ? statements : statements.filter((s) => s.card === cardFilter)),
-    [statements, cardFilter]
+    () => (effectiveCardFilter === 'all' ? statements : statements.filter((s) => s.card === effectiveCardFilter)),
+    [statements, effectiveCardFilter]
   );
 
   // Group visible statements by card
@@ -304,11 +308,11 @@ export function StatementsClient({
       {/* Card filter chips */}
       {cardLabels.length > 1 && (
         <div className="flex gap-2 mb-5 overflow-x-auto pb-1">
-          <FilterChip active={cardFilter === 'all'} onClick={() => setCardFilter('all')}>
+          <FilterChip active={effectiveCardFilter === 'all'} onClick={() => setCardFilter('all')}>
             {t('st.allCards')}
           </FilterChip>
           {cardLabels.map((c) => (
-            <FilterChip key={c} active={cardFilter === c} onClick={() => setCardFilter(c)}>
+            <FilterChip key={c} active={effectiveCardFilter === c} onClick={() => setCardFilter(c)}>
               {c}
             </FilterChip>
           ))}
@@ -1251,7 +1255,7 @@ function AddTransactionForm({ statementId, onDone }: { statementId: string; onDo
 // ─── Statement Form ────────────────────────────────────────────────────────
 
 function cardLabel(c: SerializedCard) {
-  return `${c.name}${c.last4 ? ' ' + c.last4 : ''}`;
+  return buildCardLabel(c.name, c.last4);
 }
 
 const selectClass =
@@ -1282,6 +1286,7 @@ function StatementForm({
   const printed = (v: number | undefined) => (v == null ? '' : String(toPrinted(v, storedRate)));
   const [form, setForm] = useState({
     card: statement?.card ?? (cards[0] ? cardLabel(cards[0]) : ''),
+    cardId: statement ? (cards.some((c) => c._id === statement.cardId) ? statement.cardId! : '') : cards[0]?._id ?? '',
     period: statement?.period ?? todayLocal().slice(0, 7),
     statementDate: statement?.statementDate ? statement.statementDate.slice(0, 10) : todayLocal(),
     dueDate: statement?.dueDate ? statement.dueDate.slice(0, 10) : '',
@@ -1315,14 +1320,17 @@ function StatementForm({
     <form onSubmit={handleSubmit} className="space-y-3">
       <Field label={t('stm.cardReq')}>
         {cards.length > 0 ? (
-          <select value={form.card} onChange={set('card')} className={selectClass} required>
+          <select value={form.cardId || form.card} onChange={(e) => {
+            const card = cards.find((c) => c._id === e.target.value);
+            setForm((p) => ({ ...p, cardId: card?._id ?? '', card: card ? cardLabel(card) : e.target.value }));
+          }} className={selectClass} required>
             <option value="">{t('stm.selectCard')}</option>
             {cards.map((c) => (
-              <option key={c._id} value={cardLabel(c)}>
+              <option key={c._id} value={c._id}>
                 {cardLabel(c)}
               </option>
             ))}
-            {form.card && !cards.some((c) => cardLabel(c) === form.card) && (
+            {form.card && !form.cardId && (
               <option value={form.card}>{form.card}</option>
             )}
           </select>
@@ -1515,7 +1523,7 @@ function CardsManager({
         </p>
       )}
       {cards.map((c) => {
-        const label = `${c.name}${c.last4 ? ' ' + c.last4 : ''}`;
+        const label = cardLabel(c);
         const spend = spendByCard.get(label);
         return (
           <div
