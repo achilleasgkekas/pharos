@@ -6,7 +6,7 @@ Common questions about PHAROS, grouped by topic. For step-by-step guides see the
 ## Contents
 
 - [General](#general)
-- [Self-hosting vs managed SaaS](#self-hosting-vs-managed-saas)
+- [Self-hosting](#self-hosting)
 - [Privacy & data ownership](#privacy--data-ownership)
 - [AI](#ai)
 - [Storage & backups](#storage--backups)
@@ -46,34 +46,11 @@ public sign-up on the self-hosted app.
 
 ---
 
-## Self-hosting vs managed SaaS
+## Self-hosting
 
-### What is the difference between the two?
-
-PHAROS comes in two shapes from the same codebase:
-
-- **Self-hosted (open source, AGPL-3.0):** you run the container on your own
-  hardware. Single instance, single organization, your database, your files.
-  This is the default and the focus of most of the docs.
-- **Managed SaaS (hosted):** a multi-tenant control plane on top of the same app,
-  enabled with `SAAS_MODE`. It adds accounts, workspaces, memberships & roles,
-  a plan/quota ladder, and Stripe billing. See [Managed SaaS mode](saas.md).
-
-### Which one should I pick?
-
-If you want full control and no bill, self-host. If you would rather not run
-infrastructure, the hosted service handles it for you. Feature parity is the
-goal: the paid tiers do not lock away core functionality that self-hosters get
-for free.
-
-### Can I move between them?
-
-The data model is the same underneath. Self-hosting keeps everything on your
-disk; the managed service keeps your workspace on the hosted infrastructure.
-Import/export lives in **Settings → Storage & backup** (JSON export/restore and
-CSV export) so you are never locked in.
-
----
+Pharos is available as self-hosted software under AGPL-3.0. There is no managed
+hosted service, hosted signup or paid plan. You operate the application, choose
+its optional integrations, and maintain your database, files and backups.
 
 ## Privacy & data ownership
 
@@ -170,13 +147,6 @@ AGPL terms apply if you offer it as a network service to others. See the
 Yes. The only costs are your own hardware and electricity, plus optional cloud AI
 usage if you choose a cloud provider instead of local Ollama.
 
-### What do the paid SaaS tiers include?
-
-The hosted service has a plan ladder (Free, Pro, Dedicated) that differs mainly on
-storage, AI quota, seats, and custom-domain support, not on core features. The
-exact limits and billing are documented in [Managed SaaS mode](saas.md).
-
----
 
 ## Troubleshooting
 

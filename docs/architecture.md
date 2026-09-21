@@ -18,8 +18,7 @@ The web app serves three kinds of clients from one process:
   signed session cookie.
 - **API clients** — a REST API under `/api/v1`, protected by a per-user bearer
   token, for scripts and other tools.
-- **Optionally, other tools** — an MCP endpoint under `/api/mcp` and, in hosted
-  mode, a control-plane API under `/api/saas`.
+- **Optionally, other tools** — an MCP endpoint under `/api/mcp`.
 
 AI is **optional** and lives outside the container: either a native Ollama on the
 host, or a cloud provider reached over HTTPS. Nothing about the core app depends on
@@ -116,8 +115,6 @@ first-run detection and token lookups happen in Node-runtime route handlers inst
 - **File serving** → `/api/files/*` streams binary files (receipt scans, statement
   PDFs, item photos) from the storage volume, behind the same auth.
 - **MCP** → `/api/mcp` exposes an MCP endpoint for tool-based clients.
-- **SaaS control plane** → `/api/saas` (only meaningful when `SAAS_MODE` is on; see
-  [Managed SaaS mode](saas.md)).
 
 ### Data layer
 
@@ -126,8 +123,8 @@ first-run detection and token lookups happen in Node-runtime route handlers inst
   `Item`, `ShoppingListItem`, `Receipt`, `Expense`, `Statement`, `Subscription`,
   `Voucher`, `Task`, `Store`, `Card`, plus infrastructure models `User`, `Job`
   (background AI jobs), `Notification`, `AppConfig` (a singleton settings document),
-  `Conversation`, `Phase`, and the SaaS models `Account`, `Tenant`, `Membership`,
-  `Invite`, `Usage`, `AuditEvent`.
+  `Conversation` and the legacy `Phase` model. Credentials are excluded from
+  user-facing exports.
 - **Binary files** live on disk, not in the database. Mongo stores only the path;
   the file sits under the `/storage` volume (`./data/storage` on the host). This is
   the "local-first" rule: the app always reads and serves files from local disk.
@@ -170,16 +167,6 @@ Details in [Configuration → AI providers](configuration.md).
   and can fire ntfy alerts on drops. Opt-in because the pair is heavy.
 - **mongo-express** — a browser DB admin UI for debugging, bound to loopback.
 
-## Managed SaaS mode (overlay)
-
-Setting `SAAS_MODE` turns the same app into a multi-tenant service without changing
-the self-hosted code path. The tenancy layer lives under
-[`lib/tenancy/`](../apps/web/src/lib/tenancy) (accounts, workspaces, memberships,
-roles, invites, audit) and the billing layer under
-[`lib/billing/`](../apps/web/src/lib/billing) (plans, quotas, usage, Stripe). The
-control-plane API is `/api/saas`. When `SAAS_MODE` is off, none of this is reachable
-and the app behaves as a single-tenant self-hosted hub. See
-[Managed SaaS mode](saas.md).
 
 ## Where things live (quick map)
 
@@ -199,5 +186,4 @@ and the app behaves as a single-tenant self-hosted hub. See
 - [Self-hosting](self-hosting.md) — get the stack running.
 - [Configuration](configuration.md) — AI, storage, notifications, i18n.
 - [API reference](api.md) — the `/api/v1` surface in detail.
-- [Managed SaaS mode](saas.md) — the multi-tenant overlay.
 - [Glossary](glossary.md) — Pharos-specific terms.

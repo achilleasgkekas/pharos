@@ -5,8 +5,7 @@ the code or UI, this page gives the practical definition and links to the guide
 that covers it in depth. Alphabetical.
 
 For how the modules work, see [Features](features.md); for the REST API, see the
-[API reference](api.md); for the hosted multi-tenant mode, see
-[Managed SaaS mode](saas.md).
+[API reference](api.md).
 
 ---
 
@@ -142,10 +141,7 @@ recurring auto-generation.
 
 ## S
 
-**SaaS mode.** The optional multi-tenant control plane, enabled with the
-`SAAS_MODE` env var. Adds accounts, workspaces, memberships/roles, plans and
-quotas, and Stripe billing. Off by default; the self-hosted app never needs it.
-See [Managed SaaS mode](saas.md).
+
 
 **Signature (installment).** A stable identity for a plan across statements and
 links: `merchant | total | origin`. Charges sharing a signature are recognised as
@@ -165,10 +161,7 @@ Greek→Latin, domain/legal-suffix removed) so that variants ("iStorm",
 best known price reaches it, the item shows a "deal" verdict and can trigger a
 notification.
 
-**Tenant / membership / role.** SaaS-mode concepts. A **tenant** is one isolated
-account (its own database); a **membership** ties a user to a tenant with a
-**role** (owner / admin / member) that controls what they can do. See
-[Managed SaaS mode](saas.md).
+
 
 **Trash.** The soft-delete bin. Deleted items (across most modules) sit here and
 can be restored or purged; entries auto-purge after 30 days. Distinct from a

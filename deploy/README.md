@@ -1,195 +1,27 @@
-# Deploying Pharos (hosted SaaS)
+# Self-hosted operations
 
-Target: one Hetzner Cloud server, Ubuntu 24.04, Docker. Everything below runs **on the server**
-unless it says otherwise.
+The supported installation is the repository-root `docker-compose.yml`, or
+`docker-compose.prod.yml` for prebuilt images. See [self-hosting](../docs/self-hosting.md)
+and [updating](../docs/updating.md). The former hosted stack, wildcard routing,
+SaaS development compose and hosted deployment script have been removed.
 
-This directory is only for the hosted multi-tenant deployment. The repo-root `docker-compose.yml`
-(your own single-user instance) and `docker-compose.saas-dev.yml` (local scratch stack) are
-untouched by it: different project name, different volumes, different everything.
+Keep the existing database, storage directory and secrets when updating an
+installation. Retiring the hosted software is not a database migration or an
+instruction to delete any volumes.
 
----
+## Scheduled jobs
 
-## 0. Before you start
+`cron-call.sh` calls the token-protected scheduler endpoints. Configure
+`CRON_SECRET` privately (an unquoted value), set `ENV_FILE` to that private file,
+and set `PHAROS_URL` to your own instance origin. Pass `alerts` or `prices` to the script. The price and alert routes
+are `/api/cron/prices` and `/api/cron/alerts`.
 
-- DNS for the domain must be on **Cloudflare** (nameservers moved and the zone active). The
-  wildcard certificate is issued over DNS-01, which needs Cloudflare's API, not a web server.
-- Two DNS records, both **proxied off (grey cloud)** so Let's Encrypt and the app see the real IP:
+## Existing backup installations
 
-  | Type | Name | Value |
-  |------|------|-------|
-  | A    | `@`  | your server IP |
-  | A    | `*`  | your server IP |
+`backup.sh` and `restore.sh` remain for installations already using them. Supply
+`ENV_FILE`, `MONGO_CONTAINER` and `STORAGE_DIR` for your actual instance; their
+legacy defaults must not be assumed to match a new installation. Back up both
+MongoDB and the stored files, and verify a restore into a separate instance before
+relying on a backup. See [backup and restore](../docs/backup-and-restore.md).
 
-  The wildcard is what makes `<workspace>.ph-aros.com` resolve. Without it, signup works and every
-  workspace 404s.
-- A Cloudflare API token with **Zone:Read + DNS:Edit on this zone only**. Not the Global API Key:
-  that one can do anything to every zone you own, and it will be sitting in a file on a machine
-  that is exposed to the internet.
-
-## 1. Get the code onto the server
-
-The repo is private, so the server needs read access. A **deploy key** is the least dangerous
-option: it is read-only and scoped to this one repository, unlike a personal access token.
-
-On the server:
-
-```bash
-ssh-keygen -t ed25519 -C "pharos-deploy" -f ~/.ssh/id_ed25519 -N ""
-cat ~/.ssh/id_ed25519.pub
-```
-
-Paste that into GitHub → the repo → Settings → Deploy keys → Add, **without** write access. Then:
-
-```bash
-mkdir -p /opt && git clone git@github.com:achilleasgkekas/pharos.git /opt/pharos
-```
-
-## 2. Configure
-
-```bash
-cd /opt/pharos/deploy
-cp .env.prod.example .env.prod
-chmod 600 .env.prod
-```
-
-Fill in `.env.prod`. Generate each secret separately with `openssl rand -base64 32`.
-
-`NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` deserves a word: it must stay **fixed forever**. If it
-changes, every browser tab that is already open is holding action ids the new build no longer
-recognises, and the next click gives the user an error page.
-
-## 3. Start
-
-```bash
-cd /opt/pharos
-docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env.prod up -d --build
-```
-
-First boot takes a few minutes: it compiles the app and builds a Caddy with the Cloudflare plugin.
-Watch the certificate being issued:
-
-```bash
-docker logs -f pharos-caddy
-```
-
-Then check the app answers:
-
-```bash
-curl -sI https://ph-aros.com/account/login | head -3
-```
-
-## 4. Schedule the background jobs
-
-Four endpoints are driven by cron, not by the app. They authenticate with `CRON_SECRET` and live
-under `/api/cron/`, which is the only path excluded from the session gate.
-
-Call them through `deploy/cron-call.sh`, never with the token inline. `ps` shows every process
-argv to every local user, so a `-H "Authorization: Bearer ..."` in the crontab leaks the secret for
-as long as the request runs, and duplicates a value that already has a `600` home in `.env.prod`.
-The script reads it from there and hands it to curl through a config file on stdin.
-
-`crontab -e` (UTC; backup first, so a bad night still has today's copy):
-
-```cron
-20 3 * * * /opt/pharos/deploy/backup.sh >> /var/log/pharos-backup.log 2>&1
-10 2 * * * /opt/pharos/deploy/cron-call.sh prices          >> /var/log/pharos-cron.log 2>&1
-17 4 * * * /opt/pharos/deploy/cron-call.sh usage-sample     >> /var/log/pharos-cron.log 2>&1
-27 4 * * * /opt/pharos/deploy/cron-call.sh trials-sweep     >> /var/log/pharos-cron.log 2>&1
-32 4 * * * /opt/pharos/deploy/cron-call.sh suspended-sweep  >> /var/log/pharos-cron.log 2>&1
-37 4 * * * /opt/pharos/deploy/cron-call.sh erasure-purge    >> /var/log/pharos-cron.log 2>&1
-```
-
-The **control-plane** order (`trials-sweep` → `suspended-sweep` → `erasure-purge`) is
-load-bearing, not cosmetic: `trials-sweep` creates suspensions, `suspended-sweep` warns them and
-schedules the expired ones for erasure, `erasure-purge` reports what is due. Run back to front and
-each stage acts on yesterday's state.
-
-`prices` (`POST /api/cron/saas/prices`) is the **data-plane** counterpart — it runs the price
-scraper for every live workspace, each inside its own tenant DB (the SaaS fan-out of the
-self-host `/api/cron/prices`). It is independent of the control-plane chain, so its time only
-needs to sit off-peak; once daily is plenty because the shared cross-tenant price cache (24h TTL)
-already means a URL that many workspaces track is fetched once per day, not once per workspace.
-
-Confirm one works before trusting the schedule, in the environment cron will actually use (an
-empty env with cron's default `PATH`) rather than your login shell:
-
-```bash
-env -i PATH=/usr/bin:/bin /opt/pharos/deploy/cron-call.sh trials-sweep
-```
-
-### Self-hosted crons (`SAAS_MODE` off)
-
-Two more endpoints exist for the self-hosted app and are **404 under `SAAS_MODE`** (they read the
-one shared database with no tenant scoping, so they belong only to a single-tenant instance):
-
-- `POST /api/cron/alerts` — the alert engine (deals, bills, warranties, price hikes → notifiers + bell).
-- `POST /api/cron/prices` — the price scraper: re-checks every tracked item's store links and
-  updates prices + history. This is what the Settings copy and the "Search prices" modal mean by
-  "re-checked every 6 hours"; nothing runs it unless a cron does. **Schedule prices a little before
-  alerts** so deal/price-hike alerts read fresh numbers.
-
-`cron-call.sh` targets the hosted app, so it does not fit these — call the instance's own origin with
-its own `CRON_SECRET`. On the self-hosted box (e.g. `pharos.home.<domain>`), with `CRON_SECRET` set
-in that instance's env:
-
-```cron
-# UTC. Prices every 6h at :05, alerts 10 min later so they see the fresh prices.
-5  */6 * * * curl -fsS -X POST -H "Authorization: Bearer $CRON_SECRET" https://pharos.home.example/api/cron/prices >> /var/log/pharos-cron.log 2>&1
-15 */6 * * * curl -fsS -X POST -H "Authorization: Bearer $CRON_SECRET" https://pharos.home.example/api/cron/alerts >> /var/log/pharos-cron.log 2>&1
-```
-
-(As with the hosted crons, prefer feeding the token via a file/stdin over an inline `-H` if the box
-has other local users — `ps` leaks argv. On a single-user box the inline form is acceptable.)
-
-## 5. Backups
-
-`deploy/backup.sh` dumps **every** database (the registry plus one per workspace) and tars
-`/storage`. Both halves are required: Mongo stores only file paths, so a database restored without
-the files is a catalogue of receipts nobody can open.
-
-Set `BACKUP_REMOTE` to an rclone remote (a Hetzner Storage Box is the obvious pairing) or the
-script will tell you, every night, that it is protecting you from nothing. A copy on the same disk
-dies with the disk.
-
-The script refuses to call a backup successful unless the archive passes a **dry-run restore**, not
-just a size check. An empty or truncated dump that "exists" is the failure that goes unnoticed for
-months.
-
-### Test the restore before you need one
-
-An untested backup is a hypothesis. Rehearse into a scratch stack, never production:
-
-```bash
-docker compose -f docker-compose.saas-dev.yml up -d mongo
-MONGO_CONTAINER=pharos-saas-mongo MONGO_USER=admin MONGO_PASSWORD=devlocal \
-  deploy/restore.sh deploy/backups/mongo-YYYYMMDD-HHMMSS.archive.gz
-```
-
-`restore.sh` excludes `admin.*` and `config.*` for a reason found by actually running it:
-`mongodump` cannot exclude a database, so the archive always contains `admin.system.users`.
-Restoring that replaces the target's user catalogue *while mongorestore is authenticated against
-it*, and the result is "63 documents restored successfully" followed by every index silently
-failing to build. A registry without its unique indexes will happily accept two workspaces with
-the same slug. The script now verifies indexes exist after restoring.
-
-## 6. Updating
-
-```bash
-cd /opt/pharos && git pull && docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env.prod up -d --build web
-```
-
-Mongo and Caddy keep running; only the app restarts.
-
----
-
-## Not ready yet
-
-Two things are wired but inert until you supply credentials, and it is better to know now than
-after a customer signs up:
-
-- **Email.** With no `RESEND_API_KEY`, the mailer writes messages to the container log instead of
-  sending them. Verification links, invitations and trial-expiry warnings reach nobody.
-- **Billing.** Without the Stripe keys the billing pages render and checkout does nothing. There is
-  no way for anyone to pay you.
-
-Both are fine for a private beta with your own data. Neither is fine for a paying customer.
+All environment files, archives and live storage remain private and gitignored.

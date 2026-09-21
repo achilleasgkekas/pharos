@@ -105,7 +105,7 @@ export default function OpengraphImage() {
 
         {/* Footer row: chips */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          {['Self-hosted or managed', 'Open-source · AGPL-3.0', 'Privacy-first'].map(
+          {['Self-hosted', 'Open-source · AGPL-3.0', 'Privacy-first'].map(
             (chip) => (
               <div
                 key={chip}

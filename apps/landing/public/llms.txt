@@ -1,48 +1,7 @@
 # PHAROS
 
-> PHAROS (Greek "Φάρος", lighthouse) is a personal hub, free to self-host or available managed: one private dashboard for the things you own and pay for. It reads your receipts and statements with AI, tracks inventory, expenses, credit-card installments, subscriptions and vouchers, gives you reports, and can watch your home network. Tagline: "One light over everything you run." Backronym: PH (Personal Hub) + AROS (Asset & Resource Oversight System).
+Pharos is a self-hosted personal hub for inventory, receipts, expenses, statements, subscriptions and planning. AI integrations are optional. Licensed under AGPL-3.0. No managed hosting or paid plans are offered.
 
-PHAROS ships two ways. Self-hosted is free and open source under AGPL-3.0: run it on your own hardware with Docker, and your data never leaves your machine. A managed hosted service (currently in private beta / waitlist) runs the same hub for you, with automatic backups, updates and included AI parsing.
-
-Design principles: local-first, privacy-first (financial data stays under your control), no telemetry, dark-theme dashboard, mobile-friendly. Bring your own AI provider when self-hosting (Ollama, Anthropic, OpenAI, Gemini, and OpenAI-compatible endpoints).
-
-## Modules
-
-- [Inventory & shopping](https://ph-aros.com/#features): Track what you own and what you plan to buy, with price history across stores and target-price alerts.
-- [Receipts with AI](https://ph-aros.com/#ai): Drop in a photo or PDF; AI reads store, date, total, VAT and line items, in many languages. OCR handles scanned and rotated receipts.
-- [Expenses & income](https://ph-aros.com/#features): Log bills and income, scan documents, auto-detect recurring series and spending anomalies.
-- [Statements & installments](https://ph-aros.com/#features): Import credit-card statement PDFs, reconstruct installment plans, and see what you owe month by month.
-- [Subscriptions](https://ph-aros.com/#features): Track recurring charges with a renewal calendar, free-trial reminders before the first charge, and detection of regular charges you never tracked.
-- [Vouchers](https://ph-aros.com/#features): Store discount codes and gift vouchers with expiry reminders.
-- [Reports](https://ph-aros.com/#features): Net position, cash flow, budgets, spend by category and store, depreciated inventory value, and savings goals.
-- [Tasks & planning](https://ph-aros.com/#features): A kanban planner for the projects behind the things you buy and install.
-- [Network](https://ph-aros.com/#features): Optional UniFi dashboard for devices, clients, WAN health and speed tests.
-
-Also shipped: bills you pay by hand tracked separately from card subscriptions, opt-in multi-currency across every money record, a three-month calendar that publishes as a read-only iCal feed, an eight-language interface, and a Trash with soft-delete so nothing is lost by accident.
-
-## Pricing
-
-Two tracks: self-host it yourself for free, forever, or let the hosted service run it for you. Free forever means the self-hosted edition; there is no permanent free hosted plan. Every hosted workspace opens with a 14-day free trial (no card to start) and is paid after it. The hosted plans below mirror the backend plan ladder exactly.
-
-- [Self-hosted · Free forever](https://ph-aros.com/#pricing): Every module, no seat limits, AGPL-3.0, community support. Bring your own AI provider. Run it yourself with Docker. No account and no billing at all.
-- [Pro · €9/month](https://ph-aros.com/#pricing): Up to 5 members, 50 GB storage, 1,000 AI document reads per month, shared workspace with roles and invites, priority email support. (Hosted beta, waitlist.)
-- [Dedicated · €29/month](https://ph-aros.com/#pricing): Everything in Pro, plus an isolated instance, unlimited members, 500 GB storage, unlimited AI with your own key, and a custom domain. (Hosted beta, waitlist.)
-
-The hosted plans can be billed monthly or annually. Annual billing charges ten months up front, so two months are free per year (Pro €90/year, Dedicated €290/year). Both start with the same 14-day free trial; if the trial lapses without billing, the workspace is suspended rather than deleted and reactivates the moment a payment method is added. Every hosted plan includes nightly backups and can be cancelled anytime. AI document reads are included up to each plan's monthly quota; Dedicated instead runs unlimited reads against an AI key you supply.
-
-Hosted prices are indicative during the beta and may change before general availability.
-
-## Getting started
-
-- [Self-host with Docker](https://ph-aros.com/#self-host): Bring up the hub, MongoDB and search with a single Docker Compose file.
-- [GitHub repository](https://github.com/achilleasgkekas/pharos): Source code, README and issues.
-- [Documentation (README)](https://github.com/achilleasgkekas/pharos/blob/main/README.md): Setup and configuration.
-- [Hosted beta waitlist](https://ph-aros.com/#waitlist): Join to be notified when managed hosting opens.
-
-## More
-
-- [FAQ](https://ph-aros.com/#faq): Common questions about self-hosting, data, AI keys, backups and security.
-- [Privacy policy](https://ph-aros.com/privacy): How the site and hosted service handle data.
-- [Terms of service](https://ph-aros.com/terms): Terms for the hosted service.
-- [Security policy](https://ph-aros.com/.well-known/security.txt): How to report a vulnerability.
-- [License · AGPL-3.0](https://github.com/achilleasgkekas/pharos/blob/main/LICENSE): Full license text.
+- [Features](https://ph-aros.com/#features)
+- [Self-hosting](https://ph-aros.com/#self-host)
+- [Project status](https://ph-aros.com/status)

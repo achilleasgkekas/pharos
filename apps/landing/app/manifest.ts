@@ -8,7 +8,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: 'PHAROS · Personal Hub',
     short_name: 'PHAROS',
     description:
-      'One light over everything you run. A personal hub for inventory, receipts, expenses, installments, subscriptions, and your network. Self-hosted or managed.',
+      'One light over everything you run. A personal hub for inventory, receipts, expenses, installments, subscriptions, and your network. Self-hosted.',
     id: '/',
     start_url: '/',
     scope: '/',

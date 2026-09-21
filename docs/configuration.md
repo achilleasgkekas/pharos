@@ -211,7 +211,7 @@ Supported events:
 | `installment.due` | An installment payment is due this month   | `{ kind: 'installment', itemId, amount, dueDate, remainingMonths }` |
 | `price.drop`      | A watched item's best price falls by 10%+ | `{ kind: 'price', itemId, title, oldPrice, newPrice, store }` |
 
-All webhooks include metadata: `{ event, ts (ISO 8601), tenantId (SaaS only) }`.
+All webhooks include metadata: `{ event, ts (ISO 8601) }`.
 
 ---
 
