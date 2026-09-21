@@ -1,23 +1,18 @@
 #!/bin/sh
-# Call a Pharos scheduler endpoint (/api/cron/saas/<endpoint>) authenticated with CRON_SECRET.
-#
-# WHY THIS EXISTS: the token used to sit inline in the root crontab as
-#   curl -H "Authorization: Bearer <token>" ...
-# `ps` shows every process argv to every local user, so the secret was readable for as long
-# as the request ran, and it was a second copy of a value that already has a proper 600 home
-# in deploy/.env.prod. Here the token is read from that one home and handed to curl through
-# its config file on STDIN (`-K -`), so it never becomes a command-line argument.
+# Call a self-hosted scheduler without putting its secret in process arguments.
+# Usage: PHAROS_URL=https://pharos.example.com ENV_FILE=/path/to/.env cron-call.sh alerts
 set -eu
 
-ENV_FILE=/opt/pharos/deploy/.env.prod
-ENDPOINT=${1:?usage: cron-call.sh <endpoint>   e.g. usage-sample}
+: "${ENV_FILE:?set ENV_FILE to your private environment file}"
+: "${PHAROS_URL:?set PHAROS_URL to your own instance origin}"
+ENDPOINT=${1:?usage: cron-call.sh alerts|prices}
+case "$ENDPOINT" in alerts|prices) ;; *) echo 'cron-call: expected alerts or prices' >&2; exit 1 ;; esac
+case "$PHAROS_URL" in http://*|https://*) ;; *) echo 'cron-call: PHAROS_URL must be http(s)' >&2; exit 1 ;; esac
+[ -r "$ENV_FILE" ] || { echo 'cron-call: environment file is not readable' >&2; exit 1; }
 
-[ -r "$ENV_FILE" ] || { echo "cron-call: cannot read $ENV_FILE" >&2; exit 1; }
-
-# Extract only CRON_SECRET rather than sourcing the file: .env.prod is docker-compose env
-# syntax, not shell, and sourcing it would execute whatever a value happens to contain.
-SECRET=$(sed -n "s/^CRON_SECRET=//p" "$ENV_FILE" | head -1)
-[ -n "$SECRET" ] || { echo "cron-call: CRON_SECRET is empty or missing in $ENV_FILE" >&2; exit 1; }
-
-printf "header = \"Authorization: Bearer %s\"\n" "$SECRET" |
-  curl -K - -fsS -X POST "https://app.ph-aros.com/api/cron/saas/$ENDPOINT"
+# Read a value, never execute the environment file. Use an unquoted, single-line
+# secret generated with openssl rand -base64 32 (or rand -hex 32).
+SECRET=$(sed -n 's/^CRON_SECRET=//p' "$ENV_FILE" | head -1)
+case "$SECRET" in ''|*[!A-Za-z0-9_+/=-]*) echo 'cron-call: missing or invalid CRON_SECRET' >&2; exit 1 ;; esac
+printf 'header = "Authorization: Bearer %s"\n' "$SECRET" |
+  curl -K - -fsS --max-time 300 -X POST "${PHAROS_URL%/}/api/cron/$ENDPOINT"

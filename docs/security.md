@@ -70,7 +70,7 @@ Used by every browser page and server action.
   current password. The TOTP secret is encrypted at rest the same way as other
   integration secrets (AES-256-GCM, keyed off `AUTH_SECRET`) and the plaintext is
   only ever shown once, at enrollment time. This mirrors the MFA primitive already
-  used on the hosted/SaaS side, reused for the self-hosted `User` model.
+  used by the self-hosted `User` model.
 
 ### 2. Bearer token (the REST API)
 

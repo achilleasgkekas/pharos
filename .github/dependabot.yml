@@ -6,7 +6,7 @@
 #
 # Majors of the platform pieces are IGNORED here (2026-09-14): the first run proposed Node 26
 # (not LTS yet) and TypeScript 7 (compiler rewrite). Those are planned migrations with their own
-# issue, deploy of both stacks and a human OK — not something to auto-merge on a green CI.
+# issue, self-hosted deployment and a human OK — not something to auto-merge on a green CI.
 # Security updates are a separate repo setting and are NOT silenced by these ignore rules.
 version: 2
 updates:

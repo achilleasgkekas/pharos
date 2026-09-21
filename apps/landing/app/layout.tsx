@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   title: 'PHAROS · Personal Hub',
   // Google truncates around 155 characters; the old one ran to ~200 and lost its ending mid-list.
   description:
-    'A private personal hub for everything you own: inventory, AI receipts, expenses, installments and subscriptions. Self-host it free, or let us host it.',
+    'A private personal hub for everything you own: inventory, AI receipts, expenses, installments and subscriptions. Self-hosted software with optional AI.',
   keywords: [
     'self-hosted',
     'personal hub',
@@ -21,7 +21,7 @@ export const metadata: Metadata = {
   ],
   // url points at /humans.txt so Next emits the conventional
   // <link rel="author" href="/humans.txt"> alongside <meta name="author">.
-  authors: [{ name: 'Achilleas', url: '/humans.txt' }],
+  authors: [{ name: 'Pharos contributors', url: '/humans.txt' }],
   manifest: '/manifest.webmanifest',
   alternates: { canonical: '/' },
   openGraph: {
@@ -29,14 +29,14 @@ export const metadata: Metadata = {
     url: SITE_URL,
     title: 'PHAROS · Personal Hub',
     description:
-      'One light over everything you run. Private, AI-assisted oversight on everything you own. Self-host it free, or let us host it.',
+      'One light over everything you run. Private, AI-assisted oversight on everything you own. Self-hosted software with optional AI.',
     siteName: 'PHAROS',
   },
   twitter: {
     card: 'summary_large_image',
     title: 'PHAROS · Personal Hub',
     description:
-      'One light over everything you run. A personal hub you can self-host free, or let us host.',
+      'One light over everything you run. A personal hub you run on your own hardware.',
   },
   icons: {
     // SVG favicon for modern browser tabs; generated PNG for platforms that
