@@ -1,65 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// app/statements/actions.ts is a large multi-concern module (see actions.crud.test.ts's
-// header for the full concern list + existing slices: crud, installments, reconcile,
-// tenant, categorize). This file covers `rescanStatement` — confirmed to have ZERO
-// coverage anywhere in the repo before this file
-// (`grep -rln "rescanStatement\b" --include="*.test.ts" src` returned nothing).
-// `importStatementPdf`/`attachStatementPdf` still have only their tenant-routing
-// dimension tested (actions.tenant.test.ts), not their actual behaviour — left for a
-// future slice.
-//
-// `@/lib/fx` is deliberately left UN-mocked (same choice as actions.crud.test.ts): it is
-// pure/deterministic and already has its own dedicated suite (lib/fx.test.ts), so the
-// real conversion math runs end-to-end here. `@/lib/installments`' `installmentSignature`
-// IS mocked (same as actions.installments.test.ts/actions.crud.test.ts) — its own
-// algorithm has a dedicated suite (lib/installments.test.ts); the mock here is
-// deliberately PERIOD-INVARIANT per description (a real signature is designed to match
-// the same plan across different months/periods), which is exactly what's needed to pin
-// the cross-statement link-inheritance WIRING without re-testing the algorithm itself.
-//
-// Behaviour pinned:
-//  - Gated by assertCanWrite (untested here, like every sibling statements slice — it
-//    no-ops outside a request scope, which is what every one of these unit tests is).
-//  - No statement / no stored file -> {ok:false, aiUsed:false, error:'Statement or file
-//    not found'}; a readFile failure -> {ok:false, aiUsed:false, error:'File missing
-//    from storage'}.
-//  - useOcr:true always rasterizes+OCRs every page (ocrPdf), never touches
-//    extractPdfText. useOcr:false reads the embedded text layer first; only escalates to
-//    ocrPdf (and flips the reported usedOcr to true) when looksLikeScannedPdf says the
-//    text layer is unusable.
-//  - A thrown read/OCR error -> 'Failed to read PDF: <msg>'. A thrown AI-parse error is
-//    categorized: ECONNREFUSED/fetch failed/ENOTFOUND -> 'Ollama is not reachable',
-//    anything else -> 'AI parse failed: <msg>' (truncated to 120 chars). A resolved-but-
-//    null parse -> {ok:false, error: aiError ?? 'No AI result'}.
-//  - Preservation (the whole point of this action): each OLD transaction is keyed by
-//    `description(upper, 40-char cap) + '|' + printed-amount(2dp)` — printed via
-//    toPrinted(storedAmount, storedRate) so a FOREIGN statement's old lines are keyed by
-//    what was actually printed, not the base-currency figure they were converted to.
-//    Every fresh transaction is looked up by that SAME key using its own (always
-//    printed) amount. A freshly-detected NN/MM installment (both currentInstallment AND
-//    totalInstallments present) always WINS over a preserved one, with
-//    originalPurchase set to the NEW description; when nothing was freshly detected, the
-//    OLD installmentInfo carries over unchanged. matchedItemIds carry over from the OLD
-//    entry on a key match REGARDLESS of whether an installment was detected either way.
-//  - Cross-statement link inheritance: every OTHER statement's transactions that have
-//    both an installmentInfo and matchedItemIds are indexed by signature (their OWN
-//    period); every new transaction that ended up with an installmentInfo (fresh or
-//    preserved) looks itself up by signature (the CURRENT statement's period) and, on a
-//    hit, MERGES those ids into whatever matchedItemIds it already carries (deduplicated
-//    union, not a replace).
-//  - installmentsFound counts transactions with installmentInfo truthy; preservedLinks
-//    counts transactions with a non-empty matchedItemIds, independently of each other.
-//  - totalAmount/origAmount/fxRate/currency are refreshed ONLY when parsed.totalAmount is
-//    a number; minimumPayment ONLY when parsed.minimumPayment is a number. card/period/
-//    filePath are never touched (a re-scan can't move a statement to another month).
-//  - A save() failure -> {ok:false, aiUsed:false, usedOcr, error:'Save failed: <msg>'}
-//    (truncated to 120 chars). Success revalidates '/statements', '/items' AND
-//    '/shopping', and returns the updated doc via a JSON round-trip (statement.toObject
-//    is not required by the action itself, just JSON-serializable fields).
+// Real FX conversion; mocked persistence and AI. Rescans preserve each matched
+// transaction's annotations once and refuse changes that would discard user work.
 
 const {
   connectDBMock,
+  isFeatureEnabledMock,
   statementFindById,
   statementFind,
   readFileMock,
@@ -71,6 +17,7 @@ const {
   getAppSettingsMock,
   revalidatePathMock,
 } = vi.hoisted(() => ({
+  isFeatureEnabledMock: vi.fn(async () => true),
   connectDBMock: vi.fn(async () => {}),
   statementFindById: vi.fn(async (_id: string): Promise<any> => null),
   statementFind: vi.fn((_filter: Record<string, unknown>, _proj: Record<string, unknown>) => ({ lean: async () => [] as any[] })),
@@ -98,7 +45,7 @@ vi.mock('@/lib/storage', () => ({ saveFile: vi.fn(), deleteFile: vi.fn(), readFi
 vi.mock('@/lib/pdf', () => ({ extractPdfText: extractPdfTextMock, looksLikeScannedPdf: looksLikeScannedPdfMock }));
 vi.mock('@/lib/ocr', () => ({ ocrPdf: ocrPdfMock }));
 vi.mock('@/lib/ollama', () => ({ parseStatementText: parseStatementTextMock, categorizeTransactions: vi.fn() }));
-vi.mock('@/lib/aiFeatures.server', () => ({ isFeatureEnabled: vi.fn(async () => true) }));
+vi.mock('@/lib/aiFeatures.server', () => ({ isFeatureEnabled: isFeatureEnabledMock }));
 vi.mock('@/lib/cards', () => ({ normalizeLast4: (s: string) => s, detectCardType: () => 'credit', buildCardLabel: (n: string, l: string) => `${n} ${l}` }));
 vi.mock('@/lib/mirror', () => ({ mirrorFileToRemote: vi.fn() }));
 vi.mock('@/lib/installments', () => ({ installmentSignature: installmentSignatureMock }));
@@ -280,15 +227,16 @@ describe('rescanStatement — preservation of manual installment edits + product
     expect(stmt.transactions[0].matchedItemIds.map(String)).toEqual([ITEM1]);
   });
 
-  it('does NOT preserve anything for a transaction whose key does not match any old one (new purchase)', async () => {
+  it('refuses to replace a linked transaction with an unrelated purchase', async () => {
     const stmt = stmtOf({ transactions: [{ description: 'OLD ONE', amount: 10, installmentInfo: null, matchedItemIds: [ITEM1] }] });
     statementFindById.mockResolvedValue(stmt);
     parseStatementTextMock.mockResolvedValue({
       parsed: { transactions: [{ date: '2026-06-05', description: 'BRAND NEW CHARGE', amount: 77 }] },
     });
     const res = await rescanStatement('s1', true);
-    expect(stmt.transactions[0].installmentInfo).toBeNull();
-    expect(stmt.transactions[0].matchedItemIds).toEqual([]);
+    expect(res.ok).toBe(false);
+    expect(stmt.transactions[0].matchedItemIds).toEqual([ITEM1]);
+    expect(stmt.save).not.toHaveBeenCalled();
   });
 
   it('keys a FOREIGN statement\'s old transaction by its PRINTED amount (toPrinted via the stored rate), not the base-currency figure', async () => {
@@ -453,4 +401,63 @@ describe('rescanStatement — counts, money fields, and side effects', () => {
     expect(res).toMatchObject({ ok: true, aiUsed: true, usedOcr: true, txCount: 1, installmentsFound: 0, preservedLinks: 0 });
     expect(res.statement).toBeTruthy();
   });
+});
+
+describe('rescanStatement — user annotation integrity', () => {
+  it('preserves transaction identity, category, receipt and manual grouping', async () => {
+    const stmt = stmtOf({ transactions: [{ _id: ITEM1, date: new Date('2026-06-05'), description: 'SHOP', amount: 20,
+      category: 'electronics', matchedReceiptId: ITEM5, matchedItemIds: [ITEM9],
+      installmentInfo: { currentInstallment: 2, totalInstallments: 6, originalPurchase: 'Manual name', planKey: 'manual-group' } }] });
+    statementFindById.mockResolvedValue(stmt);
+    parseStatementTextMock.mockResolvedValue({ parsed: { transactions: [{ date: '2026-06-05', description: 'SHOP', amount: 20, currentInstallment: 2, totalInstallments: 6 }] } });
+    await rescanStatement('s1', false);
+    expect(stmt.transactions[0]).toMatchObject({ _id: ITEM1, category: 'electronics', matchedReceiptId: ITEM5,
+      installmentInfo: { planKey: 'manual-group', originalPurchase: 'Manual name' } });
+  });
+
+  it('matches equal charges by date and consumes each old annotation only once', async () => {
+    const stmt = stmtOf({ transactions: [
+      { _id: ITEM1, date: new Date('2026-06-05'), description: 'SHOP', amount: 20, category: 'first', matchedItemIds: [ITEM1] },
+      { _id: ITEM5, date: new Date('2026-06-06'), description: 'SHOP', amount: 20, category: 'second', matchedItemIds: [ITEM5] },
+    ] });
+    statementFindById.mockResolvedValue(stmt);
+    parseStatementTextMock.mockResolvedValue({ parsed: { transactions: [
+      { date: '2026-06-06', description: 'SHOP', amount: 20 },
+      { date: '2026-06-05', description: 'SHOP', amount: 20 },
+      { date: '2026-06-05', description: 'SHOP', amount: 20 },
+    ] } });
+    await rescanStatement('s1', false);
+    expect(stmt.transactions.map(t => t.category)).toEqual(['second', 'first', 'uncategorized']);
+    expect(stmt.transactions[2].matchedItemIds).toEqual([]);
+  });
+});
+
+
+describe('rescanStatement — refusal paths', () => {
+  it('does not call AI or read files when statement AI is disabled', async () => {
+    statementFindById.mockResolvedValue(stmtOf());
+    isFeatureEnabledMock.mockResolvedValueOnce(false);
+    expect((await rescanStatement('s1', false)).ok).toBe(false);
+    expect(readFileMock).not.toHaveBeenCalled();
+    expect(parseStatementTextMock).not.toHaveBeenCalled();
+  });
+  it('does not erase transactions when parsing yields no transactions', async () => {
+    const stmt = stmtOf({ transactions: [{ description: 'SHOP', amount: 10 }] });
+    statementFindById.mockResolvedValue(stmt);
+    parseStatementTextMock.mockResolvedValue({ parsed: { transactions: [] } });
+    expect((await rescanStatement('s1', false)).ok).toBe(false);
+    expect(stmt.transactions).toHaveLength(1);
+    expect(stmt.save).not.toHaveBeenCalled();
+  });
+});
+
+
+it('leaves the document unchanged when a linked charge cannot be matched', async () => {
+  const transactions = [{ date: new Date('2026-06-05'), description: 'SHOP', amount: 20, matchedReceiptId: ITEM1 }];
+  const stmt = stmtOf({ transactions });
+  statementFindById.mockResolvedValue(stmt);
+  parseStatementTextMock.mockResolvedValue({ parsed: { transactions: [{ date: '2026-06-06', description: 'SHOP', amount: 20 }] } });
+  expect((await rescanStatement('s1', false)).ok).toBe(false);
+  expect(stmt.transactions).toBe(transactions);
+  expect(stmt.save).not.toHaveBeenCalled();
 });

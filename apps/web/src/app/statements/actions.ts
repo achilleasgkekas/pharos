@@ -171,10 +171,10 @@ async function findOrCreateCard(
   // already established and the card lands in the same db as its statement.
   const Card = await currentModel(CardModel);
 
-  // Match an existing card by last4 first (most reliable), else by exact name.
+  // A name must never override conflicting card digits from the document.
   let card = null;
   if (last4) card = await Card.findOne({ last4 });
-  if (!card && name) card = await Card.findOne({ name });
+  if (!card && !last4 && name) card = await Card.findOne({ name });
 
   if (!card) {
     if (!last4 && !name) return { label: 'Unknown card', cardId: null, last4: '' };
@@ -714,16 +714,14 @@ export type ImportResult =
       inherited?: number;
       aiError?: string;
       period?: string;
-      // true when this import overwrote a DIFFERENT statement already sitting in
-      // {card, period} — usually means the statement date was misread (e.g. an
-      // April statement parsed as March). Surfaced so the user can catch it.
+      // Kept for older clients; imports no longer replace existing statements.
       replacedExisting?: boolean;
     }
   | { ok: false; error: string };
 
 /**
  * Import a credit-card statement PDF: store it, extract text, parse with AI
- * into structured transactions (incl. δόσεις), and upsert by card+period.
+ * into structured transactions (incl. δόσεις), without replacing an existing month.
  */
 export async function importStatementPdf(formData: FormData): Promise<ImportResult> {
   await assertCanWrite();
@@ -743,142 +741,139 @@ export async function importStatementPdf(formData: FormData): Promise<ImportResu
     return { ok: false, error: `Failed to save: ${(err as Error).message}` };
   }
 
-  // Extract text
-  let text = '';
+  let retainedFile = false;
   try {
-    text = await extractPdfText(bytes);
-  } catch (err) {
-    return { ok: false, error: `Failed to read PDF: ${(err as Error).message}` };
-  }
+    // Extract text
+    let text = '';
+    try {
+      text = await extractPdfText(bytes);
+    } catch (err) {
+      return { ok: false, error: `Failed to read PDF: ${(err as Error).message}` };
+    }
 
-  const fallbackPeriod = new Date().toISOString().slice(0, 7);
-  /** Both no-AI paths below store the same empty draft; only the note differs. */
-  const saveDraft = async (notes: string, aiError: string): Promise<ImportResult> =>
-    withRequestTenant(async () => {
-      await connectDB();
-      const Statement = await currentModel(StatementModel);
-      const stmt = await Statement.create({
-        card: 'Unknown card', period: fallbackPeriod, statementDate: new Date(),
-        totalAmount: 0, filePath: relativePath,
-        notes,
+    const fallbackPeriod = new Date().toISOString().slice(0, 7);
+    /** Both no-AI paths below store the same empty draft; only the note differs. */
+    const saveDraft = async (notes: string, aiError: string): Promise<ImportResult> =>
+      withRequestTenant(async () => {
+        await connectDB();
+        const Statement = await currentModel(StatementModel);
+        const stmt = await Statement.create({
+          card: 'Unknown card', period: fallbackPeriod, statementDate: new Date(),
+          totalAmount: 0, filePath: relativePath,
+          notes,
+        });
+        retainedFile = true;
+        revalidatePath('/statements');
+        return { ok: true, id: String(stmt._id), aiUsed: false, txCount: 0, aiError };
       });
-      revalidatePath('/statements');
-      return { ok: true, id: String(stmt._id), aiUsed: false, txCount: 0, aiError };
-    });
 
-  if (looksLikeScannedPdf(text)) {
-    // Scanned/image PDF — store it as an empty draft for manual entry
-    return saveDraft('Scanned PDF — no text found, enter manually.', 'Scanned PDF with no text');
-  }
+    if (looksLikeScannedPdf(text)) {
+      // Scanned/image PDF — store it as an empty draft for manual entry
+      return await saveDraft('Scanned PDF — no text found, enter manually.', 'Scanned PDF with no text');
+    }
 
-  // Statement-AI off → store an empty draft for manual entry (don't hit a provider).
-  if (!(await isFeatureEnabled('statements'))) {
-    return saveDraft('AI is off — enter manually.', 'AI is off');
-  }
+    // Statement-AI off → store an empty draft for manual entry (don't hit a provider).
+    if (!(await isFeatureEnabled('statements'))) {
+      return await saveDraft('AI is off — enter manually.', 'AI is off');
+    }
 
-  // AI parse
-  let parsed: Awaited<ReturnType<typeof parseStatementText>>['parsed'] | null = null;
-  let aiError: string | undefined;
-  try {
-    parsed = (await parseStatementText(text)).parsed;
-  } catch (err) {
-    const msg = (err as Error).message || String(err);
-    aiError = /ECONNREFUSED|fetch failed|ENOTFOUND/i.test(msg)
-      ? 'Ollama is not reachable'
-      : `AI parse failed: ${msg.slice(0, 120)}`;
-  }
+    // AI parse
+    let parsed: Awaited<ReturnType<typeof parseStatementText>>['parsed'] | null = null;
+    let aiError: string | undefined;
+    try {
+      parsed = (await parseStatementText(text)).parsed;
+    } catch (err) {
+      const msg = (err as Error).message || String(err);
+      aiError = /ECONNREFUSED|fetch failed|ENOTFOUND/i.test(msg)
+        ? 'Ollama is not reachable'
+        : `AI parse failed: ${msg.slice(0, 120)}`;
+    }
 
-  // Period from the statement's OWN issue date (deterministic) — stops the model
-  // drifting one month onto the previous statement's date. Falls back to the
-  // parsed period, then the current month.
-  const sd = safeDateOrNull(parsed?.statementDate);
-  const period =
-    sd && !Number.isNaN(sd.getTime())
-      ? `${sd.getUTCFullYear()}-${String(sd.getUTCMonth() + 1).padStart(2, '0')}`
-      : parsed?.period?.match(/^\d{4}-\d{2}$/)
-        ? parsed.period
-        : fallbackPeriod;
-  const transactions = (parsed?.transactions ?? []).map((t) => ({
-    date: safeDate(t.date),
-    description: t.description,
-    amount: t.amount,
-    category: 'uncategorized',
-    installmentInfo:
-      t.currentInstallment && t.totalInstallments
-        ? {
-            currentInstallment: t.currentInstallment,
-            totalInstallments: t.totalInstallments,
-            originalPurchase: t.description,
+    // Period from the statement's OWN issue date (deterministic) — stops the model
+    // drifting one month onto the previous statement's date. Falls back to the
+    // parsed period, then the current month.
+    const sd = safeDateOrNull(parsed?.statementDate);
+    const period =
+      sd && !Number.isNaN(sd.getTime())
+        ? `${sd.getUTCFullYear()}-${String(sd.getUTCMonth() + 1).padStart(2, '0')}`
+        : parsed?.period?.match(/^\d{4}-\d{2}$/)
+          ? parsed.period
+          : fallbackPeriod;
+    const transactions = (parsed?.transactions ?? []).map((t) => ({
+      date: safeDate(t.date),
+      description: t.description,
+      amount: t.amount,
+      category: 'uncategorized',
+      installmentInfo:
+        t.currentInstallment && t.totalInstallments
+          ? {
+              currentInstallment: t.currentInstallment,
+              totalInstallments: t.totalInstallments,
+              originalPurchase: t.description,
+            }
+          : null,
+      matchedItemIds: [] as Types.ObjectId[],
+    }));
+
+    try {
+      return await withRequestTenant(async (): Promise<ImportResult> => {
+        await connectDB();
+        const Statement = await currentModel(StatementModel);
+
+        // E2: carry product links forward. If an installment of this same purchase was
+        // already matched to a product in an earlier statement, inherit that match so
+        // this month's line joins the existing plan and the product payoff advances.
+        type PriorTx = {
+          description: string;
+          installmentInfo?: { currentInstallment?: number; totalInstallments?: number; originalPurchase?: string } | null;
+          matchedItemIds?: unknown[];
+        };
+        const prior = await Statement.find({}, { period: 1, transactions: 1 }).lean();
+        const linkBySig = new Map<string, Set<string>>(); // sig → all linked product ids
+        for (const st of prior) {
+          for (const t of (st.transactions ?? []) as PriorTx[]) {
+            if (!t.installmentInfo || !(t.matchedItemIds?.length)) continue;
+            const sig = sigOf(t, st.period as string);
+            if (!sig) continue;
+            const set = linkBySig.get(sig) ?? new Set<string>();
+            for (const id of t.matchedItemIds) set.add(String(id));
+            linkBySig.set(sig, set);
           }
-        : null,
-    matchedItemIds: [] as Types.ObjectId[],
-  }));
-
-  try {
-    return await withRequestTenant(async (): Promise<ImportResult> => {
-      await connectDB();
-      const Statement = await currentModel(StatementModel);
-
-      // E2: carry product links forward. If an installment of this same purchase was
-      // already matched to a product in an earlier statement, inherit that match so
-      // this month's line joins the existing plan and the product payoff advances.
-      type PriorTx = {
-        description: string;
-        installmentInfo?: { currentInstallment?: number; totalInstallments?: number; originalPurchase?: string } | null;
-        matchedItemIds?: unknown[];
-      };
-      const prior = await Statement.find({}, { period: 1, transactions: 1 }).lean();
-      const linkBySig = new Map<string, Set<string>>(); // sig → all linked product ids
-      for (const st of prior) {
-        for (const t of (st.transactions ?? []) as PriorTx[]) {
-          if (!t.installmentInfo || !(t.matchedItemIds?.length)) continue;
-          const sig = sigOf(t, st.period as string);
-          if (!sig) continue;
-          const set = linkBySig.get(sig) ?? new Set<string>();
-          for (const id of t.matchedItemIds) set.add(String(id));
-          linkBySig.set(sig, set);
         }
-      }
-      let inherited = 0;
-      for (const t of transactions) {
-        if (!t.installmentInfo) continue;
-        const ids = linkBySig.get(sigOf(t, period));
-        if (ids && ids.size) {
-          t.matchedItemIds = [...ids].map((id) => new Types.ObjectId(id));
-          inherited++;
+        let inherited = 0;
+        for (const t of transactions) {
+          if (!t.installmentInfo) continue;
+          const ids = linkBySig.get(sigOf(t, period));
+          if (ids && ids.size) {
+            t.matchedItemIds = [...ids].map((id) => new Types.ObjectId(id));
+            inherited++;
+          }
         }
-      }
 
-      // Match/create the physical card so statements can be filtered per card.
-      const { label: card, cardId, last4 } = await findOrCreateCard(
-        parsed?.card || '',
-        parsed?.last4 || ''
-      );
-      // Collision guard: is a DIFFERENT statement already occupying {card, period}?
-      // A misread date (e.g. an April statement parsed as March) drops it onto the
-      // wrong month and the upsert would silently overwrite that month. Flag it so
-      // the UI can warn the user instead of losing a statement quietly.
-      const existing = await Statement.findOne({ card, period }, { filePath: 1, currency: 1, fxRate: 1 }).lean();
-      const replacedExisting = !!(existing && existing.filePath && existing.filePath !== relativePath);
-      // P9: the parser reads the printed figures, it does not detect the currency — so a
-      // foreign statement is marked as such by the user, once, in the edit form. Re-importing
-      // the same month REUSES that decision (same rule as re-scan keeping a user's rate),
-      // instead of silently reverting the month to base currency. A first import has nothing
-      // to reuse and passes through as base currency, exactly as before P9.
-      const money = await resolveStmtFx({
-        totalAmount: parsed?.totalAmount ?? 0,
-        minimumPayment: parsed?.minimumPayment ?? 0,
-        txAmounts: transactions.map((t) => t.amount),
-        currency: existing?.currency,
-        fxRate: existing?.fxRate,
-      });
-      transactions.forEach((t, i) => {
-        t.amount = money.txAmounts[i];
-      });
-      // Upsert by card + period (matches the unique index)
-      const stmt = await Statement.findOneAndUpdate(
-        { card, period },
-        {
+        // Match/create the physical card so statements can be filtered per card.
+        const { label: card, cardId, last4 } = await findOrCreateCard(
+          parsed?.card || '',
+          parsed?.last4 || ''
+        );
+        // Labels change when a card is edited; cardId remains the same. Never replace
+        // user transactions or their PDF as a side effect of uploading another file.
+        const existing = await Statement.findOne(
+          { period, $or: [...(cardId ? [{ cardId }] : []), { card }] },
+          { _id: 1 }
+        ).lean();
+        if (existing) {
+          return { ok: false, error: 'A statement for this card and month already exists. Open it to edit or rescan its PDF.' };
+        }
+        const money = await resolveStmtFx({
+          totalAmount: parsed?.totalAmount ?? 0,
+          minimumPayment: parsed?.minimumPayment ?? 0,
+          txAmounts: transactions.map((t) => t.amount),
+        });
+        transactions.forEach((t, i) => {
+          t.amount = money.txAmounts[i];
+        });
+        // Insert only: the unique index also prevents concurrent imports overwriting data.
+        const stmt = await Statement.create({
           card,
           last4,
           cardId,
@@ -892,27 +887,33 @@ export async function importStatementPdf(formData: FormData): Promise<ImportResu
           fxRate: money.fxRate,
           transactions,
           filePath: relativePath,
-        },
-        { upsert: true, new: true }
-      );
-      // Auto-mirror the PDF to the remote backend when enabled — fire-and-forget.
-      void mirrorFileToRemote({ kind: 'statements', store: card, date: stmt!.statementDate, total: parsed?.totalAmount ?? 0, id: stmt!._id }, relativePath);
-      revalidatePath('/statements');
-      revalidatePath('/items');
-      revalidatePath('/shopping');
-      return {
-        ok: true,
-        id: String(stmt!._id),
-        aiUsed: parsed !== null,
-        txCount: transactions.length,
-        inherited,
-        aiError,
-        period,
-        replacedExisting,
-      };
-    });
+        });
+        retainedFile = true;
+        // Auto-mirror the PDF to the remote backend when enabled — fire-and-forget.
+        void mirrorFileToRemote({ kind: 'statements', store: card, date: stmt!.statementDate, total: parsed?.totalAmount ?? 0, id: stmt!._id }, relativePath);
+        revalidatePath('/statements');
+        revalidatePath('/items');
+        revalidatePath('/shopping');
+        return {
+          ok: true,
+          id: String(stmt!._id),
+          aiUsed: parsed !== null,
+          txCount: transactions.length,
+          inherited,
+          aiError,
+          period,
+          replacedExisting: false,
+        };
+      });
+    } catch (err) {
+      return { ok: false, error: `DB error: ${(err as Error).message}` };
+    }
   } catch (err) {
-    return { ok: false, error: `DB error: ${(err as Error).message}` };
+    return { ok: false, error: `Import failed: ${(err as Error).message}` };
+  } finally {
+    if (!retainedFile) {
+      try { await deleteFile(relativePath); } catch { /* preserve the original import error */ }
+    }
   }
 }
 
@@ -944,6 +945,10 @@ export async function rescanStatement(id: string, useOcr: boolean): Promise<Stat
     const Statement = await currentModel(StatementModel);
     const stmt = await Statement.findById(id);
     if (!stmt?.filePath) return { ok: false, aiUsed: false, error: 'Statement or file not found' };
+
+    if (!(await isFeatureEnabled('statements'))) {
+      return { ok: false, aiUsed: false, error: 'Statement AI is turned off.' };
+    }
 
     let bytes: Buffer;
     try {
@@ -982,35 +987,35 @@ export async function rescanStatement(id: string, useOcr: boolean): Promise<Stat
     }
     if (!parsed) return { ok: false, aiUsed: false, usedOcr, aiError, error: aiError ?? 'No AI result' };
 
+    if (stmt.transactions.length && !parsed.transactions?.length) {
+      return { ok: false, aiUsed: false, usedOcr, error: 'No transactions were found. The existing statement was kept unchanged.' };
+    }
+
     // Preserve the user's work: capture existing installment edits + product links,
     // keyed by a stable description+amount key, before overwriting transactions.
     const keyOf = (desc: string, amount: number) =>
-      `${(desc || '').trim().toUpperCase().slice(0, 40)}|${(amount || 0).toFixed(2)}`;
-    type Preserved = {
-      installmentInfo: { currentInstallment?: number; totalInstallments?: number; originalPurchase?: string } | null;
-      matchedItemIds: string[];
+      `${(desc || '').trim().toUpperCase()}|${(amount || 0).toFixed(2)}`;
+    const dateKey = (date: unknown) => {
+      const parsed = date instanceof Date ? date : safeDateOrNull(date);
+      return parsed && !Number.isNaN(parsed.getTime()) ? parsed.toISOString().slice(0, 10) : '';
     };
-    const oldByKey = new Map<string, Preserved>();
-    // P9: the key must compare like with like. A fresh parse yields PRINTED amounts while the
-    // stored ones are already converted, so on a foreign statement the old lines are keyed by
-    // their printed figures — otherwise every installment edit and product link would be lost
-    // on re-scan purely because the two sides were denominated differently.
+    type OldTransaction = (typeof stmt.transactions)[number];
+    const oldByKey = new Map<string, OldTransaction[]>();
     const storedRate = stmt.fxRate ?? 0;
     for (const t of stmt.transactions ?? []) {
-      oldByKey.set(keyOf(t.description, toPrinted(t.amount, storedRate)), {
-        installmentInfo: t.installmentInfo
-          ? {
-              currentInstallment: t.installmentInfo.currentInstallment ?? undefined,
-              totalInstallments: t.installmentInfo.totalInstallments ?? undefined,
-              originalPurchase: t.installmentInfo.originalPurchase ?? undefined,
-            }
-          : null,
-        matchedItemIds: (t.matchedItemIds ?? []).map((x) => String(x)),
-      });
+      const key = keyOf(t.description, toPrinted(t.amount, storedRate));
+      const bucket = oldByKey.get(key) ?? [];
+      bucket.push(t);
+      oldByKey.set(key, bucket);
     }
 
     const newTx = (parsed.transactions ?? []).map((t) => {
-      const old = oldByKey.get(keyOf(t.description, t.amount));
+      const bucket = oldByKey.get(keyOf(t.description, t.amount)) ?? [];
+      // Consume each match once, using date to distinguish equal purchases.
+      // Undated legacy entries may match; different known dates must not.
+      let index = bucket.findIndex(old => dateKey(old.date) === dateKey(t.date));
+      if (index < 0) index = bucket.findIndex(old => !dateKey(old.date));
+      const old = index < 0 ? undefined : bucket.splice(index, 1)[0];
       // A freshly-detected installment wins; otherwise keep a manual one from before.
       const detected =
         t.currentInstallment && t.totalInstallments
@@ -1021,14 +1026,27 @@ export async function rescanStatement(id: string, useOcr: boolean): Promise<Stat
             }
           : null;
       return {
+        ...(old?._id ? { _id: old._id } : {}),
         date: safeDate(t.date),
         description: t.description,
         amount: t.amount,
-        category: 'uncategorized',
-        installmentInfo: detected ?? old?.installmentInfo ?? null,
-        matchedItemIds: (old?.matchedItemIds ?? []).map((sid) => new Types.ObjectId(sid)),
+        category: old?.category ?? 'uncategorized',
+        matchedReceiptId: old?.matchedReceiptId ?? null,
+        installmentInfo: old?.installmentInfo?.planKey
+          ? old.installmentInfo
+          : detected ?? old?.installmentInfo ?? null,
+        matchedItemIds: (old?.matchedItemIds ?? []).map((id) => new Types.ObjectId(String(id))),
       };
     });
+
+    const unmatchedEdits = [...oldByKey.values()].flat().some(t =>
+      t.matchedReceiptId || t.matchedItemIds?.length || t.installmentInfo ||
+      (t.category && t.category !== 'uncategorized')
+    );
+    if (unmatchedEdits) {
+      return { ok: false, aiUsed: false, usedOcr,
+        error: 'Some edited or linked transactions could not be matched. The existing statement was kept unchanged.' };
+    }
 
     // Cross-check: re-inherit product links by signature from the OTHER statements.
     type PriorTx = {
