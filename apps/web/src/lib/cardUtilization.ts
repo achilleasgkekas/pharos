@@ -136,7 +136,8 @@ export function buildCardUtilization(
       }
     }
 
-    const outstanding = latest ? Math.max(0, latest.totalAmount - latest.paidAmount) : 0;
+    if (!latest) continue; // No statement means unknown usage, not zero usage.
+    const outstanding = Math.max(0, latest.totalAmount - latest.paidAmount);
     const pct = Math.round((outstanding / creditLimit) * 100);
     const entry: CardUtilization = {
       cardId: c._id,

@@ -63,7 +63,8 @@ export function ReconcilePanel({ statements }: { statements: StmtOption[] }) {
   const matchedCount = txns.filter((tx) => tx.matchedReceiptId).length;
 
   return (
-    <div className="space-y-4">
+    <div className="min-w-0 space-y-4">
+      <p className="text-sm leading-relaxed text-[color:var(--color-text-dim)]">{t('payments.reconcileHelp')}</p>
       {/* Statement picker */}
       {statements.length > 1 && (
         <div className="flex items-center gap-2 flex-wrap">

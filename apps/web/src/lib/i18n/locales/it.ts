@@ -1,6 +1,33 @@
 import type { Dict } from './en';
 
 export const it: Partial<Dict> = {
+  "payments.billed": "Rate fatturate",
+  "payments.fullyBilled": "Tutto fatturato · verifica il saldo",
+  "payments.cashflow": "Flusso di cassa stimato",
+  "payments.cashflowNote": "Entrate note meno fatture previste, esclusi denaro disponibile e spese non registrate. Non è il credito disponibile.",
+
+  "payments.title": "Pagamenti delle carte",
+  "payments.due": "Da pagare",
+  "payments.credit": "Credito sulla carta",
+  "payments.forecast": "Prossimi mesi · {n} mesi",
+  "payments.history": "Storico estratti conto",
+  "payments.opening": "Saldo iniziale (calcolato)",
+  "payments.charges": "Addebiti",
+  "payments.included": "Pagamenti nel PDF",
+  "payments.additional": "Pagamenti aggiuntivi",
+  "payments.remaining": "Residuo",
+  "payments.otherCredits": "Altri accrediti / rimborsi",
+  "payments.closing": "Saldo finale della banca",
+  "payments.adjustment": "Rettifica saldo / pagamenti",
+  "payments.manage": "Gestisci prodotti collegati",
+  "payments.confirmUnlink": "Rimuovere i collegamenti? Prodotti e transazioni resteranno.",
+  "payments.confirmMerge": "Unire i gruppi di rate? Solo addebiti dello stesso acquisto.",
+  "payments.reconcileHelp": "Abbina addebiti e ricevute per individuare ricevute mancanti. Non registra pagamenti e non modifica il saldo.",
+  "payments.paymentNote": "I pagamenti nel PDF sono già inclusi nel saldo bancario. Inserisci solo pagamenti aggiuntivi non inclusi.",
+  "payments.forecastNote": "Stima di rate e saldi noti, senza acquisti futuri, commissioni o interessi. I prodotti acquistati insieme condividono un importo. Si usa l’ultimo intervallo di scadenza noto, altrimenti il mese dell’estratto.",
+  "payments.limitsNote": "Uso stimato dall’ultimo estratto, non credito disponibile in tempo reale. Acquisti in sospeso e rate non fatturate possono usare il limite.",
+  "payments.summaryNote": "Ultimo estratto per ogni carta. Il credito resta sulla propria carta. Storico per mese dell’estratto; saldo iniziale calcolato dalle transazioni importate.",
+
   'nav.bills': 'Bollette',
   'nav.savings': 'Risparmi',
   'nav.darkMode': 'Modalità scura',

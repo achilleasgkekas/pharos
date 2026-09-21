@@ -1,6 +1,33 @@
 import type { Dict } from './en';
 
 export const nl: Partial<Dict> = {
+  "payments.billed": "Gefactureerde termijnen",
+  "payments.fullyBilled": "Alles gefactureerd · controleer saldo",
+  "payments.cashflow": "Geschatte kasstroom",
+  "payments.cashflowNote": "Bekende inkomsten min geplande rekeningen, zonder beschikbaar geld en niet-geregistreerde uitgaven. Geen beschikbaar kaartkrediet.",
+
+  "payments.title": "Kaartbetalingen",
+  "payments.due": "Nog te betalen",
+  "payments.credit": "Kaarttegoed",
+  "payments.forecast": "Komende maanden · {n} maanden",
+  "payments.history": "Afschriftenhistorie",
+  "payments.opening": "Beginsaldo (berekend)",
+  "payments.charges": "Afschrijvingen",
+  "payments.included": "Betalingen in de PDF",
+  "payments.additional": "Extra betalingen",
+  "payments.remaining": "Resterend",
+  "payments.otherCredits": "Overige bijschrijvingen / terugbetalingen",
+  "payments.closing": "Eindsaldo bank",
+  "payments.adjustment": "Saldo- / betalingscorrectie",
+  "payments.manage": "Productkoppelingen beheren",
+  "payments.confirmUnlink": "Koppelingen verwijderen? Producten en transacties blijven behouden.",
+  "payments.confirmMerge": "Termijngroepen samenvoegen? Alleen voor dezelfde aankoop.",
+  "payments.reconcileHelp": "Koppel kaarttransacties aan bonnen om ontbrekende bonnen te vinden. Dit registreert geen betaling en wijzigt het saldo niet.",
+  "payments.paymentNote": "Betalingen in de PDF zijn al verwerkt in het banksaldo. Voer alleen extra, nog niet verwerkte betalingen in.",
+  "payments.forecastNote": "Schatting van bekende termijnen en saldi, zonder toekomstige aankopen, kosten of rente. Samen gekochte producten delen één bedrag. De laatst bekende betaaltermijn geldt, anders de afschriftmaand.",
+  "payments.limitsNote": "Geschat gebruik volgens het laatste afschrift, geen actueel beschikbaar krediet. Openstaande aankopen en toekomstige termijnen kunnen de limiet belasten.",
+  "payments.summaryNote": "Laatste afschrift per kaart. Tegoed blijft op de eigen kaart. Historie per afschriftmaand; beginsaldo berekend uit geïmporteerde transacties.",
+
   'nav.bills': 'Rekeningen',
   'nav.savings': 'Sparen',
   'nav.darkMode': 'Donkere modus',

@@ -1,5 +1,7 @@
 'use client';
 import { useState, useTransition } from 'react';
+import { StatementPaymentReport } from '@/components/StatementPaymentReport';
+import type { StatementPaymentReport as PaymentReport } from '@/lib/statementPayments';
 import { useRouter } from 'next/navigation';
 import { cur } from "@/lib/money";
 import { useLocale, useT, useMoney } from '@/components/LocaleProvider';
@@ -113,11 +115,11 @@ type GoalRow = {
 };
 
 type Data = {
+  statementPayments: PaymentReport;
   netWorth: { accountsTotal: number; series: NetWorthPoint[] };
   safeToSpend: SafeToSpend;
   monthReview: MonthReview;
   monthlySpend: { key: string; label: string; total: number; count: number }[];
-  upcomingInstallments: { label: string; amount: number }[];
   spendByStore: { name: string; total: number; count: number }[];
   spendByCategory: { name: string; value: number }[];
   subsByCategory: { name: string; value: number }[];
@@ -466,8 +468,9 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.15em] text-[color:var(--color-text-faint)] mb-1" style={{ fontFamily: 'var(--font-mono)' }}>
-              <Wallet size={12} /> {t('reports.safeToSpend')} · {data.safeToSpend.monthLabel}
+              <Wallet size={12} /> {t('payments.cashflow')} · {data.safeToSpend.monthLabel}
             </p>
+            <p className="max-w-xl mb-3 text-xs leading-relaxed text-[color:var(--color-text-dim)]">{t('payments.cashflowNote')}</p>
             <p className="text-3xl md:text-4xl font-bold" style={{ fontFamily: 'var(--font-display)', color: data.safeToSpend.thisMonth.net >= 0 ? 'var(--color-accent)' : 'var(--color-red)' }}>
               {data.safeToSpend.thisMonth.net >= 0 ? '' : '-'}{money(Math.abs(data.safeToSpend.thisMonth.net))}
             </p>
@@ -692,24 +695,9 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
         </Card>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Upcoming installment obligations */}
-        <Card title={t('reports.cInstallments')}>
-          {data.upcomingInstallments.every((m) => m.amount === 0) ? (
-            <Empty text="No active installments" />
-          ) : (
-            <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={data.upcomingInstallments} margin={{ left: 0, right: 8 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
-                <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} width={44} tickFormatter={(v: number) => money(v, undefined, { notation: 'compact', minimumFractionDigits: 0, maximumFractionDigits: 1 })} />
-                <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [money(v), 'due']} cursor={{ fill: 'rgba(127,127,127,0.08)' }} />
-                <Bar dataKey="amount" radius={[5, 5, 0, 0]} fill="#a55eea" />
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </Card>
+      <StatementPaymentReport report={data.statementPayments} />
 
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Spending by store */}
         <Card title={inWindow(t('reports.cByStore'))}>
           {data.spendByStore.length === 0 ? (

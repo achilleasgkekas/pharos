@@ -1,6 +1,33 @@
 import type { Dict } from './en';
 
 export const es: Partial<Dict> = {
+  "payments.billed": "Cuotas facturadas",
+  "payments.fullyBilled": "Todo facturado · comprueba el saldo",
+  "payments.cashflow": "Flujo de caja estimado",
+  "payments.cashflowNote": "Ingresos conocidos menos facturas previstas; excluye efectivo disponible y gastos no registrados. No es el crédito disponible.",
+
+  "payments.title": "Pagos de tarjetas",
+  "payments.due": "Pendiente de pago",
+  "payments.credit": "Saldo a favor",
+  "payments.forecast": "Próximos meses · {n} meses",
+  "payments.history": "Historial de extractos",
+  "payments.opening": "Saldo inicial (calculado)",
+  "payments.charges": "Cargos",
+  "payments.included": "Pagos en el PDF",
+  "payments.additional": "Pagos adicionales",
+  "payments.remaining": "Pendiente",
+  "payments.otherCredits": "Otros abonos / devoluciones",
+  "payments.closing": "Saldo final del banco",
+  "payments.adjustment": "Ajuste de saldo / pagos",
+  "payments.manage": "Gestionar productos vinculados",
+  "payments.confirmUnlink": "¿Quitar los vínculos? Se conservarán productos y transacciones.",
+  "payments.confirmMerge": "¿Unir grupos de cuotas? Une solo cargos de la misma compra.",
+  "payments.reconcileHelp": "Vincula cargos con recibos para detectar recibos faltantes. No registra pagos ni cambia el saldo.",
+  "payments.paymentNote": "Los pagos del PDF ya están incluidos en el saldo bancario. Introduce solo pagos adicionales no incluidos.",
+  "payments.forecastNote": "Estimación de cuotas y saldos conocidos, sin compras futuras, comisiones ni intereses. Los productos comprados juntos comparten importe. Se usa el último desfase de vencimiento conocido; si falta, el mes del extracto.",
+  "payments.limitsNote": "Uso estimado según el último extracto, no crédito disponible en tiempo real. Compras pendientes y cuotas no facturadas pueden consumir límite.",
+  "payments.summaryNote": "Se usa el último extracto de cada tarjeta. El crédito permanece en su tarjeta. Historial por mes del extracto; saldo inicial calculado con las transacciones importadas.",
+
   'nav.bills': 'Facturas',
   'nav.savings': 'Ahorrar',
   'nav.darkMode': 'Modo oscuro',

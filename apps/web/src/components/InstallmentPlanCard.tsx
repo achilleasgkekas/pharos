@@ -2,7 +2,7 @@
 import { cur } from "@/lib/money";
 import { Package } from 'lucide-react';
 import { shortMonth, type InstallmentPlan } from '@/lib/installments';
-import { useLocale } from '@/components/LocaleProvider';
+import { useLocale, useT } from '@/components/LocaleProvider';
 
 /**
  * Payoff card for a single installment plan. Shared by statements, items,
@@ -18,6 +18,7 @@ export function InstallmentPlanCard({
   compact?: boolean;
 }) {
   const locale = useLocale();
+  const t = useT();
   const pct =
     plan.totalInstallments > 0
       ? Math.round((plan.paidInstallments / plan.totalInstallments) * 100)
@@ -26,17 +27,17 @@ export function InstallmentPlanCard({
   const label = linked.length ? linked.join(' + ') : plan.label;
 
   return (
-    <div className="bg-[color:var(--color-surface-2)] rounded-xl p-3 border border-[color:var(--color-border)]">
+    <div className="min-w-0 bg-[color:var(--color-surface-2)] rounded-xl p-3 border border-[color:var(--color-border)]">
       <div className="flex items-start justify-between gap-2 mb-2">
-        <span className="text-xs font-semibold leading-snug line-clamp-2 flex items-center gap-1.5">
+        <span className="min-w-0 break-words text-xs font-semibold leading-snug line-clamp-2 flex items-center gap-1.5">
           {linked.length > 0 && <Package size={11} className="text-[color:var(--color-accent)] shrink-0" />}
           {label}
         </span>
         <span
-          className="text-[10px] text-[color:var(--color-purple)] shrink-0 tabular-nums"
+          className="max-w-[45%] text-right text-[10px] text-[color:var(--color-purple)] tabular-nums"
           style={{ fontFamily: 'var(--font-mono)' }}
         >
-          {plan.paidInstallments}/{plan.totalInstallments}
+          {t('payments.billed')} {plan.paidInstallments}/{plan.totalInstallments}
         </span>
       </div>
       <div className="h-1.5 bg-[color:var(--color-surface-3)] rounded-full overflow-hidden mb-2">
@@ -46,12 +47,12 @@ export function InstallmentPlanCard({
         />
       </div>
       <div
-        className="flex items-center justify-between text-[10px] text-[color:var(--color-text-faint)]"
+        className="flex flex-wrap gap-2 items-center justify-between text-[10px] text-[color:var(--color-text-faint)]"
         style={{ fontFamily: 'var(--font-mono)' }}
       >
         <span>{cur()}{plan.perAmount.toFixed(2)}/mo</span>
         {plan.done ? (
-          <span className="text-[color:var(--color-accent)]">paid off ✓</span>
+          <span className="text-[color:var(--color-accent)]">{t('payments.fullyBilled')}</span>
         ) : (
           <span>
             {plan.remainingInstallments} left · ends {shortMonth(plan.projectedEndDate, locale)}
