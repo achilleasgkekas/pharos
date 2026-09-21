@@ -3,9 +3,7 @@ name: CI
 on:
   push:
     branches: [main]
-    # Markdown-only commits (the routines write PROGRESS.md / SAAS_PROGRESS.md daily) cannot break
-    # the build, and running the full gate on them was a large slice of the monthly Actions minutes
-    # (#136). docs/openapi.yaml is NOT excluded: a route test reads it.
+    # docs/openapi.yaml is not excluded: route coverage tests read it.
     paths-ignore: ['**/*.md']
   pull_request:
     paths-ignore: ['**/*.md']
@@ -28,6 +26,8 @@ jobs:
         working-directory: apps/web
     steps:
       - uses: actions/checkout@v7
+      - name: Reject private operational files
+        run: python3 ../../scripts/check-public-source.py
       - uses: actions/setup-node@v7
         with:
           node-version: 24
