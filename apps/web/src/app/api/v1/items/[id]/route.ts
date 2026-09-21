@@ -171,7 +171,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       );
       Object.assign(set, money);
     }
-    const doc = await Item.findByIdAndUpdate(id, { $set: set }, { new: true }).lean();
+    const doc = await Item.findByIdAndUpdate(id, { $set: set }, { returnDocument: 'after' }).lean();
     if (!doc) return apiError('not found', 404);
     const i = doc as { _id: unknown; title: string; status?: string; category?: string; currentPrice?: number; targetPrice?: number | null; currency?: string; origAmount?: number; fxRate?: number; updatedAt?: Date };
     return NextResponse.json({
@@ -198,7 +198,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     if (!isObjectId(id)) return apiError('bad id');
     await connectDB();
     const Item = await currentModel(ItemModel);
-    const doc = await Item.findByIdAndUpdate(id, { $set: { deletedAt: new Date() } }, { new: true }).lean();
+    const doc = await Item.findByIdAndUpdate(id, { $set: { deletedAt: new Date() } }, { returnDocument: 'after' }).lean();
     if (!doc) return apiError('not found', 404);
     return NextResponse.json({ ok: true, id });
   });

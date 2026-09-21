@@ -129,10 +129,10 @@ describe('PATCH partial update', () => {
     const set = lastSet();
     expect(set).toEqual({ title: 'Wire rack' });
     expect('unknownField' in set).toBe(false);
-    // findByIdAndUpdate called with the id, {$set}, and {new:true}
+    // findByIdAndUpdate called with the id, {$set}, and the updated-document option
     const call = updateState.calls[0];
     expect(call.id).toBe(OID);
-    expect(call.opts).toEqual({ new: true });
+    expect(call.opts).toEqual({ returnDocument: 'after' });
   });
 
   it('status=done sets completedAt to a Date; a non-done status nulls it', async () => {
@@ -222,7 +222,7 @@ describe('DELETE (soft-delete)', () => {
     const call = updateState.calls[0];
     expect(call.id).toBe(OID);
     expect((call.update as { $set: { deletedAt: unknown } }).$set.deletedAt).toBeInstanceOf(Date);
-    expect(call.opts).toEqual({ new: true });
+    expect(call.opts).toEqual({ returnDocument: 'after' });
   });
 
   it('404s when the task does not exist', async () => {

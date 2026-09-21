@@ -303,7 +303,7 @@ describe('PATCH /api/v1/receipts/:id — scalar coercion', () => {
     expect(res.status).toBe(200);
     const { id, update, opts } = updateState.calls[0];
     expect(id).toBe(OID);
-    expect(opts).toEqual({ new: true });
+    expect(opts).toEqual({ returnDocument: 'after' });
     const set = (update as { $set: Record<string, unknown> }).$set;
     expect(set.store).toBe('Kotsovolos');
     expect((set.date as Date).toISOString()).toBe('2026-01-15T00:00:00.000Z');

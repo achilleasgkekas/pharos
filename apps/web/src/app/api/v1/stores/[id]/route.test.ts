@@ -140,7 +140,7 @@ describe('PATCH', () => {
     const { id, update, opts } = updateState.calls[0];
     expect(id).toBe(OID);
     expect(update).toEqual({ $set: { auto: false, name: 'iStorm', url: 'https://istorm.gr', aliases: ['i-storm', 'istorm.gr'] } });
-    expect(opts).toEqual({ new: true });
+    expect(opts).toEqual({ returnDocument: 'after' });
     expect(invalidateMock).toHaveBeenCalledOnce();
   });
 

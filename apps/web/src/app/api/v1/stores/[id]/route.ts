@@ -35,7 +35,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     await connectDB();
     const Store = await currentModel(StoreModel);
     try {
-      const doc = await Store.findByIdAndUpdate(id, { $set: set }, { new: true }).lean();
+      const doc = await Store.findByIdAndUpdate(id, { $set: set }, { returnDocument: 'after' }).lean();
       if (!doc) return apiError('not found', 404);
       invalidateStoreCache();
       return NextResponse.json({ ok: true, id });

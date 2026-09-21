@@ -100,7 +100,7 @@ export async function bumpSessionEpoch(userId: string): Promise<number> {
   const doc = (await User.findByIdAndUpdate(
     userId,
     { $inc: { sessionEpoch: 1 } },
-    { new: true, projection: { sessionEpoch: 1 } }
+    { returnDocument: 'after', projection: { sessionEpoch: 1 } }
   ).lean()) as { sessionEpoch?: number } | null;
   return Number(doc?.sessionEpoch) || 0;
 }

@@ -34,7 +34,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     await connectDB();
     const LoyaltyCard = await currentModel(LoyaltyCardModel);
-    const doc = await LoyaltyCard.findByIdAndUpdate(id, { $set: set }, { new: true }).lean();
+    const doc = await LoyaltyCard.findByIdAndUpdate(id, { $set: set }, { returnDocument: 'after' }).lean();
     if (!doc) return apiError('not found', 404);
     return NextResponse.json({ loyaltyCard: trim(doc as LoyaltyCardLean) });
   });
@@ -47,7 +47,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     if (!isObjectId(id)) return apiError('bad id');
     await connectDB();
     const LoyaltyCard = await currentModel(LoyaltyCardModel);
-    const doc = await LoyaltyCard.findByIdAndUpdate(id, { $set: { deletedAt: new Date() } }, { new: true }).lean();
+    const doc = await LoyaltyCard.findByIdAndUpdate(id, { $set: { deletedAt: new Date() } }, { returnDocument: 'after' }).lean();
     if (!doc) return apiError('not found', 404);
     return NextResponse.json({ ok: true, id });
   });

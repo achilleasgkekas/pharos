@@ -60,7 +60,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     await connectDB();
     const GiftCard = await currentModel(GiftCardModel);
-    const doc = await GiftCard.findByIdAndUpdate(id, update, { new: true }).lean();
+    const doc = await GiftCard.findByIdAndUpdate(id, update, { returnDocument: 'after' }).lean();
     if (!doc) return apiError('not found', 404);
     return NextResponse.json({ giftCard: trim(doc as GiftCardLean) });
   });
@@ -73,7 +73,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     if (!isObjectId(id)) return apiError('bad id');
     await connectDB();
     const GiftCard = await currentModel(GiftCardModel);
-    const doc = await GiftCard.findByIdAndUpdate(id, { $set: { deletedAt: new Date() } }, { new: true }).lean();
+    const doc = await GiftCard.findByIdAndUpdate(id, { $set: { deletedAt: new Date() } }, { returnDocument: 'after' }).lean();
     if (!doc) return apiError('not found', 404);
     return NextResponse.json({ ok: true, id });
   });

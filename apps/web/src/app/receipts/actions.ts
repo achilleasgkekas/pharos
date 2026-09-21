@@ -318,7 +318,7 @@ export async function updateReceipt(
   const doc = await Receipt.findByIdAndUpdate(
     id,
     { ...parsed, space: parsed.space.trim(), date: safeDate(parsed.date), ...fxFields(parsed, base) },
-    { new: true, select: 'store date total filePath verified' }
+    { returnDocument: 'after', select: 'store date total filePath verified' }
   ).lean();
   // Mirror-on-verify: once a receipt is confirmed, push its file to the remote
   // backend (when the auto-mirror toggle is on). Fire-and-forget.
@@ -365,7 +365,7 @@ export async function quickVerifyReceipt(
         verified: true,
       },
     },
-    { new: true, select: 'store date total filePath verified' }
+    { returnDocument: 'after', select: 'store date total filePath verified' }
   ).lean();
   if (doc?.filePath) {
     void mirrorFileToRemote({ kind: 'receipts', store: doc.store, date: doc.date, total: doc.total, id: doc._id }, doc.filePath);

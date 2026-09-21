@@ -323,7 +323,7 @@ describe('PATCH', () => {
         currency: 'EUR', origAmount: 0, fxRate: 0,
       },
     });
-    expect(opts).toEqual({ new: true });
+    expect(opts).toEqual({ returnDocument: 'after' });
     const { item } = await res.json();
     expect(item).toEqual({ id: 'i1', title: 'Ubiquiti U7 Pro', status: 'ordered', category: 'network', currentPrice: 284, targetPrice: 250, currency: '', origAmount: 0, fxRate: 0, updatedAt: null });
   });
@@ -376,7 +376,7 @@ describe('DELETE', () => {
     expect(id).toBe(OID);
     // SOFT delete (regression guard: a hard findByIdAndDelete would lose Trash recovery).
     expect((update as { $set: { deletedAt: unknown } }).$set.deletedAt).toBeInstanceOf(Date);
-    expect(opts).toEqual({ new: true });
+    expect(opts).toEqual({ returnDocument: 'after' });
   });
 
   it('returns 404 when the item does not exist', async () => {
