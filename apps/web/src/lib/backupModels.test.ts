@@ -99,7 +99,7 @@ describe('backup registry contents', () => {
   it('excludes every model that can hold credentials or password hashes', () => {
     // The export lands in the user's Downloads folder; a leaked API key or scrypt hash
     // there is a different class of problem from a lost expense row.
-    for (const name of ['AppConfig', 'User', 'Account']) {
+    for (const name of ['AppConfig', 'User']) {
       expect(backedUpNames, `${name} must never be exported`).not.toContain(name);
       expect(BACKUP_EXCLUDED[name]).toBeTruthy();
     }

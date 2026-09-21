@@ -11,7 +11,6 @@ import { isOllamaHealthy, isAiReady } from '@/lib/ollama';
 import { getAiConfig } from '@/lib/aiConfig';
 import { getAiBudgetStatus } from '@/lib/aiBudget';
 import { getAppSettings } from '@/lib/appSettings';
-import { saasUiEnabled } from '@/lib/tenancy/saasPage';
 import { getStores } from '@/lib/storeService';
 import { SettingsClient } from './SettingsClient';
 import { listOllamaModels, getPromptsForEditor, getScraperAi, getStorageInfo, getListsForEditor, getImapInfo } from './actions';
@@ -62,8 +61,6 @@ async function getInfo() {
     scraperAi,
     storage,
     imap,
-    // Hosted vs self-hosted: the settings UI hides what the account area already owns.
-    saas: saasUiEnabled(),
     ai: {
       // What the user picked (may differ from effective if no key yet)
       selectedProvider: ((doc?.aiProvider as string) || 'ollama') as 'ollama' | 'anthropic' | 'openai' | 'gemini' | 'openrouter' | 'custom',

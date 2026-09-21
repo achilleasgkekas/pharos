@@ -11,7 +11,6 @@ import {
   getMfaPendingUserId,
 } from '@/lib/auth';
 import { authConfigured } from '@/lib/session';
-import { saasMode } from '@/lib/tenancy/saasMode';
 import { verifyUserMfaLogin } from '@/lib/userMfaStore';
 import { rateHit, rateLimitConfig, rateStore } from '@/lib/apiRateLimit';
 
@@ -92,28 +91,8 @@ export async function cancelMfaLoginAction(): Promise<void> {
   await clearMfaPendingCookie();
 }
 
-/**
- * Sign out from inside the product, in EITHER shape.
- *
- * This used to clear only `pharos_session` and send you to `/login`, which is the
- * self-hosted pair. A hosted customer holds `pharos_account` instead, so pressing Sign out
- * in the navbar cleared a cookie they never had, left the real session alive, and dropped
- * them on the self-hosted login page — from which they were still signed in and bounced
- * straight back into the workspace. Reported as "I log out and it takes me back to the
- * workspace, and I have to log out there too". They did have to: this button had not
- * actually logged them out of anything.
- *
- * Both cookies are cleared unconditionally. Clearing one that was never set is a no-op, and
- * "log me out" should not leave a second session behind on a machine that happens to have
- * both (a self-hosted instance and the hosted app share nothing but the browser).
- */
+/** End the self-hosted session. */
 export async function logoutAction(): Promise<void> {
   await clearSessionCookie();
-  if (saasMode()) {
-    // Domain-scoped (.ph-aros.com): clearAccountCookie carries the same Domain, without
-    // which the browser keeps the cookie and every workspace subdomain stays signed in.
-    const { clearAccountCookie } = await import('@/lib/tenancy/accountSession');
-    await clearAccountCookie();
-  }
-  redirect(saasMode() ? '/account/login' : '/login');
+  redirect('/login');
 }

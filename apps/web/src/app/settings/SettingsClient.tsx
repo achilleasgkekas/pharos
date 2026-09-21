@@ -87,7 +87,6 @@ type AiInfo = {
 
 type Info = {
   /** Hosted (SAAS_MODE) — hides the surfaces the account area already owns. */
-  saas?: boolean;
   counts: { items: number; receipts: number; statements: number; subscriptions: number; cards: number };
   ollamaUp: boolean;
   stores: StoreLite[];
@@ -155,8 +154,7 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
   const t = useT();
   const [tab, setTab] = useState<TabId>('general');
   const isAdmin = currentUser.role === 'admin';
-  const saas = !!info.saas;
-  const visibleTabs = TABS.filter((t) => (!t.adminOnly || isAdmin) && (!t.selfHostOnly || !saas));
+  const visibleTabs = TABS.filter((t) => (!t.adminOnly || isAdmin));
   const searchParams = useSearchParams();
 
   // A ?tab= deep-link (e.g. from the "Set up AI" banner) wins; otherwise restore the
@@ -243,41 +241,23 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
 
               <DefaultsManager settings={info.settings} />
 
-              {/* Calendar feed (ICS) is a per-user integration, not AI, so it lives here rather than in
-                  the AI tab. Self-hosted only for now (#121): its token sits on the `User` record, which
-                  a hosted customer does not have, and the feed route refuses in SaaS mode. */}
-              {!saas && (
+
+              {(
                 <Section title={t('ics.title')} icon={<CalendarPlus size={15} />}>
                   <CalendarFeedManager />
                 </Section>
               )}
 
-              {/* Password and two-factor belong to the ACCOUNT, not to a workspace. On a hosted
-                  deployment /account/settings already owns both, and rendering them here too
-                  produced two live copies of the same control on the same screen — with the
-                  self-host copy sitting inert next to a working one. Self-hosted (no /account
-                  segment at all) keeps them: it is the only place they exist. */}
-              {!saas && <SelfPasswordCard />}
 
-              {!saas && <SelfMfaCard />}
+              <SelfPasswordCard />
 
-              {saas && (
-                <Section title={t('set.security')}>
-                  <p className="text-xs text-[color:var(--color-text-dim)]">
-                    {t('set.securityLivesInAccount')}{' '}
-                    <a href="/account/settings" className="text-[color:var(--color-accent)] hover:underline">
-                      {t('set.accountSettings')}
-                    </a>
-                  </p>
-                </Section>
-              )}
+              <SelfMfaCard />
+
+
 
               <Section title={t('set.about')}>
                 <UpdateChecker canEdit={isAdmin} />
-                {/* The "Host" row used to read "Mac mini M4 · Docker", hardcoded. True on
-                    Achilleas's own machine and a lie on every other install, hosted customers
-                    included, so it said nothing and said it wrongly. The version above it is
-                    real (stamped at build time); this row had no source of truth at all. */}
+
                 <Row label={t('set.privacy')}>
                   <span className="text-[color:var(--color-text-dim)]">
                     {info.ai.effectiveProvider === 'anthropic' ? t('set.privacyHybrid') : t('set.privacyLocal')}
@@ -297,10 +277,7 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
             </>
           )}
 
-          {/* Self-host only: in hosted mode ALL of a workspace's AI settings live in
-              Workspace → AI (the BYO key + the master/feature toggles, which write per-tenant
-              via /api/saas/workspace/ai-config). The tab is marked selfHostOnly, so this block
-              only ever renders for the self-hosted app. */}
+
           {tab === 'ai' && (
             <>
               <AiMasterAndFeatures ai={info.ai} canEdit={isAdmin} />
@@ -316,10 +293,8 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
 
           {tab === 'storage' && (
             <>
-              {/* Hosted: the remote-mirror backend (SMB / OneDrive / FTP) is a self-host
-                  concept — the platform owns storage in SaaS — so hide the connector. The
-                  per-tenant data tools below (export/backup, import, trash) still apply. */}
-              {!saas && <StorageManager storage={info.storage} counts={info.counts} />}
+
+              <StorageManager storage={info.storage} counts={info.counts} />
               <Section title={t('set.dataSection')} icon={<Database size={15} />}>
                 <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                   <Stat label={t('set.statItems')} value={info.counts.items} />
@@ -356,12 +331,10 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
             </>
           )}
 
-          {/* Hosted: workspace membership lives in the account area (Members + invites), so a
-              SECOND, unrelated user list inside the product is just a way to get the two out
-              of sync. Self-hosted keeps it — it is the only user management there is. */}
-          {tab === 'users' && isAdmin && !saas && <UsersManager currentUserId={currentUser.id} />}
 
-          {tab === 'system' && isAdmin && !saas && (
+          {tab === 'users' && isAdmin && <UsersManager currentUserId={currentUser.id} />}
+
+          {tab === 'system' && isAdmin && (
             <Section title={t('sys.title')} icon={<Activity size={15} />}>
               <p className="text-xs text-[color:var(--color-text-faint)] -mt-1 mb-1">{t('sys.desc')}</p>
               <SystemHealthPanel />
@@ -1021,7 +994,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
         </div>
       </div>
 
-      {/* AI monthly spend cap (self-hosted). Part of the form — saved with the button below. */}
+
       <div className="pt-3 border-t border-[color:var(--color-border)] mt-1">
         <Field label={t('set.aiBudget')}>
           <input

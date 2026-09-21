@@ -1,15 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { headers } from 'next/headers';
 import { connectDB } from '@/lib/db';
 import { User as UserModel } from '@/models/User';
 import { rateHit, rateLimitConfig, rateStore, type RateConfig } from '@/lib/apiRateLimit';
 import { canWrite, isReadMethod, READ_ONLY_MESSAGE, type Role } from '@/lib/roles';
-import { DEFAULT_TENANT, getTenantContext, parseTenantSlug, type TenantContext } from '@/lib/tenancy/context';
+import { DEFAULT_TENANT, type TenantContext } from '@/lib/tenancy/context';
 import { currentModel } from '@/lib/tenancy/connection';
 import { withTenant } from '@/lib/tenancy/current';
-import { saasMode } from '@/lib/tenancy/saasMode';
-import { workspaceStatusError } from '@/lib/tenancy/workspace';
-import { TENANT_HOST_HEADER } from '@/lib/tenancy/request';
 
 export type ApiUser = { id: string; name: string; username: string; role: Role };
 
@@ -61,47 +57,9 @@ export async function bearerUser(req: NextRequest): Promise<ApiUser | null> {
 /** A workspace the request may not enter, rendered as the response the caller gets. */
 export type TenantGateFailure = { status: 404 | 403; error: string };
 
-/**
- * Resolve the workspace for an /api/v1 request from its HOST alone.
- *
- * `withRequestTenant` — the gate every feature server action uses — is deliberately NOT used
- * here. It requires an authenticated Account cookie and answers failure with
- * `redirect()`/`notFound()`, which is right for a browser and wrong for an API client
- * holding a bearer token: every API call would 307 to the login page.
- *
- * So this mirrors `resolveRequestTenant`'s rule and swaps only the credential. The HOST decides
- * WHICH workspace, exactly as it does for the web app. Authorisation is then decided by the
- * credential the caller actually has: a workspace-scoped API token, checked by `bearerUser`
- * against that workspace's OWN `users` collection. A token minted in workspace A simply does
- * not exist in workspace B's database, so it cannot read B — the isolation comes from the
- * lookup landing in the right database, not from a second membership check.
- *
- * SAAS_MODE off → DEFAULT_TENANT immediately, so the self-hosted app is untouched.
- *
- * EXPORTED for `/api/mcp`, which is the app's second bearer-token door: it speaks JSON-RPC, so it
- * cannot reuse `withAuth` (whose failures are `{error}` JSON with HTTP status codes), but it must
- * resolve the workspace by exactly the same rule. Sharing this function rather than copying it is
- * the point — the copy is what let MCP keep authenticating against the default database after
- * `/api/v1` was fixed.
- */
+/** Compatibility accessor for bearer routes: the host never chooses a database. */
 export async function apiTenant(): Promise<TenantContext | TenantGateFailure> {
-  if (!saasMode()) return DEFAULT_TENANT;
-  const h = await headers();
-  const host =
-    h.get(TENANT_HOST_HEADER) || h.get('x-forwarded-host') || h.get('host') || null;
-  const ctx = await getTenantContext({ host });
-  if (!ctx || ctx.isDefault || !ctx.tenantId) {
-    // A host that NAMES a workspace which does not exist, and a host that names none at all
-    // (the apex, an unpointed domain), are both dead ends for the API — but say which, because
-    // "you pointed the app at the wrong hostname" is the single likeliest setup mistake.
-    return {
-      status: 404,
-      error: parseTenantSlug(host) !== null ? 'No such workspace' : 'No workspace for this host',
-    };
-  }
-  const statusErr = workspaceStatusError(ctx.status);
-  if (statusErr) return { status: 403, error: statusErr };
-  return ctx;
+  return DEFAULT_TENANT;
 }
 
 export function apiError(message: string, status = 400) {

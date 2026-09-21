@@ -17,7 +17,6 @@ import {
   type SessionClaims,
 } from './session';
 import { canWrite, READ_ONLY_MESSAGE } from './roles';
-import { saasMode } from './tenancy/saasMode';
 
 export type SessionUser = { id: string; role: Role; name: string };
 
@@ -95,25 +94,9 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
   return { id: claims.sub, role: claims.role, name: claims.name };
 }
 
-/**
- * Who is signed in, in EITHER shape: a self-hosted `User` session, or a hosted `Account` with a
- * membership in the workspace named by the host.
- *
- * This is the one function the app should ask. Without the second half, a paying customer who was
- * correctly signed in looked like nobody: every gate redirected to /login, /login found zero
- * `User` documents and redirected to /setup, and the customer was handed the self-hosted
- * "create your admin account" wizard. The navbar disappeared for the same reason.
- *
- * The SaaS half is imported DYNAMICALLY, for two reasons: lib/tenancy/recoveryCodes imports back
- * into this module, so a static import would close a cycle, and a self-hosted deployment must not
- * load the tenancy graph at all.
- */
+/** Current self-hosted user. Hosted account cookies are no longer credentials. */
 export async function getSessionUser(): Promise<SessionUser | null> {
-  const self = await getCurrentUser();
-  if (self) return self;
-  if (!saasMode()) return null;
-  const { saasSessionUser } = await import('./tenancy/saasIdentity');
-  return saasSessionUser();
+  return getCurrentUser();
 }
 
 /** For server components/actions that must have a user. Redirects to /login otherwise. */
