@@ -239,9 +239,9 @@ export function StatementsClient({
           </h1>
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
             {statements.length > 0 && (
-              <div className="flex flex-wrap gap-4 text-sm tabular-nums">
-                <span>{t('payments.due')}: <strong>{cur()}{balances.due.toFixed(2)}</strong></span>
-                {balances.credit > 0 && <span>{t('payments.credit')}: <strong>{cur()}{balances.credit.toFixed(2)}</strong></span>}
+              <div className="flex flex-wrap gap-4 text-xs tabular-nums text-[color:var(--color-text-dim)]" style={{ fontFamily: 'var(--font-mono)' }}>
+                <span>{t('payments.due')}: <strong className="text-[color:var(--color-red)]">{cur()}{balances.due.toFixed(2)}</strong></span>
+                {balances.credit > 0 && <span>{t('payments.credit')}: <strong className="text-[color:var(--color-accent)]">{cur()}{balances.credit.toFixed(2)}</strong></span>}
               </div>
             )}
             {statements.length > 0 && (
@@ -560,7 +560,7 @@ function PlanCardLinkable({
     <div className={cn("min-w-0", compact && 'opacity-80')}>
       <InstallmentPlanCard plan={plan} itemTitles={linkedItems.map((x) => x.title)} compact={compact} />
       <details className="mt-3 min-w-0 rounded-lg border border-[color:var(--color-border)] p-3 [&_button]:min-h-11 [&_button]:px-3 [&_button]:text-xs">
-        <summary className="cursor-pointer py-2 text-sm">{t('payments.manage')}</summary>
+        <summary className="cursor-pointer py-2 text-xs text-[color:var(--color-cyan)]" style={{ fontFamily: 'var(--font-mono)' }}>{t('payments.manage')}</summary>
         <div className="mt-3 space-y-4">
         {/* Linked products — one removable chip each. A single charge can cover several. */}
         {linkedItems.length > 0 && (
@@ -627,7 +627,7 @@ function PlanCardLinkable({
         )}
         <div className="border-t border-[color:var(--color-border)] pt-3"><PlanMergeControl plan={plan} allPlans={allPlans} /></div>
         {linkedItems.length > 0 && <div className="border-t border-[color:var(--color-border)] pt-3">
-          <button onClick={clearAll} disabled={pending} className="w-full rounded-lg border border-[color:var(--color-red)]/40 text-[color:var(--color-red)]">{t('stm.clearAll')}</button>
+          <Button variant="danger" size="sm" onClick={clearAll} disabled={pending} className="w-full justify-center min-h-11">{t('stm.clearAll')}</Button>
         </div>}
         </div>
       </details>
@@ -847,10 +847,10 @@ function StatementDetail({
         </div>
       )}
 
-      <dl className="grid min-w-0 gap-3 rounded-lg bg-[color:var(--color-surface-2)] p-3 sm:grid-cols-3">
-        <div><dt className="text-xs text-[color:var(--color-text-dim)]">{t('payments.included')}</dt><dd className="mt-1 tabular-nums">{cur()}{paymentSummary.paymentsIncluded.toFixed(2)}</dd></div>
-        <div><dt className="text-xs text-[color:var(--color-text-dim)]">{t('payments.additional')}</dt><dd className="mt-1 tabular-nums">{cur()}{paymentSummary.additionalPaid.toFixed(2)}</dd></div>
-        <div><dt className="text-xs text-[color:var(--color-text-dim)]">{t('payments.due')}</dt><dd className="mt-1 tabular-nums font-semibold">{cur()}{paymentSummary.due.toFixed(2)}</dd></div>
+      <dl className="grid min-w-0 gap-4 rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] p-4 sm:grid-cols-3">
+        <div><dt style={{ fontFamily: 'var(--font-mono)' }} className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)]">{t('payments.included')}</dt><dd className="mt-1.5 text-lg font-semibold tabular-nums text-[color:var(--color-accent)]" style={{ fontFamily: 'var(--font-display)' }}>{cur()}{paymentSummary.paymentsIncluded.toFixed(2)}</dd></div>
+        <div><dt style={{ fontFamily: 'var(--font-mono)' }} className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)]">{t('payments.additional')}</dt><dd className="mt-1.5 text-lg font-semibold tabular-nums text-[color:var(--color-accent)]" style={{ fontFamily: 'var(--font-display)' }}>{cur()}{paymentSummary.additionalPaid.toFixed(2)}</dd></div>
+        <div><dt style={{ fontFamily: 'var(--font-mono)' }} className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)]">{t('payments.due')}</dt><dd className="mt-1.5 text-lg font-semibold tabular-nums" style={{ fontFamily: 'var(--font-display)', color: paymentSummary.due > 0 ? 'var(--color-red)' : 'var(--color-accent)' }}>{cur()}{paymentSummary.due.toFixed(2)}</dd></div>
       </dl>
       {/* Editable statement fields — same form for reading and writing */}
       <StatementForm
