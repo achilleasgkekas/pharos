@@ -70,6 +70,7 @@ import { startDeviceCode, pollDeviceToken, getOnedriveCreds, disconnectOnedrive,
 import { runNtfyTest } from '@/lib/notify';
 import { ALERT_TYPE_KEYS, resolveNotifyTypes, type NotifyTypes } from '@/lib/alertTypes';
 import { isWithinQuietHours, normalizeQuietHours } from '@/lib/quietHours';
+import { lowestKnownPrice } from '@/lib/lowestKnownPrice';
 import { BACKUP_MODELS, BACKUP_KEYS } from '@/lib/backupModels';
 import { verifyBackupJson, formatBackupCounts, type BackupVerifyResult } from '@/lib/backupVerify';
 import { encryptBackup, decryptBackup } from '@/lib/backupCrypto';
@@ -621,9 +622,8 @@ export async function runAlertChecks(opts: { dedupe?: boolean } = {}): Promise<{
     links?: { price?: number | null }[];
   }>;
   const deals = dealItems.filter((i) => {
-    let lo = (i.currentPrice ?? 0) > 0 ? (i.currentPrice as number) : Infinity;
-    for (const l of i.links ?? []) if (l.price && l.price > 0) lo = Math.min(lo, l.price);
-    return lo < Infinity && lo <= (i.targetPrice ?? 0);
+    const lo = lowestKnownPrice(i);
+    return lo != null && lo <= (i.targetPrice ?? 0);
   });
 
   const warrantyItems = (await (await scoped(Item)).find({ warrantyUntil: { $ne: null } }).select('title warrantyUntil').lean()) as Array<{
