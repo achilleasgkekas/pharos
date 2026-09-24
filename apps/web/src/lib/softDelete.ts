@@ -23,11 +23,18 @@ export const SOFT_DELETE_HOOKS = [
  * The pre-hook body registered on every {@link SOFT_DELETE_HOOKS} query. Exported for
  * tests. Mongoose invokes it with the Query as `this`. Unless the caller opted in with
  * `.setOptions({ withDeleted: true })`, it narrows the query to non-trashed docs
- * (`deletedAt: null`). Always calls `next()` so the query proceeds either way.
+ * (`deletedAt: null`).
+ *
+ * NO `next` parameter, on purpose. It used to take `next` and call it, which Mongoose 8
+ * supported and Mongoose 9 removed: pre middleware no longer receives `next` at all. With the
+ * old signature, every find/count/update on every soft-deletable model threw
+ * `next is not a function` — i.e. the whole app — and neither the compiler nor the tests
+ * noticed. The registration below casts to `any`, so tsc could not see the mismatch, and the
+ * unit test called this function by hand with its own `next`. A synchronous body with no
+ * parameter works on both 8 and 9, and the query proceeds when it returns.
  */
-export function hideDeleted(this: Query<unknown, unknown>, next: () => void): void {
+export function hideDeleted(this: Query<unknown, unknown>): void {
   if (!this.getOptions().withDeleted) this.where({ deletedAt: null });
-  next();
 }
 
 export function softDeletePlugin(schema: Schema): void {

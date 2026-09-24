@@ -13,14 +13,14 @@
 // added without a gate. Self-hosted has no ambient tenant and `currentModel` returns the
 // default-connection model, i.e. exactly the imported model — unchanged behaviour.
 import { connectDB } from '@/lib/db';
-import { BILLING_CYCLES, isBillingCycle, monthlyEquivalent } from '@/lib/billingCycle';
+import { BILLING_CYCLES, isBillingCycle, monthlyEquivalent, type BillingCycle } from '@/lib/billingCycle';
 import { effectiveNextRenewal } from '@/lib/subscriptionRenewal';
 import { currentModel } from '@/lib/tenancy/connection';
 import { suggestSubscription } from '@/lib/ollama';
 import { computeInstallmentPlans } from '@/lib/installments';
 import { Subscription } from '@/models/Subscription';
 import { Task } from '@/models/Task';
-import { Item } from '@/models/Item';
+import { Item, ITEM_STATUSES, type ItemStatus } from '@/models/Item';
 import { Expense } from '@/models/Expense';
 import { Receipt } from '@/models/Receipt';
 import { Statement } from '@/models/Statement';
@@ -297,9 +297,12 @@ export async function execute(name: string, input: Record<string, unknown>): Pro
     }
     case 'add_subscription': {
       let amount = n(input, 'amount');
-      let cycle = (s(input, 'billingCycle') || 'monthly').toLowerCase();
-      if (/^annual/.test(cycle) || cycle === 'year') cycle = 'yearly';
-      if (!isBillingCycle(cycle)) cycle = 'monthly';
+      // Normalised into a real `BillingCycle`, not left as a string that merely passed a check:
+      // `isBillingCycle` only narrows inside its own `if`, so the value reaching `create` was
+      // still typed `string` — which Mongoose 9's stricter create() types now reject.
+      let rawCycle = (s(input, 'billingCycle') || 'monthly').toLowerCase();
+      if (/^annual/.test(rawCycle) || rawCycle === 'year') rawCycle = 'yearly';
+      let cycle: BillingCycle = isBillingCycle(rawCycle) ? rawCycle : 'monthly';
       let category = s(input, 'category') || 'other';
       let url = '';
       let notes = s(input, 'notes');
@@ -308,7 +311,8 @@ export async function execute(name: string, input: Record<string, unknown>): Pro
         try {
           const sug = await suggestSubscription(provider);
           amount = sug.parsed.amount || 0;
-          if (sug.parsed.billingCycle) cycle = sug.parsed.billingCycle;
+          // The suggestion is model output too — only adopt it when it is a cycle we actually have.
+          if (isBillingCycle(sug.parsed.billingCycle)) cycle = sug.parsed.billingCycle;
           category = sug.parsed.category || category;
           url = sug.parsed.url || '';
           notes = notes || sug.parsed.notes || '';
@@ -339,7 +343,12 @@ export async function execute(name: string, input: Record<string, unknown>): Pro
     }
     case 'add_item': {
       const url = s(input, 'url').trim();
-      const status = s(input, 'status') || 'researching';
+      // Checked against the real enum, not trusted: the model names the status in free text, and
+      // anything it invents ("bought", "owned") used to reach `create` and fail enum validation —
+      // an AI command that errored for a reason the user could not see. Mongoose 9's stricter
+      // create() types surfaced it; an unknown value now falls back to the wishlist default.
+      const rawStatus = s(input, 'status');
+      const status: ItemStatus = (ITEM_STATUSES as readonly string[]).includes(rawStatus) ? (rawStatus as ItemStatus) : 'researching';
       // A pasted link → run the full URL-import pipeline: fetch + AI-fill (specs,
       // price, photos), save the link, and DEDUP — a matching item gets this store's
       // link + price added (price tracking) instead of spawning a duplicate.

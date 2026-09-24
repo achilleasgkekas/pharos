@@ -1,6 +1,6 @@
 'use server';
 import { connectDB } from '@/lib/db';
-import { Job } from '@/models/Job';
+import { Job, type JobDoc } from '@/models/Job';
 import { ensureProcessor } from '@/lib/jobRunner';
 import { getAiConfig } from '@/lib/aiConfig';
 import { isFeatureEnabled } from '@/lib/aiFeatures.server';
@@ -214,7 +214,7 @@ export async function dismissJob(id: string): Promise<{ ok: boolean }> {
   return { ok: true };
 }
 
-export async function isJobRunning(kind: string): Promise<boolean> {
+export async function isJobRunning(kind: JobDoc['kind']): Promise<boolean> {
   await connectDB();
   return (await Job.countDocuments({ kind, status: 'running' })) > 0;
 }

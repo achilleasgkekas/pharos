@@ -41,6 +41,8 @@
  * each mapped to the reason. Paths are relative to `apps/web/src`.
  */
 export const SCOPING_EXEMPT_FILES: Record<string, string> = {
+  'lib/shoppingListRestock.ts':
+    'Type-only import (`import type { ShoppingListItemDoc }`), erased at compile time — it cannot touch a database. The model is passed IN by the caller (shopping-list/actions.ts), which already resolves it through currentModel(). Needed since Mongoose 9, which checks filter keys against the real document type.',
   // — 1. SaaS control plane: central registry DB, never a tenant connection —
 
   // — 2. Pre-tenant / self-host User identity (base-connection, not per-workspace data) —
