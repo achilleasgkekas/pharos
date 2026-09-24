@@ -78,6 +78,7 @@ import { InstallmentPlanCard } from '@/components/InstallmentPlanCard';
 import { useOpenParam } from '@/components/useOpenParam';
 import { ItemPhotoGallery } from './ItemPhotoGallery';
 import { ItemDocuments } from './ItemDocuments';
+import { applyItemPatch } from './itemPatch';
 import { ItemAssetTag } from './ItemAssetTag';
 import { formatDate, formatTime, formatDateTime, compareNames } from '@/lib/i18n/format';
 import { assetLabelSubtitle } from '@/lib/assetLabel';
@@ -887,6 +888,7 @@ export function ItemsClient({
           receipts={selectedItem.receiptIds.map((id) => receiptMap.get(id)).filter((r): r is ReceiptRef => !!r)}
           onClose={() => setSelectedItem(null)}
           onItemUpdated={(it) => setSelectedItem(it)}
+          onItemPatched={(patch, rekey) => setSelectedItem((cur) => applyItemPatch(cur, patch, { rekey }))}
         />
       )}
 
@@ -1671,6 +1673,7 @@ function ItemDetailModal({
   receipts,
   onClose,
   onItemUpdated,
+  onItemPatched,
 }: {
   item: SerializedItem;
   view: ItemView;
@@ -1680,6 +1683,8 @@ function ItemDetailModal({
   receipts: ReceiptRef[];
   onClose: () => void;
   onItemUpdated: (item: SerializedItem) => void;
+  /** Merges onto the parent's CURRENT item; `rekey` remounts the keyed children (#245). */
+  onItemPatched: (patch: Partial<Pick<SerializedItem, 'photos' | 'attachments'>>, rekey?: boolean) => void;
 }) {
   const locale = useLocale();
   const t = useT();
@@ -1741,7 +1746,9 @@ function ItemDetailModal({
         setActionMsg({ text: r.error ?? 'No photos found', tone: 'err' });
         return;
       }
-      onItemUpdated({ ...item, photos: r.photos, updatedAt: new Date().toISOString() }); // re-key the gallery
+      // Merge onto the current item, not the one captured when this handler ran: a document
+      // uploaded meanwhile would otherwise vanish when the re-key remounts the vault (#245).
+      onItemPatched({ photos: r.photos }, true);
       router.refresh();
       setActionMsg({ text: `✓ Fetched ${r.added} photo${r.added === 1 ? '' : 's'}`, tone: 'ok' });
     });
@@ -1888,7 +1895,7 @@ function ItemDetailModal({
     <Modal open onClose={onClose} title={item.title} size="2xl">
       {/* Hero: product photos + key facts at a glance */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-6">
-        <ItemPhotoGallery key={`g-${item._id}-${item.updatedAt}`} itemId={item._id} photos={item.photos} canFetch={false} />
+        <ItemPhotoGallery key={`g-${item._id}-${item.updatedAt}`} itemId={item._id} photos={item.photos} canFetch={false} onChange={(photos) => onItemPatched({ photos })} />
 
         <div className="flex flex-col gap-3">
           <div className="flex items-center gap-2 flex-wrap">
@@ -2405,7 +2412,7 @@ function ItemDetailModal({
           `?? []` guards items saved before this field existed (lean() reads skip
           schema defaults, so an untouched legacy doc has no `attachments` at all). */}
       <div className="mb-4">
-        <ItemDocuments key={`docs-${item._id}-${item.updatedAt}`} itemId={item._id} attachments={item.attachments ?? []} />
+        <ItemDocuments key={`docs-${item._id}-${item.updatedAt}`} itemId={item._id} attachments={item.attachments ?? []} onChange={(attachments) => onItemPatched({ attachments })} />
       </div>
 
       {/* P56 — printable QR asset tag. Owned inventory only: a wishlist entry is not a
