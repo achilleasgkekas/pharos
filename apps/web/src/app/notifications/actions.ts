@@ -22,6 +22,7 @@ import { computeInstallmentPlans } from '@/lib/installments';
 import { detectPriceHikes, type HikeEntry } from '@/lib/priceHike';
 import type { SerializedStatement } from '@/types';
 import { assertCanWrite } from '@/lib/auth';
+import { lowestKnownPrice } from '@/lib/lowestKnownPrice';
 import { collectSubscriptionReviews, type ReviewableSubscription } from '@/lib/subscriptionReview';
 
 export type NotifKind = 'deal' | 'installment' | 'warranty' | 'pricehike' | 'trialend' | 'subreview' | 'giftcard' | 'bill' | 'maintenance' | 'lending' | 'claim' | 'system';
@@ -64,9 +65,8 @@ async function computeAlerts(): Promise<Alert[]> {
     _id: unknown; title: string; targetPrice?: number; currentPrice?: number; links?: { price?: number | null }[];
   }>;
   for (const i of dealItems) {
-    let lo = (i.currentPrice ?? 0) > 0 ? (i.currentPrice as number) : Infinity;
-    for (const l of i.links ?? []) if (l.price && l.price > 0) lo = Math.min(lo, l.price);
-    if (lo < Infinity && lo <= (i.targetPrice ?? 0)) {
+    const lo = lowestKnownPrice(i);
+    if (lo != null && lo <= (i.targetPrice ?? 0)) {
       const id = String(i._id);
       // body = "<bestPrice>|<target>" (raw numbers; the bell formats with the symbol)
       alerts.push({ dedupeKey: `deal:${id}`, kind: 'deal', title: i.title, body: `${lo}|${i.targetPrice ?? 0}`, href: `/shopping?open=${id}` });

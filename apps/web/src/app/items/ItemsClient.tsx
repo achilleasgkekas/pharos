@@ -73,6 +73,7 @@ import type { TKey, TFunc } from '@/lib/i18n';
 const IT_STATUS_KEY: Record<string, TKey> = { researching: 'it.stResearching', decided: 'it.stDecided', ordered: 'it.stOrdered', received: 'it.stReceived', installed: 'it.stInstalled', deferred: 'it.stDeferred', sold: 'it.stSold', broken: 'it.stBroken' };
 const IT_SORT_KEY: Record<string, TKey> = { default: 'it.sortDefault', recent: 'it.sortRecent', 'price-desc': 'it.sortPriceDesc', 'price-asc': 'it.sortPriceAsc', name: 'it.sortName' };
 const IT_FLAG_KEY: Record<string, TKey> = { deal: 'it.fDeals', photo: 'it.fPhoto', ai: 'it.fAi', links: 'it.fLinks', warranty: 'it.fWarranty' };
+import { lowestKnownPrice } from '@/lib/lowestKnownPrice';
 import { InstallmentPlanCard } from '@/components/InstallmentPlanCard';
 import { useOpenParam } from '@/components/useOpenParam';
 import { ItemPhotoGallery } from './ItemPhotoGallery';
@@ -1304,11 +1305,7 @@ function bestLinkPrice(item: SerializedItem): { price: number; store: string } |
 }
 
 /** Lowest known price across the current price + every store-link. */
-function lowestKnown(item: SerializedItem): number | null {
-  let lo = item.currentPrice > 0 ? item.currentPrice : Infinity;
-  for (const l of item.links ?? []) if (l.price && l.price > 0) lo = Math.min(lo, l.price);
-  return lo < Infinity ? lo : null;
-}
+const lowestKnown = lowestKnownPrice;
 
 import { calculatePriceTrend } from '@/lib/priceTrend';
 
