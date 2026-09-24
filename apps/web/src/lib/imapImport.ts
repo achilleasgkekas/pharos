@@ -85,8 +85,12 @@ export async function fetchNewEmails(cfg: ImapConfig): Promise<FetchResult> {
       const query = cfg.lastUid > 0
         ? { uid: `${cfg.lastUid + 1}:*` }
         : { since: new Date(Date.now() - FIRST_RUN_LOOKBACK_DAYS * 86400_000) };
+      // `search` answers with the uid list, or with a falsy value when the server returned
+      // nothing usable. imapflow 1.x only ever used `false` there; 2.x can also hand back
+      // `undefined`, so test for falsiness rather than for one particular flavour of it —
+      // otherwise an empty result reaches `.filter` as undefined and throws at runtime.
       const found = await c.search(query, { uid: true });
-      const uids = (found === false ? [] : found).filter((u) => u > cfg.lastUid).sort((a, b) => a - b).slice(0, MAX_FETCH);
+      const uids = (found || []).filter((u) => u > cfg.lastUid).sort((a, b) => a - b).slice(0, MAX_FETCH);
       if (uids.length === 0) return { ok: true, emails: [], maxUid: cfg.lastUid };
 
       const messages = await c.fetchAll(uids, { uid: true, source: true }, { uid: true });
