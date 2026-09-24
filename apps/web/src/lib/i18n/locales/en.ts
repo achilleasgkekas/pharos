@@ -1362,6 +1362,13 @@ export const en = {
   'notif.lendingOverdueSub': '{name} is {days}d late returning it · a nudge costs less than a new one',
   'notif.claimStaleSub': 'RMA {ref} has not moved in {days}d · chase the shop while the cover still holds',
   'notif.claimStaleNoRefSub': 'The claim has not moved in {days}d · chase the shop while the cover still holds',
+  'notif.documentSub': 'Expires in {days}d · renew it before it lapses',
+  'notif.documentTodaySub': 'Expires today · renew it now',
+  'notif.documentExpiredSub': 'Expired {days}d ago · renew it',
+  'notif.specialDateSub': 'Coming up in {days}d · time to plan something',
+  'notif.specialDateYearsSub': 'Coming up in {days}d · turns {years}',
+  'notif.specialDateTodaySub': 'Today · a good day to reach out',
+  'notif.specialDateTodayYearsSub': 'Today · turns {years}',
   // Standalone shopping list (photo scan)
   'nav.shoppingList': 'Shopping list',
   'home.dShoppingList': 'Quick to-buy list with photo scanning',

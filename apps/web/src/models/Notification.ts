@@ -1,5 +1,6 @@
 import { Schema, model, models, type Model, type InferSchemaType } from 'mongoose';
 import { softDeletePlugin } from '@/lib/softDelete';
+import { NOTIF_KINDS } from '@/lib/notificationKinds';
 
 /** In-app notification (the bell). Shared across users like the rest of the app.
  *  `dedupeKey` makes each logical alert (a deal, a warranty, this month's
@@ -7,7 +8,7 @@ import { softDeletePlugin } from '@/lib/softDelete';
 const NotificationSchema = new Schema(
   {
     dedupeKey: { type: String, required: true, index: true },
-    kind: { type: String, enum: ['deal', 'installment', 'warranty', 'pricehike', 'trialend', 'subreview', 'giftcard', 'bill', 'maintenance', 'lending', 'system'], default: 'system', index: true },
+    kind: { type: String, enum: [...NOTIF_KINDS], default: 'system', index: true },
     title: { type: String, default: '' }, // optional — installments derive their heading in the bell
 
     body: { type: String, default: '' },

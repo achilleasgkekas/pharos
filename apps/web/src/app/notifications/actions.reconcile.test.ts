@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // Part 2/2 of the notifications module (part 1 in ./actions.test.ts covers the 4
 // trivial wrappers + the getNotifications throttle/error-swallow from OUTSIDE
 // computeAlerts). This file exercises `generateNotifications()` — the only exported
-// seam onto the private `computeAlerts()` — across all 7 alert kinds plus the
+// seam onto the private `computeAlerts()` — across every alert kind plus the
 // reconcile (insert-fresh / refresh-active / auto-expire-resolved / never-recreate-
 // dismissed) behavior.
 //
@@ -23,6 +23,8 @@ const {
   subscriptionFind,
   giftCardFind,
   billFind,
+  documentFind,
+  specialDateFind,
   notificationFind,
   notificationInsertMany,
   notificationUpdateOne,
@@ -36,6 +38,8 @@ const {
     subscriptions: unknown[];
     giftCards: unknown[];
     bills: unknown[];
+    documents: unknown[];
+    specialDates: unknown[];
     existingNotifications: Array<{ dedupeKey: string }>;
   } = {
     items: [],
@@ -44,6 +48,8 @@ const {
     subscriptions: [],
     giftCards: [],
     bills: [],
+    documents: [],
+    specialDates: [],
     existingNotifications: [],
   };
 
@@ -64,6 +70,8 @@ const {
       giftCardAlertDays: 30,
       billAlertDays: 5,
       subscriptionReviewIntervalDays: 0,
+      documentAlertDays: 0,
+      specialDateAlertDays: 0,
     })),
     itemFind: vi.fn(() => leanQuery(() => state.items)),
     statementFind: vi.fn(() => leanQuery(() => state.statements)),
@@ -71,6 +79,8 @@ const {
     subscriptionFind: vi.fn(() => leanQuery(() => state.subscriptions)),
     giftCardFind: vi.fn(() => leanQuery(() => state.giftCards)),
     billFind: vi.fn(() => leanQuery(() => state.bills)),
+    documentFind: vi.fn(() => leanQuery(() => state.documents)),
+    specialDateFind: vi.fn(() => leanQuery(() => state.specialDates)),
     notificationFind: vi.fn(() => leanQuery(() => state.existingNotifications)),
     notificationInsertMany: vi.fn(async (_docs: unknown[]) => undefined),
     notificationUpdateOne: vi.fn(async (_f: Record<string, unknown>, _u: Record<string, any>) => ({})),
@@ -92,6 +102,8 @@ vi.mock('@/models/Expense', () => ({ Expense: { find: expenseFind } }));
 vi.mock('@/models/Subscription', () => ({ Subscription: { find: subscriptionFind } }));
 vi.mock('@/models/GiftCard', () => ({ GiftCard: { find: giftCardFind } }));
 vi.mock('@/models/Bill', () => ({ Bill: { find: billFind } }));
+vi.mock('@/models/Document', () => ({ Document: { find: documentFind } }));
+vi.mock('@/models/SpecialDate', () => ({ SpecialDate: { find: specialDateFind } }));
 vi.mock('@/models/Notification', () => ({
   Notification: {
     find: notificationFind,
@@ -112,6 +124,8 @@ function resetState() {
   state.subscriptions = [];
   state.giftCards = [];
   state.bills = [];
+  state.documents = [];
+  state.specialDates = [];
   state.existingNotifications = [];
 }
 
@@ -125,6 +139,8 @@ beforeEach(() => {
     giftCardAlertDays: 30,
     billAlertDays: 5,
     subscriptionReviewIntervalDays: 0,
+    documentAlertDays: 0,
+    specialDateAlertDays: 0,
   }));
   vi.useFakeTimers();
   vi.setSystemTime(NOW);
@@ -250,7 +266,7 @@ describe('generateNotifications — trialend alert kind', () => {
 
 describe('generateNotifications — subscription review alert kind', () => {
   it('uses the confirmation anchor in the dedupe key so acknowledging retires the alert', async () => {
-    getAppSettingsMock.mockResolvedValue({ warrantyAlertDays: 90, trialAlertDays: 2, giftCardAlertDays: 30, billAlertDays: 5, subscriptionReviewIntervalDays: 180 });
+    getAppSettingsMock.mockResolvedValue({ warrantyAlertDays: 90, trialAlertDays: 2, giftCardAlertDays: 30, billAlertDays: 5, subscriptionReviewIntervalDays: 180, documentAlertDays: 0, specialDateAlertDays: 0 });
     state.subscriptions = [{ _id: 's1', name: 'Forgotten TV', createdAt: '2026-01-01' }];
     await generateNotifications();
     expect(notificationInsertMany).toHaveBeenCalledWith([
@@ -299,6 +315,65 @@ describe('generateNotifications — bill alert kind', () => {
   });
 });
 
+// #197: both windows were configurable and the push sweep (runAlertChecks) honoured them,
+// but the bell never showed either. Same collectors as the push, so the two cannot disagree.
+describe('generateNotifications — document expiry alert kind', () => {
+  const withDocWindow = (days: number) =>
+    getAppSettingsMock.mockResolvedValue({ warrantyAlertDays: 90, trialAlertDays: 2, giftCardAlertDays: 30, billAlertDays: 5, subscriptionReviewIntervalDays: 0, documentAlertDays: days, specialDateAlertDays: 0 });
+
+  it('fires for a document expiring within the window, keyed by its expiry date', async () => {
+    withDocWindow(30);
+    state.documents = [{ _id: 'd1', title: 'Passport', type: 'passport', holder: 'Achilleas', expiryDate: '2026-08-04' }]; // 15 days out
+    await generateNotifications();
+    expect(notificationInsertMany).toHaveBeenCalledWith([
+      expect.objectContaining({ dedupeKey: 'document:d1:2026-08-04', kind: 'document', title: 'Passport', body: '15', href: '/documents' }),
+    ]);
+  });
+
+  it('keeps nagging for an already-expired document (negative day count)', async () => {
+    withDocWindow(30);
+    state.documents = [{ _id: 'd1', title: 'ID card', expiryDate: '2026-07-10' }];
+    await generateNotifications();
+    expect(notificationInsertMany).toHaveBeenCalledWith([expect.objectContaining({ dedupeKey: 'document:d1:2026-07-10', body: '-10' })]);
+  });
+
+  it('skips the query entirely when the window is 0 (alert off)', async () => {
+    withDocWindow(0);
+    state.documents = [{ _id: 'd1', title: 'Passport', expiryDate: '2026-07-25' }];
+    await generateNotifications();
+    expect(documentFind).not.toHaveBeenCalled();
+    expect(notificationInsertMany).not.toHaveBeenCalled();
+  });
+});
+
+describe('generateNotifications — special date alert kind', () => {
+  const withDateWindow = (days: number) =>
+    getAppSettingsMock.mockResolvedValue({ warrantyAlertDays: 90, trialAlertDays: 2, giftCardAlertDays: 30, billAlertDays: 5, subscriptionReviewIntervalDays: 0, documentAlertDays: 0, specialDateAlertDays: days });
+
+  it('fires for a date whose next occurrence falls within the window, keyed by that occurrence', async () => {
+    withDateWindow(7);
+    state.specialDates = [{ _id: 's1', name: 'Maria', type: 'birthday', month: 7, day: 25, year: 1990 }]; // 5 days out, turns 36
+    await generateNotifications();
+    expect(notificationInsertMany).toHaveBeenCalledWith([
+      expect.objectContaining({ dedupeKey: 'specialdate:s1:2026-07-25', kind: 'specialdate', title: 'Maria', body: '5|36', href: '/special-dates' }),
+    ]);
+  });
+
+  it('leaves the years half empty when the year is unknown', async () => {
+    withDateWindow(7);
+    state.specialDates = [{ _id: 's1', name: 'Anniversary', month: 7, day: 20 }]; // today
+    await generateNotifications();
+    expect(notificationInsertMany).toHaveBeenCalledWith([expect.objectContaining({ dedupeKey: 'specialdate:s1:2026-07-20', body: '0|' })]);
+  });
+
+  it('does not fire when the next occurrence is outside the window', async () => {
+    withDateWindow(7);
+    state.specialDates = [{ _id: 's1', name: 'Maria', month: 9, day: 1 }];
+    await generateNotifications();
+    expect(notificationInsertMany).not.toHaveBeenCalled();
+  });
+});
+
 describe('generateNotifications — reconcile shape (insert / refresh / auto-expire / never-recreate)', () => {
   // All four cases below drive the reconcile logic through a single alert kind
   // (deal) since insertMany/updateOne/updateMany are called generically over
@@ -329,7 +404,7 @@ describe('generateNotifications — reconcile shape (insert / refresh / auto-exp
     state.existingNotifications = [{ dedupeKey: 'deal:i1' }];
     await generateNotifications();
     expect(notificationUpdateMany).toHaveBeenCalledWith(
-      { kind: { $in: ['deal', 'installment', 'warranty', 'pricehike', 'trialend', 'subreview', 'giftcard', 'bill', 'maintenance', 'lending', 'claim'] }, dedupeKey: { $nin: [] } },
+      { kind: { $in: ['deal', 'installment', 'warranty', 'pricehike', 'trialend', 'subreview', 'giftcard', 'bill', 'maintenance', 'lending', 'claim', 'document', 'specialdate'] }, dedupeKey: { $nin: [] } },
       { $set: { deletedAt: expect.any(Date) } }
     );
   });
