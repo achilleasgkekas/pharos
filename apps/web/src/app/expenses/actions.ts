@@ -846,6 +846,7 @@ export async function mergeExpenses(
           keep.currency = d.currency;
           keep.origAmount = d.origAmount;
           keep.fxRate = d.fxRate;
+          keep.amount = d.amount;
         }
         if (!keep.filePath && d.filePath) {
           keep.filePath = d.filePath;

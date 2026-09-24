@@ -72,6 +72,7 @@ function keepDoc(over: Record<string, any> = {}) {
     recurring: false,
     recurringCycle: '',
     split: [],
+    amount: 0,
     currency: 'EUR',
     origAmount: 0,
     fxRate: 0,
@@ -105,6 +106,7 @@ function dropDoc(over: Record<string, any> = {}) {
     recurring: false,
     recurringCycle: '',
     split: [],
+    amount: 0,
     currency: 'EUR',
     origAmount: 0,
     fxRate: 0,
@@ -242,14 +244,15 @@ describe('mergeExpenses', () => {
     expect(keep.verified).toBe(true);
   });
 
-  it('takes the foreign-currency provenance from whichever copy has it', async () => {
-    const keep = keepDoc();
+  it('takes the foreign-currency provenance from whichever copy has it, updating the base amount (#232)', async () => {
+    const keep = keepDoc({ amount: 100 });
     expenseFindByIdMock.mockResolvedValue(keep);
-    expenseFindDropsMock.mockResolvedValue([dropDoc({ currency: 'USD', origAmount: 70, fxRate: 0.92 })]);
+    expenseFindDropsMock.mockResolvedValue([dropDoc({ amount: 64.4, currency: 'USD', origAmount: 70, fxRate: 0.92 })]);
     await mergeExpenses('keep1', ['drop1']);
     expect(keep.currency).toBe('USD');
     expect(keep.origAmount).toBe(70);
     expect(keep.fxRate).toBe(0.92);
+    expect(keep.amount).toBe(64.4);
   });
 
   it('soft-deletes the drops instead of destroying them', async () => {
