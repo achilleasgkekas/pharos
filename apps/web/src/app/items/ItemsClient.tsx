@@ -1776,6 +1776,7 @@ function ItemDetailModal({
         setActionMsg({ text: r.error ?? 'Could not log the income', tone: 'err' });
         return;
       }
+      if (r.item) onItemUpdated(r.item);
       setActionMsg({ text: t('it.saleLoggedOk'), href: '/income', tone: 'ok' });
       router.refresh();
     });
@@ -1792,6 +1793,7 @@ function ItemDetailModal({
         setActionMsg({ text: r.error ?? 'Could not update the item', tone: 'err' });
         return;
       }
+      if (r.item) onItemUpdated(r.item);
       setActionMsg({ text: t('it.arrivedOk'), tone: 'ok' });
       router.refresh();
     });
@@ -1808,6 +1810,7 @@ function ItemDetailModal({
         setActionMsg({ text: r.error ?? 'Could not update the item', tone: 'err' });
         return;
       }
+      if (r.item) onItemUpdated(r.item);
       setActionMsg({ text: t('it.maintDoneOk'), tone: 'ok' });
       router.refresh();
     });
@@ -1824,6 +1827,7 @@ function ItemDetailModal({
         setActionMsg({ text: r.error ?? 'Could not update the item', tone: 'err' });
         return;
       }
+      if (r.item) onItemUpdated(r.item);
       setActionMsg({ text: t('it.lendReturnedOk'), tone: 'ok' });
       router.refresh();
     });
