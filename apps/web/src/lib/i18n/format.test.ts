@@ -164,6 +164,24 @@ describe('date formatting follows the app language (#5)', () => {
     expect(formatDate(d, 'de')).toBe('4.7.2026');
   });
 
+  it('formats calendar day strings (YYYY-MM-DD) without shifting back a day in timezones behind UTC when timeZone UTC is supplied', () => {
+    // Save original TZ
+    const origTZ = process.env.TZ;
+    try {
+      process.env.TZ = 'America/New_York';
+      const calendarDateStr = '2026-07-01';
+      // Without timeZone: 'UTC', 2026-07-01 parsing to UTC midnight shifts to June 30 in NY (EDT, UTC-4)
+      const formattedWithoutUtc = formatDate(calendarDateStr, 'en', { day: '2-digit', month: '2-digit', year: '2-digit' });
+      expect(formattedWithoutUtc).toBe('30/06/26');
+
+      // With timeZone: 'UTC', it stays 01/07/26
+      const formattedWithUtc = formatDate(calendarDateStr, 'en', { day: '2-digit', month: '2-digit', year: '2-digit', timeZone: 'UTC' });
+      expect(formattedWithUtc).toBe('01/07/26');
+    } finally {
+      process.env.TZ = origTZ;
+    }
+  });
+
   it('empty or invalid input returns the fallback instead of "Invalid Date"', () => {
     expect(formatDate(null, 'el')).toBe('');
     expect(formatDate('', 'el', undefined, '—')).toBe('—');
