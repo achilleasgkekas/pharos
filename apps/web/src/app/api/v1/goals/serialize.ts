@@ -13,7 +13,7 @@ export type GoalLean = {
  *  client-side (lib/goals.ts, never stored) — computed here so API clients never have to
  *  reimplement the progress math.
  *
- *  Lives in its own module (not route.ts) — see giftcards/serialize.ts's doc comment for why. */
+ *  Lives in its own module (not route.ts) — see vouchers/serialize.ts's doc comment for why. */
 export function trim(g: GoalLean): {
   id: string; title: string; targetAmount: number; targetDate: string | null; category: string;
   notes: string; archived: boolean; current: number; remaining: number; pct: number; done: boolean;

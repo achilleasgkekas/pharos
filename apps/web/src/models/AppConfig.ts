@@ -50,7 +50,6 @@ const AppConfigSchema = new Schema(
     defaultWarrantyMonths: { type: Number, default: 24 }, // receipts default this on verify
     warrantyAlertDays: { type: Number, default: 90 }, // "expiring soon" window for the badge + alerts
     trialAlertDays: { type: Number, default: 2 }, // free-trial "cancel before charge" lead time (P33)
-    giftCardAlertDays: { type: Number, default: 30 }, // "gift card expiring with balance" window (P32)
     billAlertDays: { type: Number, default: 5 }, // "bill due / overdue" lead time (P28)
     documentAlertDays: { type: Number, default: 30 }, // "document expiring / expired" lead time (P42)
     specialDateAlertDays: { type: Number, default: 7 }, // "birthday / anniversary coming up" lead time (P50)

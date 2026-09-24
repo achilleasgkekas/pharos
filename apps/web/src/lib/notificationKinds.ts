@@ -14,7 +14,6 @@ export const AUTO_NOTIF_KINDS = [
   'pricehike',
   'trialend',
   'subreview',
-  'giftcard',
   'bill',
   'maintenance',
   'lending',

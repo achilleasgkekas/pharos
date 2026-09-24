@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { syncGiftCardUses } from '@/lib/giftCardMirror';
 import { RECURRING_CYCLES } from '@/lib/billingCycle';
 import { withAuth, apiError } from '@/lib/apiAuth';
 import { isObjectId, readBody } from '@/lib/apiBody';
@@ -84,8 +83,6 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     const Expense = await currentModel(ExpenseModel);
     const doc = await Expense.findByIdAndUpdate(id, { $set: { deletedAt: new Date() } }, { returnDocument: 'after' }).lean();
     if (!doc) return apiError('not found', 404);
-    // Same as the web delete (#104): a trashed expense no longer spends gift-card credit.
-    await syncGiftCardUses(id, [], new Date(), '');
     return NextResponse.json({ ok: true, id });
   });
 }

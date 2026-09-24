@@ -17,7 +17,6 @@ import { mirrorFileToRemote } from '@/lib/mirror';
 import { cleanSplit } from '@/lib/split';
 import { cleanPaymentSplits } from '@/lib/paymentSplit';
 import { addCycleUTC, RECURRING_CYCLE_VALUES, type RecurringCycle } from '@/lib/billingCycle';
-import { syncGiftCardUses } from '@/lib/giftCardMirror';
 import { recurringExpenseId, isDuplicateKey } from '@/lib/recurringExpenseId';
 import { resolveFx, normalizeCurrency } from '@/lib/fx';
 import { revalidatePath } from 'next/cache';
@@ -330,7 +329,6 @@ const UpdateSchema = z.object({
       z.object({
         method: z.string().max(80).default(''),
         amount: z.coerce.number().default(0),
-        giftCardId: z.string().max(64).default(''),
       })
     )
     .max(20)
@@ -380,7 +378,6 @@ export async function updateExpense(id: string, data: z.input<typeof UpdateSchem
         },
       }
     );
-    await syncGiftCardUses(id, splits, date, d.vendor);
     revalidatePath('/expenses');
     revalidatePath('/income');
     return { ok: true };
@@ -431,7 +428,6 @@ export async function addExpense(data: z.input<typeof UpdateSchema>): Promise<{ 
       paymentSplits: splits,
       verified: true,
     });
-    await syncGiftCardUses(String(exp._id), splits, date, d.vendor);
     revalidatePath('/expenses');
     revalidatePath('/income');
     return { ok: true, id: String(exp._id) };
@@ -490,9 +486,6 @@ export async function deleteExpense(id: string): Promise<{ ok: boolean }> {
     const Expense = await currentModel(ExpenseModel);
     // Soft delete → Trash (Settings → Storage & data). Files stay until purge.
     await Expense.updateOne({ _id: id }, { $set: { deletedAt: new Date() } });
-    // #104: hand the gift-card money back. The mirrored `uses` rows were the only thing lowering
-    // the card's balance, and a trashed expense no longer spent anything. Restore re-applies them.
-    await syncGiftCardUses(id, [], new Date(), '');
     revalidatePath('/expenses');
     revalidatePath('/income');
     return { ok: true };
@@ -836,7 +829,7 @@ export async function mergeExpenses(
           keep.markModified('split');
         }
         // #168: how the purchase was PAID is part of the record too. Without this the survivor of a
-        // merge loses the payment split, and with it the link to the gift card the money came from.
+        // merge loses the payment split.
         if ((!keep.paymentSplits || keep.paymentSplits.length === 0) && d.paymentSplits?.length) {
           keep.paymentSplits = d.paymentSplits;
           keep.markModified('paymentSplits');
@@ -865,10 +858,6 @@ export async function mergeExpenses(
 
       const now = new Date();
       for (const d of drops) {
-        // #168: a trashed copy no longer spends anything. Release its mirrored gift-card uses
-        // exactly as deleteExpense does — otherwise merging two copies of one purchase leaves the
-        // card charged twice, and the second charge belongs to a record nobody can see any more.
-        await syncGiftCardUses(String(d._id), [], now, '');
         const set: Record<string, unknown> = { deletedAt: now };
         // See the doc comment: the survivor now owns this file, so the trashed copy must
         // stop pointing at it before purge gets the chance to delete it.
@@ -880,15 +869,6 @@ export async function mergeExpenses(
         }
         await Expense.updateOne({ _id: d._id }, { $set: set });
       }
-      // …and the survivor re-states its own spend, so the card ends up charged exactly once, under
-      // the record that still exists (the split may have just been adopted from a dropped copy).
-      await syncGiftCardUses(
-        String(keep._id),
-        cleanPaymentSplits(keep.paymentSplits ?? []),
-        keep.date ? new Date(keep.date) : now,
-        keep.vendor || ''
-      );
-
       revalidatePath('/expenses');
       revalidatePath('/income');
       revalidatePath('/reports');

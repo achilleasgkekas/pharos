@@ -1,5 +1,5 @@
 // P62 — pure, DB-free helpers for splitting ONE purchase across several PAYMENT
-// METHODS (e.g. 30 EUR off an IKEA gift card + 45 EUR on a card). Deliberately
+// METHODS (e.g. 30 EUR in cash + 45 EUR on a card). Deliberately
 // distinct from lib/split.ts (P35), which splits an expense between PEOPLE: there
 // the question is "who owes me what", here it is "which of MY methods paid this".
 // The two are independent and can coexist on the same expense.
@@ -7,29 +7,27 @@
 // Convention: an entry's `amount` is in the same (base) currency as the expense's
 // stored `amount`. An empty array means "paid with the single `paymentMethod`
 // field" — exactly the pre-P62 behaviour, so nothing changes until a user opts in.
-// `giftCardId` optionally links a row to a P32 gift card, which is what lets the
-// server mirror the row into that card's `uses[]` spend log automatically.
+// Rows used to carry a `giftCardId` linking them to a P32 gift card; that module was
+// removed 2026-09-24 and any `giftCardId` still on a stored row is ignored.
 
-export type PaymentSplitEntry = { method: string; amount: number; giftCardId: string };
+export type PaymentSplitEntry = { method: string; amount: number };
 
 /** Round to cents. */
 function r2(n: number): number {
   return Math.round((Number(n) || 0) * 100) / 100;
 }
 
-/** Clean raw rows: trim, round to cents, drop rows that name neither a method nor a
- *  gift card. Shared by the web server action and any API write path so a split
+/** Clean raw rows: trim, round to cents, drop rows that name no method. Shared by the web server action and any API write path so a split
  *  submitted by a client is sanitized identically (mirrors cleanSplit of P35). */
 export function cleanPaymentSplits(
-  rows: Array<{ method?: string; amount?: number; giftCardId?: string }>
+  rows: Array<{ method?: string; amount?: number }>
 ): PaymentSplitEntry[] {
   return (rows || [])
     .map((r) => ({
       method: (r?.method || '').trim().slice(0, 80),
       amount: r2(Number(r?.amount) || 0),
-      giftCardId: (r?.giftCardId || '').trim(),
     }))
-    .filter((r) => r.method.length > 0 || r.giftCardId.length > 0);
+    .filter((r) => r.method.length > 0);
 }
 
 /** Sum of every row, rounded to cents. */
@@ -59,19 +57,4 @@ export function balancePaymentSplits(total: number, splits: PaymentSplitEntry[] 
   const rest = paymentSplitRemainder(total, rows);
   if (rest === 0) return rows;
   return rows.map((r, i) => (i === rows.length - 1 ? { ...r, amount: r2((Number(r.amount) || 0) + rest) } : r));
-}
-
-/** Aggregate how much of this purchase each linked gift card paid for, so the server
- *  can write ONE `uses[]` entry per card even when a card appears on several rows.
- *  Rows with no card, or that round to zero, are skipped — a zero-value spend log
- *  entry would be noise on the card's history. */
-export function giftCardSpend(splits: PaymentSplitEntry[] = []): Map<string, number> {
-  const m = new Map<string, number>();
-  for (const r of splits || []) {
-    const id = (r?.giftCardId || '').trim();
-    if (!id) continue;
-    m.set(id, r2((m.get(id) ?? 0) + (Number(r.amount) || 0)));
-  }
-  for (const [id, amt] of [...m]) if (amt === 0) m.delete(id);
-  return m;
 }

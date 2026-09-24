@@ -6,7 +6,7 @@ import { softDeletePlugin } from '@/lib/softDelete';
 // PROJECTS the future): a Bill is something you pay by HAND (ΔΕΗ, ΟΤΕ, κοινόχρηστα)
 // whose lifecycle we track — "is it due?, did I pay it?, was it forgotten → overdue".
 // Status is DERIVED from dueDate + paidAt (see lib/bill.ts), never stored.
-// P61 — one manual instalment toward a bill (mirrors GiftCardUseSchema). `amount` is
+// P61 — one manual instalment toward a bill. `amount` is
 // ALWAYS in the deployment's base currency, same denomination as `Bill.amount`, so
 // "what is still owed" is plain subtraction even on a foreign-currency bill.
 // `expenseId` is set when the opt-in "also log an expense" was ticked for THIS payment.
