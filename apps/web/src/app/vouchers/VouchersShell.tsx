@@ -32,32 +32,34 @@ export function VouchersShell({
   const activeVouchers = vouchers.filter((v) => !v.used).length;
   const activeLoyalty = loyaltyCards.filter((c) => !c.archived).length;
 
-  const TabButton = ({ id, icon, label, count }: { id: Tab; icon: React.ReactNode; label: string; count: number }) => (
+  return (
+    <>
+      <div className="max-w-[1400px] mx-auto px-4 pt-6">
+        <div className="flex gap-2">
+          <TabButton id="coupons" icon={<Ticket size={15} />} label="Coupons" count={activeVouchers} isActive={tab === 'coupons'} onClick={() => setTab('coupons')} />
+          <TabButton id="giftcards" icon={<CreditCard size={15} />} label="Gift cards" count={liveCards} isActive={tab === 'giftcards'} onClick={() => setTab('giftcards')} />
+          <TabButton id="loyalty" icon={<Barcode size={15} />} label="Loyalty cards" count={activeLoyalty} isActive={tab === 'loyalty'} onClick={() => setTab('loyalty')} />
+        </div>
+      </div>
+      {tab === 'coupons' ? <VouchersClient vouchers={vouchers} /> : tab === 'giftcards' ? <GiftCardsClient giftCards={giftCards} /> : <LoyaltyCardsClient cards={loyaltyCards} />}
+    </>
+  );
+}
+
+function TabButton({ id, icon, label, count, isActive, onClick }: { id: Tab; icon: React.ReactNode; label: string; count: number; isActive: boolean; onClick: () => void }) {
+  return (
     <button
-      onClick={() => setTab(id)}
+      onClick={onClick}
       className={cn(
         'flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-colors',
-        tab === id ? 'bg-[color:var(--color-accent)] text-black' : 'text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface-2)]'
+        isActive ? 'bg-[color:var(--color-accent)] text-black' : 'text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface-2)]'
       )}
       style={{ fontFamily: 'var(--font-mono)' }}
     >
       {icon} {label}
       {count > 0 && (
-        <span className={cn('text-[10px] px-1.5 py-0.5 rounded-full', tab === id ? 'bg-black/20' : 'bg-[color:var(--color-surface-2)]')}>{count}</span>
+        <span className={cn('text-[10px] px-1.5 py-0.5 rounded-full', isActive ? 'bg-black/20' : 'bg-[color:var(--color-surface-2)]')}>{count}</span>
       )}
     </button>
-  );
-
-  return (
-    <>
-      <div className="max-w-[1400px] mx-auto px-4 pt-6">
-        <div className="flex gap-2">
-          <TabButton id="coupons" icon={<Ticket size={15} />} label="Coupons" count={activeVouchers} />
-          <TabButton id="giftcards" icon={<CreditCard size={15} />} label="Gift cards" count={liveCards} />
-          <TabButton id="loyalty" icon={<Barcode size={15} />} label="Loyalty cards" count={activeLoyalty} />
-        </div>
-      </div>
-      {tab === 'coupons' ? <VouchersClient vouchers={vouchers} /> : tab === 'giftcards' ? <GiftCardsClient giftCards={giftCards} /> : <LoyaltyCardsClient cards={loyaltyCards} />}
-    </>
   );
 }
