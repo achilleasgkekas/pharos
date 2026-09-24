@@ -36,6 +36,9 @@ const ExpenseSchema = new Schema(
     recurring: { type: Boolean, default: false },
     // Kept in sync with RECURRING_CYCLES in lib/billingCycle.ts.
     recurringCycle: { type: String, enum: ['monthly', 'quarterly', 'yearly', 'weekly', 'biennial', ''], default: '' },
+    // When the series became recurring (blocks retroactive phantom generation). For old entries
+    // before this date, no recurring instances are generated even if recurring=true. Null = no limit.
+    recurringFrom: { type: Date, default: null },
 
     filePath: { type: String, default: '' }, // /storage/expenses/...  (empty for manual entries)
     fileType: { type: String, default: '' },

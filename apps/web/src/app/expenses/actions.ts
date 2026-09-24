@@ -129,6 +129,9 @@ function periodFrom(date: Date, parsedPeriod?: string): string {
  * entry of each recurring series (kind+vendorKey) and steps forward by its cycle,
  * filling any missing periods up to today. Idempotent: each run re-seeds from the new
  * latest, so it never duplicates. Called (awaited) on the expenses/income page load.
+ *
+ * Respects `recurringFrom` to prevent phantom generation: when a recurring rule is
+ * applied retroactively, only future periods are generated, not the old periods.
  */
 export async function generateDueRecurring(): Promise<{ created: number }> {
   await assertCanWrite();
@@ -158,7 +161,14 @@ export async function generateDueRecurring(): Promise<{ created: number }> {
   let created = 0;
   for (const seed of seeds) {
     const cycle = String(seed.recurringCycle);
-    let next = addCycleUTC(new Date(seed.date), cycle);
+    // When recurringFrom is set, it marks when the series became recurring (e.g., when a rule
+    // was applied retroactively). Use the later of the entry date and recurringFrom to avoid
+    // generating phantom entries for periods before the series was marked recurring.
+    const seedDate = new Date(seed.date);
+    const effectiveStartDate = seed.recurringFrom
+      ? new Date(Math.max(seedDate.getTime(), new Date(seed.recurringFrom).getTime()))
+      : seedDate;
+    let next = addCycleUTC(effectiveStartDate, cycle);
     let guard = 0;
     while (next.getTime() <= now && guard < 36) {
       guard++;
@@ -183,6 +193,7 @@ export async function generateDueRecurring(): Promise<{ created: number }> {
           period,
           recurring: true,
           recurringCycle: seed.recurringCycle,
+          recurringFrom: seed.recurringFrom || undefined,
           aiModel: 'recurring-auto',
           verified: false,
           notes: 'Auto-generated from recurring series',
@@ -713,10 +724,13 @@ export async function applyCategoryRulesToExisting(): Promise<{ ok: boolean; upd
       for (const r of rows) {
         const rule = matchCategoryRule(rules, { vendor: r.vendor, description: r.notes });
         if (!rule || rule.category === r.category) continue;
-        const set: Partial<Pick<ExpenseDoc, 'category' | 'recurring' | 'recurringCycle'>> = { category: rule.category };
+        const set: Partial<Pick<ExpenseDoc, 'category' | 'recurring' | 'recurringCycle' | 'recurringFrom'>> = { category: rule.category };
         if (rule.recurring && !r.recurring) {
           set.recurring = true;
           if (rule.recurringCycle) set.recurringCycle = rule.recurringCycle;
+          // When retroactively applying a recurring rule, track when the series became recurring
+          // to avoid generating phantom entries for periods before the rule was applied.
+          set.recurringFrom = new Date();
         }
         ops.push({ updateOne: { filter: { _id: r._id }, update: { $set: set } } });
       }
