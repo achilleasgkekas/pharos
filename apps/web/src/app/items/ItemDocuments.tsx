@@ -54,7 +54,7 @@ export function ItemDocuments({
     const fd = new FormData();
     for (const f of Array.from(files)) fd.append('files', f);
     const r = await uploadItemAttachments(itemId, fd);
-    if (r.attachments.length) setAttachments(r.attachments);
+    if (r.attachments?.length) setAttachments(r.attachments);
     setUploading(false);
     if (!r.ok && r.error) setMsg(r.error);
     if (inputRef.current) inputRef.current.value = '';
