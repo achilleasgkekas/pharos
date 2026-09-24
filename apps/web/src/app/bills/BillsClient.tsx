@@ -1,4 +1,5 @@
 'use client';
+import { ymd } from '@/lib/calendarDay';
 import { useState, useTransition, useMemo } from 'react';
 import { RECURRING_CYCLES, type RecurringCycle } from '@/lib/billingCycle';
 import { Plus, Trash2, Check, Undo2, Archive, ArchiveRestore, CalendarClock, RotateCw, Coins } from 'lucide-react';
@@ -603,7 +604,10 @@ function PartialPaymentForm({
 }) {
   const [pending, startTransition] = useTransition();
   const [amount, setAmount] = useState('');
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  // `ymd`, not `toISOString().slice(0, 10)`: the latter is UTC, so in Athens every payment
+  // logged before 03:00 defaulted to YESTERDAY. This runs in the browser, where the local
+  // date is the one the person means by "today".
+  const [date, setDate] = useState(ymd(new Date()));
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
   const label = 'block text-[11px] uppercase tracking-[0.1em] text-[color:var(--color-text-faint)] mb-1';
