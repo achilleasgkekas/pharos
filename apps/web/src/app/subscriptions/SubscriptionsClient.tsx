@@ -399,7 +399,11 @@ export function SubscriptionsClient({
             <div className={cn(layout === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3' : 'flex flex-col gap-2')}>
               {visible.map((s) => (
                 <div key={s._id} className={cn(!s.active && 'opacity-60')}>
-                  <SubCard sub={s} base={fx.base} onEdit={() => setEditing(s)} />
+                  {layout === 'grid' ? (
+                    <SubCard sub={s} base={fx.base} onEdit={() => setEditing(s)} />
+                  ) : (
+                    <SubRow sub={s} base={fx.base} onEdit={() => setEditing(s)} />
+                  )}
                 </div>
               ))}
             </div>
@@ -447,12 +451,12 @@ function SplitBadge({ split }: { split?: SplitEntry[] }) {
 
 // ─── Sub Card ──────────────────────────────────────────────────────────────
 
-function SubCard({ sub, base, onEdit }: { sub: SerializedSubscription; base: string; onEdit: () => void }) {
+/** What the card and the list row both need, so the two layouts cannot drift apart on
+ *  what "delete" asks or what the renewal countdown says. */
+function useSubRow(sub: SerializedSubscription) {
   const t = useT();
-  const money = useMoney();
   const [pending, startTransition] = useTransition();
   const confirm = useConfirm();
-  const meta = categoryMeta(sub.category);
 
   async function handleDelete() {
     const ok = await confirm({
@@ -463,8 +467,24 @@ function SubCard({ sub, base, onEdit }: { sub: SerializedSubscription; base: str
     });
     if (ok) startTransition(() => deleteSubscription(sub._id));
   }
-  const d = renewalDaysUntil(sub.nextRenewal);
-  const cycleLabel = isBillingCycle(sub.billingCycle) ? t(`cyc.${sub.billingCycle}` as TKey) : sub.billingCycle;
+  return {
+    pending,
+    startTransition,
+    handleDelete,
+    meta: categoryMeta(sub.category),
+    d: renewalDaysUntil(sub.nextRenewal),
+    cycleLabel: isBillingCycle(sub.billingCycle) ? t(`cyc.${sub.billingCycle}` as TKey) : sub.billingCycle,
+  };
+}
+
+function renewalTone(d: number) {
+  return d <= 3 ? 'text-[color:var(--color-red)]' : d <= 7 ? 'text-[color:var(--color-gold)]' : 'text-[color:var(--color-text-dim)]';
+}
+
+function SubCard({ sub, base, onEdit }: { sub: SerializedSubscription; base: string; onEdit: () => void }) {
+  const t = useT();
+  const money = useMoney();
+  const { pending, startTransition, handleDelete, meta, d, cycleLabel } = useSubRow(sub);
 
   return (
     <div className="group bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-2xl p-4 hover:border-[color:var(--color-border-light)] transition-all">
@@ -504,10 +524,7 @@ function SubCard({ sub, base, onEdit }: { sub: SerializedSubscription; base: str
 
       {sub.active && d !== null && (
         <div
-          className={cn(
-            'text-xs mb-3',
-            d <= 3 ? 'text-[color:var(--color-red)]' : d <= 7 ? 'text-[color:var(--color-gold)]' : 'text-[color:var(--color-text-dim)]'
-          )}
+          className={cn('text-xs mb-3', renewalTone(d))}
           style={{ fontFamily: 'var(--font-mono)' }}
         >
           {t('sub.renews')} {d < 0 ? t('sub.overdue') : d === 0 ? t('sub.today') : t('sub.inD', { d })}
@@ -562,6 +579,79 @@ function SubCard({ sub, base, onEdit }: { sub: SerializedSubscription; base: str
           aria-label={t('common.delete')}
         >
           <Trash2 size={13} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Sub Row (list layout) ───────────────────────────────────────────────────
+
+/** The list layout used to render SubCard in one column — on a phone, where the grid is one
+ *  column too, the toggle changed nothing. A row is the scan view: what, when, how much, on
+ *  one line, with the whole row opening the editor (the card's pencil button would be a
+ *  fourth icon fighting for ~80px of width). Same shape as the Shopping list row. */
+function SubRow({ sub, base, onEdit }: { sub: SerializedSubscription; base: string; onEdit: () => void }) {
+  const t = useT();
+  const money = useMoney();
+  const { pending, startTransition, handleDelete, meta, d, cycleLabel } = useSubRow(sub);
+  const mono = { fontFamily: 'var(--font-mono)' };
+
+  return (
+    <div className="group relative flex items-center gap-3 bg-[color:var(--color-surface)] border border-[color:var(--color-border)] hover:border-[color:var(--color-border-light)] rounded-xl pl-4 pr-2 py-2.5 overflow-hidden transition-colors">
+      <span className="absolute left-0 top-0 bottom-0 w-1" style={{ background: meta.hex }} />
+      <button type="button" onClick={onEdit} className="min-w-0 flex-1 text-left" aria-label={`${t('common.edit')}: ${sub.name}`}>
+        <span className="block text-sm font-semibold truncate" style={{ fontFamily: 'var(--font-display)' }}>
+          {sub.name}
+          {sub.provider && <span className="text-[color:var(--color-text-faint)] font-normal"> · {sub.provider}</span>}
+        </span>
+        <span className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-0.5 text-[10px]" style={mono}>
+          <span className="uppercase tracking-[0.08em]" style={{ color: meta.hex }}>{meta.label}</span>
+          {sub.active && d !== null && (
+            <span className={renewalTone(d)}>
+              {t('sub.renews')} {d < 0 ? t('sub.overdue') : d === 0 ? t('sub.today') : t('sub.inD', { d })}
+            </span>
+          )}
+          <FxBadge doc={sub} base={base} />
+          <SplitBadge split={sub.split} />
+        </span>
+      </button>
+      <div className="text-right shrink-0">
+        <span className="block text-sm font-bold text-[color:var(--color-accent)] tabular-nums" style={{ fontFamily: 'var(--font-display)' }}>
+          {money(sub.amount)}
+        </span>
+        <span className="block text-[10px] text-[color:var(--color-text-faint)]" style={mono}>/ {cycleLabel.toLowerCase()}</span>
+      </div>
+      <div className="flex shrink-0">
+        {sub.active && (
+          <button
+            onClick={() => startTransition(() => reviewSubscription(sub._id))}
+            disabled={pending}
+            title={t('sub.stillUsing')}
+            aria-label={t('sub.stillUsing')}
+            className="p-1.5 rounded-md text-[color:var(--color-text-faint)] hover:text-[color:var(--color-accent)] transition-colors"
+          >
+            <CheckCircle2 size={14} />
+          </button>
+        )}
+        <button
+          onClick={() => startTransition(() => toggleSubscriptionActive(sub._id, !sub.active))}
+          disabled={pending}
+          className={cn(
+            'p-1.5 rounded-md transition-colors',
+            sub.active ? 'text-[color:var(--color-text-faint)] hover:text-[color:var(--color-gold)]' : 'text-[color:var(--color-accent)]'
+          )}
+          aria-label={sub.active ? 'Cancel' : 'Activate'}
+        >
+          <Power size={14} />
+        </button>
+        <button
+          onClick={handleDelete}
+          disabled={pending}
+          className="p-1.5 rounded-md text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] transition-colors opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 focus:opacity-100"
+          aria-label={t('common.delete')}
+        >
+          <Trash2 size={14} />
         </button>
       </div>
     </div>
