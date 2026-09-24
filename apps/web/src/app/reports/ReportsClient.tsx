@@ -200,8 +200,8 @@ const tooltipStyle = {
   color: 'var(--color-text)',
 };
 
-function fmtDate(s: string, locale: string): string {
-  return formatDate(s, locale, { day: '2-digit', month: '2-digit', year: '2-digit' });
+export function fmtDate(s: string, locale: string): string {
+  return formatDate(s, locale, { day: '2-digit', month: '2-digit', year: '2-digit', timeZone: 'UTC' });
 }
 
 /**
