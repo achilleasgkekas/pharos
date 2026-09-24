@@ -68,7 +68,7 @@ export async function computeMoneyAgenda(now: Date = new Date(), locale = 'en'):
 
   const [subs, statements, items, vouchers, recurring, bills, goals] = await Promise.all([
     Subscription.find({ active: true, nextRenewal: { $ne: null }, deletedAt: null }).select('name amount billingCycle nextRenewal').lean(),
-    Statement.find({ deletedAt: null }).lean(),
+    Statement.find().lean(),
     Item.find({ warrantyUntil: { $gte: windowStart, $lt: windowEnd }, deletedAt: null }).select('title warrantyUntil').lean(),
     Voucher.find({ used: false, expiresAt: { $gte: windowStart, $lt: windowEnd }, deletedAt: null }).select('title store discount expiresAt').lean(),
     Expense.find({ recurring: true, recurringCycle: { $nin: ['', null] }, amount: { $gt: 0 }, deletedAt: null })
