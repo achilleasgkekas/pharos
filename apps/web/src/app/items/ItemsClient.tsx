@@ -1999,7 +1999,11 @@ function ItemDetailModal({
               trip through the edit form for the one status change that always follows. */}
           {tracking && (
             <div className="bg-[color:var(--color-surface-2)] rounded-xl p-4 flex flex-col gap-3">
-              <div className="flex items-start justify-between gap-4">
+              {/* flex-wrap + a tighter mobile gap: the same rule #163 applied across the app.
+                  At 375px the mono detail line ("Κάθε 180 μέρες · Τελευταία 2026-09-24") and the
+                  action button do not fit side by side, and without wrapping the row pushes the
+                  whole page wider than the viewport rather than clipping. */}
+              <div className="flex items-start justify-between gap-2 sm:gap-4 flex-wrap">
                 <div className="min-w-0">
                   <div className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider mb-1 flex items-center gap-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
                     <Truck size={12} />
@@ -2031,7 +2035,11 @@ function ItemDetailModal({
               clock. No cost, no history: this is a chore timer, not a service log. */}
           {maintOn && (
             <div className="bg-[color:var(--color-surface-2)] rounded-xl p-4 flex flex-col gap-3">
-              <div className="flex items-start justify-between gap-4">
+              {/* flex-wrap + a tighter mobile gap: the same rule #163 applied across the app.
+                  At 375px the mono detail line ("Κάθε 180 μέρες · Τελευταία 2026-09-24") and the
+                  action button do not fit side by side, and without wrapping the row pushes the
+                  whole page wider than the viewport rather than clipping. */}
+              <div className="flex items-start justify-between gap-2 sm:gap-4 flex-wrap">
                 <div className="min-w-0">
                   <div className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider mb-1 flex items-center gap-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
                     <Wrench size={12} />
@@ -2044,7 +2052,7 @@ function ItemDetailModal({
                         ? t('it.maintOverdue', { n: -maintDays })
                         : t('it.maintDueIn', { n: maintDays })}
                   </div>
-                  <div className="text-[10px] text-[color:var(--color-text-faint)] mt-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
+                  <div className="text-[10px] text-[color:var(--color-text-faint)] mt-0.5 break-words" style={{ fontFamily: 'var(--font-mono)' }}>
                     {t('it.maintEvery', { n: item.maintenanceIntervalDays as number })}
                     {' · '}
                     {item.lastMaintenanceAt
