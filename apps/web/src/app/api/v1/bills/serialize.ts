@@ -14,7 +14,7 @@ export type BillLean = {
  *  the same derived paid/overdue/due-soon/upcoming used by the web BillsClient —
  *  computed here so API clients never have to reimplement `billStatus`.
  *
- *  Lives in its own module (not route.ts) — see giftcards/serialize.ts's doc comment for why:
+ *  Lives in its own module (not route.ts) — see vouchers/serialize.ts's doc comment for why:
  *  Next's route-export validation rejects any named export from a route.ts besides the HTTP
  *  method handlers + a small config whitelist.
  *

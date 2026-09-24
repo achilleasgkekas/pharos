@@ -58,7 +58,7 @@ export function serializeExpense(e: Record<string, unknown>): SerializedExpense 
     paymentSplits: Array.isArray(s.paymentSplits)
       ? (s.paymentSplits as unknown[]).map((r): PaymentSplitEntry => {
           const p = r as Record<string, unknown>;
-          return { method: String(p.method ?? ''), amount: Number(p.amount) || 0, giftCardId: String(p.giftCardId ?? '') };
+          return { method: String(p.method ?? ''), amount: Number(p.amount) || 0 };
         })
       : [],
     aiModel: s.aiModel ?? '',

@@ -6,7 +6,7 @@ import { FxRateButton } from '@/components/FxRateButton';
 import { useState, useTransition, useRef, useMemo } from 'react';
 import {
   Upload, Loader2, Trash2, CheckCircle2, AlertTriangle, FileText, FileSpreadsheet, Repeat, Wallet, Search, Plus, X, Camera, Sparkles,
-  LayoutGrid, List as ListIcon, SlidersHorizontal, MapPin, Users, Split as SplitIcon, Landmark, Copy, Check, Pencil, CreditCard, Gift,
+  LayoutGrid, List as ListIcon, SlidersHorizontal, MapPin, Users, Split as SplitIcon, Landmark, Copy, Check, Pencil, CreditCard,
 } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Input';
@@ -18,7 +18,7 @@ import { useOpenParam } from '@/components/useOpenParam';
 import { cn } from '@/components/ui/cn';
 import { shrinkImage } from '@/lib/clientImage';
 import { useRouter } from 'next/navigation';
-import type { SerializedExpense, SerializedCard, GiftCardOption } from '@/types';
+import type { SerializedExpense, SerializedCard } from '@/types';
 import { uploadExpense, updateExpense, addExpense, deleteExpense, rescanExpense, settlePerson, bulkUpdateExpenses } from './actions';
 import { equalSplit, splitTotals, computeBalances, type SplitEntry } from '@/lib/split';
 import { paymentSplitTotal, paymentSplitRemainder, paymentSplitsBalance, balancePaymentSplits, type PaymentSplitEntry } from '@/lib/paymentSplit';
@@ -53,9 +53,9 @@ const selCls = 'w-full bg-[color:var(--color-surface-2)] border border-[color:va
  *  already-long prop lists below grow by a single entry. */
 type FxCtx = { base: string; enabled: boolean };
 
-type Props = { kind: 'income' | 'expense'; expenses: SerializedExpense[]; cards: SerializedCard[]; giftCards: GiftCardOption[]; vendors: string[]; ollamaUp: boolean; categories: string[]; spaces: string[]; baseCurrency: string; multiCurrency: boolean };
+type Props = { kind: 'income' | 'expense'; expenses: SerializedExpense[]; cards: SerializedCard[]; vendors: string[]; ollamaUp: boolean; categories: string[]; spaces: string[]; baseCurrency: string; multiCurrency: boolean };
 
-export function ExpensesClient({ kind, expenses, cards, giftCards, vendors, ollamaUp, categories, spaces, baseCurrency, multiCurrency }: Props) {
+export function ExpensesClient({ kind, expenses, cards, vendors, ollamaUp, categories, spaces, baseCurrency, multiCurrency }: Props) {
   const locale = useLocale();
   const fx: FxCtx = { base: baseCurrency, enabled: multiCurrency };
   const router = useRouter();
@@ -388,9 +388,9 @@ export function ExpensesClient({ kind, expenses, cards, giftCards, vendors, olla
       </div>
 
       {selected && (
-        <ExpenseDetail expense={selected} cards={cards} giftCards={giftCards} vendors={vendors} categories={categories} spaces={spaces} fx={fx} seriesCount={selected.vendorKey ? seriesCount[selected.vendorKey] || 1 : 1} onClose={() => setSelected(null)} onChanged={() => router.refresh()} confirm={confirm} />
+        <ExpenseDetail expense={selected} cards={cards} vendors={vendors} categories={categories} spaces={spaces} fx={fx} seriesCount={selected.vendorKey ? seriesCount[selected.vendorKey] || 1 : 1} onClose={() => setSelected(null)} onChanged={() => router.refresh()} confirm={confirm} />
       )}
-      {creating && <ExpenseCreate kind={kind} cards={cards} giftCards={giftCards} vendors={vendors} categories={categories} spaces={spaces} fx={fx} onClose={() => setCreating(false)} onCreated={() => { setCreating(false); router.refresh(); }} />}
+      {creating && <ExpenseCreate kind={kind} cards={cards} vendors={vendors} categories={categories} spaces={spaces} fx={fx} onClose={() => setCreating(false)} onCreated={() => { setCreating(false); router.refresh(); }} />}
       {importingCsv && <CsvImportModal kind={kind} fx={fx} onClose={() => setImportingCsv(false)} onImported={() => router.refresh()} />}
       {findingDupes && <ExpenseDuplicatesModal kind={kind} onClose={() => setFindingDupes(false)} />}
       {showBalances && <BalancesModal balances={balances} onClose={() => setShowBalances(false)} onChanged={() => router.refresh()} confirm={confirm} />}
@@ -650,7 +650,7 @@ function toForm(e: SerializedExpense, base: string): FormState {
   };
 }
 
-function FormFields({ form, set, cards, giftCards, vendors, categories, spaces, fx }: { form: FormState; set: (p: Partial<FormState>) => void; cards: SerializedCard[]; giftCards: GiftCardOption[]; vendors: string[]; categories: string[]; spaces: string[]; fx: FxCtx }) {
+function FormFields({ form, set, cards, vendors, categories, spaces, fx }: { form: FormState; set: (p: Partial<FormState>) => void; cards: SerializedCard[]; vendors: string[]; categories: string[]; spaces: string[]; fx: FxCtx }) {
   const t = useT();
   const foreign = fx.enabled && isForeignCurrency(form.currency, fx.base);
   const printedAmount = Number(form.amount) || 0;
@@ -729,13 +729,11 @@ function FormFields({ form, set, cards, giftCards, vendors, categories, spaces, 
       {form.kind !== 'income' && (
         <SplitEditor split={form.split} amount={baseAmount} baseCurrency={fx.base} onChange={(split) => set({ split })} />
       )}
-      {/* `baseAmount`, exactly like SplitEditor above — and for a sharper reason. `form.amount` is
-          what the PAPER says; a payment split is stored in base currency and a gift card's balance
-          IS base currency, so handing the printed figure here made the editor allocate 1000
-          against a ¥1000 purchase, and `syncGiftCardUses` then took €1000 off the card instead of
-          ~€6 (#205). The per-person split was fixed for this once; the line below it was missed. */}
+      {/* `baseAmount`, exactly like SplitEditor above. `form.amount` is what the PAPER says; a
+          payment split is stored in base currency, so handing the printed figure here made the
+          editor allocate 1000 against a ¥1000 purchase (#205). */}
       {form.kind !== 'income' && (
-        <PaymentSplitEditor splits={form.paymentSplits} amount={baseAmount} giftCards={giftCards} onChange={(paymentSplits) => set({ paymentSplits })} />
+        <PaymentSplitEditor splits={form.paymentSplits} amount={baseAmount} onChange={(paymentSplits) => set({ paymentSplits })} />
       )}
     </div>
   );
@@ -856,18 +854,17 @@ function SplitEditor({ split, amount, baseCurrency, onChange }: { split: SplitEn
   );
 }
 
-/** Payment-method split (P62): ONE purchase paid with SEVERAL methods (part gift
- *  card, part card, part cash). Opt-in — the panel stays a single "split payment"
+/** Payment-method split (P62): ONE purchase paid with SEVERAL methods (part card,
+ *  part cash). Opt-in — the panel stays a single "split payment"
  *  link until the user adds a row, so the default form is exactly as before.
  *
  *  The rows are expected to add up to the expense total, but a mismatch is shown as
  *  a WARNING rather than blocking the save: the amount is often edited after the
  *  rows, and refusing to save a whole expense over a stray cent would be hostile.
  *  "Balance" drops the difference onto the last row in one click (the P62 analogue
- *  of P35's "split equally"). Picking a gift card on a row makes saving write the
- *  matching spend onto that card's balance automatically.
+ *  of P35's "split equally").
  */
-function PaymentSplitEditor({ splits, amount, giftCards, onChange }: { splits: PaymentSplitEntry[]; amount: number; giftCards: GiftCardOption[]; onChange: (s: PaymentSplitEntry[]) => void }) {
+function PaymentSplitEditor({ splits, amount, onChange }: { splits: PaymentSplitEntry[]; amount: number; onChange: (s: PaymentSplitEntry[]) => void }) {
   const t = useT();
   const money = useMoney();
   const allocated = paymentSplitTotal(splits);
@@ -880,17 +877,9 @@ function PaymentSplitEditor({ splits, amount, giftCards, onChange }: { splits: P
   function addRow() {
     // A fresh row pre-fills with whatever is still unallocated, which is the amount
     // the user is about to type in the overwhelming majority of cases.
-    onChange([...splits, { method: '', amount: Math.max(0, paymentSplitRemainder(amount, splits)), giftCardId: '' }]);
+    onChange([...splits, { method: '', amount: Math.max(0, paymentSplitRemainder(amount, splits)) }]);
   }
   function removeRow(i: number) { onChange(splits.filter((_, idx) => idx !== i)); }
-  /** Choosing a gift card also names the row after it, unless the user typed a method. */
-  function pickCard(i: number, id: string) {
-    const card = giftCards.find((g) => g._id === id);
-    const cur = splits[i];
-    const named = (cur?.method || '').trim();
-    const auto = !named || giftCards.some((g) => g.title === named);
-    setRow(i, { giftCardId: id, method: id && auto && card ? card.title : named });
-  }
 
   return (
     <div className="rounded-lg border border-[color:var(--color-border)] p-3">
@@ -909,12 +898,6 @@ function PaymentSplitEditor({ splits, amount, giftCards, onChange }: { splits: P
           {splits.map((r, i) => (
             <div key={i} className="flex items-center gap-2">
               <Input value={r.method} onChange={(e) => setRow(i, { method: e.target.value })} placeholder={t('ex.paySplitMethod')} className="flex-1" />
-              {giftCards.length > 0 && (
-                <select value={r.giftCardId} onChange={(e) => pickCard(i, e.target.value)} className={cn(selectCls, 'w-36 shrink-0 text-xs')} title={t('ex.paySplitGiftCard')}>
-                  <option value="">{t('ex.paySplitNoGiftCard')}</option>
-                  {giftCards.map((g) => <option key={g._id} value={g._id}>{g.title} ({money(g.balance)})</option>)}
-                </select>
-              )}
               <Input type="number" step="0.01" value={r.amount || ''} onChange={(e) => setRow(i, { amount: Number(e.target.value) || 0 })} placeholder="0.00" className="w-24" />
               <button type="button" onClick={() => removeRow(i)} className="shrink-0 rounded-md p-1.5 border border-[color:var(--color-border)] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] hover:border-[color:var(--color-red)]"><X size={14} /></button>
             </div>
@@ -931,16 +914,13 @@ function PaymentSplitEditor({ splits, amount, giftCards, onChange }: { splits: P
             {rest > 0 ? t('ex.paySplitShort', { amt: money(rest) }) : t('ex.paySplitOver', { amt: money(Math.abs(rest)) })}
           </span>
         )}
-        {splits.some((r) => r.giftCardId) && (
-          <span className="ml-auto flex items-center gap-1 text-[color:var(--color-text-faint)]"><Gift size={11} /> {t('ex.paySplitGiftCardHint')}</span>
-        )}
       </div>
     </div>
   );
 }
 
-function ExpenseDetail({ expense, cards, giftCards, vendors, categories, spaces, fx, seriesCount, onClose, onChanged, confirm }: {
-  expense: SerializedExpense; cards: SerializedCard[]; giftCards: GiftCardOption[]; vendors: string[]; categories: string[]; spaces: string[]; fx: FxCtx; seriesCount: number;
+function ExpenseDetail({ expense, cards, vendors, categories, spaces, fx, seriesCount, onClose, onChanged, confirm }: {
+  expense: SerializedExpense; cards: SerializedCard[]; vendors: string[]; categories: string[]; spaces: string[]; fx: FxCtx; seriesCount: number;
   onClose: () => void; onChanged: () => void; confirm: ReturnType<typeof useConfirm>;
 }) {
   const t = useT();
@@ -999,7 +979,7 @@ function ExpenseDetail({ expense, cards, giftCards, vendors, categories, spaces,
             <div className="rounded-xl border border-dashed border-[color:var(--color-border)] p-8 text-center text-xs text-[color:var(--color-text-faint)] flex items-center justify-center"><Wallet size={26} className="opacity-40" /></div>
           )}
         </div>
-        <div className="order-1 md:order-2"><FormFields form={form} set={set} cards={cards} giftCards={giftCards} vendors={vendors} categories={categories} spaces={spaces} fx={fx} /></div>
+        <div className="order-1 md:order-2"><FormFields form={form} set={set} cards={cards} vendors={vendors} categories={categories} spaces={spaces} fx={fx} /></div>
       </div>
       <div className="flex items-center gap-2 pt-4 mt-4 border-t border-[color:var(--color-border)] flex-wrap">
         <Button onClick={() => save(true)} disabled={pending}>{pending ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />} {t('common.confirm')}</Button>
@@ -1010,7 +990,7 @@ function ExpenseDetail({ expense, cards, giftCards, vendors, categories, spaces,
   );
 }
 
-function ExpenseCreate({ kind, cards, giftCards, vendors, categories, spaces, fx, onClose, onCreated }: { kind: 'income' | 'expense'; cards: SerializedCard[]; giftCards: GiftCardOption[]; vendors: string[]; categories: string[]; spaces: string[]; fx: FxCtx; onClose: () => void; onCreated: () => void }) {
+function ExpenseCreate({ kind, cards, vendors, categories, spaces, fx, onClose, onCreated }: { kind: 'income' | 'expense'; cards: SerializedCard[]; vendors: string[]; categories: string[]; spaces: string[]; fx: FxCtx; onClose: () => void; onCreated: () => void }) {
   const today = new Date();
   const iso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
   const [form, setForm] = useState<FormState>({
@@ -1027,7 +1007,7 @@ function ExpenseCreate({ kind, cards, giftCards, vendors, categories, spaces, fx
   }
   return (
     <Modal open onClose={onClose} title={t('ex.newRecord')} size="lg">
-      <FormFields form={form} set={set} cards={cards} giftCards={giftCards} vendors={vendors} categories={categories} spaces={spaces} fx={fx} />
+      <FormFields form={form} set={set} cards={cards} vendors={vendors} categories={categories} spaces={spaces} fx={fx} />
       <div className="flex items-center gap-2 pt-4 mt-4 border-t border-[color:var(--color-border)]">
         <Button onClick={save} disabled={pending || !form.amount}>{pending ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} {t('common.add')}</Button>
         <button onClick={onClose} className="text-xs px-3 py-2 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)]"><X size={13} /></button>

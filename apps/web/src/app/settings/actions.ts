@@ -9,9 +9,6 @@ import { Item } from '@/models/Item';
 import { Statement } from '@/models/Statement';
 import { Subscription } from '@/models/Subscription';
 import { Voucher } from '@/models/Voucher';
-import { GiftCard } from '@/models/GiftCard';
-import { LoyaltyCard } from '@/models/LoyaltyCard';
-import { giftCardBalance, giftCardDaysLeft } from '@/lib/giftcard';
 import { Bill } from '@/models/Bill';
 import { Document as DocumentModel } from '@/models/Document';
 import { SpecialDate as SpecialDateModel } from '@/models/SpecialDate';
@@ -25,8 +22,6 @@ import { Card } from '@/models/Card';
 import { Task } from '@/models/Task';
 import { Expense } from '@/models/Expense';
 import { Goal } from '@/models/Goal';
-import { syncGiftCardUses } from '@/lib/giftCardMirror';
-import { cleanPaymentSplits, type PaymentSplitEntry } from '@/lib/paymentSplit';
 import { Conversation } from '@/models/Conversation';
 import { invalidateAiConfigCache, getAiConfig } from '@/lib/aiConfig';
 import {
@@ -368,9 +363,6 @@ export async function saveDefaults(formData: FormData): Promise<{ ok: boolean }>
   // 0 is meaningful (trial alerts off), so parse explicitly instead of `|| 2`.
   const trialRaw = Number(formData.get('trialAlertDays'));
   const trialAlertDays = Number.isFinite(trialRaw) ? Math.max(0, Math.min(60, Math.round(trialRaw))) : 2;
-  // 0 is meaningful (gift-card expiry alerts off), so parse explicitly instead of `|| 30`.
-  const giftRaw = Number(formData.get('giftCardAlertDays'));
-  const giftCardAlertDays = Number.isFinite(giftRaw) ? Math.max(0, Math.min(365, Math.round(giftRaw))) : 30;
   // 0 is meaningful (bill due/overdue alerts off), so parse explicitly instead of `|| 5`.
   const billRaw = Number(formData.get('billAlertDays'));
   const billAlertDays = Number.isFinite(billRaw) ? Math.max(0, Math.min(90, Math.round(billRaw))) : 5;
@@ -413,7 +405,6 @@ export async function saveDefaults(formData: FormData): Promise<{ ok: boolean }>
         defaultWarrantyMonths: warrantyMonths,
         warrantyAlertDays: alertDays,
         trialAlertDays,
-        giftCardAlertDays,
         billAlertDays,
         documentAlertDays,
         specialDateAlertDays,
@@ -703,21 +694,6 @@ export async function runAlertChecks(opts: { dedupe?: boolean } = {}): Promise<{
       : [];
   const subscriptionReviews = collectSubscriptionReviews(reviewRows, s.subscriptionReviewIntervalDays, now);
 
-  // Gift-card / store-credit expiring with money still on it (P32): soonest first.
-  const giftRows = (await (await scoped(GiftCard)).find({ archived: { $ne: true }, expiresAt: { $ne: null } })
-    .select('title initialAmount uses expiresAt')
-    .lean()) as Array<{ _id: unknown; title: string; initialAmount?: number; uses?: { amount?: number }[]; expiresAt?: string | Date | null }>;
-  const giftsExpiring = giftRows
-    .map((g) => ({
-      _id: g._id,
-      title: g.title,
-      balance: giftCardBalance(g.initialAmount ?? 0, g.uses ?? []),
-      days: giftCardDaysLeft(g.expiresAt ?? null, now),
-      iso: g.expiresAt ? new Date(g.expiresAt as string).toISOString().slice(0, 10) : '',
-    }))
-    .filter((g) => g.balance > 0.009 && g.days !== null && g.days >= 0 && g.days <= s.giftCardAlertDays)
-    .sort((a, b) => (a.days ?? 0) - (b.days ?? 0));
-
   // Bills / payables (P28): unpaid bills that are overdue or due within the
   // lead-time window (overdue nag until paid), most-overdue first.
   const billRows = (await (await scoped(Bill)).find({ paidAt: null, archived: { $ne: true } })
@@ -828,7 +804,6 @@ export async function runAlertChecks(opts: { dedupe?: boolean } = {}): Promise<{
   const hikesSplit = splitFreshAlerts(nt.priceHikes ? hikes : [], (h) => `pricehike:${h.vendorKey}:${h.curr}`, previouslySent);
   const trialsSplit = splitFreshAlerts(nt.trials ? trialsEnding : [], (tr) => `trialend:${String(tr._id)}:${tr.iso}`, previouslySent);
   const reviewsSplit = splitFreshAlerts(nt.subscriptionReviews ? subscriptionReviews : [], (r) => `subreview:${String(r._id)}:${r.iso}`, previouslySent);
-  const giftsSplit = splitFreshAlerts(nt.giftCards ? giftsExpiring : [], (g) => `giftcard:${String(g._id)}:${g.iso}`, previouslySent);
   const billsSplit = splitFreshAlerts(nt.bills ? billsDue : [], (b) => `bill:${String(b._id)}:${b.iso}`, previouslySent);
   const documentsSplit = splitFreshAlerts(nt.documents ? documentsExpiring : [], (d) => `document:${String(d._id)}:${d.iso}`, previouslySent);
   // Stable per-record key: fires once when the date enters the lead window and stays quiet
@@ -854,7 +829,6 @@ export async function runAlertChecks(opts: { dedupe?: boolean } = {}): Promise<{
     ...hikesSplit.keys,
     ...trialsSplit.keys,
     ...reviewsSplit.keys,
-    ...giftsSplit.keys,
     ...billsSplit.keys,
     ...documentsSplit.keys,
     ...specialDatesSplit.keys,
@@ -873,7 +847,6 @@ export async function runAlertChecks(opts: { dedupe?: boolean } = {}): Promise<{
   const freshHikes = hikesSplit.fresh;
   const freshTrialsEnding = trialsSplit.fresh;
   const freshSubscriptionReviews = reviewsSplit.fresh;
-  const freshGiftsExpiring = giftsSplit.fresh;
   const freshBillsDue = billsSplit.fresh;
   const freshDocumentsExpiring = documentsSplit.fresh;
   const freshSpecialDates = specialDatesSplit.fresh;
@@ -915,13 +888,6 @@ export async function runAlertChecks(opts: { dedupe?: boolean } = {}): Promise<{
       `🔎 ${freshSubscriptionReviews.length} subscription(s) due a usage review: ${freshSubscriptionReviews
         .slice(0, 5)
         .map((r) => `${r.name} (${r.days}d since confirmation)`)
-        .join(', ')}`
-    );
-  if (freshGiftsExpiring.length)
-    lines.push(
-      `💳 ${freshGiftsExpiring.length} gift card(s) expiring ≤${s.giftCardAlertDays}d: ${freshGiftsExpiring
-        .slice(0, 5)
-        .map((g) => `${g.title} (${cur()}${g.balance.toFixed(0)}, ${g.days}d)`)
         .join(', ')}`
     );
   if (freshBillsDue.length)
@@ -2184,7 +2150,7 @@ export async function importDataEncrypted(
 // PRIMARY delete was the one going to the wrong database.
 
 export type TrashRow = { type: TrashType; id: string; title: string; subtitle: string; deletedAt: string };
-export type TrashType = 'item' | 'receipt' | 'expense' | 'subscription' | 'voucher' | 'giftcard' | 'loyaltycard' | 'bill' | 'goal' | 'task' | 'conversation';
+export type TrashType = 'item' | 'receipt' | 'expense' | 'subscription' | 'voucher' | 'bill' | 'goal' | 'task' | 'conversation';
 
 const TRASH_MODELS: Record<TrashType, typeof Item> = {
   item: Item,
@@ -2192,8 +2158,6 @@ const TRASH_MODELS: Record<TrashType, typeof Item> = {
   expense: Expense as unknown as typeof Item,
   subscription: Subscription as unknown as typeof Item,
   voucher: Voucher as unknown as typeof Item,
-  giftcard: GiftCard as unknown as typeof Item,
-  loyaltycard: LoyaltyCard as unknown as typeof Item,
   bill: Bill as unknown as typeof Item,
   goal: Goal as unknown as typeof Item,
   task: Task as unknown as typeof Item,
@@ -2208,8 +2172,6 @@ function trashLabel(type: TrashType, d: Record<string, unknown>, locale = 'en'):
     case 'expense': return { title: String(d.vendor || d.category || '—'), subtitle: `${d.kind} · €${d.amount ?? 0}` };
     case 'subscription': return { title: String(d.name || '—'), subtitle: `€${d.amount ?? 0}/${d.billingCycle || ''}` };
     case 'voucher': return { title: String(d.title || '—'), subtitle: String(d.store || '') };
-    case 'giftcard': return { title: String(d.title || '—'), subtitle: `${d.store || ''} · €${d.initialAmount ?? 0}`.trim() };
-    case 'loyaltycard': return { title: String(d.title || '—'), subtitle: String(d.store || '') };
     case 'bill': return { title: String(d.title || '—'), subtitle: `${d.vendor || ''} · €${d.amount ?? 0}`.trim() };
     case 'goal': return { title: String(d.title || '—'), subtitle: `€${d.targetAmount ?? 0}${d.targetDate ? ` · ${formatDate(d.targetDate as string, locale)}` : ''}` };
     case 'task': return { title: String(d.title || '—'), subtitle: String(d.status || '') };
@@ -2247,12 +2209,6 @@ export async function restoreFromTrash(type: TrashType, id: string): Promise<{ o
   await connectDB();
   const Model = await scoped(RawModel);
   await Model.updateOne({ _id: id }, { $set: { deletedAt: null } }).setOptions({ withDeleted: true });
-  if (type === 'expense') {
-    // #104: deleting released the expense's gift-card spend; bringing the expense back takes it
-    // again, from the split the expense still carries.
-    const e = (await Model.findById(id).lean()) as { paymentSplits?: PaymentSplitEntry[]; date?: Date; vendor?: string } | null;
-    if (e) await syncGiftCardUses(id, cleanPaymentSplits(e.paymentSplits ?? []), e.date ? new Date(e.date) : new Date(), e.vendor || '');
-  }
   revalidatePath('/', 'layout');
   return { ok: true };
 }

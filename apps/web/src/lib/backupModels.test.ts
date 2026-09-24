@@ -64,13 +64,12 @@ describe('backup registry completeness', () => {
 });
 
 describe('backup registry contents', () => {
-  it('includes the seven models that were silently missing before 2026-07-26', () => {
+  it('includes the models that were silently missing before 2026-07-26', () => {
+    // GiftCard and LoyaltyCard were on this list too; both modules were removed 2026-09-24.
     for (const name of [
       'Expense',
       'Bill',
       'Goal',
-      'GiftCard',
-      'LoyaltyCard',
       'NetWorthSnapshot',
       'ShoppingListItem',
     ]) {
@@ -86,7 +85,6 @@ describe('backup registry contents', () => {
 
   it('maps each key to the model it names', () => {
     expect(BACKUP_MODELS.expenses.modelName).toBe('Expense');
-    expect(BACKUP_MODELS.giftCards.modelName).toBe('GiftCard');
     expect(BACKUP_MODELS.netWorthSnapshots.modelName).toBe('NetWorthSnapshot');
     expect(BACKUP_MODELS.shoppingList.modelName).toBe('ShoppingListItem');
     expect(BACKUP_MODELS.meterReadings.modelName).toBe('MeterReading');

@@ -27,7 +27,6 @@ export type AppSettings = {
   defaultWarrantyMonths: number;
   warrantyAlertDays: number;
   trialAlertDays: number; // lead time (days) for free-trial "cancel before charge" alert (P33)
-  giftCardAlertDays: number; // window (days) for "gift card expiring with balance" alert (P32); 0 = off
   billAlertDays: number; // lead-time (days) for "bill due / overdue" alert (P28); 0 = off
   documentAlertDays: number; // lead-time (days) for "document expiring / expired" alert (P42); 0 = off
   specialDateAlertDays: number; // lead-time (days) for "birthday / anniversary coming up" alert (P50); 0 = off
@@ -63,7 +62,6 @@ export type RawAppConfigDoc = {
   defaultWarrantyMonths?: number;
   warrantyAlertDays?: number;
   trialAlertDays?: number;
-  giftCardAlertDays?: number;
   billAlertDays?: number;
   documentAlertDays?: number;
   specialDateAlertDays?: number;
@@ -109,7 +107,6 @@ const APP_CONFIG_FIELDS = {
   defaultWarrantyMonths: true,
   warrantyAlertDays: true,
   trialAlertDays: true,
-  giftCardAlertDays: true,
   billAlertDays: true,
   documentAlertDays: true,
   specialDateAlertDays: true,
@@ -157,7 +154,6 @@ const DEFAULTS: AppSettings = {
   defaultWarrantyMonths: 24,
   warrantyAlertDays: 90,
   trialAlertDays: 2,
-  giftCardAlertDays: 30,
   billAlertDays: 5,
   documentAlertDays: 30,
   specialDateAlertDays: 7,
@@ -210,7 +206,6 @@ export function normalizeSettings(doc: RawAppConfigDoc | null | undefined): AppS
     defaultWarrantyMonths: typeof doc?.defaultWarrantyMonths === 'number' ? doc.defaultWarrantyMonths : DEFAULTS.defaultWarrantyMonths,
     warrantyAlertDays: typeof doc?.warrantyAlertDays === 'number' ? doc.warrantyAlertDays : DEFAULTS.warrantyAlertDays,
     trialAlertDays: typeof doc?.trialAlertDays === 'number' ? doc.trialAlertDays : DEFAULTS.trialAlertDays,
-    giftCardAlertDays: typeof doc?.giftCardAlertDays === 'number' ? doc.giftCardAlertDays : DEFAULTS.giftCardAlertDays,
     billAlertDays: typeof doc?.billAlertDays === 'number' ? doc.billAlertDays : DEFAULTS.billAlertDays,
     documentAlertDays: typeof doc?.documentAlertDays === 'number' ? doc.documentAlertDays : DEFAULTS.documentAlertDays,
     specialDateAlertDays: typeof doc?.specialDateAlertDays === 'number' ? doc.specialDateAlertDays : DEFAULTS.specialDateAlertDays,

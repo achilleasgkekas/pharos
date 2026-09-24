@@ -9,9 +9,8 @@ import type { NextRequest } from 'next/server';
 //
 // Route-only behaviour pinned here:
 //   1. the local `:type` allow-list mirrors the action layer's `TrashType` union. 'goal' was
-//      added alongside the P12 v1 goals route, and 'loyaltycard' alongside the P20 v1
-//      loyaltycards route (both needed trash restore/purge to actually
-//      work) — both are now in the accept-list below, not the reject-list.
+//      added alongside the P12 v1 goals route. 'giftcard' and 'loyaltycard' were in it too
+//      until both modules were removed (2026-09-24); they are rejected now.
 //   2. PATCH has NO role check — any authenticated user can restore.
 //   3. DELETE's admin-role check runs BEFORE the type/id guards — a non-admin gets 403 without
 //      the route ever validating (or even reading) :type/:id, and without calling the action.
@@ -113,7 +112,7 @@ describe('PATCH (restore) — auth gate', () => {
 });
 
 describe('PATCH (restore) — type guard', () => {
-  it.each(['item', 'receipt', 'expense', 'subscription', 'voucher', 'giftcard', 'loyaltycard', 'bill', 'goal', 'task', 'conversation'])(
+  it.each(['item', 'receipt', 'expense', 'subscription', 'voucher', 'bill', 'goal', 'task', 'conversation'])(
     'accepts allow-listed type %s',
     async (type) => {
       const res = await PATCH(makeReq(type, OID), ctx(type, OID));
@@ -187,10 +186,10 @@ describe('DELETE (purge) — admin gate runs BEFORE type/id validation', () => {
 });
 
 describe('DELETE (purge) — type guard (admin)', () => {
-  it('accepts loyaltycard (P20 allow-list entry)', async () => {
-    const res = await DELETE(makeReq('loyaltycard', OID), ctx('loyaltycard', OID));
-    expect(res.status).toBe(200);
-    expect(purgeState.calls).toEqual([{ type: 'loyaltycard', id: OID }]);
+  it.each(['giftcard', 'loyaltycard'])('rejects %s — the module was removed 2026-09-24', async (type) => {
+    const res = await DELETE(makeReq(type, OID), ctx(type, OID));
+    expect(res.status).toBe(400);
+    expect(purgeMock).not.toHaveBeenCalled();
   });
 
   it('rejects an unrelated string type — 400 bad type, no action call', async () => {

@@ -1,7 +1,7 @@
 import { Schema, model, models, type Model, type InferSchemaType } from 'mongoose';
 import { softDeletePlugin } from '@/lib/softDelete';
 
-// A single manual contribution toward a goal (mirrors GiftCardUseSchema). Positive
+// A single manual contribution toward a goal (same shape as a bill payment). Positive
 // amount = money put aside; a mistaken entry is removed rather than negated.
 const GoalContributionSchema = new Schema(
   {

@@ -28,8 +28,6 @@ import { ShoppingListItem } from '@/models/ShoppingListItem';
 import { Voucher } from '@/models/Voucher';
 import { Bill } from '@/models/Bill';
 import { Goal } from '@/models/Goal';
-import { GiftCard } from '@/models/GiftCard';
-import { LoyaltyCard } from '@/models/LoyaltyCard';
 import { addExpense } from './expenses/actions';
 import { importItemFromUrl, logItemPrice } from './items/actions';
 import { getAppSettings } from '@/lib/appSettings';
@@ -60,8 +58,6 @@ const EDITABLE_MODELS = {
   voucher: Voucher,
   bill: Bill,
   goal: Goal,
-  giftcard: GiftCard,
-  loyaltycard: LoyaltyCard,
   shoppinglist: ShoppingListItem,
 } as const;
 
@@ -77,18 +73,15 @@ const REVALIDATE: Record<EditableType, string[]> = {
   voucher: ['/vouchers'],
   bill: ['/bills'],
   goal: ['/reports'],
-  giftcard: ['/vouchers'],
-  loyaltycard: ['/vouchers'],
   shoppinglist: ['/shopping-list'],
 };
 
-// Fields the assistant must never $set. `_id`/`deletedAt`/`__v` are structural; the two arrays
-// are money ledgers (a gift card's spend log, a goal's contributions) whose running balance is
-// derived from them — a language model rewriting one wholesale would silently restate a balance.
-// Those stay UI-only, exactly as the approved spec asked.
+// Fields the assistant must never $set. `_id`/`deletedAt`/`__v` are structural; a goal's
+// contributions are a money ledger whose running balance is derived from it — a language
+// model rewriting it wholesale would silently restate a balance. It stays UI-only, exactly
+// as the approved spec asked.
 const ALWAYS_BLOCKED = ['_id', '__v', 'deletedAt'];
 const BLOCKED_FIELDS: Partial<Record<EditableType, string[]>> = {
-  giftcard: ['uses'],
   goal: ['contributions'],
 };
 
@@ -196,7 +189,7 @@ export const TOOLS: AnthropicTool[] = [
   {
     name: 'search_data',
     description:
-      'Search everything (items, receipts, statements, subscriptions, tasks, expenses, vouchers, bills, goals, gift cards, loyalty cards, the shopping list) for a keyword. Returns each result with its [type id] so you can edit/delete it.',
+      'Search everything (items, receipts, statements, subscriptions, tasks, expenses, vouchers, bills, goals, the shopping list) for a keyword. Returns each result with its [type id] so you can edit/delete it.',
     input_schema: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] },
   },
   {
@@ -211,7 +204,7 @@ export const TOOLS: AnthropicTool[] = [
         fields: {
           type: 'object',
           description:
-            'properties to set, e.g. {"status":"done"}, {"amount":12.99,"category":"streaming"}, {"paidAt":"2026-08-03"} to mark a bill paid, or {"checked":true} for a shopping-list line. A gift card\'s spend log and a goal\'s contributions cannot be set here.',
+            'properties to set, e.g. {"status":"done"}, {"amount":12.99,"category":"streaming"}, {"paidAt":"2026-08-03"} to mark a bill paid, or {"checked":true} for a shopping-list line. A goal\'s contributions cannot be set here.',
         },
       },
       required: ['type', 'id', 'fields'],

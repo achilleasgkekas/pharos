@@ -6,7 +6,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // ~1651-1774): getTrash / restoreFromTrash / purgeFromTrash / purgeTrashEntry /
 // emptyTrash — the one place that restores or permanently purges the soft-deleted
 // (deletedAt-set) records that every "delete" action in the app now produces across
-// 10 record types (item/receipt/expense/subscription/voucher/giftcard/loyaltycard/
+// 8 record types (item/receipt/expense/subscription/voucher/
 // bill/goal/task). trashLabel() is a private helper, exercised indirectly through
 // getTrash's row output.
 //
@@ -16,8 +16,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 //
 // Importing the module pulls in every top-level import of the file, so the same full
 // mock set from actions.aiEngine.test.ts is required just to let the import resolve.
-// UNLIKE the other slices, the 10 TRASH_MODELS models (Item/Receipt/Expense/
-// Subscription/Voucher/GiftCard/LoyaltyCard/Bill/Goal/Task) are given REAL find/
+// UNLIKE the other slices, the TRASH_MODELS models (Item/Receipt/Expense/
+// Subscription/Voucher/Bill/Goal/Task) are given REAL find/
 // findById/updateOne/deleteOne vi.fn()s here (not `{}` stand-ins) since this concern
 // exercises all of them; Receipt/Item also get updateMany (item-purge cross-reference
 // cleanup) and Statement gets updateMany too (the same cleanup touches installment
@@ -59,8 +59,6 @@ const {
   expenseModel,
   subscriptionModel,
   voucherModel,
-  giftcardModel,
-  loyaltycardModel,
   billModel,
   goalModel,
   taskModel,
@@ -103,8 +101,6 @@ const {
     expenseModel: makeTrashModel(),
     subscriptionModel: makeTrashModel(),
     voucherModel: makeTrashModel(),
-    giftcardModel: makeTrashModel(),
-    loyaltycardModel: makeTrashModel(),
     billModel: makeTrashModel(),
     goalModel: makeTrashModel(),
     taskModel: makeTrashModel(),
@@ -129,13 +125,6 @@ vi.mock('@/models/Subscription', () => ({
 vi.mock('@/models/Voucher', () => ({
   Voucher: { find: voucherModel.findMock, findById: voucherModel.findByIdMock, updateOne: voucherModel.updateOneMock, deleteOne: voucherModel.deleteOneMock },
 }));
-vi.mock('@/models/GiftCard', () => ({
-  GiftCard: { find: giftcardModel.findMock, findById: giftcardModel.findByIdMock, updateOne: giftcardModel.updateOneMock, deleteOne: giftcardModel.deleteOneMock },
-}));
-vi.mock('@/models/LoyaltyCard', () => ({
-  LoyaltyCard: { find: loyaltycardModel.findMock, findById: loyaltycardModel.findByIdMock, updateOne: loyaltycardModel.updateOneMock, deleteOne: loyaltycardModel.deleteOneMock },
-}));
-vi.mock('@/lib/giftcard', () => ({ giftCardBalance: vi.fn(), giftCardDaysLeft: vi.fn() }));
 vi.mock('@/models/Bill', () => ({
   Bill: { find: billModel.findMock, findById: billModel.findByIdMock, updateOne: billModel.updateOneMock, deleteOne: billModel.deleteOneMock },
 }));
@@ -144,8 +133,6 @@ vi.mock('@/models/Card', () => ({ Card: {} }));
 vi.mock('@/models/Task', () => ({
   Task: { find: taskModel.findMock, findById: taskModel.findByIdMock, updateOne: taskModel.updateOneMock, deleteOne: taskModel.deleteOneMock },
 }));
-const { syncGiftCardUsesMock } = vi.hoisted(() => ({ syncGiftCardUsesMock: vi.fn(async (..._a: unknown[]) => {}) }));
-vi.mock('@/lib/giftCardMirror', () => ({ syncGiftCardUses: syncGiftCardUsesMock }));
 vi.mock('@/models/Expense', () => ({
   Expense: { find: expenseModel.findMock, findById: expenseModel.findByIdMock, updateOne: expenseModel.updateOneMock, deleteOne: expenseModel.deleteOneMock },
 }));
@@ -256,8 +243,6 @@ const ALL_TRASH_MODELS = [
   ['expense', expenseModel] as const,
   ['subscription', subscriptionModel] as const,
   ['voucher', voucherModel] as const,
-  ['giftcard', giftcardModel] as const,
-  ['loyaltycard', loyaltycardModel] as const,
   ['bill', billModel] as const,
   ['goal', goalModel] as const,
   ['task', taskModel] as const,
@@ -290,7 +275,7 @@ describe('getTrash', () => {
     expect(connectDBMock).toHaveBeenCalledTimes(1);
   });
 
-  it('queries all 10 TRASH_MODELS types with {deletedAt:{$ne:null}} + withDeleted:true, and never projects (needs the full doc to build a label)', async () => {
+  it('queries every TRASH_MODELS type with {deletedAt:{$ne:null}} + withDeleted:true, and never projects (needs the full doc to build a label)', async () => {
     const spyChain = chainList([]);
     itemModel.findMock.mockReturnValueOnce(spyChain);
     await getTrash();
@@ -312,13 +297,6 @@ describe('getTrash', () => {
     );
     subscriptionModel.findMock.mockReturnValueOnce(chainList([{ _id: ID1, name: 'Netflix', amount: 15, billingCycle: 'monthly', deletedAt: now }]));
     voucherModel.findMock.mockReturnValueOnce(chainList([{ _id: ID1, title: 'Summer sale', store: 'Skroutz', deletedAt: now }]));
-    giftcardModel.findMock.mockReturnValueOnce(
-      chainList([
-        { _id: ID1, title: 'IKEA card', store: 'IKEA', initialAmount: 50, deletedAt: now },
-        { _id: ID2, title: 'No-store card', store: '', initialAmount: 20, deletedAt: now },
-      ])
-    );
-    loyaltycardModel.findMock.mockReturnValueOnce(chainList([{ _id: ID1, title: 'AB card', store: 'AB Vasilopoulos', deletedAt: now }]));
     billModel.findMock.mockReturnValueOnce(chainList([{ _id: ID1, title: 'Electricity', vendor: 'ΔΕΗ', amount: 30, deletedAt: now }]));
     goalModel.findMock.mockReturnValueOnce(
       chainList([
@@ -339,11 +317,6 @@ describe('getTrash', () => {
     expect(byType('expense', ID2)).toMatchObject({ title: 'utilities', subtitle: 'expense · €30' });
     expect(byType('subscription', ID1)).toMatchObject({ title: 'Netflix', subtitle: '€15/monthly' });
     expect(byType('voucher', ID1)).toMatchObject({ title: 'Summer sale', subtitle: 'Skroutz' });
-    expect(byType('giftcard', ID1)).toMatchObject({ title: 'IKEA card', subtitle: 'IKEA · €50' });
-    // store='' → template leaves a leading space before the bullet, .trim() only strips
-    // the OUTER whitespace, so the bullet itself survives as the first character
-    expect(byType('giftcard', ID2).subtitle).toBe('· €20');
-    expect(byType('loyaltycard', ID1)).toMatchObject({ title: 'AB card', subtitle: 'AB Vasilopoulos' });
     expect(byType('bill', ID1)).toMatchObject({ title: 'Electricity', subtitle: 'ΔΕΗ · €30' });
     expect(byType('goal', ID1)).toMatchObject({ title: 'Emergency fund', subtitle: '€1000 · 01/01/2027' });
     // no targetDate → no trailing " · " artifact (unlike the receipt's empty-date case)
@@ -436,27 +409,6 @@ describe('restoreFromTrash', () => {
 
     expect(subscriptionModel.updateOneMock).toHaveBeenCalledWith({ _id: ID2 }, { $set: { deletedAt: null } });
     expect(itemModel.updateOneMock).not.toHaveBeenCalled();
-  });
-});
-
-describe('restoreFromTrash — gift-card spend (#104)', () => {
-  it('restoring an expense re-applies its gift-card split (deleting had released it)', async () => {
-    const when = new Date('2026-08-28T00:00:00Z');
-    expenseModel.findByIdMock.mockReturnValueOnce(
-      chainOne({ _id: ID1, vendor: 'IKEA', date: when, paymentSplits: [{ method: 'giftcard', amount: 50, giftCardId: 'gc1' }] })
-    );
-    await restoreFromTrash('expense', ID1);
-    expect(syncGiftCardUsesMock).toHaveBeenCalledTimes(1);
-    const [id, splits, date, vendor] = syncGiftCardUsesMock.mock.calls[0] as [string, { giftCardId: string; amount: number }[], Date, string];
-    expect(id).toBe(ID1);
-    expect(splits).toEqual([expect.objectContaining({ giftCardId: 'gc1', amount: 50 })]);
-    expect(date.toISOString()).toBe(when.toISOString());
-    expect(vendor).toBe('IKEA');
-  });
-
-  it('other types never touch gift cards on restore', async () => {
-    await restoreFromTrash('item', ID1);
-    expect(syncGiftCardUsesMock).not.toHaveBeenCalled();
   });
 });
 
@@ -579,14 +531,12 @@ describe('purgeTrashEntry (core, no requireAdmin — callers must authorize firs
     expect(itemModel.deleteOneMock).toHaveBeenCalledWith({ _id: ID1 });
   });
 
-  it.each(['subscription', 'voucher', 'giftcard', 'loyaltycard', 'bill', 'goal', 'task', 'conversation'] as TrashType[])(
+  it.each(['subscription', 'voucher', 'bill', 'goal', 'task', 'conversation'] as TrashType[])(
     '%s: no file deletion or cross-reference cleanup, just deleteOne',
     async (type) => {
       const modelsByType: Record<string, (typeof itemModel)> = {
         subscription: subscriptionModel,
         voucher: voucherModel,
-        giftcard: giftcardModel,
-        loyaltycard: loyaltycardModel,
         bill: billModel,
         goal: goalModel,
         task: taskModel,
@@ -631,7 +581,7 @@ describe('emptyTrash', () => {
     expect(spyChain.select).toHaveBeenCalledWith('_id');
   });
 
-  it('purges every trashed doc across all 10 TRASH_MODELS types and returns the total count — including a doc that vanishes before purgeTrashEntry re-fetches it (counted anyway, a real overcount wart)', async () => {
+  it('purges every trashed doc across every TRASH_MODELS type and returns the total count — including a doc that vanishes before purgeTrashEntry re-fetches it (counted anyway, a real overcount wart)', async () => {
     itemModel.findMock.mockReturnValueOnce(chainList([{ _id: ID1 }]));
     taskModel.findMock.mockReturnValueOnce(chainList([{ _id: ID2 }, { _id: ID3 }]));
     itemModel.findByIdMock.mockReturnValueOnce(chainOne({ _id: ID1 }));

@@ -10,7 +10,7 @@ export type SubLean = {
 
 /** Single source of truth for the v1 Subscription JSON shape (list, POST, PATCH).
  *
- *  Lives in its own module (not route.ts) — see giftcards/serialize.ts's doc comment for why. */
+ *  Lives in its own module (not route.ts) — see vouchers/serialize.ts's doc comment for why. */
 export function trim(s: SubLean) {
   return {
     id: String(s._id),

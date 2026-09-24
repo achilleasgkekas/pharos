@@ -201,7 +201,7 @@ function specBodies(): Map<string, Map<Method, SpecOp>> {
     if (m) { if (propIndent < 0) propIndent = m[1].length + 2; cur.propIndent = propIndent; continue; }
     // Every `required:` is kept with its indent; which one is the body's own is only
     // decidable once `properties:` has been seen, and the two appear in either order.
-    // A deeper one belongs to a nested object (a gift-card use, a goal contribution)
+    // A deeper one belongs to a nested object (a goal contribution)
     // whose fields are not top-level input.
     m = line.match(/^(\s+)required:\s*\[([^\]]*)\]/);
     if (m) { cur.requiredAt.push({ indent: m[1].length, keys: m[2].split(',').map((s) => s.trim()).filter(Boolean) }); continue; }

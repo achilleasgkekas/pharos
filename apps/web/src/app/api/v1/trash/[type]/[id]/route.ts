@@ -6,7 +6,7 @@ import { restoreFromTrash, purgeTrashEntry, type TrashType } from '@/app/setting
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const TYPES: TrashType[] = ['item', 'receipt', 'expense', 'subscription', 'voucher', 'giftcard', 'loyaltycard', 'bill', 'goal', 'task', 'conversation'];
+const TYPES: TrashType[] = ['item', 'receipt', 'expense', 'subscription', 'voucher', 'bill', 'goal', 'task', 'conversation'];
 const isType = (t: string): t is TrashType => (TYPES as string[]).includes(t);
 
 /** PATCH /api/v1/trash/:type/:id → restore a soft-deleted record (clears deletedAt). */

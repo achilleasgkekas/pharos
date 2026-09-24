@@ -8,7 +8,6 @@ import { Item as ItemModel } from '@/models/Item';
 import { Statement as StatementModel } from '@/models/Statement';
 import { Expense as ExpenseModel } from '@/models/Expense';
 import { Subscription as SubscriptionModel } from '@/models/Subscription';
-import { GiftCard as GiftCardModel } from '@/models/GiftCard';
 import { Bill as BillModel } from '@/models/Bill';
 import { Notification as NotificationModel } from '@/models/Notification';
 import { Document as DocumentModel } from '@/models/Document';
@@ -16,7 +15,6 @@ import { SpecialDate as SpecialDateModel } from '@/models/SpecialDate';
 import { withRequestTenant, resolveRequestTenantOrNull } from '@/lib/tenancy/request';
 import { currentModel } from '@/lib/tenancy/connection';
 import { currentTenant, withTenant } from '@/lib/tenancy/current';
-import { giftCardBalance, giftCardDaysLeft } from '@/lib/giftcard';
 import { billDaysUntilDue, billRemaining } from '@/lib/bill';
 import { collectMaintenanceDue, MAINTENANCE_STATUSES, type MaintenanceRow } from '@/lib/maintenance';
 import { collectLendingOverdue, LENDING_STATUSES, type LendingRow } from '@/lib/lending';
@@ -57,12 +55,11 @@ async function computeAlerts(): Promise<Alert[]> {
   const s = await getAppSettings(); // also sets the currency symbol for cur()
   const now = Date.now();
   const alerts: Alert[] = [];
-  const [Item, Statement, Expense, Subscription, GiftCard, Bill, DocumentM, SpecialDateM] = await Promise.all([
+  const [Item, Statement, Expense, Subscription, Bill, DocumentM, SpecialDateM] = await Promise.all([
     currentModel(ItemModel),
     currentModel(StatementModel),
     currentModel(ExpenseModel),
     currentModel(SubscriptionModel),
-    currentModel(GiftCardModel),
     currentModel(BillModel),
     currentModel(DocumentModel),
     currentModel(SpecialDateModel),
@@ -162,24 +159,6 @@ async function computeAlerts(): Promise<Alert[]> {
         href: `/subscriptions?open=${id}`,
       });
     }
-  }
-
-  // Gift-card / store-credit expiring with money still on it (P32): don't let a
-  // balance quietly expire. Only cards with a remaining balance and an expiry
-  // within the configured window. dedupeKey carries the expiry date so it
-  // auto-expires once past and re-alerts if the date is moved.
-  const giftCards = (await GiftCard.find({ archived: { $ne: true }, expiresAt: { $ne: null } })
-    .select('title initialAmount uses expiresAt')
-    .lean()) as Array<{ _id: unknown; title: string; initialAmount?: number; uses?: { amount?: number }[]; expiresAt?: string | Date | null }>;
-  for (const g of giftCards) {
-    const balance = giftCardBalance(g.initialAmount ?? 0, g.uses ?? []);
-    if (balance <= 0.009) continue;
-    const days = giftCardDaysLeft(g.expiresAt ?? null, now);
-    if (days === null || days < 0 || days > s.giftCardAlertDays) continue;
-    const id = String(g._id);
-    const iso = new Date(g.expiresAt as string).toISOString().slice(0, 10);
-    // body = "<days>|<balance>" (raw; the bell formats with the symbol)
-    alerts.push({ dedupeKey: `giftcard:${id}:${iso}`, kind: 'giftcard', title: g.title, body: `${days}|${balance}`, href: '/vouchers' });
   }
 
   // Bills / payables (P28): an unpaid bill that's overdue or due within the

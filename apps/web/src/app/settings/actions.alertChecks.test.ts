@@ -6,16 +6,16 @@ import { defaultNotifyTypes } from '@/lib/alertTypes';
 // full rationale + mock-set explanation). This file covers ONLY runAlertChecks
 // (lines 463-636): the fan-in scan that pulls deals / warranty expiries / return-window
 // closings / installment-due / recurring price-hikes / budget-exceeded / free-trial
-// endings / gift-card expiries / bills-due from eight different models, composes one
+// endings / bills-due from several models, composes one
 // human summary, feeds the in-app notification bell, dispatches outbound event
 // webhooks, and pushes a notifier (ntfy). actions.notifiers.test.ts
 // deliberately left this concern out; this file is that promised future slice.
 //
 // Strategy: the underlying per-domain math (detectPriceHikes, detectBudgetExceeded,
-// effectiveReturnWindow/returnDaysLeft, giftCardBalance/giftCardDaysLeft,
+// effectiveReturnWindow/returnDaysLeft,
 // billDaysUntilDue, computeInstallmentPlans) each already has its own dedicated unit
 // suite (lib/priceHike.test.ts, lib/budgetAlert.test.ts, lib/returnWindow.test.ts,
-// lib/giftcard.test.ts, lib/bill.test.ts, lib/installments.test.ts) — those are mocked
+// lib/bill.test.ts, lib/installments.test.ts) — those are mocked
 // here so this file only pins runAlertChecks' OWN wiring: which query is issued to
 // which model, how each helper's result feeds the deal/warranty/etc. filter + summary
 // line, and how the final dispatch (bell / event webhooks / ntfy) is gated.
@@ -41,9 +41,6 @@ import { defaultNotifyTypes } from '@/lib/alertTypes';
 //  - free trials: Subscription.find({active:true, trialEndsAt:{$ne:null}}) -> ceil-days
 //    until trialEndsAt, kept when 0 <= days <= s.trialAlertDays, charge prefers
 //    firstChargeAmount over amount, sorted soonest-first.
-//  - gift cards: GiftCard.find({archived:{$ne:true}, expiresAt:{$ne:null}}) ->
-//    giftCardBalance()+giftCardDaysLeft(), kept only when balance > 0.009 AND
-//    0 <= days <= s.giftCardAlertDays, sorted soonest-first.
 //  - bills: Bill.find({paidAt:null, archived:{$ne:true}}) -> billDaysUntilDue(), kept
 //    when days !== null && days <= s.billAlertDays — NO lower bound, so an overdue
 //    bill (negative days) always qualifies regardless of s.billAlertDays ("overdue nag
@@ -59,7 +56,7 @@ import { defaultNotifyTypes } from '@/lib/alertTypes';
 //    one per non-empty signal: 'installment.due' (only when dueThisMonth>0),
 //    'price.drop' (only when deals.length, payload maps title+target), 'budget.exceeded'
 //    (only when budgetsExceeded.length, payload is the raw array). Hikes/warranty/
-//    returns/trials/gift-cards/bills do NOT have a dedicated webhook event.
+//    returns/trials/bills do NOT have a dedicated webhook event.
 //  - Final summary: 'All clear — nothing to report.' when every signal is empty; NO
 //    dispatchAlert call in that case. When any line exists, dispatchAlert('Pharos
 //    alerts', summary) is awaited and `sent` = its `.sent > 0`.
@@ -73,7 +70,6 @@ const {
   statementFind,
   expenseFind,
   subscriptionFind,
-  giftCardFind,
   billFind,
   documentFind,
   specialDateFind,
@@ -83,8 +79,6 @@ const {
   computeInstallmentPlansMock,
   detectPriceHikesMock,
   detectBudgetExceededMock,
-  giftCardBalanceMock,
-  giftCardDaysLeftMock,
   billDaysUntilDueMock,
   generateNotificationsMock,
   dispatchEventWebhooksMock,
@@ -99,7 +93,6 @@ const {
   statementFind: vi.fn(),
   expenseFind: vi.fn(),
   subscriptionFind: vi.fn(),
-  giftCardFind: vi.fn(),
   billFind: vi.fn(),
   documentFind: vi.fn(),
   specialDateFind: vi.fn(),
@@ -109,8 +102,6 @@ const {
   computeInstallmentPlansMock: vi.fn(() => [] as unknown[]),
   detectPriceHikesMock: vi.fn(() => [] as unknown[]),
   detectBudgetExceededMock: vi.fn((_rows?: unknown, _budgets?: unknown, _monthKey?: string) => [] as unknown[]),
-  giftCardBalanceMock: vi.fn(() => 0),
-  giftCardDaysLeftMock: vi.fn(() => null as number | null),
   billDaysUntilDueMock: vi.fn(() => null as number | null),
   generateNotificationsMock: vi.fn(async () => {}),
   dispatchEventWebhooksMock: vi.fn(async () => ({ sent: 0, total: 0 })),
@@ -128,9 +119,6 @@ vi.mock('@/models/Item', () => ({ Item: { find: itemFind } }));
 vi.mock('@/models/Statement', () => ({ Statement: { find: statementFind } }));
 vi.mock('@/models/Subscription', () => ({ Subscription: { find: subscriptionFind } }));
 vi.mock('@/models/Voucher', () => ({ Voucher: {} }));
-vi.mock('@/models/GiftCard', () => ({ GiftCard: { find: giftCardFind } }));
-vi.mock('@/models/LoyaltyCard', () => ({ LoyaltyCard: {} }));
-vi.mock('@/lib/giftcard', () => ({ giftCardBalance: giftCardBalanceMock, giftCardDaysLeft: giftCardDaysLeftMock }));
 vi.mock('@/models/Bill', () => ({ Bill: { find: billFind } }));
 vi.mock('@/models/Document', () => ({ Document: { find: documentFind } }));
 vi.mock('@/models/SpecialDate', () => ({ SpecialDate: { find: specialDateFind } }));
@@ -242,7 +230,6 @@ const DEFAULT_SETTINGS = {
   warrantyAlertDays: 90,
   defaultReturnWindowDays: 0, // 0 = Receipt.find is skipped entirely unless a test overrides it
   trialAlertDays: 2,
-  giftCardAlertDays: 30,
   billAlertDays: 5,
   documentAlertDays: 30,
   specialDateAlertDays: 7,
@@ -266,7 +253,6 @@ beforeEach(() => {
   // Expense.find is called twice in fixed order: hike rows first, budget rows second.
   expenseFind.mockReturnValueOnce(chainSelectLean([])).mockReturnValueOnce(chainSelectLean([]));
   subscriptionFind.mockReturnValue(chainSelectLean([]));
-  giftCardFind.mockReturnValue(chainSelectLean([]));
   billFind.mockReturnValue(chainSelectLean([]));
   documentFind.mockReturnValue(chainSelectLean([]));
   specialDateFind.mockReturnValue(chainSelectLean([]));
@@ -276,8 +262,6 @@ beforeEach(() => {
   computeInstallmentPlansMock.mockImplementation(() => []);
   detectPriceHikesMock.mockImplementation(() => []);
   detectBudgetExceededMock.mockImplementation(() => []);
-  giftCardBalanceMock.mockImplementation(() => 0);
-  giftCardDaysLeftMock.mockImplementation(() => null);
   billDaysUntilDueMock.mockImplementation(() => null);
   generateNotificationsMock.mockImplementation(async () => {});
   dispatchEventWebhooksMock.mockImplementation(async () => ({ sent: 0, total: 0 }));
@@ -681,33 +665,6 @@ describe('runAlertChecks · subscription usage review', () => {
     const result = await runAlertChecks();
     expect(result.summary).toContain('🔎 1 subscription(s) due a usage review: Forgotten TV (255d since confirmation)');
     vi.useRealTimers();
-  });
-});
-
-describe('runAlertChecks · gift cards expiring', () => {
-  it('includes a card with a remaining balance expiring inside the window', async () => {
-    getAppSettingsMock.mockImplementation(async () => ({ ...DEFAULT_SETTINGS, giftCardAlertDays: 30 }));
-    giftCardFind.mockReturnValue(chainSelectLean([{ title: 'IKEA card', initialAmount: 50, uses: [] }]));
-    giftCardBalanceMock.mockImplementation(() => 32);
-    giftCardDaysLeftMock.mockImplementation(() => 10);
-    const result = await runAlertChecks();
-    expect(result.summary).toContain('💳 1 gift card(s) expiring ≤30d: IKEA card (€32, 10d)');
-  });
-
-  it('excludes a card that is already fully spent, even if it is expiring soon', async () => {
-    giftCardFind.mockReturnValue(chainSelectLean([{ title: 'Spent', initialAmount: 50, uses: [{ amount: 50 }] }]));
-    giftCardBalanceMock.mockImplementation(() => 0);
-    giftCardDaysLeftMock.mockImplementation(() => 5);
-    const result = await runAlertChecks();
-    expect(result.summary).toBe('All clear — nothing to report.');
-  });
-
-  it('excludes a card with a balance but no expiry inside the window', async () => {
-    giftCardFind.mockReturnValue(chainSelectLean([{ title: 'Far off', initialAmount: 50, uses: [] }]));
-    giftCardBalanceMock.mockImplementation(() => 50);
-    giftCardDaysLeftMock.mockImplementation(() => null);
-    const result = await runAlertChecks();
-    expect(result.summary).toBe('All clear — nothing to report.');
   });
 });
 

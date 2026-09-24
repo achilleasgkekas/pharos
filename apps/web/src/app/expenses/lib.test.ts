@@ -122,7 +122,8 @@ describe('serializeExpense', () => {
       paymentMethod: 'card',
       notes: 'a note',
       split: [{ name: 'Bob', share: 20, settled: false }],
-      paymentSplits: [{ method: 'IKEA gift card', amount: 30, giftCardId: 'g1' }],
+      // A `giftCardId` stored before gift cards were removed (2026-09-24) is not carried out.
+      paymentSplits: [{ method: 'IKEA gift card', amount: 30 }],
       aiModel: 'claude',
       aiParsedAt: '2026-01-15T10:00:00.000Z',
       verified: true,

@@ -50,7 +50,6 @@ describe('normalizeSettings', () => {
       defaultWarrantyMonths: 24,
       warrantyAlertDays: 90,
       trialAlertDays: 2,
-      giftCardAlertDays: 30,
       billAlertDays: 5,
       documentAlertDays: 30,
       specialDateAlertDays: 7,
@@ -103,24 +102,22 @@ describe('normalizeSettings', () => {
   });
 
   it('numeric fields honour 0 (typeof number) instead of falling back to defaults', () => {
-    const v = normalizeSettings({ defaultWarrantyMonths: 0, warrantyAlertDays: 0, defaultVatRate: 0, trialAlertDays: 0, giftCardAlertDays: 0, billAlertDays: 0, documentAlertDays: 0, specialDateAlertDays: 0 });
+    const v = normalizeSettings({ defaultWarrantyMonths: 0, warrantyAlertDays: 0, defaultVatRate: 0, trialAlertDays: 0, billAlertDays: 0, documentAlertDays: 0, specialDateAlertDays: 0 });
     expect(v.defaultWarrantyMonths).toBe(0);
     expect(v.warrantyAlertDays).toBe(0);
     expect(v.defaultVatRate).toBe(0);
     expect(v.trialAlertDays).toBe(0);
-    expect(v.giftCardAlertDays).toBe(0);
     expect(v.billAlertDays).toBe(0);
     expect(v.documentAlertDays).toBe(0);
     expect(v.specialDateAlertDays).toBe(0);
   });
 
   it('numeric fields use stored values when present', () => {
-    const v = normalizeSettings({ defaultWarrantyMonths: 12, warrantyAlertDays: 30, defaultVatRate: 19, trialAlertDays: 5, giftCardAlertDays: 45, billAlertDays: 7, documentAlertDays: 14, specialDateAlertDays: 3 });
+    const v = normalizeSettings({ defaultWarrantyMonths: 12, warrantyAlertDays: 30, defaultVatRate: 19, trialAlertDays: 5, billAlertDays: 7, documentAlertDays: 14, specialDateAlertDays: 3 });
     expect(v.defaultWarrantyMonths).toBe(12);
     expect(v.warrantyAlertDays).toBe(30);
     expect(v.defaultVatRate).toBe(19);
     expect(v.trialAlertDays).toBe(5);
-    expect(v.giftCardAlertDays).toBe(45);
     expect(v.billAlertDays).toBe(7);
     expect(v.documentAlertDays).toBe(14);
     expect(v.specialDateAlertDays).toBe(3);

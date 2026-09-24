@@ -91,7 +91,7 @@ describe('TOOLS registry', () => {
   it('locks the key mutation tools to a valid record type + id', () => {
     // update_record and delete_record are the only destructive tools; their `type` enum must
     // stay in sync with the modelFor() dispatcher or edits/deletes 404. Widened from
-    // item/task/subscription to the ten user-authored models in P66 — receipts and statements
+    // item/task/subscription to the user-authored models in P66 — receipts and statements
     // stay OUT on purpose (see EDITABLE_MODELS in aiTools.ts: statements have no soft-delete,
     // so "recoverable from Trash" could not be honoured, and both are parsed documents).
     for (const name of ['update_record', 'delete_record']) {
@@ -99,7 +99,7 @@ describe('TOOLS registry', () => {
       expect(tool).toBeDefined();
       const props = tool!.input_schema.properties as Record<string, { enum?: string[] }>;
       expect([...(props.type.enum ?? [])].sort()).toEqual(
-        ['bill', 'expense', 'giftcard', 'goal', 'item', 'loyaltycard', 'shoppinglist', 'subscription', 'task', 'voucher'].sort()
+        ['bill', 'expense', 'goal', 'item', 'shoppinglist', 'subscription', 'task', 'voucher'].sort()
       );
       expect(props.type.enum).not.toContain('statement');
       expect(props.type.enum).not.toContain('receipt');

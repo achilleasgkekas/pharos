@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic';
  * Scheduler entry point for the self-hosted alert engine (P81).
  *
  * The alert scan itself has been shipped for a long time: `runAlertChecks()` covers deals,
- * installments due, warranties, return windows, price hikes, trials, gift cards, bills and
+ * installments due, warranties, return windows, price hikes, trials, bills and
  * exceeded budgets, and fans the summary out to every configured notifier (ntfy / Discord /
  * Slack / Telegram / webhooks) and the in-app bell. What was
  * missing is a way to RUN it without a human: the only call site was the "Check & notify now"
