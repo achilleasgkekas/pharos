@@ -26,7 +26,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (!Object.keys(set).length) return apiError('no valid fields');
     await connectDB();
     const Voucher = await currentModel(VoucherModel);
-    const doc = await Voucher.findByIdAndUpdate(id, { $set: set }, { new: true }).lean();
+    const doc = await Voucher.findByIdAndUpdate(id, { $set: set }, { returnDocument: 'after' }).lean();
     if (!doc) return apiError('not found', 404);
     // Spec: PATCH returns { voucher: Voucher } (the updated doc), same trim as the list route.
     return NextResponse.json({ voucher: trim(doc as VoucherLean) });
@@ -40,7 +40,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     if (!isObjectId(id)) return apiError('bad id');
     await connectDB();
     const Voucher = await currentModel(VoucherModel);
-    const doc = await Voucher.findByIdAndUpdate(id, { $set: { deletedAt: new Date() } }, { new: true }).lean();
+    const doc = await Voucher.findByIdAndUpdate(id, { $set: { deletedAt: new Date() } }, { returnDocument: 'after' }).lean();
     if (!doc) return apiError('not found', 404);
     return NextResponse.json({ ok: true, id });
   });

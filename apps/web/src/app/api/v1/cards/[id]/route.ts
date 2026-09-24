@@ -20,7 +20,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (!Object.keys(set).length) return apiError('no valid fields');
     await connectDB();
     const Card = await currentModel(CardModel);
-    const doc = await Card.findByIdAndUpdate(id, { $set: set }, { new: true }).lean();
+    const doc = await Card.findByIdAndUpdate(id, { $set: set }, { returnDocument: 'after' }).lean();
     if (!doc) return apiError('not found', 404);
     return NextResponse.json({ ok: true, id });
   });

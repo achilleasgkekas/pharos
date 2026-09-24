@@ -68,7 +68,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
 
     if (!Object.keys(set).length) return apiError('no valid fields');
-    const doc = await Expense.findByIdAndUpdate(id, { $set: set }, { new: true }).lean();
+    const doc = await Expense.findByIdAndUpdate(id, { $set: set }, { returnDocument: 'after' }).lean();
     if (!doc) return apiError('not found', 404);
     // Spec: PATCH returns { expense: Expense } (the updated doc), same shape as the list/rescan trim.
     return NextResponse.json({ expense: trimExpense(doc as ExpenseLean) });
@@ -82,7 +82,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     if (!isObjectId(id)) return apiError('bad id');
     await connectDB();
     const Expense = await currentModel(ExpenseModel);
-    const doc = await Expense.findByIdAndUpdate(id, { $set: { deletedAt: new Date() } }, { new: true }).lean();
+    const doc = await Expense.findByIdAndUpdate(id, { $set: { deletedAt: new Date() } }, { returnDocument: 'after' }).lean();
     if (!doc) return apiError('not found', 404);
     // Same as the web delete (#104): a trashed expense no longer spends gift-card credit.
     await syncGiftCardUses(id, [], new Date(), '');

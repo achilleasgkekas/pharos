@@ -86,13 +86,13 @@ export async function dispatchWebPush(title: string, message: string): Promise<{
     if (subs.length === 0) return { sent: 0, total: 0 };
 
     const payload = JSON.stringify({ title, body: message });
-    const expired: unknown[] = [];
+    const expired: string[] = [];
     let sent = 0;
 
     await Promise.all(
       subs.map(async (s) => {
         if (!s.endpoint || !s.keys?.p256dh || !s.keys?.auth) {
-          expired.push(s._id); // malformed row — clear it out
+          expired.push(String(s._id)); // malformed row — clear it out
           return;
         }
         try {
@@ -105,7 +105,7 @@ export async function dispatchWebPush(title: string, message: string): Promise<{
         } catch (err) {
           const status = (err as { statusCode?: number }).statusCode;
           // 404 = endpoint gone, 410 = subscription expired/unsubscribed → prune.
-          if (status === 404 || status === 410) expired.push(s._id);
+          if (status === 404 || status === 410) expired.push(String(s._id));
           // Any other error (transient push-service hiccup) is left alone for next time.
         }
       })

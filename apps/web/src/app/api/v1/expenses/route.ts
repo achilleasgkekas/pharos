@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
     // P9: `amount` above is the printed figure; this is where it becomes base currency.
     const fx = resolveFx({ amount, currency: strField(b, 'currency'), fxRate: numField(b, 'fxRate') ?? 0 }, settings.currency);
     const doc = await Expense.create({
-      kind: enumField(b, 'kind', ['income', 'expense'], 'expense'),
+      kind: enumField(b, 'kind', ['income', 'expense'] as const, 'expense'),
       vendor,
       vendorKey: vendorKey(vendor),
       category,

@@ -1,6 +1,7 @@
 'use server';
 import { connectDB } from '@/lib/db';
-import { Expense as ExpenseModel } from '@/models/Expense';
+import { Expense as ExpenseModel, type ExpenseDoc } from '@/models/Expense';
+import type { AnyBulkWriteOperation } from 'mongoose';
 import { withRequestTenant } from '@/lib/tenancy/request';
 import { currentModel } from '@/lib/tenancy/connection';
 import { saveFile, deleteFile } from '@/lib/storage';
@@ -715,11 +716,11 @@ export async function applyCategoryRulesToExisting(): Promise<{ ok: boolean; upd
       const rows = await Expense.find({ $or: [{ category: 'other' }, { category: '' }, { category: { $exists: false } }] })
         .select('vendor notes category recurring recurringCycle')
         .lean();
-      const ops: Array<{ updateOne: { filter: { _id: unknown }; update: { $set: Record<string, unknown> } } }> = [];
+      const ops: AnyBulkWriteOperation<ExpenseDoc>[] = [];
       for (const r of rows) {
         const rule = matchCategoryRule(rules, { vendor: r.vendor, description: r.notes });
         if (!rule || rule.category === r.category) continue;
-        const set: Record<string, unknown> = { category: rule.category };
+        const set: Partial<Pick<ExpenseDoc, 'category' | 'recurring' | 'recurringCycle'>> = { category: rule.category };
         if (rule.recurring && !r.recurring) {
           set.recurring = true;
           if (rule.recurringCycle) set.recurringCycle = rule.recurringCycle;

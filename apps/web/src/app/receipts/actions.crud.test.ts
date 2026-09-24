@@ -128,7 +128,7 @@ describe('updateReceipt', () => {
     expect(update.verified).toBe(false);
     expect(update.date).toBeInstanceOf(Date);
     expect(localYmd(update.date as Date)).toBe('2026-06-15'); // EU day-first parsed
-    expect(opts).toEqual({ new: true, select: 'store date total filePath verified' });
+    expect(opts).toEqual({ returnDocument: 'after', select: 'store date total filePath verified' });
     expect(revalidatePathMock).toHaveBeenCalledWith('/receipts');
   });
 
@@ -196,7 +196,7 @@ describe('quickVerifyReceipt', () => {
     expect(update.$set.vatAmount).toBe(0);
     expect(update.$set.verified).toBe(true);
     expect(update.$set.date).toBeInstanceOf(Date);
-    expect(opts).toEqual({ new: true, select: 'store date total filePath verified' });
+    expect(opts).toEqual({ returnDocument: 'after', select: 'store date total filePath verified' });
     expect(revalidatePathMock).toHaveBeenCalledWith('/receipts');
   });
 

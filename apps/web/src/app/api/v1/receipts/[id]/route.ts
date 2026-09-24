@@ -135,7 +135,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         set.lineItems = printedLines.map((l, i) => ({ ...l, price: money.linePrices[i] }));
       }
     }
-    const doc = await Receipt.findByIdAndUpdate(id, { $set: set }, { new: true }).select('-rawAiResponse').lean();
+    const doc = await Receipt.findByIdAndUpdate(id, { $set: set }, { returnDocument: 'after' }).select('-rawAiResponse').lean();
     if (!doc) return apiError('not found', 404);
     return NextResponse.json({ ok: true, receipt: trimReceipt(doc as Parameters<typeof trimReceipt>[0]) });
   });

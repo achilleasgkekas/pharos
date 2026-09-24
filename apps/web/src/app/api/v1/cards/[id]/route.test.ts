@@ -8,8 +8,8 @@ import type { NextRequest } from 'next/server';
 //   - the Bearer-auth gate (withAuth → 401 without a valid token, no DB touch),
 //   - the isObjectId id guard (malformed id → 400 'bad id', never issues a write),
 //   - PATCH: partial-mode cardFieldsFromBody (name NOT required, unlike POST); an empty $set →
-//     apiError('no valid fields'); a valid $set → findByIdAndUpdate(id, {$set}, {new:true}) and a
-//     bare { ok:true, id } response; 404 when the doc is missing. The active toggle is the key
+//     apiError('no valid fields'); a valid $set → findByIdAndUpdate with the updated-document
+//     option and a bare { ok:true, id } response; 404 when the doc is missing. The active toggle is
 //     divergence from POST: here { active:false } is a legitimate write (partial mode keeps it),
 //     whereas POST force-spreads active:true.
 //   - DELETE: a HARD removal via findByIdAndDelete (cards are NOT soft-deleted, mirrors web
@@ -136,14 +136,14 @@ describe('PATCH', () => {
     expect(updateState.calls[0].update).toEqual({ $set: { last4: '4321' } });
   });
 
-  it('updates via findByIdAndUpdate with $set, {new:true}, and returns { ok, id }', async () => {
+  it('updates via findByIdAndUpdate with $set and returns { ok, id }', async () => {
     const res = await PATCH(makeReq({ body: { name: '  Εθνική  ', creditLimit: '5000', type: 'mastercard' } }), ctx(OID));
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ok: true, id: OID });
     const { id, update, opts } = updateState.calls[0];
     expect(id).toBe(OID);
     expect(update).toEqual({ $set: { name: 'Εθνική', creditLimit: 5000, type: 'mastercard' } });
-    expect(opts).toEqual({ new: true });
+    expect(opts).toEqual({ returnDocument: 'after' });
   });
 
   it('toggles the card off: { active:false } is a legitimate partial write (unlike POST)', async () => {

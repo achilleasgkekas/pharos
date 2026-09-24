@@ -32,7 +32,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (!Object.keys(set).length) return apiError('no valid fields');
     await connectDB();
     const Task = await currentModel(TaskModel);
-    const doc = await Task.findByIdAndUpdate(id, { $set: set }, { new: true }).lean();
+    const doc = await Task.findByIdAndUpdate(id, { $set: set }, { returnDocument: 'after' }).lean();
     if (!doc) return apiError('not found', 404);
     const t = doc as { _id: unknown; title: string; status?: string; priority?: string; tags?: string[]; steps?: Array<{ _id?: unknown; text?: string; done?: boolean }>; dueDate?: Date | null; completedAt?: Date | null; updatedAt?: Date };
     return NextResponse.json({
@@ -48,7 +48,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     if (!isObjectId(id)) return apiError('bad id');
     await connectDB();
     const Task = await currentModel(TaskModel);
-    const doc = await Task.findByIdAndUpdate(id, { $set: { deletedAt: new Date() } }, { new: true }).lean();
+    const doc = await Task.findByIdAndUpdate(id, { $set: { deletedAt: new Date() } }, { returnDocument: 'after' }).lean();
     if (!doc) return apiError('not found', 404);
     return NextResponse.json({ ok: true, id });
   });

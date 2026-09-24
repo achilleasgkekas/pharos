@@ -16,7 +16,6 @@ import { trim, type SubLean } from './serialize';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const CYCLES: readonly string[] = BILLING_CYCLES;
 
 /**
  * Deterministic auto-discovery of untracked recurring charges (P7), mirrors the
@@ -104,7 +103,7 @@ export async function POST(req: NextRequest) {
       currency: fx.currency,
       origAmount: fx.origAmount,
       fxRate: fx.fxRate,
-      billingCycle: enumField(b, 'billingCycle', CYCLES, 'monthly'),
+      billingCycle: enumField(b, 'billingCycle', BILLING_CYCLES, 'monthly'),
       startDate,
       nextRenewal: b.nextRenewal ? new Date(String(b.nextRenewal)) : startDate,
       paymentMethod: strField(b, 'paymentMethod'),

@@ -20,40 +20,44 @@ function fakeQuery(options: Record<string, unknown>) {
 describe('hideDeleted', () => {
   it('narrows to non-trashed docs when withDeleted is absent', () => {
     const { self, where } = fakeQuery({});
-    const next = vi.fn();
-    hideDeleted.call(self, next);
+    hideDeleted.call(self);
     expect(where).toHaveBeenCalledTimes(1);
     expect(where).toHaveBeenCalledWith({ deletedAt: null });
-    expect(next).toHaveBeenCalledTimes(1);
   });
 
   it('narrows when withDeleted is explicitly false', () => {
     const { self, where } = fakeQuery({ withDeleted: false });
-    hideDeleted.call(self, vi.fn());
+    hideDeleted.call(self);
     expect(where).toHaveBeenCalledWith({ deletedAt: null });
   });
 
   it('narrows when withDeleted is undefined (opt-in must be truthy)', () => {
     const { self, where } = fakeQuery({ withDeleted: undefined });
-    hideDeleted.call(self, vi.fn());
+    hideDeleted.call(self);
     expect(where).toHaveBeenCalledTimes(1);
   });
 
   it('does NOT narrow when withDeleted is true (Trash opt-out)', () => {
     const { self, where } = fakeQuery({ withDeleted: true });
-    const next = vi.fn();
-    hideDeleted.call(self, next);
+    hideDeleted.call(self);
     expect(where).not.toHaveBeenCalled();
-    expect(next).toHaveBeenCalledTimes(1);
   });
 
-  it('always calls next() so the query proceeds (both branches)', () => {
-    const on = vi.fn();
-    hideDeleted.call(fakeQuery({}).self, on);
-    expect(on).toHaveBeenCalledTimes(1);
-    const off = vi.fn();
-    hideDeleted.call(fakeQuery({ withDeleted: true }).self, off);
-    expect(off).toHaveBeenCalledTimes(1);
+  // Mongoose 9 stopped passing `next` to pre middleware. The hook used to take `next` and call
+  // it, and every test above called it by hand WITH a `next` — so they kept passing while, in the
+  // real app, every find/count/update on every soft-deletable model threw `next is not a function`.
+  // This one lets Mongoose itself invoke the hook, the only way to hold that contract.
+  it('runs as REAL Mongoose invokes it: the query reaches the database step, filtered', async () => {
+    const { model } = await import('mongoose');
+    // bufferCommands off, so exec() fails immediately at the (absent) connection — AFTER the
+    // pre hooks have run. Scoped to this schema so nothing else in the suite is affected.
+    const schema = new Schema({ name: String }, { bufferCommands: false });
+    schema.plugin(softDeletePlugin);
+    const Probe = model(`SoftDeleteProbe${Date.now()}`, schema);
+    const q = Probe.find({ name: 'x' });
+    const err = await q.exec().then(() => null, (e: Error) => e);
+    expect(err?.message ?? '').not.toMatch(/next is not a function/i);
+    expect(q.getFilter()).toMatchObject({ name: 'x', deletedAt: null });
   });
 });
 
