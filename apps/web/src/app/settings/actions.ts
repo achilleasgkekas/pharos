@@ -1,5 +1,6 @@
 'use server';
 import { cur } from "@/lib/money";
+import { WARRANTY_ALERT_STATUSES } from '@/lib/itemStatus';
 import { connectDB } from '@/lib/db';
 import { AppConfig } from '@/models/AppConfig';
 import { Store } from '@/models/Store';
@@ -626,7 +627,7 @@ export async function runAlertChecks(opts: { dedupe?: boolean } = {}): Promise<{
     return lo != null && lo <= (i.targetPrice ?? 0);
   });
 
-  const warrantyItems = (await (await scoped(Item)).find({ warrantyUntil: { $ne: null } }).select('title warrantyUntil').lean()) as Array<{
+  const warrantyItems = (await (await scoped(Item)).find({ warrantyUntil: { $ne: null }, status: { $in: [...WARRANTY_ALERT_STATUSES] } }).select('title warrantyUntil').lean()) as Array<{
     _id: unknown;
     title: string;
     warrantyUntil?: string | Date | null;

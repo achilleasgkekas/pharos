@@ -1,4 +1,5 @@
 import { connectDB } from '@/lib/db';
+import { WARRANTY_ALERT_STATUSES } from '@/lib/itemStatus';
 import { addCycle, cycleRenews } from '@/lib/billingCycle';
 import { renewalOnOrAfter } from '@/lib/subscriptionRenewal';
 import { Subscription as SubscriptionModel } from '@/models/Subscription';
@@ -46,7 +47,7 @@ async function getAgenda(t: TFunc, intlTag: string): Promise<{ months: MonthBloc
   const [subs, statements, items, vouchers, recurring, bills, goals] = await Promise.all([
     Subscription.find({ active: true, nextRenewal: { $ne: null }, deletedAt: null }).select('name amount billingCycle nextRenewal').lean(),
     Statement.find({ deletedAt: null }).lean(),
-    Item.find({ warrantyUntil: { $gte: windowStart, $lt: windowEnd }, status: { $nin: ['sold', 'broken', 'deferred'] }, deletedAt: null }).select('title warrantyUntil').lean(),
+    Item.find({ warrantyUntil: { $gte: windowStart, $lt: windowEnd }, status: { $in: [...WARRANTY_ALERT_STATUSES] }, deletedAt: null }).select('title warrantyUntil').lean(),
     Voucher.find({ used: false, expiresAt: { $gte: windowStart, $lt: windowEnd }, deletedAt: null }).select('title store discount expiresAt').lean(),
     Expense.find({ recurring: true, recurringCycle: { $nin: ['', null] }, amount: { $gt: 0 }, deletedAt: null })
       .sort({ date: -1 })

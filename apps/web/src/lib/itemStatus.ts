@@ -5,6 +5,16 @@
 export const OWNED_STATUSES = ['received', 'installed', 'sold', 'broken'] as const;
 export const SHOPPING_STATUSES = ['researching', 'decided', 'ordered', 'deferred'] as const;
 
+/**
+ * Items whose warranty is still worth being told about: things you HAVE. A sold or broken item's
+ * warranty expiring is not news, and a shopping-list entry has no warranty yet.
+ *
+ * One list, because three surfaces announce warranties — the calendar/agenda, the in-app bell and
+ * the outbound push — and they must agree. When only the calendar learned to skip sold items, the
+ * other two kept firing for them; this is the same drift #254 closed for prices.
+ */
+export const WARRANTY_ALERT_STATUSES = ['received', 'installed'] as const;
+
 export type ItemView = 'inventory' | 'shopping';
 
 export function statusesFor(view: ItemView): readonly string[] {
