@@ -205,16 +205,27 @@ export function StatementsClient({
     return [...map.entries()];
   }, [visible]);
 
-  // Installment plans across all statements (for per-product payoff)
-  const plans = useMemo(() => computeInstallmentPlans(visible), [visible]);
+  // Installment plans across ALL statements (for per-product payoff) — the comment was already
+  // saying "all" while the code had started passing the card-filtered set. This is a summary of
+  // what is still owed per product, the same family of figure as `balances` below, so a card
+  // filter must not quietly shrink it.
+  const plans = useMemo(() => computeInstallmentPlans(statements), [statements]);
   const itemMap = useMemo(() => new Map(items.map((i) => [i._id, i])), [items]);
 
-  const balances = useMemo(() => cardBalanceSummary(visible), [visible]);
-  const paymentReport = useMemo(() => buildStatementPaymentReport(visible,
-    new Map(items.map(i => [i._id, i.title])), new Date(), 6), [visible, items]);
-  // P84: how much of each card's limit that same balance is using. Same source of
-  // truth as `balance` above (latest statement per card), so the badge can never
-  // contradict the outstanding figure printed next to it.
+  // ALL statements, not `visible`: this is the headline "what do I owe", and the control next
+  // to it filters WHICH CARD you are browsing. Deriving it from the filtered set made the
+  // figure shrink when you picked a card — a smaller number, with no label saying it now
+  // describes one card, sitting exactly where the total used to be.
+  const balances = useMemo(() => cardBalanceSummary(statements), [statements]);
+  // Also all statements: the report draws payment history and the forecast of known
+  // commitments, and it carries its OWN card selector. Handing it a pre-filtered set left that
+  // selector with a single option and silently dropped the other cards from the forecast.
+  const paymentReport = useMemo(() => buildStatementPaymentReport(statements,
+    new Map(items.map(i => [i._id, i.title])), new Date(), 6), [statements, items]);
+  // P84: how much of each card's limit that card's balance is using. Same rule as
+  // `balances` above — the latest statement per card — so the badge can never contradict the
+  // figure printed next to it. Keyed by card, so narrowing to one card changes which badges
+  // are drawn, never what any one of them says.
   const utilization = useMemo(() => buildCardUtilization(cards, visible), [cards, visible]);
   const active = activeId ? statements.find((s) => s._id === activeId) ?? null : null;
 
