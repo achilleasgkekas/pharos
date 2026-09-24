@@ -27,9 +27,20 @@ export function Modal({ open, onClose, title, children, size = 'md' }: ModalProp
     <Dialog.Root open={open} onOpenChange={(v) => !v && onClose()}>
       <Dialog.Portal>
         <Dialog.Overlay className={cn('fixed inset-0 z-50', isFull ? 'bg-[color:var(--color-bg)]' : 'bg-black/70')} />
+        {/* Horizontal overflow is shut three ways, because on a phone every modal was sideways-
+            scrollable (measured at 375px: 373px wide, 478px of content, 105px of sideways travel).
+            Nobody asked for that — `overflow-y-auto` alone makes the browser compute overflow-x
+            as `auto` too, so any child wider than the screen turned the whole sheet into a
+            horizontal scroller, which on iOS reads as the PAGE sliding left and right. It showed
+            up on every page that opens a modal, because they all open this one.
+              - overflow-x-hidden: the sheet is no longer a horizontal scroll container;
+              - touch-pan-y touch-pinch-zoom: iOS may only pan it vertically — pinch-zoom kept,
+                since receipts and photos open in here;
+              - overflow-wrap:anywhere on the body: long unbroken text (URLs, file names) wraps
+                instead of being the one thing that is wider than the screen. */}
         <Dialog.Content
           className={cn(
-            'fixed z-50 bg-[color:var(--color-surface)] outline-none overflow-y-auto overscroll-contain max-w-full',
+            'fixed z-50 bg-[color:var(--color-surface)] outline-none overflow-y-auto overflow-x-hidden overscroll-contain max-w-full touch-pan-y touch-pinch-zoom',
             isFull
               ? 'inset-0 bg-[color:var(--color-bg)]'
               : cn(
@@ -61,7 +72,7 @@ export function Modal({ open, onClose, title, children, size = 'md' }: ModalProp
                   )}
                 </div>
               </div>
-              <div className="max-w-[1000px] mx-auto px-4 py-6">{children}</div>
+              <div className="min-w-0 max-w-[1000px] mx-auto px-4 py-6 [overflow-wrap:anywhere]">{children}</div>
             </>
           ) : (
             <>
@@ -78,7 +89,7 @@ export function Modal({ open, onClose, title, children, size = 'md' }: ModalProp
                   </button>
                 </div>
               )}
-              <div className="px-4 py-5 md:px-6">{children}</div>
+              <div className="min-w-0 px-4 py-5 md:px-6 [overflow-wrap:anywhere]">{children}</div>
             </>
           )}
         </Dialog.Content>
