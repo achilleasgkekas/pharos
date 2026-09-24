@@ -1,6 +1,6 @@
 'use client';
 import { cur, currencySymbol, CURRENCIES } from '@/lib/money';
-import { isForeignCurrency, normalizeCurrency, convertToBase, deriveFxRate } from '@/lib/fx';
+import { isForeignCurrency, normalizeCurrency, convertToBase, deriveFxRate, needsFxRate } from '@/lib/fx';
 import { FxBadge } from '@/components/FxBadge';
 import { FxRateButton } from '@/components/FxRateButton';
 import { useState, useTransition, useRef, useMemo } from 'react';
@@ -109,8 +109,12 @@ export function ExpensesClient({ kind, expenses, cards, giftCards, vendors, olla
 
   const now = new Date();
   const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  const monthTotal = expenses.filter((e) => (e.period || e.date.slice(0, 7)) === monthKey).reduce((s, e) => s + (e.amount || 0), 0);
-  const yearTotal = expenses.filter((e) => e.date.slice(0, 4) === String(now.getFullYear())).reduce((s, e) => s + (e.amount || 0), 0);
+  const monthExps = expenses.filter((e) => (e.period || e.date.slice(0, 7)) === monthKey);
+  const monthTotal = monthExps.filter(e => !needsFxRate(e, fx.base)).reduce((s, e) => s + (e.amount || 0), 0);
+  const monthMissingRate = monthExps.length - monthExps.filter(e => !needsFxRate(e, fx.base)).length;
+  const yearExps = expenses.filter((e) => e.date.slice(0, 4) === String(now.getFullYear()));
+  const yearTotal = yearExps.filter(e => !needsFxRate(e, fx.base)).reduce((s, e) => s + (e.amount || 0), 0);
+  const yearMissingRate = yearExps.length - yearExps.filter(e => !needsFxRate(e, fx.base)).length;
 
   const failed = useMemo(() => expenses.filter((e) => statusOf(e) === 'failed' && e.filePath), [expenses]);
   const seriesCount = useMemo(() => {
@@ -302,10 +306,12 @@ export function ExpensesClient({ kind, expenses, cards, giftCards, vendors, olla
         <div className="rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-4">
           <p className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)] mb-1" style={{ fontFamily: 'var(--font-mono)' }}>{t('ex.thisMonth')}</p>
           <p className={cn('text-2xl font-bold', isIncome ? 'text-[color:var(--color-accent)]' : 'text-[color:var(--color-gold)]')} style={{ fontFamily: 'var(--font-display)' }}>{money(monthTotal)}</p>
+          {monthMissingRate > 0 && <p className="text-xs text-[color:var(--color-gold)] mt-1 flex items-center gap-1" style={{ fontFamily: 'var(--font-mono)' }} title={t('reports.fxMissing', { n: monthMissingRate })}><AlertTriangle size={12} /> {monthMissingRate}</p>}
         </div>
         <div className="rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-4">
           <p className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)] mb-1" style={{ fontFamily: 'var(--font-mono)' }}>{t('ex.thisYear')}</p>
           <p className="text-2xl font-bold" style={{ fontFamily: 'var(--font-display)' }}>{money(yearTotal)}</p>
+          {yearMissingRate > 0 && <p className="text-xs text-[color:var(--color-gold)] mt-1 flex items-center gap-1" style={{ fontFamily: 'var(--font-mono)' }} title={t('reports.fxMissing', { n: yearMissingRate })}><AlertTriangle size={12} /> {yearMissingRate}</p>}
         </div>
       </div>
 

@@ -741,6 +741,15 @@ describe('logBillPayment', () => {
     expect(localYmd(update.paidAt)).toBe('2026-07-20');
   });
 
+  it('a foreign bill without an exchange rate is not auto-settled by payments', async () => {
+    billFindById
+      .mockResolvedValueOnce({ _id: 'b1', title: 'AWS', amount: 100, currency: 'USD', origAmount: 100, fxRate: 0, paidAt: null, payments: [] })
+      .mockResolvedValueOnce({ _id: 'b1', amount: 100, currency: 'USD', origAmount: 100, fxRate: 0, paidAt: null, payments: [{ amount: 100 }] });
+    const res = await logBillPayment('b1', { amount: 100, date: '05/07/2026' });
+    expect(res).toEqual({ ok: true, settled: false });
+    expect(billFindByIdAndUpdate).not.toHaveBeenCalled();
+  });
+
   it('the settling call never double-books an expense for the final instalment', async () => {
     billFindById
       .mockResolvedValueOnce({ _id: 'b1', title: 'Κοινόχρηστα', vendor: 'ΔΕΗ', amount: 100, category: 'utilities', paidAt: null, payments: [] })
@@ -826,6 +835,14 @@ describe('removeBillPayment', () => {
     const res = await removeBillPayment('b1', 'p1');
     expect(res).toEqual({ ok: true });
     expect(billUpdateOne.mock.calls[0][1]).toEqual({ $pull: { payments: { _id: 'p1' } } });
+  });
+
+  it('never rolls back a settlement for a foreign bill without a rate, because it could never auto-settle', async () => {
+    billFindById
+      .mockResolvedValueOnce({ _id: 'b1', amount: 300, currency: 'USD', origAmount: 300, fxRate: 0, paidAt: new Date(), payments: [{ amount: 300 }] })
+      .mockResolvedValueOnce({ _id: 'b1', amount: 300, currency: 'USD', origAmount: 300, fxRate: 0, paidAt: new Date(), payments: [] });
+    await removeBillPayment('b1', 'p1');
+    expect(billUpdateOne).toHaveBeenCalledTimes(1); // pull only
   });
 
   it('rolls back an automatic settlement when the remaining instalments no longer cover the bill', async () => {

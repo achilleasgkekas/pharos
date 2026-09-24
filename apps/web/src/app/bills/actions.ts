@@ -9,7 +9,7 @@ import { safeDateOrNull } from '@/lib/dates';
 import { spawnNextBillOnce } from '@/lib/billRecurrence';
 import { addExpense } from '@/app/expenses/actions';
 import { getAppSettings } from '@/lib/appSettings';
-import { resolveFx } from '@/lib/fx';
+import { resolveFx, needsFxRate } from '@/lib/fx';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { assertCanWrite } from '@/lib/auth';
@@ -101,7 +101,8 @@ export async function updateBill(id: string, formData: FormData): Promise<{ ok: 
     // Deliberately one-way: RAISING the amount never reopens a paid bill, because a bill
     // settled with "mark paid" on top of instalments looks identical here and must stay paid.
     const after = await Bill.findById(id).lean();
-    if (after && !after.paidAt && billIsSettledByPayments(after.amount, after.payments)) {
+    const baseCurr = (await getAppSettings()).currency;
+    if (after && !after.paidAt && !needsFxRate(after, baseCurr) && billIsSettledByPayments(after.amount, after.payments)) {
       const lastPaid = Math.max(...(after.payments ?? []).map((p) => new Date(p.date ?? 0).getTime() || 0));
       await markBillPaid(id, { logExpense: false, paidDate: lastPaid > 0 ? new Date(lastPaid).toISOString() : '' });
     }
@@ -291,7 +292,8 @@ export async function logBillPayment(
     );
 
     const after = await Bill.findById(id).lean();
-    const settled = !!after && billIsSettledByPayments(after.amount, after.payments);
+    const baseCurr = (await getAppSettings()).currency;
+    const settled = !!after && !needsFxRate(after, baseCurr) && billIsSettledByPayments(after.amount, after.payments);
     revalidatePath('/bills');
     return { ok: true as const, settled, paidOn: settled ? paidOn.toISOString() : '' };
   });
@@ -322,7 +324,8 @@ export async function removeBillPayment(id: string, paymentId: string): Promise<
     // thing that distinguishes the two ways a bill gets a `paidAt`: an automatic settlement, which
     // this function is allowed to roll back, and a deliberate "Mark paid" click, which it is not —
     // removing a stray instalment must never quietly un-pay a bill the user said was paid.
-    const wasSettledByPayments = billIsSettledByPayments(bill.amount, bill.payments);
+    const baseCurr = (await getAppSettings()).currency;
+    const wasSettledByPayments = !needsFxRate(bill, baseCurr) && billIsSettledByPayments(bill.amount, bill.payments);
 
     await Bill.updateOne({ _id: id }, { $pull: { payments: { _id: paymentId } } });
 
@@ -332,7 +335,7 @@ export async function removeBillPayment(id: string, paymentId: string): Promise<
     // condition failed, and the bill stayed marked paid with nothing paid against it — the exact
     // opposite of what this function's own comment promises (#203).
     const after = await Bill.findById(id).lean();
-    if (after?.paidAt && wasSettledByPayments && !billIsSettledByPayments(after.amount, after.payments)) {
+    if (after?.paidAt && wasSettledByPayments && (!after || needsFxRate(after, baseCurr) || !billIsSettledByPayments(after.amount, after.payments))) {
       await Bill.updateOne({ _id: id }, { $set: { paidAt: null } });
     }
     revalidatePath('/bills');
