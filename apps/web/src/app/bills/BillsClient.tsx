@@ -603,6 +603,7 @@ function PartialPaymentForm({
   onDone: () => void;
 }) {
   const [pending, startTransition] = useTransition();
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [amount, setAmount] = useState('');
   // `ymd`, not `toISOString().slice(0, 10)`: the latter is UTC, so in Athens every payment
   // logged before 03:00 defaulted to YESTERDAY. This runs in the browser, where the local
@@ -613,11 +614,22 @@ function PartialPaymentForm({
   const label = 'block text-[11px] uppercase tracking-[0.1em] text-[color:var(--color-text-faint)] mb-1';
 
   const submit = () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     setError('');
+    const paymentId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : undefined;
     startTransition(async () => {
-      const r = await logBillPayment(billId, { amount: Number(amount) || 0, date, note, logExpense });
-      if (r.ok) onDone();
-      else setError(r.error || 'Could not log the payment');
+      try {
+        const r = await logBillPayment(billId, { paymentId, amount: Number(amount) || 0, date, note, logExpense });
+        if (r.ok) onDone();
+        else {
+          setError(r.error || 'Could not log the payment');
+          setIsSubmitting(false);
+        }
+      } catch (err) {
+        setError((err as Error).message || 'Could not log payment');
+        setIsSubmitting(false);
+      }
     });
   };
 
@@ -644,7 +656,7 @@ function PartialPaymentForm({
       )}
       {error && <p className="text-xs text-[color:var(--color-red)]">{error}</p>}
       <div className="flex items-center gap-2">
-        <Button type="button" variant="primary" disabled={pending || !(Number(amount) > 0)} onClick={submit}>
+        <Button type="button" variant="primary" disabled={pending || isSubmitting || !(Number(amount) > 0)} onClick={submit}>
           <Coins size={14} /> Log payment
         </Button>
         <p className="text-[11px] text-[color:var(--color-text-faint)]">

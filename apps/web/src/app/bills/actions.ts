@@ -1,4 +1,6 @@
 'use server';
+import { Types } from 'mongoose';
+import { createHash } from 'node:crypto';
 import { connectDB } from '@/lib/db';
 import { RECURRING_CYCLE_VALUES } from '@/lib/billingCycle';
 import { Bill as BillModel } from '@/models/Bill';
@@ -60,6 +62,14 @@ async function resolveBillFx(raw: { amount: number; currency: string; fxRate: nu
 /** The printed figure behind a stored bill: what a person reads off the paper. */
 function printedAmount(bill: { amount?: number | null; origAmount?: number | null }): number {
   return (Number(bill.origAmount) || 0) > 0 ? Number(bill.origAmount) : Number(bill.amount) || 0;
+}
+
+export function billPaidExpenseId(billId: unknown): string {
+  return createHash('sha256').update(`bill-paid-expense:${String(billId)}`).digest('hex').slice(0, 24);
+}
+
+export function billPaymentExpenseId(paymentId: unknown): string {
+  return createHash('sha256').update(`bill-payment-expense:${String(paymentId)}`).digest('hex').slice(0, 24);
 }
 
 export async function createBill(formData: FormData): Promise<{ ok: boolean; error?: string }> {
@@ -168,7 +178,9 @@ export async function markBillPaid(
 
   let linkedExpenseId = bill.linkedExpenseId || '';
   if (opts?.logExpense && !wasPaid && !linkedExpenseId && partlyPaid && owed > 0) {
+    const expId = billPaidExpenseId(id);
     const res = await addExpense({
+      _id: expId,
       kind: 'expense',
       vendor: bill.vendor || bill.title,
       category: bill.category || 'other',
@@ -183,7 +195,9 @@ export async function markBillPaid(
     // addExpense opens its OWN withRequestTenant, which re-resolves to the same context we are
     // already inside (the wrapper is re-entrant and host-derived), so the logged expense lands
     // in the same tenant DB as the bill. Nothing extra needs threading through.
+    const expId = billPaidExpenseId(id);
     const res = await addExpense({
+      _id: expId,
       kind: 'expense',
       vendor: bill.vendor || bill.title,
       category: bill.category || 'other',
@@ -230,6 +244,7 @@ export async function markBillUnpaid(id: string): Promise<{ ok: boolean }> {
 // ---------------------------------------------------------------------------
 
 const PaymentSchema = z.object({
+  paymentId: z.string().optional(),
   amount: z.coerce.number().positive('Payment amount must be greater than zero'),
   date: z.string().default(''),
   note: z.string().default(''),
@@ -250,7 +265,7 @@ const PaymentSchema = z.object({
  */
 export async function logBillPayment(
   id: string,
-  data: { amount: number; date?: string; note?: string; logExpense?: boolean }
+  data: { paymentId?: string; amount: number; date?: string; note?: string; logExpense?: boolean }
 ): Promise<{ ok: boolean; error?: string; settled?: boolean }> {
   await assertCanWrite();
   const parsed = PaymentSchema.safeParse(data);
@@ -265,14 +280,17 @@ export async function logBillPayment(
     if (bill.paidAt) return { ok: false as const, error: 'Bill is already paid' };
 
     const paidOn = safeDateOrNull(p.date) ?? new Date();
+    const paymentId = p.paymentId || new Types.ObjectId().toString();
 
     let expenseId = '';
     if (p.logExpense) {
+      const expId = billPaymentExpenseId(paymentId);
       // Instalments are stored base-denominated, so this is the plain single-currency
       // case: no currency/fxRate is handed over, and addExpense's own resolveFx passes
       // it straight through. Passing the bill's rate here would convert an already
       // converted figure a second time.
       const res = await addExpense({
+        _id: expId,
         kind: 'expense',
         vendor: bill.vendor || bill.title,
         category: bill.category || 'other',
@@ -287,7 +305,7 @@ export async function logBillPayment(
 
     await Bill.updateOne(
       { _id: id },
-      { $push: { payments: { amount: p.amount, date: paidOn, note: p.note, expenseId } } }
+      { $push: { payments: { _id: paymentId, amount: p.amount, date: paidOn, note: p.note, expenseId } } }
     );
 
     const after = await Bill.findById(id).lean();

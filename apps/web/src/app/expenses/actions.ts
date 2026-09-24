@@ -295,6 +295,7 @@ export async function uploadExpense(formData: FormData): Promise<UploadExpenseRe
 }
 
 const UpdateSchema = z.object({
+  _id: z.string().optional(),
   kind: z.enum(['income', 'expense']).default('expense'),
   vendor: z.string().default(''),
   category: z.string().default('other'),
@@ -410,6 +411,7 @@ export async function addExpense(data: z.input<typeof UpdateSchema>): Promise<{ 
     const rule = explicit ? null : matchCategoryRule(settings.categoryRules, { vendor: d.vendor, description: d.notes });
     const fx = resolveFx({ amount: d.amount, currency: d.currency, fxRate: d.fxRate }, settings.currency);
     const exp = await Expense.create({
+      ...(d._id ? { _id: d._id } : {}),
       kind: d.kind,
       vendor: d.vendor,
       vendorKey: vendorKey(d.vendor),
@@ -436,6 +438,9 @@ export async function addExpense(data: z.input<typeof UpdateSchema>): Promise<{ 
     revalidatePath('/income');
     return { ok: true, id: String(exp._id) };
   } catch (err) {
+    if (d._id && isDuplicateKey(err)) {
+      return { ok: true, id: d._id };
+    }
     return { ok: false, error: (err as Error).message };
   }
   });

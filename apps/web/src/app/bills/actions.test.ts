@@ -76,7 +76,7 @@ vi.mock('next/cache', () => ({ revalidatePath: (p: string) => revalidatePathMock
 
 import {
   createBill, updateBill, setBillArchived, deleteBill, markBillPaid, markBillUnpaid,
-  logBillPayment, removeBillPayment,
+  logBillPayment, removeBillPayment, billPaidExpenseId, billPaymentExpenseId,
 } from './actions';
 
 function formData(fields: Record<string, string>): FormData {
@@ -307,10 +307,11 @@ describe('markBillPaid', () => {
       _id: 'b1', title: 'ΔΕΗ ρεύμα', vendor: 'ΔΕΗ', category: 'utilities', amount: 84.5,
       paidAt: null, cycle: '', linkedExpenseId: '',
     });
-    addExpenseMock.mockResolvedValueOnce({ ok: true, id: 'exp-new' });
+    addExpenseMock.mockResolvedValueOnce({ ok: true, id: billPaidExpenseId('b1') });
     await markBillPaid('b1', { logExpense: true });
     expect(addExpenseMock).toHaveBeenCalledTimes(1);
     const call = addExpenseMock.mock.calls[0][0];
+    expect(call._id).toBe(billPaidExpenseId('b1'));
     expect(call.kind).toBe('expense');
     expect(call.vendor).toBe('ΔΕΗ');
     expect(call.category).toBe('utilities');
@@ -318,7 +319,17 @@ describe('markBillPaid', () => {
     expect(call.notes).toBe('Bill: ΔΕΗ ρεύμα');
     expect(call.verified).toBe(true);
     const update = billFindByIdAndUpdate.mock.calls[0][1];
-    expect(update.linkedExpenseId).toBe('exp-new');
+    expect(update.linkedExpenseId).toBe(billPaidExpenseId('b1'));
+  });
+
+  it('logExpense:true passes deterministic _id (billPaidExpenseId) to addExpense', async () => {
+    billFindById.mockResolvedValueOnce({
+      _id: 'b1', title: 'ΔΕΗ ρεύμα', vendor: 'ΔΕΗ', category: 'utilities', amount: 84.5,
+      paidAt: null, cycle: '', linkedExpenseId: '',
+    });
+    await markBillPaid('b1', { logExpense: true });
+    expect(addExpenseMock).toHaveBeenCalledTimes(1);
+    expect(addExpenseMock.mock.calls[0][0]._id).toBe(billPaidExpenseId('b1'));
   });
 
   it('logExpense:true falls back to the bill title as vendor when vendor is blank', async () => {
@@ -756,8 +767,9 @@ describe('logBillPayment', () => {
     billFindById
       .mockResolvedValueOnce({ _id: 'b1', title: 'AWS', vendor: 'AWS', amount: 80.96, currency: 'USD', origAmount: 88, fxRate: 0.92, category: 'other', paidAt: null, payments: [] })
       .mockResolvedValueOnce({ _id: 'b1', amount: 80.96, paidAt: null, payments: [{ amount: 40 }] });
-    await logBillPayment('b1', { amount: 40, logExpense: true });
+    await logBillPayment('b1', { paymentId: 'pay123', amount: 40, logExpense: true });
     const call = addExpenseMock.mock.calls[0][0];
+    expect(call._id).toBe(billPaymentExpenseId('pay123'));
     expect(call.amount).toBe(40);
     // Instalments are already base currency, so no currency/rate is handed over at all.
     expect(call.currency).toBeUndefined();
