@@ -30,11 +30,19 @@ const GoalFormSchema = z.object({
   notes: z.string().default(''),
 });
 
+function formatZodError(error: z.ZodError): string {
+  const issue = error.issues[0];
+  if (!issue) return 'Invalid data';
+  // Zod v4 changed the error message for missing/invalid types; normalize for UX
+  if (issue.code === 'invalid_type' && issue.message?.includes('received undefined')) return 'Required';
+  return issue.message || 'Invalid data';
+}
+
 export async function createGoal(formData: FormData): Promise<{ ok: boolean; error?: string }> {
   return withRequestTenant(async () => {
     await assertCanWrite();
     const parsed = GoalFormSchema.safeParse(Object.fromEntries(formData));
-    if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message || 'Invalid data' };
+    if (!parsed.success) return { ok: false, error: formatZodError(parsed.error) };
     const raw = parsed.data;
     await connectDB();
     const Model = await currentModel(Goal);
@@ -50,7 +58,7 @@ export async function updateGoal(id: string, formData: FormData): Promise<{ ok: 
   return withRequestTenant(async () => {
     await assertCanWrite();
     const parsed = GoalFormSchema.safeParse(Object.fromEntries(formData));
-    if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message || 'Invalid data' };
+    if (!parsed.success) return { ok: false, error: formatZodError(parsed.error) };
     const raw = parsed.data;
     await connectDB();
     const Model = await currentModel(Goal);

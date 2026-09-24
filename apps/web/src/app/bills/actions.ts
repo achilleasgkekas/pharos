@@ -46,6 +46,14 @@ const BillFormSchema = z.object({
   space: z.string().max(40).optional(),
 });
 
+function formatZodError(error: z.ZodError): string {
+  const issue = error.issues[0];
+  if (!issue) return 'Invalid data';
+  // Zod v4 changed the error message for missing/invalid types; normalize for UX
+  if (issue.code === 'invalid_type' && issue.message?.includes('received undefined')) return 'Required';
+  return issue.message || 'Invalid data';
+}
+
 /**
  * P9 for Bills. A bill has ONE money field, so this is the plain `resolveFx` case: the form
  * hands over what the paper prints, and what gets stored in `amount` is always base currency
@@ -65,7 +73,7 @@ function printedAmount(bill: { amount?: number | null; origAmount?: number | nul
 export async function createBill(formData: FormData): Promise<{ ok: boolean; error?: string }> {
   await assertCanWrite();
   const parsed = BillFormSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message || 'Invalid data' };
+  if (!parsed.success) return { ok: false, error: formatZodError(parsed.error) };
   const raw = parsed.data;
   const due = safeDateOrNull(raw.dueDate);
   if (!due) return { ok: false, error: 'Invalid due date' };
@@ -81,7 +89,7 @@ export async function createBill(formData: FormData): Promise<{ ok: boolean; err
 export async function updateBill(id: string, formData: FormData): Promise<{ ok: boolean; error?: string }> {
   await assertCanWrite();
   const parsed = BillFormSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message || 'Invalid data' };
+  if (!parsed.success) return { ok: false, error: formatZodError(parsed.error) };
   const raw = parsed.data;
   const due = safeDateOrNull(raw.dueDate);
   if (!due) return { ok: false, error: 'Invalid due date' };
