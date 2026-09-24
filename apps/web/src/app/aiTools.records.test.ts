@@ -11,8 +11,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 //     plugin, so a delete could not be undone and delete_record's "recoverable from Trash for 30
 //     days" would be a lie to the user,
 //   - `receipt` likewise (a scanned document with a file + line items + installment links),
-//   - a gift card's `uses` and a goal's `contributions` are money ledgers whose balance is
-//     derived from them, so an assistant must not rewrite one wholesale,
+//   - a goal's `contributions` are a money ledger whose balance is derived from it, so an
+//     assistant must not rewrite it wholesale,
 //   - a blocked field must be REFUSED OUT LOUD, never silently dropped — an assistant told
 //     "done" would report a balance change to the user that never happened,
 //   - an id that matches nothing must fail, not report success (the previous implementation
@@ -48,8 +48,6 @@ vi.mock('@/models/Statement', () => ({ Statement: model('Statement') }));
 vi.mock('@/models/Voucher', () => ({ Voucher: model('Voucher') }));
 vi.mock('@/models/Bill', () => ({ Bill: model('Bill') }));
 vi.mock('@/models/Goal', () => ({ Goal: model('Goal') }));
-vi.mock('@/models/GiftCard', () => ({ GiftCard: model('GiftCard') }));
-vi.mock('@/models/LoyaltyCard', () => ({ LoyaltyCard: model('LoyaltyCard') }));
 vi.mock('@/models/ShoppingListItem', () => ({ ShoppingListItem: model('ShoppingListItem') }));
 vi.mock('./expenses/actions', () => ({ addExpense: async () => ({ ok: true }) }));
 vi.mock('./items/actions', () => ({ importItemFromUrl: async () => ({}), logItemPrice: async () => ({}) }));
@@ -72,20 +70,28 @@ beforeEach(() => {
 });
 
 describe('the editable-type list', () => {
-  it('covers the ten user-authored models and excludes receipts and statements', () => {
+  it('covers the user-authored models and excludes receipts and statements', () => {
     expect([...EDITABLE_TYPES].sort()).toEqual(
-      ['bill', 'expense', 'giftcard', 'goal', 'item', 'loyaltycard', 'shoppinglist', 'subscription', 'task', 'voucher'].sort()
+      ['bill', 'expense', 'goal', 'item', 'shoppinglist', 'subscription', 'task', 'voucher'].sort()
     );
+  });
+
+  it('no longer knows gift or loyalty cards (both modules removed 2026-09-24)', async () => {
+    for (const type of ['giftcard', 'loyaltycard']) {
+      const r = await execute('update_record', { type, id: ID, fields: { title: 'x' } });
+      expect(r.summary, type).toBe('update failed');
+    }
+    expect(updateOnes).toHaveLength(0);
   });
 });
 
 describe('update_record', () => {
-  it('reaches the five modules that used to be unreachable', async () => {
-    for (const type of ['bill', 'goal', 'giftcard', 'loyaltycard', 'shoppinglist']) {
+  it('reaches the modules that used to be unreachable', async () => {
+    for (const type of ['bill', 'goal', 'shoppinglist']) {
       const r = await execute('update_record', { type, id: ID, fields: { title: 'x' } });
       expect(r.summary, type).toBe(`updated ${type}`);
     }
-    expect(updateOnes.map((u) => u.model)).toEqual(['Bill', 'Goal', 'GiftCard', 'LoyaltyCard', 'ShoppingListItem']);
+    expect(updateOnes.map((u) => u.model)).toEqual(['Bill', 'Goal', 'ShoppingListItem']);
   });
 
   it('marks a bill paid, the sentence that used to fail outright', async () => {
@@ -103,31 +109,24 @@ describe('update_record', () => {
     expect(updateOnes).toHaveLength(0);
   });
 
-  it('refuses a gift card spend log out loud instead of silently dropping it', async () => {
-    const r = await execute('update_record', { type: 'giftcard', id: ID, fields: { uses: [{ amount: 999 }] } });
-
-    expect(r.summary).toBe('update failed');
-    expect(r.content).toContain('uses');
-    expect(updateOnes).toHaveLength(0);
-  });
-
-  it('refuses a goal contribution ledger the same way', async () => {
+  it('refuses a goal contribution ledger out loud instead of silently dropping it', async () => {
     const r = await execute('update_record', { type: 'goal', id: ID, fields: { contributions: [{ amount: 500 }] } });
 
     expect(r.summary).toBe('update failed');
+    expect(r.content).toContain('contributions');
     expect(updateOnes).toHaveLength(0);
   });
 
   it('writes the legal fields but names what it ignored when an update mixes both', async () => {
-    const r = await execute('update_record', { type: 'giftcard', id: ID, fields: { title: 'IKEA', uses: [] } });
+    const r = await execute('update_record', { type: 'goal', id: ID, fields: { title: 'House', contributions: [] } });
 
-    expect(r.summary).toBe('updated giftcard');
-    expect(updateOnes[0].update).toEqual({ $set: { title: 'IKEA' } });
-    expect(r.content).toContain('ignored uses');
+    expect(r.summary).toBe('updated goal');
+    expect(updateOnes[0].update).toEqual({ $set: { title: 'House' } });
+    expect(r.content).toContain('ignored contributions');
   });
 
   it('cannot smuggle a blocked field through a dotted path', async () => {
-    const r = await execute('update_record', { type: 'giftcard', id: ID, fields: { 'uses.0.amount': 999 } });
+    const r = await execute('update_record', { type: 'goal', id: ID, fields: { 'contributions.0.amount': 999 } });
 
     expect(r.summary).toBe('update failed');
     expect(updateOnes).toHaveLength(0);
@@ -164,10 +163,10 @@ describe('update_record', () => {
 
 describe('delete_record', () => {
   it('soft-deletes, so the record is recoverable exactly as the tool promises', async () => {
-    const r = await execute('delete_record', { type: 'loyaltycard', id: ID });
+    const r = await execute('delete_record', { type: 'voucher', id: ID });
 
-    expect(r.summary).toBe('deleted loyaltycard');
-    expect(updateOnes[0].model).toBe('LoyaltyCard');
+    expect(r.summary).toBe('deleted voucher');
+    expect(updateOnes[0].model).toBe('Voucher');
     expect(updateOnes[0].update.$set.deletedAt).toBeInstanceOf(Date);
     expect(r.content).toContain('Trash');
   });

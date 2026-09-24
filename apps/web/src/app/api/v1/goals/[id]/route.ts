@@ -14,7 +14,7 @@ export const dynamic = 'force-dynamic';
  *  addContribution?: { amount, note?, date? }, removeContributionId? }
  *
  *  Plain field edits, archiving, and a single contribution add/undo can be combined in one
- *  request (mirrors the GiftCard addUse/removeUseId pattern). `addContribution` mirrors the
+ *  request. `addContribution` mirrors the
  *  web `addGoalContribution` action — amount must be positive (a goal only ever gains money
  *  through contributions; mistaken entries are undone via `removeContributionId`, not negated).
  *  The two are mutually exclusive in a single request (both mutate the same `contributions`
@@ -66,7 +66,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   });
 }
 
-/** DELETE /api/v1/goals/:id → soft-delete (recoverable from Trash, same as Bills/GiftCards). */
+/** DELETE /api/v1/goals/:id → soft-delete (recoverable from Trash, same as Bills). */
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   return withAuth(req, async () => {
     const { id } = await params;

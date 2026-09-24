@@ -7,7 +7,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // reconcile (insert-fresh / refresh-active / auto-expire-resolved / never-recreate-
 // dismissed) behavior.
 //
-// The 4 pure helper libs (`@/lib/giftcard`, `@/lib/bill`, `@/lib/priceHike`,
+// The pure helper libs (`@/lib/bill`, `@/lib/priceHike`,
 // `@/lib/installments`) are NOT mocked — each already has its own dedicated unit
 // test, and running the real implementation here end-to-end pins the actual wiring
 // (thresholds, dedupeKeys) rather than a hand-rolled stand-in that could drift from
@@ -21,7 +21,6 @@ const {
   statementFind,
   expenseFind,
   subscriptionFind,
-  giftCardFind,
   billFind,
   documentFind,
   specialDateFind,
@@ -36,7 +35,6 @@ const {
     statements: unknown[];
     expenses: unknown[];
     subscriptions: unknown[];
-    giftCards: unknown[];
     bills: unknown[];
     documents: unknown[];
     specialDates: unknown[];
@@ -46,7 +44,6 @@ const {
     statements: [],
     expenses: [],
     subscriptions: [],
-    giftCards: [],
     bills: [],
     documents: [],
     specialDates: [],
@@ -67,7 +64,6 @@ const {
     getAppSettingsMock: vi.fn(async () => ({
       warrantyAlertDays: 90,
       trialAlertDays: 2,
-      giftCardAlertDays: 30,
       billAlertDays: 5,
       subscriptionReviewIntervalDays: 0,
       documentAlertDays: 0,
@@ -77,7 +73,6 @@ const {
     statementFind: vi.fn(() => leanQuery(() => state.statements)),
     expenseFind: vi.fn(() => leanQuery(() => state.expenses)),
     subscriptionFind: vi.fn(() => leanQuery(() => state.subscriptions)),
-    giftCardFind: vi.fn(() => leanQuery(() => state.giftCards)),
     billFind: vi.fn(() => leanQuery(() => state.bills)),
     documentFind: vi.fn(() => leanQuery(() => state.documents)),
     specialDateFind: vi.fn(() => leanQuery(() => state.specialDates)),
@@ -100,7 +95,6 @@ vi.mock('@/models/Item', () => ({ Item: { find: itemFind } }));
 vi.mock('@/models/Statement', () => ({ Statement: { find: statementFind } }));
 vi.mock('@/models/Expense', () => ({ Expense: { find: expenseFind } }));
 vi.mock('@/models/Subscription', () => ({ Subscription: { find: subscriptionFind } }));
-vi.mock('@/models/GiftCard', () => ({ GiftCard: { find: giftCardFind } }));
 vi.mock('@/models/Bill', () => ({ Bill: { find: billFind } }));
 vi.mock('@/models/Document', () => ({ Document: { find: documentFind } }));
 vi.mock('@/models/SpecialDate', () => ({ SpecialDate: { find: specialDateFind } }));
@@ -122,7 +116,6 @@ function resetState() {
   state.statements = [];
   state.expenses = [];
   state.subscriptions = [];
-  state.giftCards = [];
   state.bills = [];
   state.documents = [];
   state.specialDates = [];
@@ -136,7 +129,6 @@ beforeEach(() => {
   getAppSettingsMock.mockImplementation(async () => ({
     warrantyAlertDays: 90,
     trialAlertDays: 2,
-    giftCardAlertDays: 30,
     billAlertDays: 5,
     subscriptionReviewIntervalDays: 0,
     documentAlertDays: 0,
@@ -275,30 +267,12 @@ describe('generateNotifications — trialend alert kind', () => {
 
 describe('generateNotifications — subscription review alert kind', () => {
   it('uses the confirmation anchor in the dedupe key so acknowledging retires the alert', async () => {
-    getAppSettingsMock.mockResolvedValue({ warrantyAlertDays: 90, trialAlertDays: 2, giftCardAlertDays: 30, billAlertDays: 5, subscriptionReviewIntervalDays: 180, documentAlertDays: 0, specialDateAlertDays: 0 });
+    getAppSettingsMock.mockResolvedValue({ warrantyAlertDays: 90, trialAlertDays: 2, billAlertDays: 5, subscriptionReviewIntervalDays: 180, documentAlertDays: 0, specialDateAlertDays: 0 });
     state.subscriptions = [{ _id: 's1', name: 'Forgotten TV', createdAt: '2026-01-01' }];
     await generateNotifications();
     expect(notificationInsertMany).toHaveBeenCalledWith([
       expect.objectContaining({ dedupeKey: 'subreview:s1:2026-01-01', kind: 'subreview', title: 'Forgotten TV', body: '200' }),
     ]);
-  });
-});
-
-describe('generateNotifications — giftcard alert kind', () => {
-  it('fires for a card with a positive balance expiring within the window', async () => {
-    state.giftCards = [
-      { _id: 'g1', title: 'Skroutz voucher', initialAmount: 50, uses: [{ amount: 20 }], expiresAt: '2026-08-01' },
-    ]; // balance 30, 12 days out, window 30
-    await generateNotifications();
-    expect(notificationInsertMany).toHaveBeenCalledWith([
-      expect.objectContaining({ dedupeKey: 'giftcard:g1:2026-08-01', kind: 'giftcard', title: 'Skroutz voucher', body: '12|30', href: '/vouchers' }),
-    ]);
-  });
-
-  it('does not fire once the balance has been fully spent', async () => {
-    state.giftCards = [{ _id: 'g1', title: 'Skroutz voucher', initialAmount: 50, uses: [{ amount: 50 }], expiresAt: '2026-08-01' }];
-    await generateNotifications();
-    expect(notificationInsertMany).not.toHaveBeenCalled();
   });
 });
 
@@ -328,7 +302,7 @@ describe('generateNotifications — bill alert kind', () => {
 // but the bell never showed either. Same collectors as the push, so the two cannot disagree.
 describe('generateNotifications — document expiry alert kind', () => {
   const withDocWindow = (days: number) =>
-    getAppSettingsMock.mockResolvedValue({ warrantyAlertDays: 90, trialAlertDays: 2, giftCardAlertDays: 30, billAlertDays: 5, subscriptionReviewIntervalDays: 0, documentAlertDays: days, specialDateAlertDays: 0 });
+    getAppSettingsMock.mockResolvedValue({ warrantyAlertDays: 90, trialAlertDays: 2, billAlertDays: 5, subscriptionReviewIntervalDays: 0, documentAlertDays: days, specialDateAlertDays: 0 });
 
   it('fires for a document expiring within the window, keyed by its expiry date', async () => {
     withDocWindow(30);
@@ -357,7 +331,7 @@ describe('generateNotifications — document expiry alert kind', () => {
 
 describe('generateNotifications — special date alert kind', () => {
   const withDateWindow = (days: number) =>
-    getAppSettingsMock.mockResolvedValue({ warrantyAlertDays: 90, trialAlertDays: 2, giftCardAlertDays: 30, billAlertDays: 5, subscriptionReviewIntervalDays: 0, documentAlertDays: 0, specialDateAlertDays: days });
+    getAppSettingsMock.mockResolvedValue({ warrantyAlertDays: 90, trialAlertDays: 2, billAlertDays: 5, subscriptionReviewIntervalDays: 0, documentAlertDays: 0, specialDateAlertDays: days });
 
   it('fires for a date whose next occurrence falls within the window, keyed by that occurrence', async () => {
     withDateWindow(7);
@@ -413,7 +387,7 @@ describe('generateNotifications — reconcile shape (insert / refresh / auto-exp
     state.existingNotifications = [{ dedupeKey: 'deal:i1' }];
     await generateNotifications();
     expect(notificationUpdateMany).toHaveBeenCalledWith(
-      { kind: { $in: ['deal', 'installment', 'warranty', 'pricehike', 'trialend', 'subreview', 'giftcard', 'bill', 'maintenance', 'lending', 'claim', 'document', 'specialdate'] }, dedupeKey: { $nin: [] } },
+      { kind: { $in: ['deal', 'installment', 'warranty', 'pricehike', 'trialend', 'subreview', 'bill', 'maintenance', 'lending', 'claim', 'document', 'specialdate'] }, dedupeKey: { $nin: [] } },
       { $set: { deletedAt: expect.any(Date) } }
     );
   });

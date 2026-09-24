@@ -129,9 +129,6 @@ vi.mock('@/models/Statement', () => ({
 }));
 vi.mock('@/models/Subscription', () => ({ Subscription: {} }));
 vi.mock('@/models/Voucher', () => ({ Voucher: {} }));
-vi.mock('@/models/GiftCard', () => ({ GiftCard: {} }));
-vi.mock('@/models/LoyaltyCard', () => ({ LoyaltyCard: {} }));
-vi.mock('@/lib/giftcard', () => ({ giftCardBalance: vi.fn(), giftCardDaysLeft: vi.fn() }));
 vi.mock('@/models/Bill', () => ({ Bill: {} }));
 vi.mock('@/lib/bill', () => ({ billDaysUntilDue: vi.fn() }));
 vi.mock('@/models/Card', () => ({ Card: {} }));

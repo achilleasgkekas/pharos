@@ -13,12 +13,9 @@ import { Expense as ExpenseModel } from '@/models/Expense';
 import { Voucher as VoucherModel } from '@/models/Voucher';
 import { Bill as BillModel } from '@/models/Bill';
 import { Goal as GoalModel } from '@/models/Goal';
-import { GiftCard as GiftCardModel } from '@/models/GiftCard';
-import { LoyaltyCard as LoyaltyCardModel } from '@/models/LoyaltyCard';
 import { ShoppingListItem as ShoppingListItemModel } from '@/models/ShoppingListItem';
 import { OWNED_STATUSES } from '@/lib/itemStatus';
 import { matchedLineItemName } from '@/lib/receiptSearch';
-import { giftCardBalance } from '@/lib/giftcard';
 import { formatDate } from '@/lib/i18n/format';
 import { getLocaleSafe } from '@/lib/i18n/server';
 
@@ -37,8 +34,6 @@ export type SearchHit = {
     | 'voucher'
     | 'bill'
     | 'goal'
-    | 'giftcard'
-    | 'loyaltycard'
     | 'shoppinglist';
   id: string;
   title: string;
@@ -58,8 +53,6 @@ type ExpenseLean = { _id: unknown; vendor?: string; kind?: string; amount?: numb
 type VoucherLean = { _id: unknown; title: string; store?: string; discount?: string; used?: boolean };
 type BillLean = { _id: unknown; title: string; vendor?: string; amount?: number; dueDate?: string | Date; paidAt?: string | Date | null };
 type GoalLean = { _id: unknown; title: string; targetAmount?: number; category?: string; archived?: boolean };
-type GiftCardLean = { _id: unknown; title: string; store?: string; initialAmount?: number; uses?: { amount: number }[]; archived?: boolean };
-type LoyaltyCardLean = { _id: unknown; title: string; store?: string; cardNumber?: string; archived?: boolean };
 type ShoppingListLean = { _id: unknown; name: string; quantity?: string; category?: string; brand?: string; checked?: boolean };
 
 function rx(query: string): RegExp {
@@ -73,10 +66,10 @@ function rx(query: string): RegExp {
  * Search across every collection of the CALLER'S workspace and return a flat, ranked-ish
  * list of hits.
  *
- * Twelve models, one tenant context. Every `find` here used the imported model, so in SaaS
+ * Ten models, one tenant context. Every `find` here used the imported model, so in SaaS
  * mode the navbar dropdown AND the assistant's `search_data` tool answered every workspace
  * out of the DEFAULT database: one customer typing two letters would see another's receipts,
- * statements, bills and gift cards, with working deep links to them. Nothing looked broken
+ * statements and bills, with working deep links to them. Nothing looked broken
  * from the UI, because a fresh workspace simply searched an inventory that was not its own.
  *
  * The models resolve INSIDE a single `withRequestTenant` block rather than one wrap per
@@ -93,7 +86,7 @@ export async function searchAll(query: string): Promise<SearchHit[]> {
   const locale = await getLocaleSafe();
 
   return withRequestTenant(async () => {
-    const [Item, Receipt, Statement, Task, Subscription, Expense, Voucher, Bill, Goal, GiftCard, LoyaltyCard, ShoppingListItem] =
+    const [Item, Receipt, Statement, Task, Subscription, Expense, Voucher, Bill, Goal, ShoppingListItem] =
       await Promise.all([
         currentModel(ItemModel),
         currentModel(ReceiptModel),
@@ -104,12 +97,10 @@ export async function searchAll(query: string): Promise<SearchHit[]> {
         currentModel(VoucherModel),
         currentModel(BillModel),
         currentModel(GoalModel),
-        currentModel(GiftCardModel),
-        currentModel(LoyaltyCardModel),
         currentModel(ShoppingListItemModel),
       ]);
 
-    const [items, receipts, statements, tasks, subs, expenses, vouchers, bills, goals, giftCards, loyaltyCards, listItems] = await Promise.all([
+    const [items, receipts, statements, tasks, subs, expenses, vouchers, bills, goals, listItems] = await Promise.all([
       Item.find({ $or: [{ title: r }, { specs: r }, { notes: r }, { tags: r }, { serialNumber: r }] })
         .limit(8)
         .select('title status currentPrice purchasedPrice')
@@ -148,14 +139,6 @@ export async function searchAll(query: string): Promise<SearchHit[]> {
         .limit(6)
         .select('title targetAmount category archived')
         .lean<GoalLean[]>(),
-      GiftCard.find({ $or: [{ title: r }, { store: r }, { code: r }, { notes: r }] })
-        .limit(6)
-        .select('title store initialAmount uses archived')
-        .lean<GiftCardLean[]>(),
-      LoyaltyCard.find({ $or: [{ title: r }, { store: r }, { cardNumber: r }, { notes: r }] })
-        .limit(6)
-        .select('title store cardNumber archived')
-        .lean<LoyaltyCardLean[]>(),
       ShoppingListItem.find({ $or: [{ name: r }, { category: r }, { brand: r }, { note: r }] })
         .limit(6)
         .select('name quantity category brand checked')
@@ -260,27 +243,6 @@ export async function searchAll(query: string): Promise<SearchHit[]> {
         title: g.title,
         subtitle: `Goal · ${cur()}${g.targetAmount ?? 0} target${g.category ? ` · ${g.category}` : ''}${g.archived ? ' · closed' : ''}`,
         href: '/reports#goals',
-      });
-    }
-    for (const gc of giftCards) {
-      const id = String(gc._id);
-      const left = giftCardBalance(gc.initialAmount ?? 0, gc.uses ?? []);
-      hits.push({
-        type: 'giftcard',
-        id,
-        title: gc.title,
-        subtitle: `Gift card · ${cur()}${left.toFixed(2)} left${gc.store ? ` · ${gc.store}` : ''}${gc.archived ? ' · closed' : ''}`,
-        href: `/vouchers?tab=giftcards&open=${id}`,
-      });
-    }
-    for (const lc of loyaltyCards) {
-      const id = String(lc._id);
-      hits.push({
-        type: 'loyaltycard',
-        id,
-        title: lc.title,
-        subtitle: `Loyalty card · ${lc.store || '—'}${lc.archived ? ' · archived' : ''}`,
-        href: `/vouchers?tab=loyalty&open=${id}`,
       });
     }
     for (const li of listItems) {

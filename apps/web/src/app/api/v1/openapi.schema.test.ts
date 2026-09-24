@@ -42,9 +42,7 @@ const SERIALIZERS: { schema: string; file: string; fn: string }[] = [
   { schema: 'Voucher', file: 'app/api/v1/vouchers/serialize.ts', fn: 'trim' },
   { schema: 'Task', file: 'app/api/v1/tasks/route.ts', fn: 'trim' },
   { schema: 'Bill', file: 'app/api/v1/bills/serialize.ts', fn: 'trim' },
-  { schema: 'GiftCard', file: 'app/api/v1/giftcards/serialize.ts', fn: 'trim' },
   { schema: 'Goal', file: 'app/api/v1/goals/serialize.ts', fn: 'trim' },
-  { schema: 'LoyaltyCard', file: 'app/api/v1/loyaltycards/serialize.ts', fn: 'trim' },
   // Shared with the web UI, hence `_id` instead of `id` — documented as such in the spec.
   { schema: 'ShoppingListItem', file: 'app/shopping-list/actions.ts', fn: 'serialize' },
   { schema: 'Notification', file: 'app/notifications/actions.ts', fn: 'serialize' },
@@ -87,7 +85,7 @@ function serializerKeys(file: string, fn: string): string[] {
   expect(close, `unbalanced object literal in ${fn}() of ${file}`).toBeGreaterThan(open);
 
   // A key is named by text sitting at depth 0 of the body; anything deeper belongs to a
-  // nested object (a task's steps, a gift card's uses, a goal's contributions, a split
+  // nested object (a task's steps, a goal's contributions, a split
   // row) and is documented by its own schema. Nested literals are written inline on one
   // line here, so the filtering is per character, not per line.
   const keys: string[] = [];

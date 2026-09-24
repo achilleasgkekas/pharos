@@ -53,7 +53,7 @@ export function billIsOpen(paidAt: string | Date | null | undefined, archived = 
 // So progress is its own axis: the four-state urgency chip AND a payment state.
 // ---------------------------------------------------------------------------
 
-/** One manual payment toward a bill (mirrors GiftCardUseSchema). */
+/** One manual payment toward a bill. */
 export type BillPayment = { amount?: number | null; date?: string | Date | null; note?: string };
 
 export type BillPaymentState = 'unpaid' | 'partially-paid' | 'paid';

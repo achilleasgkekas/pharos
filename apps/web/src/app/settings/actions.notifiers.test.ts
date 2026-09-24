@@ -7,7 +7,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // sendTestNtfy / getNotifierChannels / saveNotifierChannels / testNotifierChannel /
 // getWebhookSubscriptions / saveWebhookSubscriptions / testWebhookSubscription.
 // runAlertChecks (the big scan-and-dispatch function right after these, lines 463-636)
-// is its own concern (deals/warranty/return-windows/hikes/budgets/trials/gift-cards/
+// is its own concern (deals/warranty/return-windows/hikes/budgets/trials/
 // bills fan-in) and is deliberately left for a future slice — everything else here is
 // out of scope.
 //
@@ -20,10 +20,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 //    not admin-only config. Several numeric fields use `Number(x) || fallback`, which
 //    means an explicit "0" is INDISTINGUISHABLE from blank and silently becomes the
 //    fallback (defaultWarrantyMonths, warrantyAlertDays, defaultVatRate); others
-//    (trialAlertDays, giftCardAlertDays, billAlertDays, defaultReturnWindowDays)
+//    (trialAlertDays, billAlertDays, defaultReturnWindowDays)
 //    deliberately parse with Number.isFinite so an explicit 0 (alerts off) sticks —
 //    but note a MISSING field also reads as 0 there (Number(null) is 0, which IS
-//    finite), so their stated fallback (2/30/5/14) only ever kicks in for genuinely
+//    finite), so their stated fallback (2/5/14) only ever kicks in for genuinely
 //    non-numeric input, never for a blank/absent field.
 //    Always $set (never $unset), always upsert, invalidates app-settings + revalidates
 //    '/' (layout, because the currency symbol renders app-wide).
@@ -93,9 +93,6 @@ vi.mock('@/models/Item', () => ({ Item: {} }));
 vi.mock('@/models/Statement', () => ({ Statement: {} }));
 vi.mock('@/models/Subscription', () => ({ Subscription: {} }));
 vi.mock('@/models/Voucher', () => ({ Voucher: {} }));
-vi.mock('@/models/GiftCard', () => ({ GiftCard: {} }));
-vi.mock('@/models/LoyaltyCard', () => ({ LoyaltyCard: {} }));
-vi.mock('@/lib/giftcard', () => ({ giftCardBalance: vi.fn(), giftCardDaysLeft: vi.fn() }));
 vi.mock('@/models/Bill', () => ({ Bill: {} }));
 vi.mock('@/lib/bill', () => ({ billDaysUntilDue: vi.fn() }));
 vi.mock('@/models/Card', () => ({ Card: {} }));
@@ -244,8 +241,8 @@ describe('saveDefaults', () => {
   });
 
   it('applies safe defaults for a fully blank form', async () => {
-    // Note: the explicit-0-allowed fields (trial/giftCard/bill/returnWindow) do NOT
-    // fall back to their stated default (2/30/5/14) on a blank form: a missing
+    // Note: the explicit-0-allowed fields (trial/bill/returnWindow) do NOT
+    // fall back to their stated default (2/5/14) on a blank form: a missing
     // FormData field reads as null, Number(null) is 0, and Number.isFinite(0) is
     // true — so a blank form and an explicit "0" are indistinguishable for these
     // fields, both landing on 0. The stated fallback only triggers when the raw
@@ -259,7 +256,6 @@ describe('saveDefaults', () => {
       defaultWarrantyMonths: 24,
       warrantyAlertDays: 90,
       trialAlertDays: 0,
-      giftCardAlertDays: 0,
       billAlertDays: 0,
       documentAlertDays: 0, // blank form → 0, same explicit-zero rule as siblings (P42)
       specialDateAlertDays: 0, // same explicit-zero rule (P50)
@@ -306,15 +302,6 @@ describe('saveDefaults', () => {
     expect((appConfigUpdateOne.mock.calls[1][1] as Record<string, { trialAlertDays: number }>).$set.trialAlertDays).toBe(60);
     await saveDefaults(formData({ trialAlertDays: 'not-a-number' })); // NaN -> the stated fallback (2)
     expect((appConfigUpdateOne.mock.calls[2][1] as Record<string, { trialAlertDays: number }>).$set.trialAlertDays).toBe(2);
-  });
-
-  it('giftCardAlertDays deliberately allows an explicit 0 and clamps to [0,365], rounding', async () => {
-    await saveDefaults(formData({ giftCardAlertDays: '0' }));
-    expect((appConfigUpdateOne.mock.calls[0][1] as Record<string, { giftCardAlertDays: number }>).$set.giftCardAlertDays).toBe(0);
-    await saveDefaults(formData({ giftCardAlertDays: '10000' }));
-    expect((appConfigUpdateOne.mock.calls[1][1] as Record<string, { giftCardAlertDays: number }>).$set.giftCardAlertDays).toBe(365);
-    await saveDefaults(formData({ giftCardAlertDays: '7.6' }));
-    expect((appConfigUpdateOne.mock.calls[2][1] as Record<string, { giftCardAlertDays: number }>).$set.giftCardAlertDays).toBe(8);
   });
 
   it('billAlertDays deliberately allows an explicit 0 and clamps to [0,90]', async () => {

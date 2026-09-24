@@ -11,8 +11,6 @@ import { Bill } from '@/models/Bill';
 import { Document } from '@/models/Document';
 import { SpecialDate } from '@/models/SpecialDate';
 import { Goal } from '@/models/Goal';
-import { GiftCard } from '@/models/GiftCard';
-import { LoyaltyCard } from '@/models/LoyaltyCard';
 import { NetWorthSnapshot } from '@/models/NetWorthSnapshot';
 import { ShoppingListItem } from '@/models/ShoppingListItem';
 import { MeterReading } from '@/models/MeterReading';
@@ -50,8 +48,6 @@ export const BACKUP_MODELS = {
   documents: Document,
   specialDates: SpecialDate,
   goals: Goal,
-  giftCards: GiftCard,
-  loyaltyCards: LoyaltyCard,
   netWorthSnapshots: NetWorthSnapshot,
   shoppingList: ShoppingListItem,
   meterReadings: MeterReading,

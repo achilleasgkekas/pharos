@@ -209,49 +209,6 @@ export type SerializedVoucher = {
   updatedAt: string;
 };
 
-export type SerializedGiftCardUse = {
-  _id: string;
-  amount: number;
-  date: string | null;
-  note: string;
-  // P62: non-empty when this use was mirrored from an expense's payment split.
-  expenseId: string;
-};
-
-// P32 — gift-card / store-credit / prepaid with a decreasing monetary balance.
-export type SerializedGiftCard = {
-  _id: string;
-  title: string;
-  store: string;
-  code: string;
-  initialAmount: number;
-  expiresAt: string | null;
-  archived: boolean;
-  notes: string;
-  uses: SerializedGiftCardUse[];
-  createdAt: string;
-  updatedAt: string;
-};
-
-// P62 — the minimum a payment-split row needs in order to offer a gift card as one
-// of the methods that paid a purchase: which card it is, and how much is still on it.
-// The balance is computed server-side so the expenses page never ships whole `uses[]`
-// histories just to render a picker.
-export type GiftCardOption = { _id: string; title: string; store: string; balance: number };
-
-// P20 — loyalty/membership card wallet entry (no monetary balance, unlike GiftCard).
-export type SerializedLoyaltyCard = {
-  _id: string;
-  title: string;
-  store: string;
-  cardNumber: string;
-  barcodeFormat: string;
-  notes: string;
-  archived: boolean;
-  createdAt: string;
-  updatedAt: string;
-};
-
 // P28 — a manually-paid bill/payable whose status (paid/overdue/due-soon) is derived.
 export type SerializedBill = {
   _id: string;

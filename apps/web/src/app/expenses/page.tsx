@@ -1,7 +1,6 @@
 import { connectDB } from '@/lib/db';
 import { Expense as ExpenseModel } from '@/models/Expense';
 import { Card as CardModel } from '@/models/Card';
-import { GiftCard as GiftCardModel } from '@/models/GiftCard';
 import { isAiReady } from '@/lib/ollama';
 import { getAppSettings } from '@/lib/appSettings';
 import { withRequestTenant } from '@/lib/tenancy/request';
@@ -9,8 +8,7 @@ import { currentModel } from '@/lib/tenancy/connection';
 import { serializeExpense } from './lib';
 import { generateDueRecurring } from './actions';
 import { ExpensesClient } from './ExpensesClient';
-import { giftCardBalance } from '@/lib/giftcard';
-import type { SerializedCard, GiftCardOption } from '@/types';
+import type { SerializedCard } from '@/types';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,26 +17,14 @@ export async function getExpenseData(kind: 'income' | 'expense') {
   await connectDB();
   const Expense = await currentModel(ExpenseModel);
   const Card = await currentModel(CardModel);
-  const GiftCard = await currentModel(GiftCardModel);
   // Auto-post any due recurring bills/income before reading (idempotent).
   await generateDueRecurring().catch(() => {});
-  const [docs, cards, giftCardDocs, ollamaUp, settings] = await Promise.all([
+  const [docs, cards, ollamaUp, settings] = await Promise.all([
     Expense.find({ kind }).select('-rawAiResponse').sort({ date: -1 }).lean(),
     Card.find().sort({ name: 1 }).lean(),
-    // P62: only live cards can pay for something, so the picker never offers an
-    // archived or fully-spent one. Same live-card rule as the /vouchers tab itself.
-    GiftCard.find({ archived: { $ne: true } }).select('title store initialAmount uses').sort({ title: 1 }).lean(),
     isAiReady(),
     getAppSettings(),
   ]);
-  const giftCards: GiftCardOption[] = (giftCardDocs as unknown as Array<Record<string, unknown>>)
-    .map((g) => ({
-      _id: String(g._id),
-      title: String(g.title ?? ''),
-      store: String(g.store ?? ''),
-      balance: giftCardBalance(Number(g.initialAmount) || 0, (g.uses ?? []) as Array<{ amount: number }>),
-    }))
-    .filter((g) => g.balance > 0.009);
   const expenses = docs.map((d) => serializeExpense(d as Record<string, unknown>));
 
   // Anomaly flags: within each vendor series (≥3 priced entries), mark entries that
@@ -69,7 +55,6 @@ export async function getExpenseData(kind: 'income' | 'expense') {
   return {
     expenses,
     cards: JSON.parse(JSON.stringify(cards)) as SerializedCard[],
-    giftCards,
     vendors,
     ollamaUp,
     categories: settings.expenseCategories,

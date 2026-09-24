@@ -16,7 +16,7 @@ import {
   type NotifKind,
 } from '@/app/notifications/actions';
 
-const KIND_ICON: Record<NotifKind, typeof Bell> = { deal: Tag, warranty: ShieldCheck, installment: CreditCard, pricehike: TrendingUp, trialend: AlarmClock, subreview: AlarmClock, giftcard: Wallet, bill: FileText, maintenance: Wrench, lending: Handshake, claim: PackageOpen, document: IdCard, specialdate: Cake, system: Bell };
+const KIND_ICON: Record<NotifKind, typeof Bell> = { deal: Tag, warranty: ShieldCheck, installment: CreditCard, pricehike: TrendingUp, trialend: AlarmClock, subreview: AlarmClock, bill: FileText, maintenance: Wrench, lending: Handshake, claim: PackageOpen, document: IdCard, specialdate: Cake, system: Bell };
 const KIND_COLOR: Record<NotifKind, string> = {
   deal: 'var(--color-accent)',
   warranty: 'var(--color-gold)',
@@ -24,7 +24,6 @@ const KIND_COLOR: Record<NotifKind, string> = {
   pricehike: 'var(--color-red)',
   trialend: 'var(--color-purple)',
   subreview: 'var(--color-cyan)',
-  giftcard: 'var(--color-cyan)',
   bill: 'var(--color-gold)',
   maintenance: 'var(--color-cyan)',
   lending: 'var(--color-purple)',
@@ -115,11 +114,6 @@ export function NotificationBell({ open, onOpenChange }: { open: boolean; onOpen
       return { heading: n.title, sub: t(key, { days, amount: cur() + amount }) };
     }
     if (n.kind === 'subreview') return { heading: n.title, sub: t('notif.subscriptionReviewSub', { days: n.body }) };
-    if (n.kind === 'giftcard') {
-      const [days, balance] = n.body.split('|');
-      const key = Number(days) <= 0 ? 'notif.giftcardTodaySub' : 'notif.giftcardSub';
-      return { heading: n.title, sub: t(key, { days, balance: cur() + balance }) };
-    }
     if (n.kind === 'bill') {
       const [days, amount] = n.body.split('|');
       const d = Number(days);
