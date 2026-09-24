@@ -281,6 +281,7 @@ function VoucherForm({ voucher, onSuccess, onDeleted }: { voucher?: SerializedVo
   const t = useT();
   const [pending, startTransition] = useTransition();
   const confirm = useConfirm();
+  const [error, setError] = useState('');
   const [form, setForm] = useState({
     title: voucher?.title ?? '',
     code: voucher?.code ?? '',
@@ -344,12 +345,17 @@ function VoucherForm({ voucher, onSuccess, onDeleted }: { voucher?: SerializedVo
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
+    setError('');
     const fd = new FormData();
     Object.entries(form).forEach(([k, v]) => fd.set(k, v));
     startTransition(async () => {
-      if (voucher) await updateVoucher(voucher._id, fd);
-      else await createVoucher(fd);
-      onSuccess();
+      try {
+        if (voucher) await updateVoucher(voucher._id, fd);
+        else await createVoucher(fd);
+        onSuccess();
+      } catch (err) {
+        setError((err as Error).message || 'Save failed');
+      }
     });
   }
 
@@ -409,6 +415,7 @@ function VoucherForm({ voucher, onSuccess, onDeleted }: { voucher?: SerializedVo
           className="w-full bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[color:var(--color-accent)] resize-none"
         />
       </Field>
+      {error && <p className="text-xs text-[color:var(--color-red)]">{error}</p>}
       <div className="flex gap-3 pt-2">
         <Button type="submit" variant="primary" disabled={pending}>
           {pending ? t('v.saving') : voucher ? t('common.save') : t('v.create')}
