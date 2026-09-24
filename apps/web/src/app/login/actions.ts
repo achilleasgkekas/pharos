@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 import { connectDB } from '@/lib/db';
 import { User } from '@/models/User';
 import {
-  verifyPassword,
+  verifyPasswordFor,
   setSessionCookie,
   clearSessionCookie,
   setMfaPendingCookie,
@@ -24,7 +24,12 @@ export async function loginAction(formData: FormData): Promise<{ ok: boolean; er
 
   await connectDB();
   const user = await User.findOne({ username }).lean();
-  if (!user || !verifyPassword(password, user.passwordHash)) {
+  // `verifyPasswordFor`, not `!user || verifyPassword(...)`: see lib/auth.ts — the short-circuit
+  // let a wrong USERNAME answer faster than a wrong password, which leaks which accounts exist.
+  // Computed BEFORE the `!user` test, on purpose: `!user || verify(...)` would short-circuit and
+  // skip scrypt for exactly the case this exists to cover.
+  const passwordOk = verifyPasswordFor(password, user?.passwordHash);
+  if (!user || !passwordOk) {
     return { ok: false, error: 'Wrong username or password.' };
   }
   // P79: a correct password alone must not hand out a real session when MFA is enabled — stash

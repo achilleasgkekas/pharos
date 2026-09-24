@@ -34,7 +34,15 @@ const { connectDBMock, userFindOne, userState, verifyPasswordMock } = vi.hoisted
 
 vi.mock('@/lib/db', () => ({ connectDB: connectDBMock }));
 vi.mock('@/models/User', () => ({ User: { findOne: userFindOne } }));
-vi.mock('@/lib/auth', () => ({ verifyPassword: verifyPasswordMock, assertCanWrite: vi.fn(async () => {}) }));
+// The route calls `verifyPasswordFor`, which must run the password check even when no account
+// matched (see lib/auth.timing.test.ts). Delegating to the same mock keeps every assertion below
+// about "was the password checked, and with what" meaning what it meant before; a missing hash
+// answers false, as the real helper does.
+vi.mock('@/lib/auth', () => ({
+  verifyPassword: verifyPasswordMock,
+  verifyPasswordFor: (plain: string, stored?: string | null) => (stored ? verifyPasswordMock(plain, stored) : false),
+  assertCanWrite: vi.fn(async () => {}),
+}));
 
 // withAuth now resolves models through currentModel(). SAAS_MODE is off in tests, so the real
 // helper would hand back the same model anyway; this keeps the DB seam mocked without a connection.

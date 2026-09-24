@@ -3,7 +3,7 @@ import { randomBytes } from 'node:crypto';
 import { connectDB } from '@/lib/db';
 import { User as UserModel } from '@/models/User';
 import { currentModel } from '@/lib/tenancy/connection';
-import { verifyPassword } from '@/lib/auth';
+import { verifyPasswordFor } from '@/lib/auth';
 import { rateLimit, apiError, apiTenant, clientIp } from '@/lib/apiAuth';
 import { withTenant } from '@/lib/tenancy/current';
 
@@ -48,7 +48,12 @@ export async function POST(req: NextRequest) {
   await connectDB();
   const User = await currentModel(UserModel);
   const user = await User.findOne({ username }).select('_id name username role passwordHash apiToken');
-  if (!user || !verifyPassword(password, user.passwordHash)) {
+  // `verifyPasswordFor` runs scrypt even when no account matched, so a wrong username and a
+  // wrong password take the same time — see lib/auth.ts.
+  // Computed BEFORE the `!user` test: `!user || verify(...)` would short-circuit and skip scrypt
+  // for exactly the case this exists to cover.
+  const passwordOk = verifyPasswordFor(password, user?.passwordHash);
+  if (!user || !passwordOk) {
     return apiError('Invalid credentials', 401);
   }
 
