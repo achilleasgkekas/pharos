@@ -162,7 +162,7 @@ describe('computeMoneyAgenda — window structure', () => {
   it('queries each collection with the documented filters', async () => {
     await computeMoneyAgenda(NOW);
     expect(subscriptionFind).toHaveBeenCalledWith({ active: true, nextRenewal: { $ne: null }, deletedAt: null });
-    expect(statementFind).toHaveBeenCalledWith();
+    expect(statementFind).toHaveBeenCalledWith({ deletedAt: null });
     expect(itemFind).toHaveBeenCalledWith({ warrantyUntil: { $gte: new Date(2026, 2, 1), $lt: new Date(2026, 5, 1) }, deletedAt: null });
     expect(voucherFind).toHaveBeenCalledWith({ used: false, expiresAt: { $gte: new Date(2026, 2, 1), $lt: new Date(2026, 5, 1) }, deletedAt: null });
     expect(expenseFind).toHaveBeenCalledWith({ recurring: true, recurringCycle: { $nin: ['', null] }, amount: { $gt: 0 }, deletedAt: null });
