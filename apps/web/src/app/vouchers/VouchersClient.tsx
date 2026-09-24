@@ -174,9 +174,13 @@ export function VouchersClient({ vouchers }: { vouchers: SerializedVoucher[] }) 
             </div>
           ) : (
             <div className={cn(layout === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3' : 'flex flex-col gap-2')}>
-              {visible.map((v) => (
-                <VoucherCard key={v._id} voucher={v} onEdit={() => setEditing(v)} />
-              ))}
+              {visible.map((v) =>
+                layout === 'grid' ? (
+                  <VoucherCard key={v._id} voucher={v} onEdit={() => setEditing(v)} />
+                ) : (
+                  <VoucherRow key={v._id} voucher={v} onEdit={() => setEditing(v)} />
+                )
+              )}
             </div>
           )}
         </div>
@@ -194,13 +198,14 @@ export function VouchersClient({ vouchers }: { vouchers: SerializedVoucher[] }) 
   );
 }
 
-function VoucherCard({ voucher, onEdit }: { voucher: SerializedVoucher; onEdit: () => void }) {
+/** What the card and the list row both need, so the two layouts cannot drift apart on
+ *  what "copy", "delete" or the expiry countdown do. */
+function useVoucherRow(voucher: SerializedVoucher) {
   const t = useT();
   const [pending, startTransition] = useTransition();
   const [copied, setCopied] = useState(false);
   const confirm = useConfirm();
   const d = daysUntil(voucher.expiresAt);
-  const expired = d !== null && d < 0;
 
   function copy() {
     if (!voucher.code) return;
@@ -213,6 +218,16 @@ function VoucherCard({ voucher, onEdit }: { voucher: SerializedVoucher; onEdit: 
     const ok = await confirm({ title: t('v.deleteVoucher'), message: t('v.confirmDelete', { title: voucher.title }), confirmLabel: t('common.delete'), danger: true });
     if (ok) startTransition(() => deleteVoucher(voucher._id));
   }
+  return { pending, startTransition, copied, copy, handleDelete, d, expired: d !== null && d < 0 };
+}
+
+function expiryTone(expired: boolean, d: number | null) {
+  return expired ? 'text-[color:var(--color-red)]' : d !== null && d <= 7 ? 'text-[color:var(--color-gold)]' : 'text-[color:var(--color-text-faint)]';
+}
+
+function VoucherCard({ voucher, onEdit }: { voucher: SerializedVoucher; onEdit: () => void }) {
+  const t = useT();
+  const { pending, startTransition, copied, copy, handleDelete, d, expired } = useVoucherRow(voucher);
 
   return (
     <div className={cn('group bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-2xl p-4 transition-all', voucher.used && 'opacity-50')}>
@@ -244,7 +259,7 @@ function VoucherCard({ voucher, onEdit }: { voucher: SerializedVoucher; onEdit: 
 
       <div className="flex items-center gap-2 text-[10px] mb-3" style={{ fontFamily: 'var(--font-mono)' }}>
         {voucher.expiresAt ? (
-          <span className={cn(expired ? 'text-[color:var(--color-red)]' : d! <= 7 ? 'text-[color:var(--color-gold)]' : 'text-[color:var(--color-text-faint)]')}>
+          <span className={expiryTone(expired, d)}>
             {expired ? t('v.expired') : t('v.expiresInD', { d: d ?? 0 })}
           </span>
         ) : (
@@ -271,6 +286,64 @@ function VoucherCard({ voucher, onEdit }: { voucher: SerializedVoucher; onEdit: 
         )}
         <button onClick={handleDelete} disabled={pending} className="ml-auto p-1.5 rounded-md text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-all" aria-label="Delete">
           <Trash2 size={13} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** The list layout used to render VoucherCard in one column — on a phone, where the grid is
+ *  one column too, the toggle changed nothing (same bug Subscriptions had, #310). A row is the
+ *  scan view: which voucher, when it lapses, how much it is worth, and the code one tap away
+ *  from the clipboard — the thing you actually need at a till. The whole title opens the editor. */
+function VoucherRow({ voucher, onEdit }: { voucher: SerializedVoucher; onEdit: () => void }) {
+  const t = useT();
+  const { pending, startTransition, copied, copy, handleDelete, d, expired } = useVoucherRow(voucher);
+  const mono = { fontFamily: 'var(--font-mono)' };
+
+  return (
+    <div className={cn('group flex items-center gap-3 bg-[color:var(--color-surface)] border border-[color:var(--color-border)] hover:border-[color:var(--color-border-light)] rounded-xl px-3 py-2.5 transition-colors', voucher.used && 'opacity-50')}>
+      <button type="button" onClick={onEdit} className="min-w-0 flex-1 text-left" aria-label={`${t('common.edit')}: ${voucher.title}`}>
+        <span className="block text-sm font-semibold truncate" style={{ fontFamily: 'var(--font-display)' }}>
+          {voucher.title}
+          {voucher.store && <span className="text-[color:var(--color-text-faint)] font-normal"> · {voucher.store}</span>}
+        </span>
+        <span className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-0.5 text-[10px]" style={mono}>
+          {voucher.discount && <span className="font-bold text-[color:var(--color-accent)]">{voucher.discount}</span>}
+          <span className={voucher.expiresAt ? expiryTone(expired, d) : 'text-[color:var(--color-text-faint)]'}>
+            {voucher.expiresAt ? (expired ? t('v.expired') : t('v.expiresInD', { d: d ?? 0 })) : t('v.noExpiry')}
+          </span>
+          {voucher.used && <span className="text-[color:var(--color-text-faint)]">{t('v.usedTag')}</span>}
+        </span>
+      </button>
+      {voucher.code && (
+        <button
+          type="button"
+          onClick={copy}
+          title={voucher.code}
+          className="shrink-0 max-w-[7.5rem] flex items-center gap-1.5 border border-dashed border-[color:var(--color-border-light)] bg-[color:var(--color-surface-2)] rounded-md px-2 py-1 hover:border-[color:var(--color-accent)] transition-colors"
+        >
+          <span className="text-xs font-bold tracking-wider truncate" style={mono}>{voucher.code}</span>
+          {copied ? <Check size={12} className="text-[color:var(--color-accent)] shrink-0" /> : <Copy size={11} className="text-[color:var(--color-text-faint)] shrink-0" />}
+        </button>
+      )}
+      <div className="flex shrink-0">
+        <button
+          onClick={() => startTransition(() => toggleVoucherUsed(voucher._id, !voucher.used))}
+          disabled={pending}
+          title={voucher.used ? t('v.markUnused') : t('v.markUsed')}
+          aria-label={voucher.used ? t('v.markUnused') : t('v.markUsed')}
+          className={cn('p-1.5 rounded-md transition-colors', voucher.used ? 'text-[color:var(--color-text-faint)] hover:text-[color:var(--color-accent)]' : 'text-[color:var(--color-accent)]')}
+        >
+          <Check size={14} />
+        </button>
+        <button
+          onClick={handleDelete}
+          disabled={pending}
+          className="p-1.5 rounded-md text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] transition-colors opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 focus:opacity-100"
+          aria-label={t('common.delete')}
+        >
+          <Trash2 size={14} />
         </button>
       </div>
     </div>
