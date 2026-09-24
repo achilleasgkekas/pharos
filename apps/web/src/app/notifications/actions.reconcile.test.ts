@@ -178,6 +178,15 @@ describe('generateNotifications — warranty alert kind', () => {
     await generateNotifications();
     expect(notificationInsertMany).not.toHaveBeenCalled();
   });
+  // Three surfaces announce warranties — the calendar, this bell and the push — and they must
+  // skip the same items. When only the calendar learned to ignore sold/broken things, the other
+  // two kept firing for them. The mock returns state.items whatever the query, so pin the query.
+  it('asks only for items you still own (WARRANTY_ALERT_STATUSES), same as the calendar', async () => {
+    await generateNotifications();
+    expect(itemFind).toHaveBeenCalledWith(
+      expect.objectContaining({ warrantyUntil: { $ne: null }, status: { $in: ['received', 'installed'] } }),
+    );
+  });
 });
 
 describe('generateNotifications — installment alert kind', () => {

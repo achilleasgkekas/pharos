@@ -1,6 +1,7 @@
 'use server';
 
 import { connectDB } from '@/lib/db';
+import { WARRANTY_ALERT_STATUSES } from '@/lib/itemStatus';
 import { getAppSettings } from '@/lib/appSettings';
 import { cur } from '@/lib/money';
 import { Item as ItemModel } from '@/models/Item';
@@ -81,7 +82,7 @@ async function computeAlerts(): Promise<Alert[]> {
   }
 
   // Warranties expiring within the configured window.
-  const warrantyItems = (await Item.find({ warrantyUntil: { $ne: null } }).select('title warrantyUntil').lean()) as Array<{
+  const warrantyItems = (await Item.find({ warrantyUntil: { $ne: null }, status: { $in: [...WARRANTY_ALERT_STATUSES] } }).select('title warrantyUntil').lean()) as Array<{
     _id: unknown; title: string; warrantyUntil?: string | Date | null;
   }>;
   for (const i of warrantyItems) {
