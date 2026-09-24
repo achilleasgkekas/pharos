@@ -84,9 +84,13 @@ export function ItemPhotoGallery({
     const ok = await confirm({ title: 'Delete photo', message: 'Remove this photo?', confirmLabel: 'Delete', danger: true });
     if (ok)
       startTransition(async () => {
-        setActive(0);
         const r = await deleteItemPhoto(itemId, p);
         setPhotos(r.photos);
+        // Move the selection only once the delete has actually happened, and only as far as it
+        // has to. Resetting to 0 up front meant a failed delete still threw you back to the
+        // first photo, with the list unchanged — so the gallery said something had happened
+        // when nothing had. Clamping keeps you where you were when a middle photo goes.
+        setActive((i) => Math.min(i, Math.max(0, r.photos.length - 1)));
       });
   }
 
