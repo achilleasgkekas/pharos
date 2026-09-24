@@ -13,8 +13,31 @@ REPO=/opt/pharos
 STACK=/opt/pharos-local
 log() { printf "%s %s\n" "$(date +%H:%M:%S)" "$*"; }
 
+# Every deploy tags the image it replaces as rollback-<sha>, ~620 MB each, and nothing ever
+# removed them: on 2026-09-24 a busy day left nine behind and the next deploy stopped at the
+# disk check below with 5 GB free. Only ONE is ever needed — the image serving right now,
+# which is re-tagged rollback-$OLD a few lines further down, BEFORE the build starts. So every
+# older rollback tag goes first, ahead of the disk check that would otherwise refuse the build.
+# `docker rmi` of a tag only untags when another tag (pharos-web:local) still holds the image,
+# so the running container's image is never removed.
+prune_rollbacks() {
+  docker images pharos-web --format '{{.Tag}}' | grep '^rollback-' |
+    while read -r t; do docker rmi "pharos-web:$t" >/dev/null 2>&1 && log "pruned old rollback image $t"; done
+}
+
+# The whole body is one function, called on the last line. bash reads a script as it runs,
+# and this one `git reset --hard`s its own file halfway through: whenever a commit changes
+# the script, the running copy would carry on reading the NEW file from the OLD byte offset.
+# A function is parsed completely before it starts, so the running deploy is immune.
+main() {
+# One deploy at a time. On 2026-09-24 two were started a minute apart: two parallel builds of
+# the same commit, each needing ~6 GB on a disk with 8 GB free, both writing /tmp/deploy-sh.log.
+exec 9>/tmp/deploy-selfhosted.lock
+flock -n 9 || { log "ABORT: another deploy is already running (lock /tmp/deploy-selfhosted.lock)"; exit 6; }
+
 # A build needs ~6 GB. The 2026-09-17 ENOSPC surfaced as "UNHEALTHY -> rolled back", which
 # reads like broken code rather than a full disk, so refuse up front with the real reason.
+prune_rollbacks
 docker builder prune -af >/dev/null 2>&1; docker image prune -f >/dev/null 2>&1
 FREE=$(df -BG --output=avail / | tail -1 | tr -dc 0-9)
 log "free disk: ${FREE}GB"
@@ -55,3 +78,6 @@ sleep 10
 docker exec pharos-local-web wget -qO- http://localhost:3000/login >/dev/null 2>&1 \
   && log "ROLLED BACK to $OLD, healthy" || log "ROLLED BACK to $OLD, STILL UNHEALTHY - needs a human"
 exit 3
+}
+
+main "$@"
