@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { scryptSync, randomBytes } from 'node:crypto';
-import { hashPassword, verifyPassword } from './auth';
+import { hashPassword, verifyPassword, verifyPasswordFor } from './auth';
 
 // Pure password-hashing helpers of lib/auth.ts. scrypt via node:crypto — no DB,
 // no cookies, deterministic against a known hash. The async accessors
@@ -103,4 +103,23 @@ describe('verifyPassword', () => {
     expect(verifyPassword('x', null as unknown as string)).toBe(false);
     expect(verifyPassword('x', 12345 as unknown as string)).toBe(false);
   });
+});
+
+// The login paths used to read `if (!user || !verifyPassword(...))`. With no matching account
+// `!user` short-circuited and scrypt never ran, so a wrong USERNAME answered measurably faster
+// than a wrong password — and timing the endpoint revealed which usernames exist.
+describe('verifyPasswordFor — no account must cost the same as a wrong password', () => {
+  const real = hashPassword('correct horse battery staple');
+
+  it('answers the same as verifyPassword when there is an account', () => {
+    expect(verifyPasswordFor('correct horse battery staple', real)).toBe(true);
+    expect(verifyPasswordFor('wrong', real)).toBe(false);
+  });
+
+  it('answers false when there is no account, whatever the password', () => {
+    for (const stored of [null, undefined, '']) {
+      expect(verifyPasswordFor('anything', stored)).toBe(false);
+    }
+  });
+
 });

@@ -34,6 +34,36 @@ export function hashPassword(plain: string): string {
 }
 
 /** Constant-time verify. Never throws — returns false on any malformed input. */
+/**
+ * A real scrypt hash of a random string, computed once. Checking a password against it takes
+ * exactly as long as checking one against a real account — which is the whole point.
+ *
+ * Lazy so importing this module (every server action does) does not pay an scrypt on startup.
+ */
+let dummyHash: string | null = null;
+function timingDummy(): string {
+  return (dummyHash ??= hashPassword(randomBytes(16).toString('hex')));
+}
+
+/**
+ * `verifyPassword`, for a lookup that may have found NO account.
+ *
+ * The login paths used to read `if (!user || !verifyPassword(...))`. When the username did not
+ * exist, `!user` short-circuited and scrypt — deliberately slow, tens of milliseconds — never
+ * ran. So a wrong username answered measurably faster than a wrong password, and anyone timing
+ * the login endpoint could learn which usernames exist without a single correct guess.
+ *
+ * With no account, this still runs scrypt against a throwaway hash and then answers false, so
+ * both failures take the same time and say the same thing.
+ */
+export function verifyPasswordFor(plain: string, stored: string | null | undefined): boolean {
+  if (!stored) {
+    verifyPassword(plain, timingDummy());
+    return false;
+  }
+  return verifyPassword(plain, stored);
+}
+
 export function verifyPassword(plain: string, stored: string): boolean {
   try {
     const parts = stored.split('$');
