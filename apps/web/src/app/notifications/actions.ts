@@ -315,28 +315,30 @@ export async function generateNotifications(): Promise<void> {
     // dismissed alert isn't recreated and an active one isn't duplicated.
     const existing = (await Notification.find({ kind: { $in: AUTO_KINDS } })
       .setOptions({ withDeleted: true })
-      .select('dedupeKey deletedAt dismissedAtPrice')
-      .lean()) as Array<{ dedupeKey: string; deletedAt?: Date | null; dismissedAtPrice?: number | null }>;
+      .select('dedupeKey deletedAt dismissedAtPrice autoExpired')
+      .lean()) as Array<{ dedupeKey: string; deletedAt?: Date | null; dismissedAtPrice?: number | null; autoExpired?: boolean }>;
     const existingKeys = new Set(existing.map((e) => e.dedupeKey));
 
     const fresh = alerts.filter((a) => !existingKeys.has(a.dedupeKey));
     if (fresh.length) await Notification.insertMany(fresh.map((a) => ({ ...a, read: false })));
 
-    // A dismissed deal stays dismissed, UNLESS the price has since dropped below the one the
-    // user turned down (#253): then it comes back as a new, unread alert. Only a real
-    // improvement counts, so a scraper wobbling around the same figure never re-alerts, and
-    // the key stays `deal:<id>` rather than carrying the price.
-    const dismissedAt = new Map(
-      existing.filter((e) => e.deletedAt && e.dismissedAtPrice != null).map((e) => [e.dedupeKey, e.dismissedAtPrice as number])
-    );
+    // A deal's key is `deal:<id>` with no price in it, so its soft-deleted row would block it
+    // forever. Two cases bring it back as a new, unread alert (#253):
+    //  - the reconcile retired it (the price rose above target) and the deal is live again;
+    //  - the USER dismissed it and the price has since dropped below the one they turned down.
+    //    Only a real improvement counts, so a scraper wobbling around the same figure never
+    //    re-alerts something the user said no to.
+    const retired = new Map(existing.filter((e) => e.deletedAt).map((e) => [e.dedupeKey, e]));
     for (const a of alerts) {
       if (a.kind !== 'deal') continue;
-      const was = dismissedAt.get(a.dedupeKey);
+      const row = retired.get(a.dedupeKey);
+      if (!row) continue;
       const price = dealPrice(a.body);
-      if (was == null || price == null || price >= was) continue;
+      const beatsDismissal = row.dismissedAtPrice != null && price != null && price < row.dismissedAtPrice;
+      if (!row.autoExpired && !beatsDismissal) continue;
       await Notification.updateOne(
         { dedupeKey: a.dedupeKey },
-        { $set: { title: a.title, body: a.body, href: a.href, read: false, deletedAt: null, dismissedAtPrice: null } }
+        { $set: { title: a.title, body: a.body, href: a.href, read: false, deletedAt: null, dismissedAtPrice: null, autoExpired: false } }
       ).setOptions({ withDeleted: true });
     }
 
@@ -347,10 +349,11 @@ export async function generateNotifications(): Promise<void> {
       }
     }
 
-    // Auto-expire resolved alerts (price rose, warranty passed, month rolled over).
+    // Auto-expire resolved alerts (price rose, warranty passed, month rolled over). Marked as
+    // such so the deal revival above can tell "resolved on its own" from "the user said no".
     await Notification.updateMany(
       { kind: { $in: AUTO_KINDS }, dedupeKey: { $nin: currentKeys } },
-      { $set: { deletedAt: new Date() } }
+      { $set: { deletedAt: new Date(), autoExpired: true } }
     );
   });
 }

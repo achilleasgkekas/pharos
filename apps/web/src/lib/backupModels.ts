@@ -81,7 +81,8 @@ export const BACKUP_EXCLUDED: Record<string, string> = {
 
   // — Transient / regenerable state —
   Job: 'Background job queue state; a finished or interrupted job means nothing after a restore.',
-  Notification: 'Alert instances, re-derived by the next alert check (dedupeKey keeps them unique).',
+  Notification:
+    'Alert instances, re-derived by the next alert check (dedupeKey keeps them unique). What is lost is dismissals: a dismissed alert is a soft-deleted row, and the export skips soft-deleted rows for every model, so after a restore each dismissed alert (including a deal and the price it was dismissed at, #253) shows once more and can be dismissed again.',
   Phase: 'Legacy setup-phases model from the original tracker import; no UI imports it any more.',
   ScrapedPrice:
     'Global scraped-price cache (shared, not per-tenant); pure derived data that regenerates on the next scrape, and per-tenant restore does not apply to it.',

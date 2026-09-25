@@ -38,7 +38,7 @@ const {
     bills: unknown[];
     documents: unknown[];
     specialDates: unknown[];
-    existingNotifications: Array<{ dedupeKey: string; deletedAt?: Date | null; dismissedAtPrice?: number | null }>;
+    existingNotifications: Array<{ dedupeKey: string; deletedAt?: Date | null; dismissedAtPrice?: number | null; autoExpired?: boolean }>;
   } = {
     items: [],
     statements: [],
@@ -392,7 +392,7 @@ describe('generateNotifications — reconcile shape (insert / refresh / auto-exp
     await generateNotifications();
     expect(notificationUpdateMany).toHaveBeenCalledWith(
       { kind: { $in: ['deal', 'installment', 'warranty', 'pricehike', 'trialend', 'subreview', 'bill', 'maintenance', 'lending', 'claim', 'document', 'specialdate'] }, dedupeKey: { $nin: [] } },
-      { $set: { deletedAt: expect.any(Date) } }
+      { $set: { deletedAt: expect.any(Date), autoExpired: true } }
     );
   });
 
@@ -420,7 +420,7 @@ describe('generateNotifications — a dismissed deal comes back only at a better
     expect(notificationInsertMany).not.toHaveBeenCalled();
     expect(notificationUpdateOne).toHaveBeenCalledWith(
       { dedupeKey: 'deal:i1' },
-      { $set: { title: 'RTX 5080', body: '600|900', href: '/shopping?open=i1', read: false, deletedAt: null, dismissedAtPrice: null } }
+      { $set: { title: 'RTX 5080', body: '600|900', href: '/shopping?open=i1', read: false, deletedAt: null, dismissedAtPrice: null, autoExpired: false } }
     );
     // The row is soft-deleted, so the update has to opt into trashed docs to reach it.
     const call = notificationUpdateOne.mock.calls.findIndex(([, u]) => u.$set?.deletedAt === null);
@@ -440,6 +440,29 @@ describe('generateNotifications — a dismissed deal comes back only at a better
   it('stays dismissed when the dismissal predates the remembered price', async () => {
     state.items = [{ _id: 'i1', title: 'RTX 5080', targetPrice: 900, currentPrice: 100, links: [] }];
     state.existingNotifications = dismissed(null);
+    await generateNotifications();
+    expect(revived()).toEqual([]);
+  });
+
+  it('revives a deal the reconcile retired (price rose above target) once it is a deal again', async () => {
+    state.items = [{ _id: 'i1', title: 'RTX 5080', targetPrice: 900, currentPrice: 890, links: [] }];
+    state.existingNotifications = [{ dedupeKey: 'deal:i1', deletedAt: new Date('2026-07-01'), dismissedAtPrice: null, autoExpired: true }];
+    await generateNotifications();
+    expect(notificationInsertMany).not.toHaveBeenCalled();
+    expect(revived()).toHaveLength(1);
+    expect(revived()[0][1].$set).toMatchObject({ body: '890|900', read: false, autoExpired: false });
+  });
+
+  it('revives a retired deal at any price, since the user never turned it down', async () => {
+    state.items = [{ _id: 'i1', title: 'RTX 5080', targetPrice: 900, currentPrice: 900, links: [] }];
+    state.existingNotifications = [{ dedupeKey: 'deal:i1', deletedAt: new Date('2026-07-01'), dismissedAtPrice: null, autoExpired: true }];
+    await generateNotifications();
+    expect(revived()).toHaveLength(1);
+  });
+
+  it('a retired row stays retired while it is not a deal', async () => {
+    state.items = [{ _id: 'i1', title: 'RTX 5080', targetPrice: 900, currentPrice: 950, links: [] }];
+    state.existingNotifications = [{ dedupeKey: 'deal:i1', deletedAt: new Date('2026-07-01'), autoExpired: true }];
     await generateNotifications();
     expect(revived()).toEqual([]);
   });

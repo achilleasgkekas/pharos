@@ -18,6 +18,9 @@ const NotificationSchema = new Schema(
     // `deal:<id>`, so a dismissal would otherwise silence the item forever; with this, the
     // reconcile brings the alert back only when the price beats what was turned down (#253).
     dismissedAtPrice: { type: Number, default: null },
+    // Set when the reconcile retired the alert because it stopped applying, as opposed to the
+    // user dismissing it. A retired deal comes back when the price crosses the target again.
+    autoExpired: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
