@@ -20,6 +20,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const {
   connectDBMock,
   itemFind,
+  itemUpdateOne,
   configFindLean,
   fetchPageTextMock,
   parseProductFromPageMock,
@@ -28,6 +29,7 @@ const {
 } = vi.hoisted(() => ({
   connectDBMock: vi.fn(async () => {}),
   itemFind: vi.fn(async (_q: Record<string, any>) => [] as Array<Record<string, any>>),
+  itemUpdateOne: vi.fn(async (..._a: any[]) => ({})),
   configFindLean: vi.fn(async () => ({ scraperEnabled: true, scraperMaxLinks: 0 }) as Record<string, any> | null),
   fetchPageTextMock: vi.fn(async (_url: string) => ({ url: '', title: '', jsonLd: '', text: '' })),
   parseProductFromPageMock: vi.fn(async () => ({ parsed: { title: '', store: '', price: 0, currency: 'EUR' }, raw: '', model: 'm' })),
@@ -35,7 +37,7 @@ const {
   safeRevalidateMock: vi.fn(),
 }));
 
-const itemModel = { find: itemFind };
+const itemModel = { find: itemFind, updateOne: itemUpdateOne };
 const configModel = { findOne: () => ({ select: () => ({ lean: configFindLean }) }) };
 
 vi.mock('@/models/Item', () => ({ Item: 'ITEM_MODEL_TOKEN' }));
@@ -72,14 +74,24 @@ function makeItemDoc(overrides: Partial<Record<string, any>> = {}) {
   return {
     _id: '507f1f77bcf86cd799439001',
     title: 'RTX 5080',
+    status: 'researching', // a Shopping item unless a test says otherwise (#330)
     currentPrice: 999,
     links: [] as Link[],
     priceHistory: [] as any[],
     save: vi.fn(async () => {}),
     markModified: vi.fn(),
+    set(this: Record<string, any>, v: Record<string, any>) {
+      Object.assign(this, v);
+    },
     ...overrides,
   };
 }
+
+/** The `$set` the scrape recorded for an item that had no price change. */
+const recordedCheck = (id: string) => {
+  const call = itemUpdateOne.mock.calls.find((c) => c[0]?._id === id && c[1]?.$set?.lastPriceCheckAt);
+  return call ? { set: call[1].$set, opts: call[2] } : null;
+};
 
 // A parsed product that satisfies the REAL productMatchesItem for title "RTX 5080"
 // (its distinctive token is "5080") at the given price.
@@ -89,7 +101,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   isFeatureEnabledMock.mockResolvedValue(true);
   itemFind.mockResolvedValue([]);
-  configFindLean.mockResolvedValue({ scraperEnabled: true, scraperMaxLinks: 0 }); // enabled, no cap
+  configFindLean.mockResolvedValue({ scraperEnabled: true, scraperMaxLinks: 0, scraperFindLinks: false }); // enabled, no cap
   fetchPageTextMock.mockResolvedValue({ url: 'https://shop.example/p', title: 'RTX 5080', jsonLd: '', text: 'RTX 5080 €900' });
 });
 
@@ -111,7 +123,7 @@ describe('runPriceScrape', () => {
   });
 
   it('stops at the per-run link cap (scraperMaxLinks)', async () => {
-    configFindLean.mockResolvedValue({ scraperEnabled: true, scraperMaxLinks: 2 });
+    configFindLean.mockResolvedValue({ scraperEnabled: true, scraperMaxLinks: 2, scraperFindLinks: false });
     const mk = (id: string) => makeItemDoc({ _id: id, links: [{ label: 'S', url: `https://shop.example/${id}`, price: 100 }] });
     itemFind.mockResolvedValue([mk('a'), mk('b'), mk('c'), mk('d')]); // 4 items, 1 link each
     parseProductFromPageMock.mockResolvedValue(parsedAt(90));
@@ -120,9 +132,31 @@ describe('runPriceScrape', () => {
     expect(r.scanned).toBeLessThanOrEqual(2);
   });
 
-  it('only queries non-deleted items that have at least one link', async () => {
+  it('queries non-deleted items that are not sold or broken (the link check is in selectForScrape)', async () => {
     await runPriceScrape();
-    expect(itemFind).toHaveBeenCalledWith({ deletedAt: null, 'links.0': { $exists: true } });
+    expect(itemFind).toHaveBeenCalledWith({ deletedAt: null, status: { $nin: ['sold', 'broken'] } });
+  });
+
+  it('checks Shopping items before owned ones, so a link cap never starves Shopping (#330)', async () => {
+    configFindLean.mockResolvedValue({ scraperEnabled: true, scraperMaxLinks: 1, scraperFindLinks: false });
+    const owned = makeItemDoc({ _id: 'owned', status: 'installed', links: [{ label: 'S', url: 'https://shop.example/o', price: 900 }] });
+    const wanted = makeItemDoc({ _id: 'wanted', status: 'researching', links: [{ label: 'S', url: 'https://shop.example/w', price: 900 }] });
+    itemFind.mockResolvedValue([owned, wanted]); // owned listed first, as the old query returned them
+    parseProductFromPageMock.mockResolvedValue(parsedAt(850));
+
+    const r = await runPriceScrape();
+
+    expect(r.linksChecked).toBe(1);
+    expect(wanted.links[0].price).toBe(850);
+    expect(owned.links[0].price).toBe(900); // not reached this run
+  });
+
+  it('skips an owned item that was price-checked within the last week', async () => {
+    const owned = makeItemDoc({ _id: 'owned', status: 'received', lastPriceCheckAt: new Date(Date.now() - 86_400_000), links: [{ label: 'S', url: 'https://shop.example/o', price: 900 }] });
+    itemFind.mockResolvedValue([owned]);
+    const r = await runPriceScrape();
+    expect(r.scanned).toBe(0);
+    expect(fetchPageTextMock).not.toHaveBeenCalled();
   });
 
   it('updates a moved price: writes the link, one history point, recomputes currentPrice, counts a drop', async () => {
@@ -150,6 +184,8 @@ describe('runPriceScrape', () => {
     expect(item.priceHistory).toHaveLength(0);
     expect(item.save).not.toHaveBeenCalled();
     expect(r).toMatchObject({ scanned: 1, itemsChanged: 0, linksChecked: 1, drops: 0, errors: 0 });
+    // The check itself is still recorded, without bumping updatedAt.
+    expect(recordedCheck(item._id)).toMatchObject({ set: { lastPriceCheckNote: '' }, opts: { timestamps: false } });
   });
 
   it('counts a fetch error and keeps going — a later item is still scraped and saved', async () => {
@@ -164,7 +200,9 @@ describe('runPriceScrape', () => {
     const r = await runPriceScrape();
 
     expect(bad.save).not.toHaveBeenCalled();
+    expect(recordedCheck(bad._id)?.set.lastPriceCheckNote).toBe('error');
     expect(good.links[0].price).toBe(650);
+    expect((good as Record<string, unknown>).lastPriceCheckNote).toBe('');
     expect(good.save).toHaveBeenCalledTimes(1);
     expect(r).toMatchObject({ ok: true, scanned: 2, itemsChanged: 1, linksChecked: 2, drops: 1, errors: 1 });
   });
@@ -180,6 +218,7 @@ describe('runPriceScrape', () => {
     expect(item.links[0].price).toBe(900); // unchanged
     expect(item.priceHistory).toHaveLength(0);
     expect(item.save).not.toHaveBeenCalled();
+    expect(recordedCheck(item._id)?.set.lastPriceCheckNote).toBe('no-match');
     expect(r).toMatchObject({ scanned: 1, itemsChanged: 0, linksChecked: 1, errors: 1 });
   });
 });

@@ -2,7 +2,8 @@ import { config } from './config.js';
 import { Item } from './db.js';
 import { fetchPageText, storeFromUrl } from './scrape.js';
 import { extractPrice, isOllamaHealthy } from './extract.js';
-import { getScraperAiConfig, getShoppingMarket } from './appConfig.js';
+import { getScraperAiConfig, getScrapeScope, getShoppingMarket } from './appConfig.js';
+import { selectForScrape } from './scrapeOrder.js';
 import { isInMarket } from './shoppingRegion.js';
 import { notify } from './notify.js';
 
@@ -33,10 +34,14 @@ export async function runOnce(): Promise<{ items: number; checks: number; update
   const inMarket = (url: string | undefined | null) => isInMarket(url, market);
   if (market) console.log(`[scrape] alerts limited to the ${market.country} market`);
 
-  const query = Item.find({ 'links.0': { $exists: true } }).sort({ updatedAt: 1 });
-  if (config.limit > 0) query.limit(config.limit);
-  const items = await query;
-  console.log(`[scrape] ${items.length} items with links${config.limit ? ` (limit ${config.limit})` : ''}`);
+  // #330: Shopping first, owned items only when due, longest-unchecked first within each.
+  // Sorting by updatedAt put old (mostly owned) items first, so SCRAPER_LIMIT never reached
+  // Shopping; and soft-deleted items (in the Trash) were scraped too.
+  const { scope, ownedIntervalDays } = await getScrapeScope();
+  const all = await Item.find({ deletedAt: null, status: { $nin: ['sold', 'broken'] } });
+  let items = selectForScrape(all, { scope, ownedIntervalDays });
+  if (config.limit > 0) items = items.slice(0, config.limit);
+  console.log(`[scrape] ${items.length} items due (${scope})${config.limit ? ` (limit ${config.limit})` : ''}`);
 
   for (const item of items) {
     const links = (item.links ?? []).filter((l) => l.url && /^https?:\/\//i.test(l.url));
@@ -49,6 +54,7 @@ export async function runOnce(): Promise<{ items: number; checks: number; update
     // back to currentPrice would reuse an out-of-market price and hide the first real crossing.
     const lowestBefore = known.length ? Math.min(...known) : priced.length ? Infinity : (item.currentPrice || Infinity);
 
+    let note = 'no-price'; // #330: why no price was read; cleared by the first price
     let bestNow = Infinity; // cheapest price this pass, any shop: becomes currentPrice
     let alertPrice = Infinity; // cheapest in-market price this pass: what the alerts judge
     let alertUrl = '';
@@ -58,6 +64,7 @@ export async function runOnce(): Promise<{ items: number; checks: number; update
         const page = await fetchPageText(link.url!);
         const { price, currency, inStock } = await extractPrice(page);
         if (price != null && price > 0) {
+          note = '';
           item.priceHistory.push({
             price,
             store: storeFromUrl(link.url!),
@@ -79,12 +86,19 @@ export async function runOnce(): Promise<{ items: number; checks: number; update
         }
       } catch (err) {
         console.error(`  ✗ ${storeFromUrl(link.url!)}: ${(err as Error).message}`);
+        if (note === 'no-price') note = 'error';
       }
       await sleep(config.fetchDelayMs);
     }
 
+    const checked = { lastPriceCheckAt: new Date(), lastPriceCheckNote: note };
+    if (bestNow >= Infinity) {
+      // Nothing read: record the check only, without bumping updatedAt.
+      await Item.updateOne({ _id: item._id }, { $set: checked }, { timestamps: false });
+    }
     if (bestNow < Infinity) {
       item.currentPrice = bestNow;
+      item.set(checked);
       item.markModified('links');
       await item.save();
       stats.updates++;

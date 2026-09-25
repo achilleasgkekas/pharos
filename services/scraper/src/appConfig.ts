@@ -1,4 +1,5 @@
 import mongoose, { Schema } from 'mongoose';
+import { normalizeScrapeScope, DEFAULT_OWNED_INTERVAL_DAYS, type ScrapeScope } from './scrapeOrder.js';
 import { marketFor, normalizeShoppingCountry, normalizeShopList, type ShoppingMarket } from './shoppingRegion.js';
 
 // Read-only view of the web app's AppConfig singleton (collection `appconfigs`).
@@ -67,5 +68,19 @@ export async function getShoppingMarket(): Promise<ShoppingMarket | null> {
     return marketFor(normalizeShoppingCountry(doc?.shoppingCountry), normalizeShopList(doc?.shoppingExtraShops));
   } catch {
     return null; // DB unreachable → no filter, the pre-#319 behaviour
+  }
+}
+
+/**
+ * Which items to scrape (#330): the scope and how often owned items are re-checked, from
+ * Settings → Scraper. Read fresh each pass; defaults (both, 7 days) if the DB is unreachable.
+ */
+export async function getScrapeScope(): Promise<{ scope: ScrapeScope; ownedIntervalDays: number }> {
+  try {
+    const doc = (await AppConfigModel.findOne({ key: 'singleton' }).select('scraperScope scraperOwnedIntervalDays').lean()) as Record<string, unknown> | null;
+    const days = Number(doc?.scraperOwnedIntervalDays);
+    return { scope: normalizeScrapeScope(doc?.scraperScope), ownedIntervalDays: Number.isFinite(days) ? days : DEFAULT_OWNED_INTERVAL_DAYS };
+  } catch {
+    return { scope: 'both', ownedIntervalDays: DEFAULT_OWNED_INTERVAL_DAYS };
   }
 }

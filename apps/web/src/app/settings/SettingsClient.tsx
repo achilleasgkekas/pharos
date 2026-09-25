@@ -1052,6 +1052,9 @@ function ScraperAiSettings({ scraperAi, installed, hasAnthropicKey }: { scraperA
   const [model, setModel] = useState(scraperAi.model);
   const [enabled, setEnabled] = useState(scraperAi.enabled);
   const [maxLinks, setMaxLinks] = useState(scraperAi.maxLinks ? String(scraperAi.maxLinks) : '');
+  const [scope, setScope] = useState(scraperAi.scope);
+  const [ownedDays, setOwnedDays] = useState(String(scraperAi.ownedIntervalDays));
+  const [findLinks, setFindLinks] = useState(scraperAi.findLinks);
   const [msg, setMsg] = useState<string | null>(null);
   const installedNames = installed.map((m) => m.name);
 
@@ -1061,6 +1064,9 @@ function ScraperAiSettings({ scraperAi, installed, hasAnthropicKey }: { scraperA
     fd.set('scraperModel', model.trim());
     fd.set('scraperEnabled', String(enabled));
     fd.set('scraperMaxLinks', String(Number(maxLinks) || 0));
+    fd.set('scraperScope', scope);
+    fd.set('scraperOwnedIntervalDays', ownedDays);
+    fd.set('scraperFindLinks', String(findLinks));
     setMsg(null);
     startTransition(async () => {
       await saveScraperAi(fd);
@@ -1165,6 +1171,37 @@ function ScraperAiSettings({ scraperAi, installed, hasAnthropicKey }: { scraperA
         />
         <p className="text-[10px] text-[color:var(--color-text-faint)] mt-1">{t('set.scraperMaxLinksHint')}</p>
       </Field>
+      {/* #330: what a scheduled scrape covers. Shopping always goes first. */}
+      <Field label={t('set.scraperScope')}>
+        <select value={scope} onChange={(e) => setScope(e.target.value as typeof scope)} className={selectClass}>
+          <option value="both">{t('set.scraperScopeBoth')}</option>
+          <option value="shopping">{t('set.scraperScopeShopping')}</option>
+          <option value="inventory">{t('set.scraperScopeInventory')}</option>
+        </select>
+        <p className="text-[10px] text-[color:var(--color-text-faint)] mt-1">{t('set.scraperScopeHint')}</p>
+      </Field>
+      {scope !== 'shopping' && (
+        <Field label={t('set.scraperOwnedDays')}>
+          <input
+            type="number"
+            min="1"
+            max="365"
+            step="1"
+            inputMode="numeric"
+            value={ownedDays}
+            onChange={(e) => setOwnedDays(e.target.value)}
+            className={inputClass}
+            style={{ fontFamily: 'var(--font-mono)' }}
+          />
+        </Field>
+      )}
+      <label className="flex items-start gap-2 text-xs text-[color:var(--color-text-dim)] cursor-pointer">
+        <input type="checkbox" checked={findLinks} onChange={(e) => setFindLinks(e.target.checked)} className="mt-0.5 accent-[color:var(--color-accent)]" />
+        <span>
+          {t('set.scraperFindLinks')}
+          <span className="block text-[10px] text-[color:var(--color-text-faint)] mt-0.5">{t('set.scraperFindLinksHint')}</span>
+        </span>
+      </label>
 
       <div className="flex items-center gap-3 pt-2 border-t border-[color:var(--color-border)] mt-1">
         <button type="button" onClick={save} disabled={pending} className={saveBtn}>
