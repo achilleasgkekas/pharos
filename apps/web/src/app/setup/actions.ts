@@ -5,6 +5,7 @@ import { AppConfig } from '@/models/AppConfig';
 import { hashPassword, setSessionCookie, requireAdmin } from '@/lib/auth';
 import { invalidateAiConfigCache } from '@/lib/aiConfig';
 import { invalidateAppSettings } from '@/lib/appSettings';
+import { normalizeShoppingCountry, SHOPPING_PRESETS } from '@/lib/shoppingRegion';
 import { saveAiConfig } from '@/app/settings/actions';
 
 /** Step 1 — create the first account (admin) and sign them in. Only works on first run. */
@@ -27,13 +28,21 @@ export async function createFirstAdmin(formData: FormData): Promise<{ ok: boolea
   return { ok: true };
 }
 
-/** Step 2 — currency + default VAT (the rest keep their defaults). */
-export async function saveSetupBasics(currency: string, vat: number): Promise<{ ok: boolean }> {
+/** Step 2 — currency + default VAT + shopping country (the rest keep their defaults). The
+ *  country (#319) is optional so an older client that omits it leaves the setting untouched;
+ *  when given, its shipping shops start from the country's preset, editable in Settings. */
+export async function saveSetupBasics(currency: string, vat: number, shoppingCountry?: string): Promise<{ ok: boolean }> {
   await requireAdmin();
   await connectDB();
   const code = (currency || 'EUR').trim().toUpperCase() || 'EUR';
   const vatRate = Math.max(0, Math.min(100, Number(vat) || 24));
-  await AppConfig.updateOne({ key: 'singleton' }, { $set: { currency: code, defaultVatRate: vatRate } }, { upsert: true });
+  const $set: Record<string, unknown> = { currency: code, defaultVatRate: vatRate };
+  if (shoppingCountry !== undefined) {
+    const country = normalizeShoppingCountry(shoppingCountry);
+    $set.shoppingCountry = country;
+    $set.shoppingExtraShops = country ? [...SHOPPING_PRESETS[country].extraShops] : [];
+  }
+  await AppConfig.updateOne({ key: 'singleton' }, { $set }, { upsert: true });
   invalidateAppSettings();
   return { ok: true };
 }

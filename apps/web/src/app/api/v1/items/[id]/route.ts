@@ -4,6 +4,7 @@ import { isObjectId, readBody } from '@/lib/apiBody';
 import { iso } from '@/lib/apiList';
 import { connectDB } from '@/lib/db';
 import { getAppSettings } from '@/lib/appSettings';
+import { marketFor, marketRank, type ShoppingMarket } from '@/lib/shoppingRegion';
 import { resolveItemPrices, isForeignCurrency, toPrinted } from '@/lib/fx';
 import { calculatePriceTrend } from '@/lib/priceTrend';
 import { Item as ItemModel, ITEM_STATUSES } from '@/models/Item';
@@ -25,16 +26,18 @@ type AttachmentLean = { path: string; name?: string; mimeType?: string; size?: n
 /** Mirror of components/PricePanel.tsx priceStatus(): one coherent price picture
  *  (best-now, lowest/highest seen, trend, verdict, where-to-buy) computed server-side
  *  so API clients' detail views stay in sync with the web without re-implementing the logic. */
-function priceStatus(item: { currentPrice: number; targetPrice?: number | null; links: LinkLean[]; priceHistory: HistLean[] }) {
+function priceStatus(item: { currentPrice: number; targetPrice?: number | null; links: LinkLean[]; priceHistory: HistLean[] }, market: ShoppingMarket | null) {
   const stores = (item.links ?? [])
     .filter((l) => l.price && l.price > 0)
     .map((l) => ({ store: l.label || linkHost(l.url), url: l.url, price: l.price as number }))
     .sort((a, b) => a.price - b.price);
 
-  let bestNow: { price: number; store: string; url: string | null } | null = stores[0]
-    ? { price: stores[0].price, store: stores[0].store, url: stores[0].url }
-    : null;
+  // Same shopping-market rule as the PricePanel (#319): headline and deal from in-market shops.
+  const inMarket = market ? stores.filter((st) => !st.url || marketRank(st.url, market) !== null) : stores;
+  const best = inMarket[0] ?? stores[0];
+  let bestNow: { price: number; store: string; url: string | null } | null = best ? { price: best.price, store: best.store, url: best.url } : null;
   if (!bestNow && item.currentPrice > 0) bestNow = { price: item.currentPrice, store: '', url: null };
+  const dealEligible = inMarket.length > 0 || stores.length === 0;
 
   const hist = [...(item.priceHistory ?? [])].filter((h) => h.price > 0).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   const prices = hist.map((h) => h.price);
@@ -49,7 +52,7 @@ function priceStatus(item: { currentPrice: number; targetPrice?: number | null; 
   if (bestNow && lo != null && hi != null) {
     const range = hi - lo || 1;
     const pos = (bestNow.price - lo) / range;
-    if (target && bestNow.price <= target) verdict = 'deal';
+    if (target && dealEligible && bestNow.price <= target) verdict = 'deal';
     else if (trend < 0) verdict = 'dropping';
     else if (trend > 0) verdict = 'rising';
     else if (pos <= 0.15) verdict = 'good';
@@ -81,7 +84,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const priceHistory = [...(doc.priceHistory ?? [])]
       .map((h) => ({ price: h.price, store: h.store, date: new Date(h.date).toISOString() }))
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    const price = priceStatus({ currentPrice: doc.currentPrice ?? 0, targetPrice: doc.targetPrice ?? null, links, priceHistory });
+    const settings = await getAppSettings();
+    const market = marketFor(settings.shoppingCountry, settings.shoppingExtraShops);
+    const price = priceStatus({ currentPrice: doc.currentPrice ?? 0, targetPrice: doc.targetPrice ?? null, links, priceHistory }, market);
     const attachments = (doc.attachments ?? []).map((a) => ({
       path: a.path,
       name: a.name ?? '',

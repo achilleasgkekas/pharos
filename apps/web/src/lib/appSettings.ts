@@ -4,6 +4,7 @@ import { tenantDb, tenantModel } from './tenancy/connection';
 import { softRequestTenant } from './tenancy/request';
 import { currentTenant } from './tenancy/current';
 import { setCurrencySymbol, currencySymbol } from './money';
+import { normalizeShoppingCountry, normalizeShopList } from './shoppingRegion';
 // Side-effect import: registers the tenant-aware currency-symbol resolver into money.ts.
 // getAppSettings is server-only and runs on every request before render, so importing it
 // here guarantees the resolver is bound server-side without money.ts needing a node import.
@@ -42,6 +43,8 @@ export type AppSettings = {
   multiCurrency: boolean; // P9: allow per-entry foreign currency + FX rate; off = single-currency UI
   defaultVatRate: number;
   defaultReturnWindowDays: number; // return window (days) unless a store overrides it; 0 = off
+  shoppingCountry: string; // #319: ISO country price searches are limited to; '' = off (search everywhere)
+  shoppingExtraShops: string[]; // #319: foreign shops that ship to that country, as bare hosts
   expenseCategories: string[];
   itemCategories: string[];
   subscriptionCategories: string[];
@@ -77,6 +80,8 @@ export type RawAppConfigDoc = {
   multiCurrency?: boolean;
   defaultVatRate?: number;
   defaultReturnWindowDays?: number;
+  shoppingCountry?: string;
+  shoppingExtraShops?: unknown;
   lists?: Record<string, unknown>;
   spaces?: unknown;
   budgets?: Record<string, unknown>;
@@ -122,6 +127,8 @@ const APP_CONFIG_FIELDS = {
   multiCurrency: true,
   defaultVatRate: true,
   defaultReturnWindowDays: true,
+  shoppingCountry: true,
+  shoppingExtraShops: true,
   lists: true,
   spaces: true,
   budgets: true,
@@ -169,6 +176,8 @@ const DEFAULTS: AppSettings = {
   multiCurrency: false,
   defaultVatRate: 24,
   defaultReturnWindowDays: 14, // EU distance-selling default
+  shoppingCountry: '',
+  shoppingExtraShops: [],
   expenseCategories: DEFAULT_EXPENSE_CATEGORIES,
   itemCategories: DEFAULT_ITEM_CATEGORIES,
   subscriptionCategories: DEFAULT_SUBSCRIPTION_CATEGORIES,
@@ -228,6 +237,8 @@ export function normalizeSettings(doc: RawAppConfigDoc | null | undefined): AppS
       typeof doc?.defaultReturnWindowDays === 'number' && doc.defaultReturnWindowDays >= 0
         ? doc.defaultReturnWindowDays
         : DEFAULTS.defaultReturnWindowDays,
+    shoppingCountry: normalizeShoppingCountry(doc?.shoppingCountry),
+    shoppingExtraShops: normalizeShopList(doc?.shoppingExtraShops),
     expenseCategories: resolveTaxonomy('expenseCategories', doc?.lists, DEFAULT_EXPENSE_CATEGORIES),
     itemCategories: resolveTaxonomy('itemCategories', doc?.lists, DEFAULT_ITEM_CATEGORIES),
     subscriptionCategories: resolveTaxonomy('subscriptionCategories', doc?.lists, DEFAULT_SUBSCRIPTION_CATEGORIES),

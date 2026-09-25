@@ -8,6 +8,7 @@ import { ItemsClient, type ReceiptRef } from './ItemsClient';
 import { OWNED_STATUSES } from '@/lib/itemStatus';
 import { computeInstallmentPlans, type InstallmentPlan } from '@/lib/installments';
 import { getAppSettings } from '@/lib/appSettings';
+import { marketFor } from '@/lib/shoppingRegion';
 import type { SerializedItem, SerializedStatement } from '@/types';
 
 export const dynamic = 'force-dynamic';
@@ -53,6 +54,7 @@ export default async function ItemsPage() {
       categoryList={settings.itemCategories}
       baseCurrency={settings.currency}
       multiCurrency={settings.multiCurrency} // P9: off = no per-item currency controls at all
+      shoppingMarket={marketFor(settings.shoppingCountry, settings.shoppingExtraShops)}
     />
   );
 }

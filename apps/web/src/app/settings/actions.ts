@@ -68,6 +68,7 @@ import { ALERT_TYPE_KEYS, resolveNotifyTypes, type NotifyTypes } from '@/lib/ale
 import { isWithinQuietHours, normalizeQuietHours } from '@/lib/quietHours';
 import { lowestKnownPrice } from '@/lib/lowestKnownPrice';
 import { BACKUP_MODELS, BACKUP_KEYS } from '@/lib/backupModels';
+import { normalizeShoppingCountry, normalizeShopList, marketFor } from '@/lib/shoppingRegion';
 import { verifyBackupJson, formatBackupCounts, type BackupVerifyResult } from '@/lib/backupVerify';
 import { encryptBackup, decryptBackup } from '@/lib/backupCrypto';
 import { detectSyncStaleness, formatSyncStaleness } from '@/lib/syncStaleness';
@@ -397,6 +398,10 @@ export async function saveDefaults(formData: FormData): Promise<{ ok: boolean }>
   // 0 is meaningful here (return tracking off), so parse explicitly instead of `|| 14`.
   const returnRaw = Number(formData.get('defaultReturnWindowDays'));
   const returnDays = Number.isFinite(returnRaw) ? Math.max(0, Math.min(365, Math.round(returnRaw))) : 14;
+  // Shopping country (#319). An unknown code is stored as '' (off) rather than rejected, and the
+  // shop list is cleaned to bare hosts, so a pasted URL or a typo never breaks the search.
+  const shoppingCountry = normalizeShoppingCountry(formData.get('shoppingCountry'));
+  const shoppingExtraShops = shoppingCountry ? normalizeShopList(String(formData.get('shoppingExtraShops') || '')) : [];
   await (await scoped(AppConfig)).updateOne(
     { key: 'singleton' },
     {
@@ -418,6 +423,8 @@ export async function saveDefaults(formData: FormData): Promise<{ ok: boolean }>
         multiCurrency,
         defaultVatRate: vatRate,
         defaultReturnWindowDays: returnDays,
+        shoppingCountry,
+        shoppingExtraShops,
       },
     },
     { upsert: true }
@@ -611,10 +618,12 @@ export async function runAlertChecks(opts: { dedupe?: boolean } = {}): Promise<{
     title: string;
     targetPrice?: number;
     currentPrice?: number;
-    links?: { price?: number | null }[];
+    links?: { price?: number | null; url?: string }[];
   }>;
+  // Same market filter as the bell (#319), so the phone and the bell name the same deals.
+  const market = marketFor(s.shoppingCountry, s.shoppingExtraShops);
   const deals = dealItems.filter((i) => {
-    const lo = lowestKnownPrice(i);
+    const lo = lowestKnownPrice(i, market);
     return lo != null && lo <= (i.targetPrice ?? 0);
   });
 
