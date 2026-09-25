@@ -165,13 +165,15 @@ export async function generateDueRecurring(): Promise<{ created: number }> {
     // was applied retroactively). Use the later of the entry date and recurringFrom to avoid
     // generating phantom entries for periods before the series was marked recurring.
     const seedDate = new Date(seed.date);
-    const effectiveStartDate = seed.recurringFrom
-      ? new Date(Math.max(seedDate.getTime(), new Date(seed.recurringFrom).getTime()))
-      : seedDate;
-    let next = addCycleUTC(effectiveStartDate, cycle);
+    const cutoff = seed.recurringFrom ? new Date(seed.recurringFrom).getTime() : 0;
+    let next = addCycleUTC(seedDate, cycle);
     let guard = 0;
     while (next.getTime() <= now && guard < 36) {
       guard++;
+      if (next.getTime() < cutoff) {
+        next = addCycleUTC(next, cycle);
+        continue;
+      }
       // #69: the id is derived from the series and the period, so a concurrent run that decided
       // to create the same entry loses on the _id index instead of writing a second copy.
       const period = periodFrom(next);

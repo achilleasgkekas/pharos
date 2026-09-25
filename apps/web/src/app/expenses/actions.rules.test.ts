@@ -128,7 +128,7 @@ describe('applyCategoryRulesToExisting — per-row rule matching', () => {
     expect(expenseBulkWrite).toHaveBeenCalledTimes(1);
     const ops = expenseBulkWrite.mock.calls[0][0];
     expect(ops).toEqual([
-      { updateOne: { filter: { _id: 'e1' }, update: { $set: { category: 'utilities', recurring: true, recurringCycle: 'monthly' } } } },
+      { updateOne: { filter: { _id: 'e1' }, update: { $set: { category: 'utilities', recurring: true, recurringCycle: 'monthly', recurringFrom: expect.any(Date) } } } },
     ]);
   });
 
@@ -177,7 +177,7 @@ describe('applyCategoryRulesToExisting — recurring/recurringCycle delta', () =
     expenseFindLean.mockResolvedValue([existingRow({ vendor: 'Netflix', category: 'other' })]);
     await applyCategoryRulesToExisting();
     const ops = expenseBulkWrite.mock.calls[0][0];
-    expect(ops[0].updateOne.update.$set).toEqual({ category: 'subscriptions', recurring: true });
+    expect(ops[0].updateOne.update.$set).toEqual({ category: 'subscriptions', recurring: true, recurringFrom: expect.any(Date) });
   });
 });
 

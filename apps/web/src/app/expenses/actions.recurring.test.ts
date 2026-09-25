@@ -275,4 +275,46 @@ describe('generateDueRecurring', () => {
     expect(expenseCreate).not.toHaveBeenCalled();
     expect(revalidatePathMock).not.toHaveBeenCalled();
   });
+
+  it('respects recurringFrom by skipping periods before the cutoff while preserving cadence', async () => {
+    expenseFindSortLean.mockResolvedValue([
+      { 
+        kind: 'expense', 
+        vendor: 'Cadence', 
+        vendorKey: 'cadence', 
+        category: 'other', 
+        amount: 10, 
+        date: new Date(2025, 0, 1), 
+        recurringCycle: 'yearly',
+        recurringFrom: new Date(2025, 8, 25),
+      },
+    ]);
+    const res = await generateDueRecurring();
+    // Seed date: 2025-01-01. Next: 2026-01-01. Is 2026-01-01 >= 2025-09-25? Yes.
+    expect(res).toEqual({ created: 1 });
+    expect(localYmd(expenseCreate.mock.calls[0][0].date)).toBe('2026-01-01');
+    expect(expenseCreate.mock.calls[0][0].recurringFrom).toEqual(new Date(2025, 8, 25));
+  });
+
+  it('skips multiple historical periods before recurringFrom cutoff', async () => {
+    expenseFindSortLean.mockResolvedValue([
+      { 
+        kind: 'expense', 
+        vendor: 'Netflix', 
+        vendorKey: 'netflix', 
+        category: 'subscriptions', 
+        amount: 15, 
+        date: new Date(2025, 10, 10), // Nov 10, 2025
+        recurringCycle: 'monthly',
+        recurringFrom: new Date(2026, 1, 20), // Feb 20, 2026
+      },
+    ]);
+    const res = await generateDueRecurring();
+    // next: Dec 10 (< Feb 20, skip)
+    // next: Jan 10 (< Feb 20, skip)
+    // next: Feb 10 (< Feb 20, skip)
+    // next: Mar 10 (>= Feb 20, keep)
+    expect(res).toEqual({ created: 1 });
+    expect(localYmd(expenseCreate.mock.calls[0][0].date)).toBe('2026-03-10');
+  });
 });
