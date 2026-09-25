@@ -1612,6 +1612,8 @@ export const el: Partial<Dict> = {
   'pp.highest': '{x} υψηλότερη',
   'pp.targetBar': '◆ στόχος {x}',
   'pp.cheapest': 'φθηνότερο',
+  'pp.outOfMarket': 'Εκτός αγοράς',
+  'pp.outOfMarketTitle': 'Δεν είναι κατάστημα της {country} ούτε από όσα στέλνουν εκεί (Ρυθμίσεις → Προεπιλογές)',
   'pp.targetPlaceholder': 'στόχος {cur}',
   'pp.reached': 'επιτεύχθηκε ✓',
   'pp.toGo': 'ακόμα {x}',

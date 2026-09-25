@@ -1707,6 +1707,8 @@ export const nl: Partial<Dict> = {
   'pp.highest': '{x} hoogste',
   'pp.targetBar': '◆ doel {x}',
   'pp.cheapest': 'goedkoopste',
+  'pp.outOfMarket': 'Buiten je markt',
+  'pp.outOfMarketTitle': 'Geen winkel in {country} en geen winkel die daarheen levert (Instellingen → Standaarden)',
   'pp.targetPlaceholder': '{cur} doel',
   'pp.reached': 'bereikt ✓',
   'pp.toGo': 'nog {x}',

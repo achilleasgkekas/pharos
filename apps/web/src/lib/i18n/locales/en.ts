@@ -1662,6 +1662,8 @@ export const en = {
   'pp.highest': '{x} highest',
   'pp.targetBar': '◆ target {x}',
   'pp.cheapest': 'cheapest',
+  'pp.outOfMarket': 'Not in your market',
+  'pp.outOfMarketTitle': 'Not a shop in {country}, nor one listed as shipping there (Settings → Defaults)',
   'pp.targetPlaceholder': '{cur} target',
   'pp.reached': 'reached ✓',
   'pp.toGo': '{x} to go',

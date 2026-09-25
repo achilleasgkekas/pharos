@@ -1,6 +1,8 @@
 'use client';
 import { cur } from "@/lib/money";
 import { createContext, useContext, useState, useTransition, useMemo } from 'react';
+import { ShoppingMarketProvider } from '@/components/ShoppingMarketContext';
+import type { ShoppingMarket } from '@/lib/shoppingRegion';
 import { useRouter } from 'next/navigation';
 import {
   Search,
@@ -267,6 +269,7 @@ export function ItemsClient({
   categoryList = [],
   baseCurrency = 'EUR',
   multiCurrency = false,
+  shoppingMarket = null,
 }: {
   items: SerializedItem[];
   view?: ItemView;
@@ -277,6 +280,7 @@ export function ItemsClient({
   categoryList?: string[];
   baseCurrency?: string;
   multiCurrency?: boolean;
+  shoppingMarket?: ShoppingMarket | null; // #319: store links outside it get a badge
 }) {
   const locale = useLocale();
   // The workspace's configured list, handed down instead of parked in module scope — see the
@@ -674,6 +678,7 @@ export function ItemsClient({
 
   return (
     <ItemCategoriesContext.Provider value={configuredCategories}>
+    <ShoppingMarketProvider value={shoppingMarket}>
     <main className="max-w-[1400px] mx-auto px-4 py-6 pb-24">
       {/* Page header */}
       <div className="mb-6 pb-4 border-b border-[color:var(--color-border)]">
@@ -976,6 +981,7 @@ export function ItemsClient({
         <CompareItemsTable items={compareItems} t={t} truncated={selectedIds.size > compareItems.length} />
       </Modal>
     </main>
+    </ShoppingMarketProvider>
     </ItemCategoriesContext.Provider>
   );
 }

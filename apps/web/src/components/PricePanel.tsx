@@ -11,8 +11,19 @@ import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { useLocale, useT } from '@/components/LocaleProvider';
 import type { TKey } from '@/lib/i18n';
 import { formatDate, formatTime, formatDateTime } from '@/lib/i18n/format';
+import { useShoppingMarket } from '@/components/ShoppingMarketContext';
+import { marketRank } from '@/lib/shoppingRegion';
 
 const VERDICT_KEY: Record<string, TKey> = { deal: 'pp.vDeal', dropping: 'pp.vDropping', rising: 'pp.vRising', good: 'pp.vGood', high: 'pp.vHigh' };
+
+/** A country code in the UI language ('GR' → 'Greece' / 'Ελλάδα'); the code itself if unknown. */
+function regionName(code: string, locale: string): string {
+  try {
+    return new Intl.DisplayNames([locale], { type: 'region' }).of(code) ?? code;
+  } catch {
+    return code;
+  }
+}
 
 const PriceHistoryChart = dynamic(() => import('@/components/PriceHistoryChart').then((m) => m.PriceHistoryChart), { ssr: false });
 
@@ -75,6 +86,7 @@ const money = (n: number) => `${cur()}${Math.round(n * 100) / 100}`;
 export function PricePanel({ item, summary = true, onChanged, onSearchOnline }: { item: SerializedItem; summary?: boolean; onChanged?: () => void; onSearchOnline?: () => void }) {
   const locale = useLocale();
   const s = useMemo(() => priceStatus(item), [item]);
+  const market = useShoppingMarket();
   const t = useT();
   const [pending, startTransition] = useTransition();
   const [logging, setLogging] = useState(false);
@@ -202,6 +214,14 @@ export function PricePanel({ item, summary = true, onChanged, onSearchOnline }: 
                     className="flex items-center gap-2 text-xs rounded-lg px-2.5 py-1.5 bg-[color:var(--color-surface-2)] hover:bg-[color:var(--color-surface-3)] transition-colors group">
                     <span className={`w-1.5 h-1.5 rounded-full ${i === 0 ? 'bg-[color:var(--color-accent)]' : 'bg-[color:var(--color-text-faint)]'}`} />
                     <span className="flex-1 truncate text-[color:var(--color-text-dim)]">{st.store}</span>
+                    {market && st.url && marketRank(st.url, market) === null && (
+                      <span
+                        title={t('pp.outOfMarketTitle', { country: regionName(market.country, locale) })}
+                        className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-[color:var(--color-gold)]/15 text-[color:var(--color-gold)]"
+                      >
+                        {t('pp.outOfMarket')}
+                      </span>
+                    )}
                     {i === 0 && s.stores.length > 1 && <span className="text-[9px] font-bold text-[color:var(--color-accent)] uppercase">{t('pp.cheapest')}</span>}
                     <span className="font-bold text-[color:var(--color-text)]" style={{ fontFamily: 'var(--font-mono)' }}>{money(st.price)}</span>
                     <ExternalLink size={11} className="text-[color:var(--color-text-faint)] group-hover:text-[color:var(--color-cyan)]" />

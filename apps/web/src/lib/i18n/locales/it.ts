@@ -1707,6 +1707,8 @@ export const it: Partial<Dict> = {
   'pp.highest': '{x} massimo',
   'pp.targetBar': '◆ obiettivo {x}',
   'pp.cheapest': 'più economico',
+  'pp.outOfMarket': 'Fuori dal tuo mercato',
+  'pp.outOfMarketTitle': 'Non è un negozio di {country} né uno che spedisce lì (Impostazioni → Predefiniti)',
   'pp.targetPlaceholder': '{cur} obiettivo',
   'pp.reached': 'raggiunto ✓',
   'pp.toGo': 'ancora {x}',
