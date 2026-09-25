@@ -23,10 +23,27 @@ optional; you can develop most features with it turned off.
 ```bash
 cd apps/web
 npm run type-check   # tsc --noEmit — must pass
+npm test             # vitest — must pass
+npm run lint         # eslint — no errors
 npm run build        # next build — must pass
+python3 ../../scripts/check-doc-links.py   # from apps/web; when you touched docs
 ```
 
-CI runs both on every PR.
+### What CI checks
+
+| Workflow | Job | Runs when |
+| --- | --- | --- |
+| CI | **Type-check & build** (required): private-file guard, `tsc`, vitest, eslint, `next build`, then the production server starts against MongoDB and a browser smoke test (`apps/web/e2e/smoke.mjs`) runs first-time setup and opens every main page | any non-Markdown change (docs-only PRs skip it, which counts as passing) |
+| CI | Docker image builds and serves `/login` | `apps/web/`, compose files |
+| CI | Docs links (relative links and `#anchors`) | Markdown or `docs/` changes |
+| CI | Workflow lint (actionlint) | `.github/workflows/` changes |
+| CI | Everything above, nightly on `main` | 03:23 UTC |
+| Supply chain | `npm audit` (production deps, high+) for web, landing and scraper | every PR, `main`, weekly |
+| Supply chain | Dependency review (new vulnerable or incompatible-licence deps) | every PR |
+| Supply chain | Secret scan (gitleaks) over the PR's commits | every PR, `main` |
+| Landing / Scraper / Extension | type-check and build of those packages | changes in them |
+| CodeQL | security analysis | every PR, `main` |
+| Security scan | Semgrep, report-only weekly issue | Mondays |
 
 ## Code style
 
