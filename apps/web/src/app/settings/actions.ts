@@ -14,6 +14,7 @@ import { Document as DocumentModel } from '@/models/Document';
 import { SpecialDate as SpecialDateModel } from '@/models/SpecialDate';
 import { billDaysUntilDue } from '@/lib/bill';
 import { collectExpiringDocuments } from '@/lib/documentExpiry';
+import { normalizeScrapeScope, DEFAULT_OWNED_INTERVAL_DAYS, type ScrapeScope } from '@/lib/scrapeOrder';
 import { collectVehicleDue, type VehicleDueRow } from '@/lib/vehicles';
 import { Vehicle as VehicleModel } from '@/models/Vehicle';
 
@@ -1114,16 +1115,33 @@ export async function resetPrompt(key: string): Promise<{ ok: boolean }> {
 
 // ─── Scraper AI (separate provider/model from the main app) ───────────────────
 
-export type ScraperAiConfig = { provider: 'ollama' | 'anthropic'; model: string; enabled: boolean; maxLinks: number };
+export type ScraperAiConfig = {
+  provider: 'ollama' | 'anthropic';
+  model: string;
+  enabled: boolean;
+  maxLinks: number;
+  /** #330: which items a scheduled scrape covers, how often owned items are re-checked, and
+   *  whether it searches shops for Shopping items that have no link. */
+  scope: ScrapeScope;
+  ownedIntervalDays: number;
+  findLinks: boolean;
+};
 
 export async function getScraperAi(): Promise<ScraperAiConfig> {
   await connectDB();
-  const doc = await (await scoped(AppConfig)).findOne({ key: 'singleton' }).select('scraperProvider scraperModel scraperEnabled scraperMaxLinks').lean();
+  const doc = await (await scoped(AppConfig))
+    .findOne({ key: 'singleton' })
+    .select('scraperProvider scraperModel scraperEnabled scraperMaxLinks scraperScope scraperOwnedIntervalDays scraperFindLinks')
+    .lean();
+  const days = Number(doc?.scraperOwnedIntervalDays);
   return {
     provider: doc?.scraperProvider === 'anthropic' ? 'anthropic' : 'ollama',
     model: doc?.scraperModel || '',
     enabled: doc?.scraperEnabled !== false, // default ON for existing installs
     maxLinks: Math.max(0, Number(doc?.scraperMaxLinks) || 0),
+    scope: normalizeScrapeScope(doc?.scraperScope),
+    ownedIntervalDays: Number.isFinite(days) ? days : DEFAULT_OWNED_INTERVAL_DAYS,
+    findLinks: doc?.scraperFindLinks !== false,
   };
 }
 
@@ -1134,9 +1152,25 @@ export async function saveScraperAi(formData: FormData): Promise<{ ok: boolean }
   const model = String(formData.get('scraperModel') || '').trim();
   const enabled = String(formData.get('scraperEnabled') || 'true') !== 'false';
   const maxLinks = Math.max(0, Number(formData.get('scraperMaxLinks')) || 0);
+  const scope = normalizeScrapeScope(formData.get('scraperScope'));
+  // An absent or blank field keeps the default: Number(null) is 0, which would clamp to 1 day.
+  const daysField = String(formData.get('scraperOwnedIntervalDays') ?? '').trim();
+  const daysRaw = daysField ? Number(daysField) : NaN;
+  const ownedIntervalDays = Number.isFinite(daysRaw) ? Math.max(1, Math.min(365, Math.round(daysRaw))) : DEFAULT_OWNED_INTERVAL_DAYS;
+  const findLinks = String(formData.get('scraperFindLinks') || 'true') !== 'false';
   await (await scoped(AppConfig)).updateOne(
     { key: 'singleton' },
-    { $set: { scraperProvider: provider, scraperModel: model, scraperEnabled: enabled, scraperMaxLinks: maxLinks } },
+    {
+      $set: {
+        scraperProvider: provider,
+        scraperModel: model,
+        scraperEnabled: enabled,
+        scraperMaxLinks: maxLinks,
+        scraperScope: scope,
+        scraperOwnedIntervalDays: ownedIntervalDays,
+        scraperFindLinks: findLinks,
+      },
+    },
     { upsert: true }
   );
   revalidatePath('/settings');

@@ -17,6 +17,7 @@ import { searchShops } from '@/lib/shopSearch';
 import { marketFor } from '@/lib/shoppingRegion';
 import { type ItemView } from '@/lib/itemStatus';
 import { saveFile, deleteFile } from '@/lib/storage';
+import { selectForScrape, selectForLinkSearch, normalizeScrapeScope, DEFAULT_OWNED_INTERVAL_DAYS } from '@/lib/scrapeOrder';
 import { assertPublicUrl } from '@/lib/ssrf';
 import { safeFetch } from '@/lib/safeFetch';
 import { revalidatePath } from 'next/cache';
@@ -2034,22 +2035,34 @@ export async function runPriceScrape(): Promise<{
   linksChecked: number;
   drops: number;
   errors: number;
+  /** #330: store links added to Shopping items that had none. */
+  linksFound: number;
   skipped?: string;
 }> {
   await assertCanWrite();
   return withRequestTenant(async () => {
-    const empty = { ok: true, scanned: 0, itemsChanged: 0, linksChecked: 0, drops: 0, errors: 0 };
+    const empty = { ok: true, scanned: 0, itemsChanged: 0, linksChecked: 0, drops: 0, errors: 0, linksFound: 0 };
     if (!(await isFeatureEnabled('itemsImport'))) return { ...empty, skipped: 'product AI is off' };
     await connectDB();
     const Item = await currentModel(ItemModel);
     // Scraper controls (Settings → Scraper AI): a kill switch + a per-run link cap. The cap
     // bounds both AI cost per run and the IP-flagging risk of hammering many shops at once.
-    const ctl = (await (await currentModel(AppConfigModel)).findOne({ key: 'singleton' }).select('scraperEnabled scraperMaxLinks').lean()) as
-      | { scraperEnabled?: boolean; scraperMaxLinks?: number }
+    const ctl = (await (await currentModel(AppConfigModel))
+      .findOne({ key: 'singleton' })
+      .select('scraperEnabled scraperMaxLinks scraperScope scraperOwnedIntervalDays scraperFindLinks')
+      .lean()) as
+      | { scraperEnabled?: boolean; scraperMaxLinks?: number; scraperScope?: string; scraperOwnedIntervalDays?: number; scraperFindLinks?: boolean }
       | null;
     if (ctl?.scraperEnabled === false) return { ...empty, skipped: 'scraper disabled' };
     const maxLinks = Math.max(0, Number(ctl?.scraperMaxLinks) || 0); // 0 = no cap
-    const items = await Item.find({ deletedAt: null, 'links.0': { $exists: true } });
+    // #330: Shopping first, then owned items that are due, longest-unchecked first within each.
+    // The old query walked every linked item in insertion order (mostly Inventory), so a link
+    // cap was always spent before any Shopping item was reached.
+    const all = await Item.find({ deletedAt: null, status: { $nin: ['sold', 'broken'] } });
+    const items = selectForScrape(all, {
+      scope: normalizeScrapeScope(ctl?.scraperScope),
+      ownedIntervalDays: Number.isFinite(Number(ctl?.scraperOwnedIntervalDays)) ? Number(ctl?.scraperOwnedIntervalDays) : DEFAULT_OWNED_INTERVAL_DAYS,
+    });
 
     let scanned = 0;
     let itemsChanged = 0;
@@ -2063,6 +2076,10 @@ export async function runPriceScrape(): Promise<{
       if (links.length === 0) continue;
       scanned++;
       let anyChange = false;
+      // Why no price was read this pass, for the "last price check" line (#330). The first
+      // readable price clears it.
+      let read = false;
+      let note = '';
       for (const link of links) {
         if (maxLinks > 0 && linksChecked >= maxLinks) break;
         linksChecked++;
@@ -2072,13 +2089,16 @@ export async function runPriceScrape(): Promise<{
           const parsed = (await getParsedProductForUrl(link.url!)).parsed; // shared cache: scrape each URL once/TTL
           if (!productMatchesItem(item.title, parsed)) {
             errors++;
+            note ||= 'no-match';
             continue; // page drifted to an unrelated product — keep the old price
           }
           const newPrice = parsed.price > 0 ? parsed.price : null;
           if (newPrice == null) {
             errors++;
+            note ||= 'no-price';
             continue; // no readable price on the page this pass
           }
+          read = true;
           if (oldPrice == null || newPrice !== oldPrice) {
             link.price = newPrice;
             item.priceHistory.push({ price: newPrice, store, url: link.url!, date: new Date() } as (typeof item.priceHistory)[number]);
@@ -2087,6 +2107,7 @@ export async function runPriceScrape(): Promise<{
           }
         } catch {
           errors++; // Cloudflare, timeout, dead link — counted, never fatal
+          note ||= 'error';
         }
       }
       const lowest = lowestKnownPrice(item);
@@ -2094,17 +2115,45 @@ export async function runPriceScrape(): Promise<{
         item.currentPrice = lowest;
         anyChange = true;
       }
+      const checked = { lastPriceCheckAt: new Date(), lastPriceCheckNote: read ? '' : note };
       if (anyChange) {
         item.markModified('links');
         item.markModified('priceHistory');
+        item.set(checked);
         await item.save();
         itemsChanged++;
+      } else {
+        // Only the check itself changed: record it without bumping updatedAt, which drives
+        // "recently updated" sorting and incremental sync for API clients.
+        await Item.updateOne({ _id: item._id }, { $set: checked }, { timestamps: false });
+      }
+    }
+
+    // #330: Shopping items with no store link can't be priced at all. Search shops in the
+    // user's market for a few of them per run and add the ones that match, with their price.
+    let linksFound = 0;
+    if (ctl?.scraperFindLinks !== false) {
+      for (const item of selectForLinkSearch(all, { max: 3, retryDays: 7 })) {
+        try {
+          const found = await searchItemPriceCandidates(String(item._id));
+          const picks = (found.candidates ?? [])
+            .filter((c) => !c.error && c.price > 0 && !c.alreadyLinked)
+            .sort((a, b) => a.price - b.price)
+            .slice(0, 2);
+          if (picks.length) {
+            const res = await addPriceLinks(String(item._id), picks);
+            if (res.ok) linksFound += res.added;
+          }
+        } catch {
+          errors++; // a failed search must not stop the run
+        }
+        await Item.updateOne({ _id: item._id }, { $set: { linkSearchAt: new Date() } }, { timestamps: false });
       }
     }
 
     safeRevalidate('/items');
     safeRevalidate('/shopping');
-    return { ok: true, scanned, itemsChanged, linksChecked, drops, errors };
+    return { ok: true, scanned, itemsChanged, linksChecked, drops, errors, linksFound };
   });
 }
 

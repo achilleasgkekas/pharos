@@ -37,6 +37,9 @@ export type SerializedItem = {
   /** P9: base units per 1 unit of `currency`; 0 when not foreign or the rate is still unknown. */
   fxRate: number;
   priceHistory: SerializedPriceEntry[];
+  /** #330: last scheduled price check, and why it read no price ('' = it did). */
+  lastPriceCheckAt?: string | null;
+  lastPriceCheckNote?: string;
   links: { label: string; url: string; price?: number | null }[];
   receiptIds: string[];
   photos: string[];

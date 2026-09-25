@@ -112,6 +112,13 @@ const ItemSchema = new Schema(
     fxRate: { type: Number, default: 0 },
 
     priceHistory: { type: [PriceEntrySchema], default: [] },
+    // #330: when a scheduled scrape last looked at this item's links, and how it went ('' = a
+    // price was read; otherwise why not: no-match / no-price / error). Drives the scrape order
+    // (longest-unchecked first) and the "last price check" line on the item.
+    lastPriceCheckAt: { type: Date, default: null },
+    lastPriceCheckNote: { type: String, default: '' },
+    // #330: when the scrape last searched shops for a Shopping item that had no link yet.
+    linkSearchAt: { type: Date, default: null },
     links: { type: [LinkSchema], default: [] },
 
     receiptIds: { type: [Schema.Types.ObjectId], ref: 'Receipt', default: [] },

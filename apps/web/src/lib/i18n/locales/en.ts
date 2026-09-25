@@ -1909,6 +1909,21 @@ export const en = {
   "notif.vehicleSub": "{what} due in {days}d",
   "notif.vehicleTodaySub": "{what} due today",
   "notif.vehicleOverdueSub": "{what} overdue by {days}d",
+  // #330 price scrape scope and last check
+  "set.scraperScope": "What to price-check",
+  "set.scraperScopeBoth": "Shopping and inventory",
+  "set.scraperScopeShopping": "Shopping only",
+  "set.scraperScopeInventory": "Inventory only",
+  "set.scraperScopeHint": "Shopping items are checked first, on every run.",
+  "set.scraperOwnedDays": "Re-check owned items every (days)",
+  "set.scraperFindLinks": "Find shops for Shopping items without a link",
+  "set.scraperFindLinksHint": "Up to 3 items per run, each at most once a week, in your shopping country.",
+  "pp.lastCheck": "Last price check {when}",
+  "pp.checkNever": "Not price-checked yet",
+  "pp.checkNoLink": "No store link yet, so no price checks. Search online, or let the scraper find shops.",
+  "pp.checkNoMatch": "the page no longer matched this product",
+  "pp.checkNoPrice": "no price found on the page",
+  "pp.checkError": "the shop could not be reached",
 } as const;
 
 export type Dict = Record<keyof typeof en, string>;

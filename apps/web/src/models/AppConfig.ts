@@ -137,6 +137,12 @@ const AppConfigSchema = new Schema(
     // cost; the cap also bounds IP-flagging from hitting many shops in one pass). 0 = no cap.
     scraperEnabled: { type: Boolean, default: true },
     scraperMaxLinks: { type: Number, default: 0 },
+    // #330: which items a scheduled scrape covers (lib/scrapeOrder.ts). Shopping is always
+    // checked first; owned items at most every `scraperOwnedIntervalDays`.
+    scraperScope: { type: String, enum: ['both', 'shopping', 'inventory'], default: 'both' },
+    scraperOwnedIntervalDays: { type: Number, default: 7 },
+    // #330: search shops (in your market) for Shopping items that have no store link yet.
+    scraperFindLinks: { type: Boolean, default: true },
 
     // ── File storage (PDFs/images) ──
     // Local is ALWAYS the working copy (serving, thumbnails, AI). A remote backend is

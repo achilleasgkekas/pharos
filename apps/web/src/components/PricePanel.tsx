@@ -1,4 +1,5 @@
 'use client';
+import { relTime } from '@/lib/i18n/format';
 import { useState, useMemo, useTransition } from 'react';
 import dynamic from 'next/dynamic';
 import { cur } from '@/lib/money';
@@ -283,6 +284,22 @@ export function PricePanel({ item, summary = true, onChanged, onSearchOnline }: 
               )}
             </div>
           </div>
+
+          {/* #330: when the scheduled scrape last looked at this item, and why it read nothing. */}
+          <p className="mt-2 text-[10px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
+            {linkCount === 0
+              ? t('pp.checkNoLink')
+              : item.lastPriceCheckAt
+                ? t('pp.lastCheck', { when: relTime(item.lastPriceCheckAt, t) }) +
+                  (item.lastPriceCheckNote === 'no-match'
+                    ? ` · ${t('pp.checkNoMatch')}`
+                    : item.lastPriceCheckNote === 'no-price'
+                      ? ` · ${t('pp.checkNoPrice')}`
+                      : item.lastPriceCheckNote === 'error'
+                        ? ` · ${t('pp.checkError')}`
+                        : '')
+                : t('pp.checkNever')}
+          </p>
 
           {/* Refresh-prices diff — per tracked store: down / up / unchanged / error */}
           {refreshResults && (

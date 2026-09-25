@@ -81,6 +81,12 @@ Highlights:
 - **Bulk actions.** Select multiple items and run AI fill on the selection.
 - **List / grid** layouts, a left filter sidebar (search, status, store, category,
   sort, flag chips such as "has photo", "under warranty", "deals only").
+- **Scheduled price checks.** The price scraper checks your **Shopping** items first,
+  on every run, and owned items only every few days (7 by default), so a per-run link
+  limit never runs out before it reaches what you want to buy. For Shopping items with
+  no store link yet, it searches shops in your shopping country (up to 3 items per run,
+  each at most weekly) and adds the ones that match. Each item shows when it was last
+  checked and, if no price was read, why. Configure it in Settings → AI → Scraper AI.
 - **Shopping country.** Pick the country you shop in (Settings → General, or the
   setup wizard) and price searches only look at shops that sell there: the
   country's own shops plus the foreign shops you add (Amazon.de by default for

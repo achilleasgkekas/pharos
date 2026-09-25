@@ -157,13 +157,13 @@ describe('getScraperAi', () => {
 
   it('defaults to ollama + empty model when nothing is stored', async () => {
     const cfg = await getScraperAi();
-    expect(cfg).toEqual({ provider: 'ollama', model: '', enabled: true, maxLinks: 0 });
+    expect(cfg).toEqual({ provider: 'ollama', model: '', enabled: true, maxLinks: 0, scope: 'both', ownedIntervalDays: 7, findLinks: true });
   });
 
   it('returns anthropic only on an exact stored match', async () => {
     appConfigFindOneLean.mockResolvedValueOnce({ scraperProvider: 'anthropic', scraperModel: 'claude-haiku-4-5' });
     const cfg = await getScraperAi();
-    expect(cfg).toEqual({ provider: 'anthropic', model: 'claude-haiku-4-5', enabled: true, maxLinks: 0 });
+    expect(cfg).toEqual({ provider: 'anthropic', model: 'claude-haiku-4-5', enabled: true, maxLinks: 0, scope: 'both', ownedIntervalDays: 7, findLinks: true });
   });
 
   it('falls back to ollama for any other stored value', async () => {
@@ -190,26 +190,37 @@ describe('saveScraperAi', () => {
     await saveScraperAi(fd({ scraperProvider: 'anthropic', scraperModel: 'claude-haiku-4-5' }));
     const [filter, update, opts] = appConfigUpdateOne.mock.calls[0];
     expect(filter).toEqual({ key: 'singleton' });
-    expect(update).toEqual({ $set: { scraperProvider: 'anthropic', scraperModel: 'claude-haiku-4-5', scraperEnabled: true, scraperMaxLinks: 0 } });
+    expect(update).toEqual({ $set: { scraperProvider: 'anthropic', scraperModel: 'claude-haiku-4-5', scraperEnabled: true, scraperMaxLinks: 0, scraperScope: 'both', scraperOwnedIntervalDays: 7, scraperFindLinks: true } });
     expect(opts).toEqual({ upsert: true });
   });
 
   it('falls back to ollama for any other or missing provider field', async () => {
     await saveScraperAi(fd({ scraperModel: 'qwen2.5:14b' }));
     const [, update] = appConfigUpdateOne.mock.calls[0];
-    expect(update).toEqual({ $set: { scraperProvider: 'ollama', scraperModel: 'qwen2.5:14b', scraperEnabled: true, scraperMaxLinks: 0 } });
+    expect(update).toEqual({ $set: { scraperProvider: 'ollama', scraperModel: 'qwen2.5:14b', scraperEnabled: true, scraperMaxLinks: 0, scraperScope: 'both', scraperOwnedIntervalDays: 7, scraperFindLinks: true } });
   });
 
   it('trims the model field', async () => {
     await saveScraperAi(fd({ scraperProvider: 'ollama', scraperModel: '  qwen2.5:14b  ' }));
     const [, update] = appConfigUpdateOne.mock.calls[0];
-    expect(update).toEqual({ $set: { scraperProvider: 'ollama', scraperModel: 'qwen2.5:14b', scraperEnabled: true, scraperMaxLinks: 0 } });
+    expect(update).toEqual({ $set: { scraperProvider: 'ollama', scraperModel: 'qwen2.5:14b', scraperEnabled: true, scraperMaxLinks: 0, scraperScope: 'both', scraperOwnedIntervalDays: 7, scraperFindLinks: true } });
   });
 
   it('defaults model to empty string when missing', async () => {
     await saveScraperAi(fd({ scraperProvider: 'ollama' }));
     const [, update] = appConfigUpdateOne.mock.calls[0];
-    expect(update).toEqual({ $set: { scraperProvider: 'ollama', scraperModel: '', scraperEnabled: true, scraperMaxLinks: 0 } });
+    expect(update).toEqual({ $set: { scraperProvider: 'ollama', scraperModel: '', scraperEnabled: true, scraperMaxLinks: 0, scraperScope: 'both', scraperOwnedIntervalDays: 7, scraperFindLinks: true } });
+  });
+
+  it('stores the #330 scope, owned-item interval (clamped 1–365) and link finding', async () => {
+    await saveScraperAi(fd({ scraperScope: 'shopping', scraperOwnedIntervalDays: '30', scraperFindLinks: 'false' }));
+    expect(appConfigUpdateOne.mock.calls[0][1].$set).toMatchObject({ scraperScope: 'shopping', scraperOwnedIntervalDays: 30, scraperFindLinks: false });
+    appConfigUpdateOne.mockClear();
+    await saveScraperAi(fd({ scraperScope: 'nonsense', scraperOwnedIntervalDays: '9999' }));
+    expect(appConfigUpdateOne.mock.calls[0][1].$set).toMatchObject({ scraperScope: 'both', scraperOwnedIntervalDays: 365, scraperFindLinks: true });
+    appConfigUpdateOne.mockClear();
+    await saveScraperAi(fd({ scraperOwnedIntervalDays: '0' }));
+    expect(appConfigUpdateOne.mock.calls[0][1].$set).toMatchObject({ scraperOwnedIntervalDays: 1 });
   });
 
   it('always upserts and revalidates /settings on success', async () => {
