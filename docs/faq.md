@@ -1,5 +1,7 @@
 # FAQ
 
+<sub>[📚 Docs home](README.md) · [✨ Features](features.md) · [🚀 Self-hosting](self-hosting.md) · [⚙️ Configuration](configuration.md) · [❓ FAQ](faq.md)</sub>
+
 Common questions about PHAROS, grouped by topic. For step-by-step guides see the
 [documentation index](README.md).
 
@@ -22,8 +24,8 @@ Common questions about PHAROS, grouped by topic. For step-by-step guides see the
 A self-hosted personal hub. It keeps track of the things you own (inventory and
 shopping), the money you spend and earn (receipts, expenses, income, credit-card
 statements with installments, subscriptions, vouchers), and the small logistics
-of running a household or home lab (calendar, reports, tasks, and an optional
-UniFi network view). Optional AI reads your documents so you do not have to type
+of running a household (bills, utilities, vehicles, personal documents, special
+dates, calendar, reports and tasks). Optional AI reads your documents so you do not have to type
 them in by hand. See [Features](features.md) for a per-module tour.
 
 ### Who is it for?

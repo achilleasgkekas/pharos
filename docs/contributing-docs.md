@@ -1,5 +1,7 @@
 # Contributing documentation
 
+<sub>[📚 Docs home](README.md) · [✨ Features](features.md) · [🚀 Self-hosting](self-hosting.md) · [⚙️ Configuration](configuration.md) · [❓ FAQ](faq.md)</sub>
+
 Documentation lives in `docs/`. Start with the [index](README.md) and use English
 for shared guides. Write examples with reserved domains such as `example.com`
 and documentation addresses such as `192.0.2.10`; never include a real deployment's

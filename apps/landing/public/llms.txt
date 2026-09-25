@@ -1,7 +1,10 @@
 # PHAROS
 
-Pharos is a self-hosted personal hub for inventory, receipts, expenses, statements, subscriptions and planning. AI integrations are optional. Licensed under AGPL-3.0. No managed hosting or paid plans are offered.
+PHAROS is a self-hosted personal hub for households: inventory and shopping (with price tracking limited to your shopping country), receipts, expenses and income, card statements with installments, subscriptions, bills, utilities (meter readings), vehicles (fuel, service, MOT and insurance dates), vouchers, personal documents, special dates, a money calendar, savings forecasts and reports. Each household member has their own login (admin, member or viewer). AI integrations are optional. Licensed under AGPL-3.0. No managed hosting or paid plans are offered.
 
 - [Features](https://ph-aros.com/#features)
+- [Optional AI](https://ph-aros.com/#ai)
 - [Self-hosting](https://ph-aros.com/#self-host)
+- [Privacy](https://ph-aros.com/privacy)
+- [License](https://ph-aros.com/terms)
 - [Project status](https://ph-aros.com/status)

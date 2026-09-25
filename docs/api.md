@@ -1,5 +1,7 @@
 # Pharos REST API (v1)
 
+<sub>[📚 Docs home](README.md) · [✨ Features](features.md) · [🚀 Self-hosting](self-hosting.md) · [⚙️ Configuration](configuration.md) · [❓ FAQ](faq.md)</sub>
+
 Pharos exposes a versioned REST API under `/api/v1`. It is stable enough to
 build your own clients or scripts against. Every route runs on the Node.js
 runtime and talks to the same MongoDB as the web app, so anything you change
@@ -80,18 +82,6 @@ Enable it for a shared or public deployment with two environment variables:
 |----------------------|---------|-------------------------------------------------------------|
 | `API_RATE_LIMIT`     | (unset) | Max requests per window per caller. Unset or `<= 0` = off.  |
 | `API_RATE_WINDOW_MS` | `60000` | Window length in milliseconds.                              |
-
-The SaaS activation endpoint (`POST /api/saas/billing/activate`) is the exception: it
-is the only route to a paid plan and its codes are human-shaped, so it carries its own,
-much tighter budget which is **on by default** rather than opt-in.
-
-| Env var                        | Default   | Meaning                                          |
-|--------------------------------|-----------|--------------------------------------------------|
-| `SAAS_ACTIVATE_RATE_LIMIT`     | `5`       | Attempts per window, per IP **and** per account. |
-| `SAAS_ACTIVATE_RATE_WINDOW_MS` | `3600000` | Window length (1 hour).                          |
-
-An explicit `0` disables it; an unparseable value falls back to the default, so a typo
-cannot quietly remove the guard.
 
 When enabled, authenticated requests are counted **per API token** and the login
 endpoint is counted **per client IP** (to blunt brute-force attempts). Over the
@@ -237,6 +227,7 @@ These are flagged **(AI)** below with the feature name.
 | POST   | `/scan/product`     | **(AI)** `multipart` field `file` (product image) → `{ data: { name, brand, category, quantity, notes } }`. No save. |
 | POST   | `/scan/expense`     | **(AI: expenses)** JSON `{ text }` or `multipart` `file` (bill/payslip) → `{ data: { kind, vendor, category, amount, currency, date, period, paymentMethod, recurringCycle } }`. No save. |
 | POST   | `/scan/voucher`     | **(AI: vouchers)** JSON `{ text }` or `multipart` `file` → `{ data: { title, code, store, discount, expiresAt, url, notes } }`. No save. |
+| POST   | `/share`            | `multipart` fields `file` and `target` (`receipt` \| `statement`; statements must be PDF). Imports the file through that module's normal upload, which **persists** it → `{ data: { target, redirectTo } }`. This is what the iPhone share-sheet Shortcut calls, since iOS has no Web Share Target. |
 
 ### Expenses & income
 
@@ -311,15 +302,6 @@ Each plan in the `GET /statements/plans` response is:
 | PATCH  | `/vouchers/:id`     | Update `{ title?, code?, store?, discount?, url?, expiresAt?, used? }`. |
 | DELETE | `/vouchers/:id`     | Soft-delete. |
 
-### Loyalty cards
-
-| Method | Path                             | Description |
-|--------|----------------------------------|-------------|
-| GET    | `/loyaltycards?archived=0&limit&offset&updatedSince` | List (+ `limit`/`offset`/`updatedSince`). Default excludes archived cards. |
-| POST   | `/loyaltycards`                  | Create `{ title, cardNumber, store?, barcodeFormat?, notes? }`. `barcodeFormat` (when missing or invalid) falls back to a shape-based guess from `cardNumber`. |
-| PATCH  | `/loyaltycards/:id`              | Update `{ title?, store?, cardNumber?, barcodeFormat?, notes?, archived? }`. If `cardNumber` changes without explicit `barcodeFormat`, the format is re-guessed. |
-| DELETE | `/loyaltycards/:id`              | Soft-delete (recoverable from Trash). |
-
 ### Bills
 
 | Method | Path                        | Description |
@@ -330,15 +312,6 @@ Each plan in the `GET /statements/plans` response is:
 | DELETE | `/bills/:id`                | Soft-delete. |
 
 **Multi-currency fields (P9):** every bill carries `currency` (the code printed on the invoice), `origAmount` (the printed figure) and `fxRate` (base units per 1 unit of `currency`). `amount` is always the deployment's base currency, converted with that rate, so a client can sum bills without conversion; divide by `fxRate` for the printed figure. Both extra fields are `0` on an ordinary bill. `fxRate: 0` with a foreign `currency` means no rate has been entered yet, so `amount` is still the printed number: show it as unconverted rather than mixing it into a base-currency total (`/reports` lists exactly these). Marking a bill paid with expense logging carries the same currency and rate onto the expense, and a recurring bill's spawned next instance inherits the currency plus the last known rate.
-
-### Gift cards
-
-| Method | Path                           | Description |
-|--------|--------------------------------|-------------|
-| GET    | `/giftcards?archived=0&limit&offset&updatedSince` | List (+ `limit`/`offset`/`updatedSince`). Default excludes archived cards. Each card has computed `balance`, `spentPct`, and `daysLeft` fields derived from spending history. |
-| POST   | `/giftcards`                   | Create `{ title, store?, code?, initialAmount?, expiresAt?, notes? }`. |
-| PATCH  | `/giftcards/:id`               | Update `{ title?, store?, code?, initialAmount?, expiresAt?, notes?, archived? }`. Special: `addUse: { amount, note?, date? }` records a spend (positive) or reload (negative); `removeUseId` undoes one entry. Both are mutually exclusive. Response includes `{ giftCard: … }`. |
-| DELETE | `/giftcards/:id`               | Soft-delete (recoverable from Trash). |
 
 ### Goals
 
@@ -500,15 +473,9 @@ To connect Claude Code, add it as a remote MCP server pointing at
 
 | Method | Path                 | Description |
 |--------|----------------------|-------------|
-| POST   | `/api/cron/alerts`   | Runs the same alert scan as the "Check & notify now" button in Settings (deals, installments due, warranties, return windows, price hikes, trials, gift cards, bills, exceeded budgets) and fans the summary out to every configured notifier. Intended to be called by an external scheduler (cron, systemd timer, etc.) so alerts fire without a human opening the app. |
+| POST   | `/api/cron/alerts`   | Runs the same alert scan as the "Check & notify now" button in Settings (deals, installments due, warranties, return windows, price hikes, trials, subscription reviews, bills, documents, vehicle dates, special dates, maintenance, lent items, stale warranty claims, exceeded budgets and remote-backup staleness) and fans the summary out to every configured notifier. Intended to be called by an external scheduler (cron, systemd timer, etc.) so alerts fire without a human opening the app. |
 
 Note the path is `/api/cron`, not under `/api/v1`.
-
-**Self-hosted only** — returns `404` when the instance runs in `SAAS_MODE`. The
-scan reads the single shared database with no tenant scoping, so in a
-multi-tenant deployment it would mix (or leak) one tenant's numbers into
-another's notification channel; hosted workspaces get their own per-tenant
-sweep instead.
 
 Authentication is a **shared `CRON_SECRET` bearer**, not a user session
 (`Authorization: Bearer <CRON_SECRET>`), constant-time compared. Like `/api/mcp`

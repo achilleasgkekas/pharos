@@ -1,5 +1,7 @@
 # Security
 
+<sub>[📚 Docs home](README.md) · [✨ Features](features.md) · [🚀 Self-hosting](self-hosting.md) · [⚙️ Configuration](configuration.md) · [❓ FAQ](faq.md)</sub>
+
 How Pharos protects your data, what its default threat model assumes, and the
 checklist to follow before you expose an instance beyond your LAN or VPN.
 
