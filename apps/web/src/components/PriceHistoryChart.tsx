@@ -76,8 +76,8 @@ export function PriceHistoryChart({ history }: { history: SerializedPriceEntry[]
         />
         <Tooltip
           contentStyle={tooltipStyle}
-          labelFormatter={(t: number) => fmtDate(t, locale)}
-          formatter={(v: number, name: string) => [`${cur()}${v}`, name]}
+          labelFormatter={(t) => fmtDate(Number(t), locale)}
+          formatter={(v, name) => [`${cur()}${v}`, name]}
           cursor={{ stroke: 'var(--color-border-light)' }}
         />
         {!single && <Legend wrapperStyle={{ fontSize: 11 }} iconType="plainline" />}

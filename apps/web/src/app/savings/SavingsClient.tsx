@@ -188,7 +188,7 @@ export function SavingsClient({ data }: { data: SavingsData }) {
               <YAxis tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} width={52} tickFormatter={(v: number) => money(v, undefined, { notation: 'compact', minimumFractionDigits: 0, maximumFractionDigits: 1 })} />
               <Tooltip
                 contentStyle={tooltipStyle}
-                formatter={(v: number) => [money(v), t('sav.chartBalance')]}
+                formatter={(v) => [money(Number(v)), t('sav.chartBalance')]}
                 cursor={{ stroke: 'var(--color-accent)', strokeWidth: 1, strokeOpacity: 0.3 }}
               />
               <ReferenceLine y={0} stroke="var(--color-red)" strokeDasharray="4 4" />
@@ -262,7 +262,7 @@ export function SavingsClient({ data }: { data: SavingsData }) {
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
               <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#888' }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 10, fill: '#888' }} axisLine={false} tickLine={false} width={52} tickFormatter={(v: number) => money(v, undefined, { notation: 'compact', minimumFractionDigits: 0, maximumFractionDigits: 1 })} />
-              <Tooltip contentStyle={tooltipStyle} formatter={(v: number, n) => [money(v), n]} cursor={{ fill: 'rgba(127,127,127,0.08)' }} />
+              <Tooltip contentStyle={tooltipStyle} formatter={(v, n) => [money(Number(v)), n]} cursor={{ fill: 'rgba(127,127,127,0.08)' }} />
               <Legend wrapperStyle={{ fontSize: 11 }} />
               <Bar dataKey="income" name={t('sav.bIncome')} radius={[5, 5, 0, 0]} fill="#00ff88" />
               <Bar dataKey="expense" name={t('sav.bSpend')} radius={[5, 5, 0, 0]} fill="#ff4757" />

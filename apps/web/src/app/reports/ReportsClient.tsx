@@ -452,7 +452,7 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
                 <CartesianGrid stroke="var(--color-border)" strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="period" tick={{ fill: 'var(--color-text-faint)', fontSize: 10 }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fill: 'var(--color-text-faint)', fontSize: 10 }} axisLine={false} tickLine={false} width={52} tickFormatter={(v: number) => money(v, undefined, { notation: 'compact', minimumFractionDigits: 0, maximumFractionDigits: 1 })} />
-                <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [money(Number(v)), t('reports.netWorth')]} />
+                <Tooltip contentStyle={tooltipStyle} formatter={(v) => [money(Number(v)), t('reports.netWorth')]} />
                 <Area type="monotone" dataKey="net" stroke="#00ff88" strokeWidth={2} fill="url(#netWorthFill)" />
               </AreaChart>
             </ResponsiveContainer>
@@ -546,7 +546,7 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
               <YAxis tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} width={44} tickFormatter={(v: number) => money(v, undefined, { notation: 'compact', minimumFractionDigits: 0, maximumFractionDigits: 1 })} />
               <Tooltip
                 contentStyle={tooltipStyle}
-                formatter={(v: number, _n, p) => [`${money(v)} · ${(p?.payload?.count ?? 0)} receipts`, t('reports.spent')]}
+                formatter={(v, _n, p) => [`${money(Number(v))} · ${(p?.payload?.count ?? 0)} receipts`, t('reports.spent')]}
                 cursor={{ stroke: 'var(--color-accent)', strokeWidth: 1, strokeOpacity: 0.3 }}
               />
               <Area type="monotone" dataKey="total" stroke="#00ff88" strokeWidth={2} fill="url(#spendGrad)" />
@@ -580,7 +580,7 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
                 <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} width={44} tickFormatter={(v: number) => money(v, undefined, { notation: 'compact', minimumFractionDigits: 0, maximumFractionDigits: 1 })} />
-                <Tooltip contentStyle={tooltipStyle} formatter={(v: number, n) => [money(v), n]} cursor={{ fill: 'rgba(127,127,127,0.08)' }} />
+                <Tooltip contentStyle={tooltipStyle} formatter={(v, n) => [money(Number(v)), n]} cursor={{ fill: 'rgba(127,127,127,0.08)' }} />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
                 <Bar dataKey="income" name={t('nav.income')} radius={[5, 5, 0, 0]} fill="#00ff88" />
                 <Bar dataKey="expense" name={t('reports.expense')} radius={[5, 5, 0, 0]} fill="#ff4757" />
@@ -622,7 +622,7 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
               <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} width={44} tickFormatter={(v: number) => money(v, undefined, { notation: 'compact', minimumFractionDigits: 0, maximumFractionDigits: 1 })} />
-              <Tooltip contentStyle={tooltipStyle} formatter={(v: number, n) => [money(v), n]} cursor={{ fill: 'rgba(127,127,127,0.08)' }} />
+              <Tooltip contentStyle={tooltipStyle} formatter={(v, n) => [money(Number(v)), n]} cursor={{ fill: 'rgba(127,127,127,0.08)' }} />
               <Legend wrapperStyle={{ fontSize: 11 }} />
               <Bar dataKey="previous" name={t('reports.yoyLastYear')} radius={[5, 5, 0, 0]} fill="#4a4a4a" />
               <Bar dataKey="current" name={t('reports.yoyThisYear')} radius={[5, 5, 0, 0]} fill="#00d4ff" />
@@ -707,7 +707,7 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
               <BarChart data={data.spendByStore} layout="vertical" margin={{ left: 8, right: 16 }}>
                 <XAxis type="number" tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} tickFormatter={(v: number) => money(v, undefined, { notation: 'compact', minimumFractionDigits: 0, maximumFractionDigits: 1 })} />
                 <YAxis type="category" dataKey="name" width={110} tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} />
-                <Tooltip contentStyle={tooltipStyle} formatter={(v: number, _n, p) => [`${money(v)} · ${p?.payload?.count ?? 0} receipts`, 'spent']} cursor={{ fill: 'rgba(127,127,127,0.08)' }} />
+                <Tooltip contentStyle={tooltipStyle} formatter={(v, _n, p) => [`${money(Number(v))} · ${p?.payload?.count ?? 0} receipts`, 'spent']} cursor={{ fill: 'rgba(127,127,127,0.08)' }} />
                 <Bar dataKey="total" radius={[0, 5, 5, 0]}>
                   {data.spendByStore.map((_, i) => (
                     <Cell key={i} fill={PALETTE[i % PALETTE.length]} />
@@ -730,7 +730,7 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
                     <Cell key={i} fill={PALETTE[i % PALETTE.length]} stroke="var(--color-bg)" />
                   ))}
                 </Pie>
-                <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [money(v), 'value']} />
+                <Tooltip contentStyle={tooltipStyle} formatter={(v) => [money(Number(v)), 'value']} />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
               </PieChart>
             </ResponsiveContainer>
@@ -746,7 +746,7 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
               <BarChart data={data.expenseByCategory} layout="vertical" margin={{ left: 8, right: 16 }}>
                 <XAxis type="number" tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} tickFormatter={(v: number) => money(v, undefined, { notation: 'compact', minimumFractionDigits: 0, maximumFractionDigits: 1 })} />
                 <YAxis type="category" dataKey="name" width={90} tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} />
-                <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [money(v), 'total']} cursor={{ fill: 'rgba(127,127,127,0.08)' }} />
+                <Tooltip contentStyle={tooltipStyle} formatter={(v) => [money(Number(v)), 'total']} cursor={{ fill: 'rgba(127,127,127,0.08)' }} />
                 <Bar dataKey="value" radius={[0, 5, 5, 0]}>
                   {data.expenseByCategory.map((_, i) => (
                     <Cell key={i} fill={PALETTE[(i + 4) % PALETTE.length]} />
@@ -764,7 +764,7 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
               <BarChart data={data.expenseBySpace.map((s) => ({ name: s.name || t('ex.spaceNone'), value: s.value }))} layout="vertical" margin={{ left: 8, right: 16 }}>
                 <XAxis type="number" tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} tickFormatter={(v: number) => money(v, undefined, { notation: 'compact', minimumFractionDigits: 0, maximumFractionDigits: 1 })} />
                 <YAxis type="category" dataKey="name" width={90} tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} />
-                <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [money(v), 'total']} cursor={{ fill: 'rgba(127,127,127,0.08)' }} />
+                <Tooltip contentStyle={tooltipStyle} formatter={(v) => [money(Number(v)), 'total']} cursor={{ fill: 'rgba(127,127,127,0.08)' }} />
                 <Bar dataKey="value" radius={[0, 5, 5, 0]}>
                   {data.expenseBySpace.map((_, i) => (
                     <Cell key={i} fill={PALETTE[(i + 1) % PALETTE.length]} />
@@ -785,7 +785,7 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
                 <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} width={36} tickFormatter={(v: number) => money(v, undefined, { notation: 'compact', minimumFractionDigits: 0, maximumFractionDigits: 1 })} />
-                <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${money(v)}/mo`, 'cost']} cursor={{ fill: 'rgba(127,127,127,0.08)' }} />
+                <Tooltip contentStyle={tooltipStyle} formatter={(v) => [`${money(Number(v))}/mo`, 'cost']} cursor={{ fill: 'rgba(127,127,127,0.08)' }} />
                 <Bar dataKey="value" radius={[5, 5, 0, 0]}>
                   {data.subsByCategory.map((_, i) => (
                     <Cell key={i} fill={PALETTE[(i + 2) % PALETTE.length]} />
@@ -803,7 +803,7 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
               <BarChart data={data.subsBySpace} layout="vertical" margin={{ left: 8, right: 16 }}>
                 <XAxis type="number" tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} tickFormatter={(v: number) => money(v, undefined, { notation: 'compact', minimumFractionDigits: 0, maximumFractionDigits: 1 })} />
                 <YAxis type="category" dataKey="name" width={90} tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} />
-                <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${money(v)}/mo`, 'cost']} cursor={{ fill: 'rgba(127,127,127,0.08)' }} />
+                <Tooltip contentStyle={tooltipStyle} formatter={(v) => [`${money(Number(v))}/mo`, 'cost']} cursor={{ fill: 'rgba(127,127,127,0.08)' }} />
                 <Bar dataKey="value" radius={[0, 5, 5, 0]}>
                   {data.subsBySpace.map((_, i) => (
                     <Cell key={i} fill={PALETTE[(i + 3) % PALETTE.length]} />
