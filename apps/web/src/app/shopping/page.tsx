@@ -7,26 +7,30 @@ import { SHOPPING_STATUSES } from '@/lib/itemStatus';
 import { getAppSettings } from '@/lib/appSettings';
 import { marketFor } from '@/lib/shoppingRegion';
 import type { SerializedItem } from '@/types';
+import { loadBundleSummaries } from '../items/bundleData';
+import type { BundleSummary } from '@/lib/bundles';
 
 export const dynamic = 'force-dynamic';
 
-async function getItems(): Promise<SerializedItem[]> {
+async function getItems(): Promise<{ items: SerializedItem[]; bundles: BundleSummary[] }> {
   return withRequestTenant(async () => {
   await connectDB();
   const Item = await currentModel(ItemModel);
-  const items = await Item.find({ status: { $in: SHOPPING_STATUSES } })
-    .sort({ num: 1, createdAt: -1 })
-    .lean();
-  return JSON.parse(JSON.stringify(items));
+  const [items, bundles] = await Promise.all([
+    Item.find({ status: { $in: SHOPPING_STATUSES } }).sort({ num: 1, createdAt: -1 }).lean(),
+    loadBundleSummaries(),
+  ]);
+  return { items: JSON.parse(JSON.stringify(items)), bundles };
   });
 }
 
 export default async function ShoppingPage() {
-  const [items, settings] = await Promise.all([getItems(), getAppSettings()]);
+  const [{ items, bundles }, settings] = await Promise.all([getItems(), getAppSettings()]);
   return (
     <ItemsClient
       items={items}
       view="shopping"
+      bundles={bundles}
       defaultView={settings.defaultItemView}
       categoryList={settings.itemCategories}
       baseCurrency={settings.currency}

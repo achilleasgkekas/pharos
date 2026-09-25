@@ -5,7 +5,7 @@ import { createContext, useContext, useState, useTransition, useMemo } from 'rea
 import { ShoppingMarketProvider, useShoppingMarket } from '@/components/ShoppingMarketContext';
 import { isInMarket, marketRank, type ShoppingMarket } from '@/lib/shoppingRegion';
 import { useRouter } from 'next/navigation';
-import { Search, Plus, Trash2, X, Loader2, Sparkles, Link2, ExternalLink, Wand2, ListPlus, Check, FileText, TrendingDown, TrendingUp, Target, Merge, Columns3, ImagePlus, Pencil, Truck, Printer, Wrench, HandHelping, ShieldAlert } from 'lucide-react';
+import { Search, Plus, Trash2, X, Loader2, Sparkles, Link2, ExternalLink, Wand2, ListPlus, Check, FileText, TrendingDown, TrendingUp, Target, Merge, Columns3, ImagePlus, Pencil, Truck, Printer, Wrench, HandHelping, ShieldAlert, Boxes } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -21,6 +21,7 @@ import { convertToBase, deriveFxRate, formatMoney, isForeignCurrency, normalizeC
 import { COMMON_CARRIERS, hasKnownCarrier, resolveTrackingUrl } from '@/lib/tracking';
 import { maintenanceApplies, maintenanceDaysUntilDue, maintenanceState } from '@/lib/maintenance';
 import { isLentOut, lendingApplies, lendingDaysOut, lendingDaysUntilReturn, lendingState } from '@/lib/lending';
+import { MAX_BUNDLE_LENGTH, type BundleSummary } from '@/lib/bundles';
 import {
   CLAIM_STATUSES,
   MAX_CLAIM_NOTES_LENGTH,
@@ -94,6 +95,9 @@ const CATEGORIES = [
 const CATEGORY_LABELS: Record<string, string> = Object.fromEntries(CATEGORIES.map((c) => [c.value, c.label]));
 const BUILTIN_CATEGORY_VALUES = CATEGORIES.map((c) => c.value);
 const ItemCategoriesContext = createContext<string[]>(BUILTIN_CATEGORY_VALUES);
+// P39: the existing build names, offered as suggestions in the item form's bundle field so a
+// part joins "Battle Station" instead of starting a near-duplicate "battle station".
+const BundleNamesContext = createContext<string[]>([]);
 
 /** The category dropdown's options for a given list. `current` is prepended when the item already
  *  carries a value that is no longer on the list, so editing an item never silently
@@ -244,6 +248,7 @@ export function ItemsClient({
   baseCurrency = 'EUR',
   multiCurrency = false,
   shoppingMarket = null,
+  bundles = [],
 }: {
   items: SerializedItem[];
   view?: ItemView;
@@ -255,6 +260,7 @@ export function ItemsClient({
   baseCurrency?: string;
   multiCurrency?: boolean;
   shoppingMarket?: ShoppingMarket | null; // #319: store links outside it get a badge
+  bundles?: BundleSummary[]; // P39: every build's roll-up, across both views
 }) {
   const locale = useLocale();
   // The workspace's configured list, handed down instead of parked in module scope — see the
@@ -271,6 +277,7 @@ export function ItemsClient({
   const [storeFilter, setStoreFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [locationFilter, setLocationFilter] = useState(''); // P92 — where the item physically lives
+  const [bundleFilter, setBundleFilter] = useState(''); // P39 — the build an item is a part of
   const [sortBy, setSortBy] = useState<SortKey>('default');
   const [flags, setFlags] = useState<Set<string>>(new Set());
   const toggleFlag = (f: string) =>
@@ -327,6 +334,14 @@ export function ItemsClient({
     () => [...new Set(items.map((i) => i.location).filter(Boolean))].sort((a, b) => compareNames(a, b, locale)),
     [items]
   );
+  // P39 — builds, keyed by name. The filter lists only the ones with a part in THIS view,
+  // while the summary card and the detail line read the full cross-view roll-up.
+  const bundleByName = useMemo(() => new Map(bundles.map((b) => [b.name, b])), [bundles]);
+  const bundleNames = useMemo(() => bundles.map((b) => b.name), [bundles]);
+  const viewBundles = useMemo(
+    () => [...new Set(items.map((i) => i.bundle ?? '').filter(Boolean))].sort((a, b) => compareNames(a, b, locale)),
+    [items, locale]
+  );
 
   // Installment plans grouped by each product they're linked to (a plan can list several)
   const plansByItem = useMemo(() => {
@@ -357,6 +372,7 @@ export function ItemsClient({
       if (storeFilter && item.purchasedFrom !== storeFilter) return false;
       if (categoryFilter && item.category !== categoryFilter) return false;
       if (locationFilter && item.location !== locationFilter) return false;
+      if (bundleFilter && (item.bundle ?? '') !== bundleFilter) return false;
       if (activeFlags.some((f) => !f.test(item, shoppingMarket))) return false;
       if (search) {
         const q = search.toLowerCase();
@@ -390,7 +406,7 @@ export function ItemsClient({
       }
     });
     return sorted;
-  }, [items, filter, storeFilter, categoryFilter, locationFilter, flags, search, sortBy]);
+  }, [items, filter, storeFilter, categoryFilter, locationFilter, bundleFilter, flags, search, sortBy]);
 
   // Bulk "AI fill from web" over the current filtered view. Chunks of 5 (the server
   // action also caps at 5) run sequentially so we never hammer Ollama/SearXNG; one
@@ -533,12 +549,13 @@ export function ItemsClient({
     .reduce((s, i) => s + (i.currentPrice || 0), 0);
   const dealsCount = view === 'shopping' ? items.filter((i) => isDeal(i, shoppingMarket)).length : 0;
 
-  const anyFilterActive = !!(filter || storeFilter || categoryFilter || locationFilter || flags.size > 0 || search || sortBy !== 'default');
+  const anyFilterActive = !!(filter || storeFilter || categoryFilter || locationFilter || bundleFilter || flags.size > 0 || search || sortBy !== 'default');
   const resetFilters = () => {
     setFilter('');
     setStoreFilter('');
     setCategoryFilter('');
     setLocationFilter('');
+    setBundleFilter('');
     setFlags(new Set());
     setSearch('');
     setSortBy('default');
@@ -546,13 +563,14 @@ export function ItemsClient({
 
   // P87: named, saved filter presets. The full filter state as one JSON-serialisable
   // snapshot (flags Set → array), restored via applyView.
-  const currentView = { filter, storeFilter, categoryFilter, locationFilter, sortBy, flags: [...flags], search };
+  const currentView = { filter, storeFilter, categoryFilter, locationFilter, bundleFilter, sortBy, flags: [...flags], search };
   type ItemsView = typeof currentView;
   const applyView = (v: ItemsView) => {
     setFilter(v.filter ?? '');
     setStoreFilter(v.storeFilter ?? '');
     setCategoryFilter(v.categoryFilter ?? '');
     setLocationFilter(v.locationFilter ?? '');
+    setBundleFilter(v.bundleFilter ?? '');
     setSortBy((v.sortBy as SortKey) ?? 'default');
     setFlags(new Set(Array.isArray(v.flags) ? v.flags : []));
     setSearch(v.search ?? '');
@@ -596,6 +614,13 @@ export function ItemsClient({
       {locations.length > 1 && (
         <FilterGroup label={t('it.fLocation')}>
           <SearchableSelect value={locationFilter} onChange={setLocationFilter} options={locations} placeholder={t('it.allLocations')} clearable size="sm" className="w-full" />
+        </FilterGroup>
+      )}
+      {/* P39 — browse one build. Shown as soon as a single item in this view names one: a
+          build with parts in only this view is still worth jumping to. */}
+      {viewBundles.length > 0 && (
+        <FilterGroup label={t('it.fBundle')}>
+          <SearchableSelect value={bundleFilter} onChange={setBundleFilter} options={viewBundles} placeholder={t('it.allBundles')} clearable size="sm" className="w-full" />
         </FilterGroup>
       )}
       <FilterGroup label={t('common.sort')}>
@@ -652,6 +677,7 @@ export function ItemsClient({
 
   return (
     <ItemCategoriesContext.Provider value={configuredCategories}>
+    <BundleNamesContext.Provider value={bundleNames}>
     <ShoppingMarketProvider value={shoppingMarket}>
     <main className={PAGE_MAIN}>
       <PageHeader title={viewName} count={`${items.length} ${items.length === 1 ? t('it.item') : t('it.items')}`}>
@@ -758,6 +784,9 @@ export function ItemsClient({
       </PageHeader>
 
       <FilterLayout filters={filterControls} active={anyFilterActive}>
+          {bundleFilter && bundleByName.get(bundleFilter) && (
+            <BundleSummaryCard bundle={bundleByName.get(bundleFilter) as BundleSummary} />
+          )}
           {filtered.length === 0 ? (
             <div className="text-center py-24 text-[color:var(--color-text-faint)]">
               <p className="text-5xl mb-4">{cfg.emptyEmoji}</p>
@@ -810,6 +839,11 @@ export function ItemsClient({
           onClose={() => setSelectedItem(null)}
           onItemUpdated={(it) => setSelectedItem(it)}
           onItemPatched={(patch, rekey) => setSelectedItem((cur) => applyItemPatch(cur, patch, { rekey }))}
+          bundle={selectedItem.bundle ? bundleByName.get(selectedItem.bundle) : undefined}
+          onShowBundle={(name) => {
+            setBundleFilter(name);
+            setSelectedItem(null);
+          }}
         />
       )}
 
@@ -898,6 +932,7 @@ export function ItemsClient({
       </Modal>
     </main>
     </ShoppingMarketProvider>
+    </BundleNamesContext.Provider>
     </ItemCategoriesContext.Provider>
   );
 }
@@ -1255,6 +1290,50 @@ function isDeal(item: SerializedItem, market: ShoppingMarket | null): boolean {
   return lo != null && lo <= item.targetPrice;
 }
 
+/**
+ * P39 — the roll-up of one build, shown above the list while it is filtered to that build.
+ * Reads the cross-view summary, so an Inventory list of the installed parts still says what
+ * the ordered and wished-for ones on the Shopping list add up to.
+ */
+function BundleSummaryCard({ bundle }: { bundle: BundleSummary }) {
+  const t = useT();
+  const stages = [
+    bundle.planned ? t('it.bundlePlanned', { n: bundle.planned }) : '',
+    bundle.ordered ? t('it.bundleOrdered', { n: bundle.ordered }) : '',
+    bundle.received ? t('it.bundleReceived', { n: bundle.received }) : '',
+    bundle.installed ? t('it.bundleInstalled', { n: bundle.installed }) : '',
+  ].filter(Boolean);
+  return (
+    <div className="mb-3 bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-xl p-4 flex flex-wrap items-end justify-between gap-4">
+      <div className="min-w-0">
+        <div className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider mb-1 flex items-center gap-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
+          <Boxes size={12} />
+          {t('it.bundleLabel')}
+        </div>
+        <div className="text-lg font-bold truncate" style={{ fontFamily: 'var(--font-display)' }}>
+          {bundle.name}
+        </div>
+        <div className="text-[10px] text-[color:var(--color-text-faint)] mt-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
+          {t('it.bundlePartsN', { n: bundle.parts })}
+          {stages.length > 0 && ` · ${stages.join(' · ')}`}
+        </div>
+      </div>
+      <div className="flex gap-6" style={{ fontFamily: 'var(--font-mono)' }}>
+        <div className="text-right">
+          <div className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider">{t('it.bundleInvested')}</div>
+          <div className="text-sm font-semibold text-[color:var(--color-cyan)]">{cur()}{bundle.invested.toFixed(0)}</div>
+        </div>
+        {bundle.toBuy > 0 && (
+          <div className="text-right">
+            <div className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider">{t('it.bundleToBuy')}</div>
+            <div className="text-sm font-semibold">{cur()}{bundle.toBuy.toFixed(0)}</div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // Labelled group for the filter sidebar
 function FilterGroup({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -1607,6 +1686,8 @@ function ItemDetailModal({
   onClose,
   onItemUpdated,
   onItemPatched,
+  bundle,
+  onShowBundle,
 }: {
   item: SerializedItem;
   view: ItemView;
@@ -1618,6 +1699,9 @@ function ItemDetailModal({
   onItemUpdated: (item: SerializedItem) => void;
   /** Merges onto the parent's CURRENT item; `rekey` remounts the keyed children (#245). */
   onItemPatched: (patch: Partial<Pick<SerializedItem, 'photos' | 'attachments'>>, rekey?: boolean) => void;
+  /** P39: the roll-up of the build this item is a part of, when it is part of one. */
+  bundle?: BundleSummary;
+  onShowBundle: (name: string) => void;
 }) {
   const market = useShoppingMarket(); // #319: deal checks count in-market shops only
   const locale = useLocale();
@@ -1997,6 +2081,27 @@ function ItemDetailModal({
               </div>
               <Button variant="ghost" onClick={handleMaintenanceDone} disabled={pending} className="self-start">
                 {t('it.markMaintDone')}
+              </Button>
+            </div>
+          )}
+
+          {/* P39 — the build this is a part of, with the whole build's cost next to it, and
+              the one link that lists the other parts. Read-only: the name is edited in the
+              form, and the roll-up is derived from the parts, never typed. */}
+          {bundle && (
+            <div className="bg-[color:var(--color-surface-2)] rounded-xl p-4 flex flex-col gap-2">
+              <div className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider flex items-center gap-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
+                <Boxes size={12} />
+                {t('it.bundlePartOf')}
+              </div>
+              <div className="text-sm font-semibold truncate" style={{ fontFamily: 'var(--font-mono)' }}>
+                {bundle.name}
+              </div>
+              <div className="text-[10px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
+                {t('it.bundleInvestedParts', { amount: `${cur()}${bundle.invested.toFixed(0)}`, n: bundle.parts })}
+              </div>
+              <Button variant="ghost" onClick={() => onShowBundle(bundle.name)} className="self-start">
+                {t('it.bundleShowParts')}
               </Button>
             </div>
           )}
@@ -2412,6 +2517,7 @@ type ItemFormState = {
   tags: string;
   serialNumber: string;
   location: string;
+  bundle: string;
   /** P41: only shown while the item is owned, kept in state across a status change for
    *  the same reason the sale and tracking fields above are. */
   maintenanceIntervalDays: string;
@@ -2474,6 +2580,7 @@ function ItemForm({
     tags: (item?.tags ?? []).join(', '),
     serialNumber: item?.serialNumber ?? '',
     location: item?.location ?? '',
+    bundle: item?.bundle ?? '',
     maintenanceIntervalDays: item?.maintenanceIntervalDays != null ? String(item.maintenanceIntervalDays) : '',
     lastMaintenanceAt: item?.lastMaintenanceAt ? item.lastMaintenanceAt.slice(0, 10) : '',
     lentTo: item?.lentTo ?? '',
@@ -2481,6 +2588,7 @@ function ItemForm({
     expectedReturnAt: item?.expectedReturnAt ? item.expectedReturnAt.slice(0, 10) : '',
   });
   const categoryOptions = useItemCategoryOptions(form.category);
+  const bundleNames = useContext(BundleNamesContext);
   const [links, setLinks] = useState<{ label: string; url: string; price: string }[]>(
     item?.links?.length
       ? item.links.map((l) => ({ label: l.label, url: l.url, price: l.price != null ? String(l.price) : '' }))
@@ -2764,6 +2872,22 @@ function ItemForm({
       </Field>
       <Field label={t('it.fLocation')}>
         <Input value={form.location} onChange={set('location')} placeholder={t('it.fLocationPlaceholder')} />
+      </Field>
+      {/* P39 — which build this is a part of. A plain input with the existing names as
+          suggestions: typing a new name starts a new build, there is nothing to create first. */}
+      <Field label={t('it.fBundle')}>
+        <Input
+          value={form.bundle}
+          onChange={set('bundle')}
+          placeholder={t('it.fBundlePlaceholder')}
+          list="item-bundle-names"
+          maxLength={MAX_BUNDLE_LENGTH}
+        />
+        <datalist id="item-bundle-names">
+          {bundleNames.map((b) => (
+            <option key={b} value={b} />
+          ))}
+        </datalist>
       </Field>
 
       {/* P41 — maintenance schedule. Owned items only: a wishlist entry is not yet a thing

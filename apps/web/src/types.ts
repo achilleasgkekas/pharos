@@ -83,6 +83,9 @@ export type SerializedItem = {
   warrantyUntil: string | null;
   serialNumber: string;
   location: string;
+  /** P39: the build this item is a part of. Absent on documents written before P39: read
+   *  it as `item.bundle ?? ''`. See lib/bundles.ts for the roll-up. */
+  bundle?: string;
   aiFilledAt: string | null;
   createdAt: string;
   updatedAt: string;
