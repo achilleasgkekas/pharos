@@ -115,7 +115,7 @@ export async function POST(req: NextRequest) {
       // Same rate as `amount` (see resolveSubFx in app/subscriptions/actions.ts for why both
       // money fields must move together); unknown rate leaves the printed number alone.
       firstChargeAmount: fx.fxRate > 0 ? convertToBase(printedFirstCharge, fx.fxRate) : printedFirstCharge,
-    });
-    return NextResponse.json({ subscription: trim(doc.toObject() as SubLean) }, { status: 201 });
+    } as any);
+    return NextResponse.json({ subscription: trim((doc as any).toObject() as SubLean) }, { status: 201 });
   });
 }

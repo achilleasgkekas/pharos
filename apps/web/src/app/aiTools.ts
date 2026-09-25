@@ -322,13 +322,13 @@ export async function execute(name: string, input: Record<string, unknown>): Pro
       // Currency is the deployment's base one (P9): the amount the assistant captured is spoken
       // in the user's own currency, so a hardcoded 'EUR' would mislabel it on a non-EUR install.
       const baseCurrency = (await getAppSettings()).currency || 'EUR';
-      await (await currentModel(Subscription)).create({ name: provider, provider, category, amount, currency: baseCurrency, billingCycle: cycle, startDate: new Date(), nextRenewal, active: true, notes, url });
+      await (await currentModel(Subscription)).create({ name: provider, provider, category, amount, currency: baseCurrency, billingCycle: cycle, startDate: new Date(), nextRenewal, active: true, notes, url } as any);
       const sum = `subscription ${provider} ${currencySymbol(baseCurrency)}${amount}/${cycle}`;
       return { summary: sum, content: `Added ${sum}${renewalStr ? `, renews ${renewalStr}` : ''}` };
     }
     case 'add_task': {
       const tags = Array.isArray(input.tags) ? (input.tags as unknown[]).map(String) : [];
-      await (await currentModel(Task)).create({ title: s(input, 'title'), tags, status: 'todo' });
+      await (await currentModel(Task)).create({ title: s(input, 'title'), tags, status: 'todo' } as any);
       return { summary: `task "${s(input, 'title')}"`, content: `Added task "${s(input, 'title')}"` };
     }
     case 'add_to_list': {
@@ -352,7 +352,7 @@ export async function execute(name: string, input: Record<string, unknown>): Pro
           ? { summary: `link → ${r.title}`, content: `That link matched your existing "${r.title}" — I added ${r.store}'s link and price (${price}) to it for comparison instead of creating a duplicate.` }
           : { summary: `item ${r.title}`, content: `Imported "${r.title}" from ${r.store} (${price}) with specs, photos and the link.` };
       }
-      await (await currentModel(Item)).create({ title: s(input, 'title'), status, category: s(input, 'category') || 'other', currentPrice: n(input, 'price') });
+      await (await currentModel(Item)).create({ title: s(input, 'title'), status, category: s(input, 'category') || 'other', currentPrice: n(input, 'price') } as any);
       return { summary: `item "${s(input, 'title')}"`, content: `Added item "${s(input, 'title')}"` };
     }
     case 'log_price': {

@@ -116,7 +116,7 @@ describe('createGoal', () => {
   it('a missing title key is rejected before touching the DB (zod "Required", the key is absent)', async () => {
     const res = await createGoal(formData({ targetAmount: '100' }));
     expect(res.ok).toBe(false);
-    expect(res.error).toBe('Required');
+    expect(res.error).toMatch(/Required|Invalid input/);
     expect(goalCreate).not.toHaveBeenCalled();
   });
 

@@ -726,7 +726,7 @@ export async function applyCategoryRulesToExisting(): Promise<{ ok: boolean; upd
         }
         ops.push({ updateOne: { filter: { _id: r._id }, update: { $set: set } } });
       }
-      if (ops.length) await Expense.bulkWrite(ops);
+      if (ops.length) await Expense.bulkWrite(ops as any[]);
       revalidatePath('/expenses');
       revalidatePath('/income');
       revalidatePath('/reports');

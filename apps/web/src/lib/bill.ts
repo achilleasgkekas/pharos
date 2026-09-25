@@ -74,9 +74,11 @@ export function billPaidAmount(payments: BillPayment[] | null | undefined): numb
 export function billRemaining(
   amount: number | null | undefined,
   payments: BillPayment[] | null | undefined,
-  paidAt?: string | Date | null
+  paidAt?: string | Date | null,
+  foreignNoRate = false
 ): number {
   if (paidAt) return 0;
+  if (foreignNoRate) return round2(Number(amount) || 0);
   return round2(Math.max(0, (Number(amount) || 0) - billPaidAmount(payments)));
 }
 
@@ -91,11 +93,13 @@ export function billRemaining(
 export function billPaymentState(
   amount: number | null | undefined,
   payments: BillPayment[] | null | undefined,
-  paidAt?: string | Date | null
+  paidAt?: string | Date | null,
+  foreignNoRate = false
 ): BillPaymentState {
   if (paidAt) return 'paid';
   const paid = billPaidAmount(payments);
   if (paid <= 0) return 'unpaid';
+  if (foreignNoRate) return 'partially-paid';
   const total = Number(amount) || 0;
   if (total > 0 && paid >= total) return 'paid';
   return 'partially-paid';

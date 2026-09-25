@@ -65,7 +65,7 @@ export async function getListItems(): Promise<SerializedListItem[]> {
   return withRequestTenant(async () => {
     await connectDB();
     const ShoppingListItem = await currentModel(ShoppingListItemModel);
-    await resurfaceDueRestocks(ShoppingListItem);
+    await resurfaceDueRestocks(ShoppingListItem as any);
     // Unchecked first, then newest. Checked items sink to the bottom.
     const docs = (await ShoppingListItem.find().sort({ checked: 1, createdAt: -1 }).lean()) as ListItemLean[];
     return docs.map(serialize);

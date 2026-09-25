@@ -87,6 +87,9 @@ describe('billRemaining', () => {
   it('is zero once the bill is explicitly paid', () => {
     expect(billRemaining(100, [{ amount: 20 }], iso(-1))).toBe(0);
   });
+  it('does not subtract payments when foreignNoRate is true, returning the printed amount', () => {
+    expect(billRemaining(120, [{ amount: 50 }], null, true)).toBe(120);
+  });
 });
 
 describe('billPaymentState', () => {
@@ -105,6 +108,10 @@ describe('billPaymentState', () => {
   });
   it('a zero-amount bill is never auto-settled by a payment', () => {
     expect(billPaymentState(0, [{ amount: 10 }])).toBe('partially-paid');
+  });
+  it('never auto-settles when foreignNoRate is true, staying partially-paid', () => {
+    expect(billPaymentState(100, [{ amount: 100 }], null, true)).toBe('partially-paid');
+    expect(billPaymentState(100, [{ amount: 150 }], null, true)).toBe('partially-paid');
   });
 });
 

@@ -111,7 +111,7 @@ export async function dispatchWebPush(title: string, message: string): Promise<{
       })
     );
 
-    if (expired.length) await Subs.deleteMany({ _id: { $in: expired } });
+    if (expired.length) await Subs.deleteMany({ _id: { $in: expired as string[] } });
     return { sent, total: subs.length };
   } catch {
     // Best-effort, exactly like the other channels: a broken push send must never fail

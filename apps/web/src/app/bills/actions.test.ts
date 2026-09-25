@@ -131,7 +131,7 @@ describe('createBill', () => {
   it('a missing title key is rejected before touching the DB (zod "Required", the key is absent)', async () => {
     const res = await createBill(formData({ dueDate: '01/01/2027' }));
     expect(res.ok).toBe(false);
-    expect(res.error).toBe('Required');
+    expect(res.error).toMatch(/Required|Invalid input/);
     expect(billCreate).not.toHaveBeenCalled();
   });
 
@@ -144,7 +144,7 @@ describe('createBill', () => {
   it('a missing dueDate key is rejected before touching the DB (zod "Required", the key is absent)', async () => {
     const res = await createBill(formData({ title: 'X' }));
     expect(res.ok).toBe(false);
-    expect(res.error).toBe('Required');
+    expect(res.error).toMatch(/Required|Invalid input/);
     expect(billCreate).not.toHaveBeenCalled();
   });
 

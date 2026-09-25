@@ -10,7 +10,7 @@ import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { useOpenParam } from '@/components/useOpenParam';
 import { cn } from '@/components/ui/cn';
 import { cur, currencySymbol, CURRENCIES } from '@/lib/money';
-import { convertToBase, deriveFxRate, formatMoney, isForeignCurrency, normalizeCurrency } from '@/lib/fx';
+import { convertToBase, deriveFxRate, formatMoney, isForeignCurrency, normalizeCurrency, needsFxRate } from '@/lib/fx';
 import { FxBadge } from '@/components/FxBadge';
 import { FxRateButton } from '@/components/FxRateButton';
 import { billStatus, billDaysUntilDue, billPaidAmount, billRemaining, billPaymentState, type BillStatus } from '@/lib/bill';
@@ -92,13 +92,16 @@ export function BillsClient({
   // still owed, which is what the "to pay" header should total.
   const withStatus = useMemo(
     () =>
-      bills.map((b) => ({
-        b,
-        status: billStatus(b.dueDate, b.paidAt),
-        partPaid: billPaymentState(b.amount, b.payments, b.paidAt) === 'partially-paid',
-        remaining: billRemaining(b.amount, b.payments, b.paidAt),
-      })),
-    [bills]
+      bills.map((b) => {
+        const foreignNoRate = fx.enabled && needsFxRate(b, fx.base);
+        return {
+          b,
+          status: billStatus(b.dueDate, b.paidAt),
+          partPaid: billPaymentState(b.amount, b.payments, b.paidAt, foreignNoRate) === 'partially-paid',
+          remaining: billRemaining(b.amount, b.payments, b.paidAt, foreignNoRate),
+        };
+      }),
+    [bills, fx.base, fx.enabled]
   );
 
   const openBills = withStatus.filter(({ b, status }) => !b.archived && status !== 'paid');

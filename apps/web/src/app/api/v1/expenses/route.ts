@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
       taxDeductible: boolField(b, 'taxDeductible'),
       taxCategory: strField(b, 'taxCategory').trim().slice(0, 60),
       verified: true, // manually entered → trusted
-    });
-    return NextResponse.json({ expense: trimExpense(doc.toObject() as ExpenseLean) }, { status: 201 });
+    } as any);
+    return NextResponse.json({ expense: trimExpense((doc as any).toObject() as ExpenseLean) }, { status: 201 });
   });
 }

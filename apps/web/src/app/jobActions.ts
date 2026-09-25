@@ -216,5 +216,5 @@ export async function dismissJob(id: string): Promise<{ ok: boolean }> {
 
 export async function isJobRunning(kind: string): Promise<boolean> {
   await connectDB();
-  return (await Job.countDocuments({ kind, status: 'running' })) > 0;
+  return (await Job.countDocuments({ kind, status: 'running' } as any)) > 0;
 }
