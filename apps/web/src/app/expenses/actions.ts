@@ -163,6 +163,18 @@ export async function generateDueRecurring(): Promise<{ created: number }> {
   for (const seed of seeds) {
     const cycle = String(seed.recurringCycle);
     let next = addCycleUTC(new Date(seed.date), cycle);
+    // #298: periods before `recurringFrom` predate the series being recurring; step past them
+    // on the seed's own calendar (so a yearly Jan 1 bill stays on Jan 1) without creating
+    // anything. This walk does not count against the 36-entry cap below, or a series whose
+    // cutoff sits more than 36 cycles past its last entry would never reach it.
+    if (seed.recurringFrom) {
+      const cutoff = new Date(seed.recurringFrom).getTime();
+      let skip = 0;
+      while (next.getTime() < cutoff && skip < 10000) {
+        next = addCycleUTC(next, cycle);
+        skip++;
+      }
+    }
     let guard = 0;
     while (next.getTime() <= now && guard < 36) {
       guard++;
@@ -410,12 +422,23 @@ const AddSchema = UpdateSchema.extend({
   recurring: z.boolean().optional(),
 });
 
-/** Manual entry (no file) — e.g. type in a salary or a cash expense. */
-export async function addExpense(data: z.input<typeof AddSchema>): Promise<{ ok: boolean; id?: string; error?: string }> {
+/**
+ * Manual entry (no file) — e.g. type in a salary or a cash expense.
+ *
+ * `opts.id` (#299) lets a caller that writes the expense as one half of a larger action (paying a
+ * bill) pin its `_id`. A second write with the same id then reports the existing entry instead of
+ * booking a copy, which is what makes a double-click or a retry harmless.
+ */
+export async function addExpense(
+  data: z.input<typeof AddSchema>,
+  opts?: { id?: string }
+): Promise<{ ok: boolean; id?: string; error?: string }> {
   await assertCanWrite();
   const p = AddSchema.safeParse(data);
   if (!p.success) return { ok: false, error: 'Invalid data' };
   const d = p.data;
+  const fixedId = opts?.id ?? '';
+  if (fixedId && !/^[0-9a-f]{24}$/.test(fixedId)) return { ok: false, error: 'Invalid data' };
   return withRequestTenant(async () => {
   try {
     await connectDB();
@@ -430,6 +453,7 @@ export async function addExpense(data: z.input<typeof AddSchema>): Promise<{ ok:
     const rule = explicit ? null : matchCategoryRule(settings.categoryRules, { vendor: d.vendor, description: d.notes });
     const fx = resolveFx({ amount: d.amount, currency: d.currency, fxRate: d.fxRate }, settings.currency);
     const exp = await Expense.create({
+      ...(fixedId ? { _id: fixedId } : {}),
       kind: d.kind,
       vendor: d.vendor,
       vendorKey: vendorKey(d.vendor),
@@ -461,6 +485,8 @@ export async function addExpense(data: z.input<typeof AddSchema>): Promise<{ ok:
     revalidatePath('/income');
     return { ok: true, id: String(exp._id) };
   } catch (err) {
+    // The pinned slot is already taken: an earlier attempt of the same action got there first.
+    if (fixedId && isDuplicateKey(err)) return { ok: true, id: fixedId };
     return { ok: false, error: (err as Error).message };
   }
   });
@@ -739,13 +765,19 @@ export async function applyCategoryRulesToExisting(): Promise<{ ok: boolean; upd
         .select('vendor notes category recurring recurringCycle')
         .lean();
       const ops: AnyBulkWriteOperation<ExpenseDoc>[] = [];
+      // UTC midnight, the same shape as stored dates, so a period falling due today still projects.
+      const t = new Date();
+      const recurringFromToday = new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate()));
       for (const r of rows) {
         const rule = matchCategoryRule(rules, { vendor: r.vendor, description: r.notes });
         if (!rule || rule.category === r.category) continue;
-        const set: Partial<Pick<ExpenseDoc, 'category' | 'recurring' | 'recurringCycle'>> = { category: rule.category };
+        const set: Partial<Pick<ExpenseDoc, 'category' | 'recurring' | 'recurringCycle' | 'recurringFrom'>> = { category: rule.category };
         if (rule.recurring && !r.recurring) {
           set.recurring = true;
           if (rule.recurringCycle) set.recurringCycle = rule.recurringCycle;
+          // #298: the series is recurring from today, not from its old entries. Without this the
+          // next page load backfills every missed period since the series stopped (up to 36).
+          set.recurringFrom = recurringFromToday;
         }
         ops.push({ updateOne: { filter: { _id: r._id }, update: { $set: set } } });
       }

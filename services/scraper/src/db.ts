@@ -23,6 +23,9 @@ const ItemSchema = new Schema(
     priceHistory: { type: [PriceEntrySchema], default: [] },
     links: { type: [{ label: String, url: String, price: { type: Number, default: null } }], default: [] },
     status: String,
+    deletedAt: { type: Date, default: null }, // soft delete (Trash): never scraped
+    lastPriceCheckAt: { type: Date, default: null }, // #330: see lib/scrapeOrder in the web app
+    lastPriceCheckNote: { type: String, default: '' },
   },
   { timestamps: true, collection: 'items' }
 );

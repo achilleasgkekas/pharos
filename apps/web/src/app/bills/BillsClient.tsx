@@ -597,12 +597,17 @@ function PartialPaymentForm({
   const [date, setDate] = useState(ymd(new Date()));
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
+  // #299: one key per opened form. A double-click (or a retry after an error) sends the same key,
+  // so the server records the instalment and its expense once however many requests arrive.
+  const [paymentKey] = useState(() =>
+    typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `p${Date.now()}${Math.random().toString(36).slice(2)}`
+  );
   const label = 'block text-[11px] uppercase tracking-[0.1em] text-[color:var(--color-text-faint)] mb-1';
 
   const submit = () => {
     setError('');
     startTransition(async () => {
-      const r = await logBillPayment(billId, { amount: Number(amount) || 0, date, note, logExpense });
+      const r = await logBillPayment(billId, { amount: Number(amount) || 0, date, note, logExpense, key: paymentKey });
       if (r.ok) onDone();
       else setError(r.error || 'Could not log the payment');
     });

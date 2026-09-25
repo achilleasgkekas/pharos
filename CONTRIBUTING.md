@@ -22,12 +22,17 @@ optional; you can develop most features with it turned off.
 
 ```bash
 cd apps/web
-npm run type-check   # tsc --noEmit — must pass
+npm run type-check   # tsc --noEmit with TypeScript 7 (~3x faster) — must pass
 npm test             # vitest — must pass
 npm run lint         # eslint — no errors
 npm run build        # next build — must pass
 python3 ../../scripts/check-doc-links.py   # from apps/web; when you touched docs
 ```
+
+`type-check` runs TypeScript 7 (the native compiler, installed as the `typescript7` alias).
+The regular `typescript` package stays on 5.x because typescript-eslint does not support TS 7
+yet, and `next build` type-checks with that 5.x install, so CI still covers both compilers.
+If the two ever disagree, `npm run type-check:ts5` runs the old check. See issue #72.
 
 ### What CI checks
 

@@ -7,8 +7,9 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint . --max-warnings 66",
-    "type-check": "tsc --noEmit",
+    "lint": "eslint .",
+    "type-check": "node node_modules/typescript7/bin/tsc --noEmit",
+    "type-check:ts5": "tsc --noEmit",
     "migrate": "tsx ../../scripts/migrate.ts",
     "seed": "tsx ../../scripts/seed.ts",
     "test": "vitest run",
@@ -57,6 +58,7 @@
     "tailwindcss": "^4.0.0-beta.3",
     "tsx": "^4.23.13",
     "typescript": "^5.6.3",
+    "typescript7": "npm:typescript@^7.0.2",
     "vitest": "^5.0.1"
   },
   "overrides": {
