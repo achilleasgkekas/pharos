@@ -14,6 +14,10 @@ concurrency:
   group: scraper-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
+# Read-only token: these jobs only check out and build.
+permissions:
+  contents: read
+
 jobs:
   typecheck:
     name: Type-check

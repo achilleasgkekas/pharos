@@ -3,6 +3,7 @@ import { connectDB } from './db';
 import { AppConfig } from '@/models/AppConfig';
 import { currentModel } from './tenancy/connection';
 import { assertPublicUrl } from './ssrf';
+import { safeFetch } from './safeFetch';
 import { rateHit, type RateConfig } from './apiRateLimit';
 import { WEBHOOK_EVENTS, type WebhookEvent, type WebhookSubscription } from './webhooks.shared';
 import { deliverWithRetry, describeOutcome, type DeliveryOutcome } from './deliveryRetry';
@@ -101,7 +102,7 @@ async function attemptOne(sub: WebhookSubscription, event: WebhookEvent, data: u
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (sub.secret) headers['X-Pharos-Signature'] = signWebhookPayload(sub.secret, ts, body);
   try {
-    const res = await fetch(sub.url, { method: 'POST', headers, body, signal: AbortSignal.timeout(TIMEOUT) });
+    const res = await safeFetch(sub.url, { method: 'POST', headers, body, signal: AbortSignal.timeout(TIMEOUT) });
     return res.ok
       ? { ok: true, ...(res.status ? { status: res.status } : {}) }
       : { ok: false, status: res.status, error: 'Rejected by receiver' };

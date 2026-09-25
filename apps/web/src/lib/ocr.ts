@@ -1,7 +1,6 @@
 import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import crypto from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import sharp from 'sharp';
@@ -47,10 +46,12 @@ async function detectRotation(file: string): Promise<number> {
  */
 export async function ocrImage(img: Buffer, ext = 'png'): Promise<string> {
   const safeExt = /^[a-z0-9]{1,5}$/i.test(ext) ? ext : 'png';
-  const base = path.join(os.tmpdir(), `ocr_${crypto.randomBytes(6).toString('hex')}`);
-  const inImg = `${base}.${safeExt}`;
-  const rotImg = `${base}_rot.${safeExt}`;
+  let dir = '';
   try {
+    // A private (0700) directory, not a guessable name in the shared temp dir.
+    dir = await fs.mkdtemp(path.join(os.tmpdir(), 'ocr-'));
+    const inImg = path.join(dir, `in.${safeExt}`);
+    const rotImg = path.join(dir, `rot.${safeExt}`);
     await fs.writeFile(inImg, img);
     // Sideways receipts (phone photos taken landscape) OCR to garbage. Detect the
     // rotation first; if upright, one OCR pass. If rotated, OCR a sharp-rotated copy
@@ -73,8 +74,7 @@ export async function ocrImage(img: Buffer, ext = 'png'): Promise<string> {
   } catch {
     return '';
   } finally {
-    await fs.rm(inImg, { force: true }).catch(() => {});
-    await fs.rm(rotImg, { force: true }).catch(() => {});
+    if (dir) await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
   }
 }
 
@@ -91,10 +91,12 @@ export function looksLikeUsableOcr(text: string): boolean {
  * Capped at `maxPages` so a large PDF can't hang the request.
  */
 export async function ocrPdf(pdf: Buffer, maxPages = 10): Promise<string> {
-  const base = path.join(os.tmpdir(), `ocrpdf_${crypto.randomBytes(6).toString('hex')}`);
-  const inPdf = `${base}.pdf`;
   const parts: string[] = [];
+  let dir = '';
   try {
+    dir = await fs.mkdtemp(path.join(os.tmpdir(), 'ocrpdf-'));
+    const base = path.join(dir, 'page');
+    const inPdf = path.join(dir, 'in.pdf');
     await fs.writeFile(inPdf, pdf);
     for (let page = 1; page <= maxPages; page++) {
       const prefix = `${base}_p${page}`;
@@ -122,6 +124,6 @@ export async function ocrPdf(pdf: Buffer, maxPages = 10): Promise<string> {
   } catch {
     return '';
   } finally {
-    await fs.rm(inPdf, { force: true }).catch(() => {});
+    if (dir) await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
   }
 }

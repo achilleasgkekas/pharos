@@ -23,12 +23,12 @@ import {
   CartesianGrid,
 } from 'recharts';
 import { keepSeriesOrder } from '@/lib/chartOrder';
-import { Store, Package, CalendarClock, Receipt as ReceiptIcon, Layers, ShieldCheck, TrendingUp, CreditCard, Wallet, Target, Plus, Trash2, X, Sparkles, AlertTriangle, Check, ArrowRight } from 'lucide-react';
+import { Store, CalendarClock, Receipt as ReceiptIcon, Layers, ShieldCheck, TrendingUp, CreditCard, Wallet, Target, Plus, Trash2, X, Sparkles, AlertTriangle, Check, ArrowRight } from 'lucide-react';
 import { convertToBase } from '@/lib/fx';
 import { applyFxRate, applyFxRateToCurrency } from './fxActions';
 import { FxRateButton } from '@/components/FxRateButton';
 import { createGoal, addGoalContribution, deleteGoal, sweepBudgetLeftoverToGoal } from './goalsActions';
-import { formatDate, formatTime, formatDateTime } from '@/lib/i18n/format';
+import { formatDate } from '@/lib/i18n/format';
 
 const PALETTE = ['#00ff88', '#00d4ff', '#ffd93d', '#a55eea', '#ff4757', '#00b894', '#fdcb6e', '#6c5ce7'];
 

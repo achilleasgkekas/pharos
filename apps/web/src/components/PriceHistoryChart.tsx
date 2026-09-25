@@ -3,7 +3,7 @@ import { cur } from "@/lib/money";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from 'recharts';
 import { keepSeriesOrder } from '@/lib/chartOrder';
 import type { SerializedPriceEntry } from '@/types';
-import { formatDate, formatTime, formatDateTime } from '@/lib/i18n/format';
+import { formatDate } from '@/lib/i18n/format';
 import { useLocale } from '@/components/LocaleProvider';
 
 const tooltipStyle = {

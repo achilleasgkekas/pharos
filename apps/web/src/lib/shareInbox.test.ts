@@ -74,7 +74,7 @@ describe('shareInbox · what the share sheet may hand us', () => {
 
 describe('shareInbox · abandoned shares do not live forever', () => {
   it('deletes staged files older than a day and keeps fresh ones', async () => {
-    const root = path.join(os.tmpdir(), `share-sweep-${Date.now()}`);
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'share-sweep-'));
     const dir = path.join(root, 'share', '2026', '09');
     await fs.mkdir(dir, { recursive: true });
     await fs.writeFile(path.join(dir, 'old.pdf'), 'x');

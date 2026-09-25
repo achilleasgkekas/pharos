@@ -4,7 +4,7 @@ import path from 'node:path';
 import { getStorageConfig } from './storageConfig';
 import { pushToRemote } from './remoteStorage';
 import { uploadToOnedrive, downloadFromOnedrive, createShareLink } from './onedrive';
-import { readFile } from './storage';
+import { readFile, resolveWithinStorage } from './storage';
 import { renderStoragePath } from './storagePath';
 import { markRemoteSync } from './syncState';
 
@@ -97,8 +97,9 @@ export async function recacheFromRemote(meta: MirrorMeta, filePath: string): Pro
     if (s.backend !== 'onedrive') return null;
     const r = await downloadFromOnedrive(remoteRelPath(s, meta, filePath));
     if (!r.ok || !r.data) return null;
-    const root = process.env.STORAGE_ROOT ?? path.join(process.cwd(), 'storage');
-    const dest = path.join(root, filePath);
+    // filePath comes from the database (and so from a restored backup): it must stay inside
+    // the storage root, the same guard readFile/deleteFile use.
+    const dest = resolveWithinStorage(filePath);
     await fs.mkdir(path.dirname(dest), { recursive: true });
     await fs.writeFile(dest, r.data);
     return r.data;

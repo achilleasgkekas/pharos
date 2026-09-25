@@ -73,12 +73,12 @@ def bodies(msg):
             try:
                 html = (part.get_payload(decode=True) or b'').decode('utf-8', 'ignore')
             except Exception:
-                pass
+                pass  # undecodable body: keep looking in the other parts
         elif ct == 'text/plain' and not text:
             try:
                 text = (part.get_payload(decode=True) or b'').decode('utf-8', 'ignore')
             except Exception:
-                pass
+                pass  # undecodable body: keep looking in the other parts
     return html, text
 
 
@@ -200,7 +200,7 @@ def main():
         with open(mpath, encoding='utf-8') as f:
             existing = json.load(f)
     except Exception:
-        pass
+        pass  # no manifest yet (or unreadable): start a fresh one
     with open(mpath, 'w', encoding='utf-8') as f:
         json.dump(existing + manifest, f, ensure_ascii=False, indent=1)
     print(f'\nDone: {ok} downloaded, {err} failed. Import them from the Receipts page (📧 import), then re-scan.')

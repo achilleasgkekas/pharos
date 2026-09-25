@@ -6,7 +6,7 @@ import { useLocale, useT } from '@/components/LocaleProvider';
 import type { TKey } from '@/lib/i18n';
 import type { HealthCheck, HealthCheckId, HealthLevel, SystemHealth } from '@/lib/systemHealth';
 import { getSystemHealth } from './healthActions';
-import { formatDate, formatTime, formatDateTime } from '@/lib/i18n/format';
+import { formatDate, formatTime } from '@/lib/i18n/format';
 
 /**
  * P77 — Settings → System status. A read-only traffic-light grid over the checks the app

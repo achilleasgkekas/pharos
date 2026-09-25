@@ -3,6 +3,7 @@ import { AppConfig } from '@/models/AppConfig';
 import { currentModel } from './tenancy/connection';
 import { sendNtfyTo } from './notify';
 import { assertPublicUrl } from './ssrf';
+import { safeFetch } from './safeFetch';
 import { NOTIFIER_TYPES, type NotifierConfig, type NotifierType } from './notifiers.shared';
 import { deliverWithRetry, describeOutcome, type DeliveryOutcome } from './deliveryRetry';
 import { recordDeliveries } from './deliveryLog';
@@ -38,12 +39,14 @@ async function postJson(url: string, payload: unknown, guard: boolean): Promise<
     }
   }
   try {
-    const res = await fetch(url, {
+    const init: RequestInit = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
       signal: AbortSignal.timeout(TIMEOUT),
-    });
+    };
+    // A guarded (user-supplied) URL goes through safeFetch so a redirect cannot reach an internal host.
+    const res = guard ? await safeFetch(url, init) : await fetch(url, init);
     return res.ok ? { ok: true, ...(res.status ? { status: res.status } : {}) } : { ok: false, status: res.status, error: 'Rejected by receiver' };
   } catch (err) {
     return { ok: false, error: (err as Error)?.message || 'Network error' };

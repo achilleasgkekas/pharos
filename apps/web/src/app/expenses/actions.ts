@@ -4,7 +4,7 @@ import { Expense as ExpenseModel, type ExpenseDoc } from '@/models/Expense';
 import type { AnyBulkWriteOperation } from 'mongoose';
 import { withRequestTenant } from '@/lib/tenancy/request';
 import { currentModel } from '@/lib/tenancy/connection';
-import { saveFile, deleteFile } from '@/lib/storage';
+import { saveFile } from '@/lib/storage';
 import { parseExpenseText, parseExpenseImage } from '@/lib/ollama';
 import { isFeatureEnabled } from '@/lib/aiFeatures.server';
 import { extractPdfText, looksLikeScannedPdf } from '@/lib/pdf';

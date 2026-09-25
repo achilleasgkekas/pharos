@@ -495,7 +495,7 @@ describe('PATCH /api/v1/receipts/:id — lineItems sanitizer', () => {
   });
 
   it('clamps qty 0/negative to the default 1 and negative price/vatRate to 0', async () => {
-    const res = await PATCH(makeReq({ body: { lineItems: [
+    await PATCH(makeReq({ body: { lineItems: [
       { name: 'A', qty: 0, price: -5, vatRate: -1 },
       { name: 'B', qty: -2 },
     ] } }), ctx(OID));
@@ -507,7 +507,7 @@ describe('PATCH /api/v1/receipts/:id — lineItems sanitizer', () => {
   });
 
   it('drops rows that are empty-name AND zero-price, keeps empty-name rows with a price', async () => {
-    const res = await PATCH(makeReq({ body: { lineItems: [
+    await PATCH(makeReq({ body: { lineItems: [
       { name: '   ', price: 0 }, // dropped
       { name: '', price: 9.99 }, // kept (price > 0)
       { qty: 5 }, // dropped (no name, price 0)

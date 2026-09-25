@@ -10,7 +10,7 @@ import { cn } from '@/components/ui/cn';
 import { documentDaysUntilExpiry, documentStatus, type DocStatus } from '@/lib/documentExpiry';
 import type { SerializedDocument } from '@/types';
 import { createDocument, updateDocument, deleteDocument, setDocumentArchived } from './actions';
-import { formatDate, formatTime, formatDateTime } from '@/lib/i18n/format';
+import { formatDate } from '@/lib/i18n/format';
 import { useLocale } from '@/components/LocaleProvider';
 
 // P42 — personal document expiry tracker. Inline English wording (like BillsClient), which

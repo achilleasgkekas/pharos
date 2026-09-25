@@ -1,7 +1,6 @@
 import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import crypto from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
@@ -13,10 +12,13 @@ const execFileP = promisify(execFile);
  * or the PDF can't be rendered — callers fall back to the file-type placeholder.
  */
 export async function pdfFirstPageJpeg(pdf: Buffer, width = 480): Promise<Buffer | null> {
-  const base = path.join(os.tmpdir(), `thumb_${crypto.randomBytes(6).toString('hex')}`);
-  const inPdf = `${base}.pdf`;
-  const out = `${base}.jpg`; // -singlefile appends .jpg
+  let dir = '';
   try {
+    // A private (0700) directory, not a guessable name in the shared temp dir.
+    dir = await fs.mkdtemp(path.join(os.tmpdir(), 'thumb-'));
+    const base = path.join(dir, 'page');
+    const inPdf = path.join(dir, 'in.pdf');
+    const out = `${base}.jpg`; // -singlefile appends .jpg
     await fs.writeFile(inPdf, pdf);
     await execFileP(
       'pdftoppm',
@@ -27,7 +29,6 @@ export async function pdfFirstPageJpeg(pdf: Buffer, width = 480): Promise<Buffer
   } catch {
     return null;
   } finally {
-    await fs.rm(inPdf, { force: true }).catch(() => {});
-    await fs.rm(out, { force: true }).catch(() => {});
+    if (dir) await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
   }
 }
