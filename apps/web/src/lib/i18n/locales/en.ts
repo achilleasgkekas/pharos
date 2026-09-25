@@ -1553,6 +1553,7 @@ export const en = {
   'setup.createAccount': 'Create account',
   'setup.couldNotCreate': 'Could not create the account.',
   'setup.basicPrefs': 'Basic preferences',
+  'setup.shoppingCountryHint': 'Price searches will show shops in this country first, plus foreign shops that ship there. You can change this in Settings.',
   'setup.continue': 'Continue',
   'setup.aiFeaturesOpt': 'AI features (optional)',
   'setup.aiBlurb': 'AI auto-reads receipts, bills, statements and more. You can skip this and turn it on later from Settings — the app works fully without it.',

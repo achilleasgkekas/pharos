@@ -1602,6 +1602,7 @@ export const es: Partial<Dict> = {
   'setup.createAccount': 'Crear cuenta',
   'setup.couldNotCreate': 'No se pudo crear la cuenta.',
   'setup.basicPrefs': 'Preferencias básicas',
+  'setup.shoppingCountryHint': 'La búsqueda de precios mostrará tiendas de este país y tiendas extranjeras que envían allí. Se cambia en Ajustes.',
   'setup.continue': 'Continuar',
   'setup.aiFeaturesOpt': 'Funciones de IA (opcional)',
   'setup.aiBlurb': 'La IA lee automáticamente recibos, facturas, extractos y más. Puedes saltarte esto y activarlo luego desde Ajustes — la app funciona del todo sin ello.',

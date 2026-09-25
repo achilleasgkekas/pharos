@@ -1602,6 +1602,7 @@ export const nl: Partial<Dict> = {
   'setup.createAccount': 'Account aanmaken',
   'setup.couldNotCreate': 'Kon het account niet aanmaken.',
   'setup.basicPrefs': 'Basisvoorkeuren',
+  'setup.shoppingCountryHint': 'Prijszoekopdrachten tonen winkels in dit land en buitenlandse winkels die daarheen leveren. Te wijzigen in Instellingen.',
   'setup.continue': 'Doorgaan',
   'setup.aiFeaturesOpt': 'AI-functies (optioneel)',
   'setup.aiBlurb': 'AI leest automatisch bonnen, facturen, afschriften en meer. Je kunt dit overslaan en later inschakelen via Instellingen — de app werkt volledig zonder.',

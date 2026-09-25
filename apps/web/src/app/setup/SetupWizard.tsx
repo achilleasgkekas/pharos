@@ -1,5 +1,5 @@
 'use client';
-import { useState, useTransition } from 'react';
+import { useState, useSyncExternalStore, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { User as UserIcon, Lock, Check, ArrowRight, Sparkles, SkipForward, Sun, Moon } from 'lucide-react';
 import { createFirstAdmin, saveSetupBasics, saveSetupAi, finishWithoutAi } from './actions';
@@ -8,7 +8,8 @@ import { Input } from '@/components/ui/Input';
 import { PharosMark } from '@/components/PharosMark';
 import { useTheme } from '@/components/ThemeProvider';
 import { CURRENCIES } from '@/lib/money';
-import { useT } from '@/components/LocaleProvider';
+import { useT, useLocale } from '@/components/LocaleProvider';
+import { SHOPPING_COUNTRIES, countryFromLanguageTag } from '@/lib/shoppingRegion';
 
 const STEPS = ['Account', 'Basics', 'AI', 'Done'];
 
@@ -36,6 +37,24 @@ export function SetupWizard() {
   // Step 2 state
   const [currency, setCurrency] = useState('EUR');
   const [vat, setVat] = useState('24');
+  // Shopping country (#319): null until the user picks, and until then the browser's region
+  // (el-GR → Greece) is the suggestion. Read through useSyncExternalStore so the server render
+  // ('' = anywhere) and the client agree during hydration.
+  const [pickedCountry, setPickedCountry] = useState<string | null>(null);
+  const browserCountry = useSyncExternalStore(
+    () => () => {},
+    () => countryFromLanguageTag(navigator.language),
+    () => ''
+  );
+  const country = pickedCountry ?? browserCountry;
+  const locale = useLocale();
+  const countryName = (code: string) => {
+    try {
+      return new Intl.DisplayNames([locale], { type: 'region' }).of(code) ?? code;
+    } catch {
+      return code;
+    }
+  };
 
   // Step 3 state
   const [provider, setProvider] = useState<Provider>('ollama');
@@ -60,7 +79,7 @@ export function SetupWizard() {
   function submitBasics() {
     setError('');
     start(async () => {
-      await saveSetupBasics(currency, Number(vat));
+      await saveSetupBasics(currency, Number(vat), country);
       setStep(3);
     });
   }
@@ -166,6 +185,18 @@ export function SetupWizard() {
                     <option key={c.code} value={c.code}>{c.code} · {c.symbol} · {c.label}</option>
                   ))}
                 </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-[color:var(--color-text-dim)]">{t('set.shoppingCountry')}</label>
+                <select value={country} onChange={(e) => setPickedCountry(e.target.value)} className={`${SELECT_CLS} mt-1`}>
+                  <option value="">{t('set.shoppingCountryAny')}</option>
+                  {[...SHOPPING_COUNTRIES]
+                    .sort((a, b) => countryName(a).localeCompare(countryName(b), locale))
+                    .map((code) => (
+                      <option key={code} value={code}>{countryName(code)}</option>
+                    ))}
+                </select>
+                <p className="text-[11px] text-[color:var(--color-text-faint)] mt-1">{t('setup.shoppingCountryHint')}</p>
               </div>
               <div>
                 <label className="text-xs font-medium text-[color:var(--color-text-dim)]">{t('set.defaultVat')}</label>

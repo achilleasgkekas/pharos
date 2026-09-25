@@ -1602,6 +1602,7 @@ export const de: Partial<Dict> = {
   'setup.createAccount': 'Konto erstellen',
   'setup.couldNotCreate': 'Konto konnte nicht erstellt werden.',
   'setup.basicPrefs': 'Grundeinstellungen',
+  'setup.shoppingCountryHint': 'Die Preissuche zeigt Shops aus diesem Land und ausländische Shops, die dorthin liefern. Änderbar in den Einstellungen.',
   'setup.continue': 'Weiter',
   'setup.aiFeaturesOpt': 'KI-Funktionen (optional)',
   'setup.aiBlurb': 'Die KI liest Belege, Rechnungen, Auszüge und mehr automatisch. Du kannst das überspringen und später in den Einstellungen aktivieren — die App funktioniert vollständig ohne.',

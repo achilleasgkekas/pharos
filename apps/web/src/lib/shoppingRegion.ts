@@ -82,6 +82,15 @@ export function normalizeShoppingCountry(raw: unknown): string {
   return SHOPPING_PRESETS[c] ? c : '';
 }
 
+/**
+ * The preset country for a BCP 47 language tag's region ('el-GR' → 'GR'), or '' when the tag has
+ * no region or the region has no preset. Used only to suggest a country in the setup wizard.
+ */
+export function countryFromLanguageTag(tag: string | undefined): string {
+  const region = String(tag ?? '').split(/[-_]/)[1] ?? '';
+  return normalizeShoppingCountry(region.length === 2 ? region : '');
+}
+
 /** The market for the saved settings, or null when the feature is off (no country chosen). */
 export function marketFor(country: string, extraShops: string[]): ShoppingMarket | null {
   const preset = SHOPPING_PRESETS[normalizeShoppingCountry(country)];

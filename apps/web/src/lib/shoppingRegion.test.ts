@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  countryFromLanguageTag,
   marketFor,
   marketRank,
   normalizeShopHost,
@@ -104,5 +105,17 @@ describe('rankByMarket', () => {
       GR
     );
     expect(out.map((x) => x.url)).toEqual(['https://www.skroutz.gr/rtx', 'https://www.public.gr/rtx', 'https://www.amazon.de/rtx']);
+  });
+});
+
+describe('countryFromLanguageTag', () => {
+  it('suggests the preset country for a tag with a region', () => {
+    expect(countryFromLanguageTag('el-GR')).toBe('GR');
+    expect(countryFromLanguageTag('de_AT')).toBe('AT');
+    expect(countryFromLanguageTag('en-gb')).toBe('GB');
+  });
+
+  it('suggests nothing without a region, or for a region with no preset', () => {
+    for (const tag of ['el', '', undefined, 'en-JP', 'zh-Hant-TW', 'es-419']) expect(countryFromLanguageTag(tag)).toBe('');
   });
 });
