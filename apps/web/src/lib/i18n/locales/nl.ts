@@ -539,6 +539,7 @@ export const nl: Partial<Dict> = {
   'set.insuranceExportDesc': 'Een ZIP met een CSV + afdrukbaar HTML-rapport van elk bezeten item (waarde, serienummer, garantie) plus de foto’s, handleidingen en bonnen — alles wat een verzekeraar na een claim vraagt.',
   'set.insuranceExportDone': '✓ {n} items · {total} totaal verzekerde waarde',
   'set.taxExport': 'Belastingexport (ZIP)',
+  'set.taxYear': 'Belastingjaar',
   'set.taxExportDesc': 'Een ZIP met een CSV + afdrukbaar HTML-rapport van elke aftrekbare uitgave van het gekozen jaar, gegroepeerd per fiscale categorie, plus de originele rekening-/bonbestanden — alles voor een boekhouder of belastingaangifte.',
   'set.taxExportDone': '✓ {n} uitgaven · {total} totaal',
   'set.sampleData': 'Voorbeeldgegevens',

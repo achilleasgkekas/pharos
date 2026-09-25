@@ -51,46 +51,41 @@ export function OnboardingChecklist({
   return (
     <div className="max-w-[1400px] mx-auto px-4 mb-6">
       <div className="rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] overflow-hidden">
-        <button
-          type="button"
-          onClick={() => setCollapsed((c) => !c)}
-          className="w-full flex items-center gap-3 px-5 py-3.5 text-left hover:bg-[color:var(--color-surface-2)]/50 transition-colors"
-        >
-          <span
-            className="shrink-0 grid place-items-center w-7 h-7 rounded-full text-xs font-bold"
-            style={{
-              ...mono,
-              color: allDone ? 'var(--color-accent)' : 'var(--color-cyan)',
-              background: allDone ? 'var(--color-accent)1a' : 'var(--color-cyan)1a',
-              border: `1px solid ${allDone ? 'var(--color-accent)' : 'var(--color-cyan)'}33`,
-            }}
+        {/* Dismiss sits BESIDE the collapse toggle, not inside it: a control nested in a button
+            is unreachable for keyboard and screen-reader users (axe nested-interactive). */}
+        <div className="flex items-center gap-3 pr-5 hover:bg-[color:var(--color-surface-2)]/50 transition-colors">
+          <button
+            type="button"
+            onClick={() => setCollapsed((c) => !c)}
+            aria-expanded={!collapsed}
+            className="flex-1 min-w-0 flex items-center gap-3 pl-5 py-3.5 text-left"
           >
-            {allDone ? <Check size={14} /> : `${doneCount}/${steps.length}`}
-          </span>
-          <span className="flex-1 min-w-0">
-            <span className="block text-sm font-semibold">{allDone ? doneLabel : title}</span>
-            {!collapsed && !allDone && <span className="block text-xs text-[color:var(--color-text-dim)] mt-0.5">{subtitle}</span>}
-          </span>
-          {collapsed ? <ChevronDown size={16} className="text-[color:var(--color-text-faint)] shrink-0" /> : <ChevronUp size={16} className="text-[color:var(--color-text-faint)] shrink-0" />}
-          <span
-            role="button"
-            tabIndex={0}
-            onClick={(e) => {
-              e.stopPropagation();
-              dismiss();
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.stopPropagation();
-                dismiss();
-              }
-            }}
+            <span
+              className="shrink-0 grid place-items-center w-7 h-7 rounded-full text-xs font-bold"
+              style={{
+                ...mono,
+                color: allDone ? 'var(--color-accent)' : 'var(--color-cyan)',
+                background: allDone ? 'var(--color-accent)1a' : 'var(--color-cyan)1a',
+                border: `1px solid ${allDone ? 'var(--color-accent)' : 'var(--color-cyan)'}33`,
+              }}
+            >
+              {allDone ? <Check size={14} /> : `${doneCount}/${steps.length}`}
+            </span>
+            <span className="flex-1 min-w-0">
+              <span className="block text-sm font-semibold">{allDone ? doneLabel : title}</span>
+              {!collapsed && !allDone && <span className="block text-xs text-[color:var(--color-text-dim)] mt-0.5">{subtitle}</span>}
+            </span>
+            {collapsed ? <ChevronDown size={16} className="text-[color:var(--color-text-faint)] shrink-0" /> : <ChevronUp size={16} className="text-[color:var(--color-text-faint)] shrink-0" />}
+          </button>
+          <button
+            type="button"
+            onClick={dismiss}
             aria-label="Dismiss"
             className="shrink-0 text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)] p-1 -m-1"
           >
             <X size={15} />
-          </span>
-        </button>
+          </button>
+        </div>
 
         {!collapsed && (
           <div className="px-5 pb-4 pt-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">

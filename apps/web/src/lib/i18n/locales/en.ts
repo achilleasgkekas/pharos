@@ -1515,6 +1515,7 @@ export const en = {
   'set.insuranceExportDesc': 'A ZIP with a CSV + printable HTML report of every owned item (value, serial, warranty) plus its photos, manuals and receipts — everything an insurer asks for after a claim.',
   'set.insuranceExportDone': '✓ {n} items · {total} total insured value',
   'set.taxExport': 'Tax export (ZIP)',
+  'set.taxYear': 'Tax year',
   'set.taxExportDesc': 'A ZIP with a CSV + printable HTML report of every tax-deductible expense for the chosen year, grouped by tax category, plus the original bill/receipt files — everything for an accountant or tax return.',
   'set.taxExportDone': '✓ {n} expenses · {total} total',
   'set.sampleData': 'Sample data',

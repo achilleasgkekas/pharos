@@ -1,0 +1,8 @@
+# typos (CI "Docs" job, #331): spelling in the docs and the English UI copy (en.ts). CI passes
+# those files explicitly; the other locales and the code are out of scope (Spanish words and
+# Mongo operators like $nin read as misspellings). It only flags known misspellings, so product
+# names and Greek text need no word list.
+[default.extend-words]
+# i18n key prefixes, not words: reports.yoy* (year over year), sav.* (savings)
+yoy = "yoy"
+sav = "sav"

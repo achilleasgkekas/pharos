@@ -61,8 +61,8 @@ jobs:
           else
             echo "code=false" >> "$GITHUB_OUTPUT"
           fi
-          out docker '^(apps/web/|docker-compose|\.github/workflows/ci\.yml)'
-          out docs '(\.md$|^docs/|^scripts/check-doc-links\.py$|^\.github/workflows/ci\.yml$)'
+          out docker '^(apps/web/|docker-compose|scripts/mongo-init\.js|searxng/|\.github/ci/|\.github/workflows/ci\.yml)'
+          out docs '(\.md$|^docs/|^scripts/check-doc-links\.py$|^\.github/workflows/ci\.yml$|^\.markdownlint-cli2\.yaml$|^_typos\.toml$|^apps/web/src/lib/i18n/locales/en\.ts$)'
           out workflows '^\.github/(workflows/|zizmor\.yml$)'
 
   build:
@@ -70,6 +70,10 @@ jobs:
     needs: changes
     if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read # download main's ci-baseline artifact
+      pull-requests: read # list the PR's changed files for the coverage comparison
     defaults:
       run:
         working-directory: apps/web
@@ -100,6 +104,11 @@ jobs:
           jq -r '.total | "### Unit test coverage (apps/web)\n\n| | % | covered |\n| --- | --- | --- |",
             (["lines", "statements", "functions", "branches"][] as $k | "| \($k) | \(.[$k].pct)% | \(.[$k].covered) / \(.[$k].total) |")' \
             coverage/coverage-summary.json >> "$GITHUB_STEP_SUMMARY"
+      # The parts unit tests mock (soft-delete plugin, the single-database guard, every model's
+      # indexes, backup export -> restore), against the MongoDB service. See vitest.integration.config.ts.
+      - run: npm run test:integration
+        env:
+          MONGO_URI: mongodb://127.0.0.1:27017
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -115,12 +124,46 @@ jobs:
       # `npm run lint` carries `--max-warnings`: a ratchet, so the warning count can only go down.
       # When you remove warnings, lower the number in package.json to lock the gain in.
       - run: npm run lint
+      # Unused files, exports and dependencies (knip). Report-only for now: the backlog is listed
+      # on the run page to be worked down, then this becomes a gate.
+      - name: Dead code report (knip)
+        run: |
+          { echo '### Unused code (knip, report-only)'; echo '```'; npx --yes knip@5.88.1 --no-progress --reporter compact || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
       - run: npm run build
         env:
           # Placeholders so the build never reads a real secret; these are only
           # consumed at runtime, not during `next build`.
           AUTH_SECRET: ci-placeholder-secret-do-not-use-in-production
           NEXT_SERVER_ACTIONS_ENCRYPTION_KEY: ci-placeholder-encryption-key-000000
+      # Coverage of the changed files and the client JS size, against the last green run on main
+      # (its `ci-baseline` artifact). Fails when a changed file loses coverage or the JS grows past
+      # the budget; see scripts/ci/baseline.mjs for the thresholds.
+      - name: Measure client JS
+        run: node ../../scripts/ci/baseline.mjs bundle .next "$RUNNER_TEMP/bundle.json"
+      - name: Compare with main (coverage of changed files, bundle size)
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          base="$RUNNER_TEMP/baseline"
+          mkdir -p "$base"
+          run_id=$(gh run list --workflow CI --branch main --event push --status success --limit 1 --json databaseId --jq '.[0].databaseId // empty')
+          if [ -n "$run_id" ]; then gh run download "$run_id" --name ci-baseline --dir "$base" || echo "main run $run_id has no ci-baseline artifact"; fi
+          gh api "repos/$GH_REPO/pulls/$PR/files" --paginate --jq '.[].filename' > "$RUNNER_TEMP/changed.txt"
+          node ../../scripts/ci/baseline.mjs compare "$base" coverage/coverage-summary.json "$RUNNER_TEMP/bundle.json" "$RUNNER_TEMP/changed.txt" | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Publish the baseline (main)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          mkdir -p "$RUNNER_TEMP/ci-baseline"
+          cp coverage/coverage-summary.json "$RUNNER_TEMP/bundle.json" "$RUNNER_TEMP/ci-baseline/"
+      - uses: actions/upload-artifact@v7
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        with:
+          name: ci-baseline
+          path: ${{ runner.temp }}/ci-baseline/
+          retention-days: 30
       # Smoke + browser test against the build that was just made, with a real MongoDB: the
       # production server must start, and every main page must render for a fresh admin.
       - name: Start the production server
@@ -144,11 +187,24 @@ jobs:
           NEXT_SERVER_ACTIONS_ENCRYPTION_KEY: ci-placeholder-encryption-key-000000
       - name: Browser smoke test (setup + every page)
         run: |
-          npm install --no-save playwright@1
+          npm install --no-save playwright@1 @axe-core/playwright@4
           npx playwright install --with-deps chromium
           node e2e/smoke.mjs
         env:
           BASE_URL: http://127.0.0.1:3000
+      # The critical paths through the real UI (item, expense, bill paid -> expense, fuel fill ->
+      # expense, backup export -> restore), then axe on the key pages. Needs the account smoke made.
+      - name: E2E flows and accessibility
+        run: node e2e/flows.mjs
+        env:
+          BASE_URL: http://127.0.0.1:3000
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: e2e-failures
+          path: apps/web/e2e-failure-*.png
+          retention-days: 7
+          if-no-files-found: ignore
       - name: Server log
         if: failure()
         run: cat "$RUNNER_TEMP/server.log" || true
@@ -174,21 +230,39 @@ jobs:
           tags: pharos-web:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
-      - name: Image starts and serves the login page
+      # The stack as a self-hoster runs it: docker-compose.yml (MongoDB with auth and its init
+      # script, SearXNG, the storage volume) with generated secrets, then the browser smoke test
+      # does first-run setup through /setup and opens every page.
+      - name: Compose stack starts
         run: |
-          docker network create ci
-          docker run -d --name mongo --network ci mongo:7
-          docker run -d --name web --network ci -p 3000:3000 \
-            -e MONGO_URI=mongodb://mongo:27017/pharos_ci \
-            -e AUTH_SECRET=ci-placeholder-secret-do-not-use-in-production \
-            -e NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=ci-placeholder-encryption-key-000000 \
-            pharos-web:ci
+          {
+            echo "AUTH_SECRET=$(openssl rand -hex 32)"
+            echo "NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=$(openssl rand -base64 32)"
+            echo "MONGO_PASS=$(openssl rand -hex 16)"
+          } > .env
+          docker compose -f docker-compose.yml -f .github/ci/compose.ci.yml up -d --no-build --wait web
           for _ in $(seq 1 45); do
             code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/login || true)
-            if [ "$code" = "200" ] || [ "$code" = "307" ]; then echo "image serves /login ($code)"; exit 0; fi
+            if [ "$code" = "200" ] || [ "$code" = "307" ]; then echo "stack serves /login ($code)"; exit 0; fi
             sleep 2
           done
-          docker logs web; exit 1
+          exit 1
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Browser smoke test against the compose stack
+        run: |
+          mkdir -p "$RUNNER_TEMP/e2e" && cp apps/web/e2e/smoke.mjs "$RUNNER_TEMP/e2e/"
+          cd "$RUNNER_TEMP/e2e"
+          npm init -y > /dev/null
+          npm install --no-audit --no-fund playwright@1
+          npx playwright install --with-deps chromium
+          node smoke.mjs
+        env:
+          BASE_URL: http://127.0.0.1:3000
+      - name: Compose logs
+        if: failure()
+        run: docker compose -f docker-compose.yml -f .github/ci/compose.ci.yml logs --no-color --tail 200
       # Container scan of the image just built. Blocks only on a CRITICAL vulnerability that has
       # a fix available (so bumping the base image or the package resolves it). HIGH findings are
       # listed on the run page: several sit in the npm CLI bundled with node:24-alpine, which we
@@ -216,6 +290,14 @@ jobs:
       # not fail the job.
       - name: OpenAPI lint (redocly)
         run: npx --yes @redocly/cli@2.54.3 lint docs/openapi.yaml --format=github-actions
+      # Structure that breaks rendering (config: .markdownlint-cli2.yaml) and misspellings in the
+      # docs and the English UI copy (config: _typos.toml).
+      - name: markdownlint
+        run: npx --yes markdownlint-cli2@0.18.1 "**/*.md"
+      - name: Spelling (typos)
+        run: |
+          curl -sSfL https://github.com/crate-ci/typos/releases/download/v1.50.2/typos-v1.50.2-x86_64-unknown-linux-musl.tar.gz | tar xz ./typos
+          git ls-files -z '*.md' | xargs -0 ./typos --format brief apps/web/src/lib/i18n/locales/en.ts
 
   actionlint:
     name: Workflow lint

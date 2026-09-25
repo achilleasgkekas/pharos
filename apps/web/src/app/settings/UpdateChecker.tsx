@@ -118,6 +118,7 @@ export function UpdateChecker({ canEdit }: { canEdit: boolean }) {
           <button
             type="button"
             role="switch"
+            aria-label={t('upd.toggle')}
             aria-checked={!!status.enabled}
             onClick={() => toggle(!status.enabled)}
             className={cn(
