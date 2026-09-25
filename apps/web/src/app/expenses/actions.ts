@@ -387,10 +387,23 @@ export async function updateExpense(id: string, data: z.input<typeof UpdateSchem
   });
 }
 
+/**
+ * `addExpense` takes the same fields, except that the two flags are tri-state (#252). A plain
+ * boolean cannot tell "the user unticked it" from "nobody asked": the expense form always
+ * asks, so its `false` is an answer and must beat a vendor rule or the series' last entry,
+ * while the AI tool, "paid → log as expense" and "sold → log as income" never ask and leave
+ * the flag out, which lets the rule / series decide as before. Same idea as `category`, where
+ * the form default 'other' means "not chosen", but a checkbox has no spare value for that.
+ */
+const AddSchema = UpdateSchema.extend({
+  taxDeductible: z.boolean().optional(),
+  recurring: z.boolean().optional(),
+});
+
 /** Manual entry (no file) — e.g. type in a salary or a cash expense. */
-export async function addExpense(data: z.input<typeof UpdateSchema>): Promise<{ ok: boolean; id?: string; error?: string }> {
+export async function addExpense(data: z.input<typeof AddSchema>): Promise<{ ok: boolean; id?: string; error?: string }> {
   await assertCanWrite();
-  const p = UpdateSchema.safeParse(data);
+  const p = AddSchema.safeParse(data);
   if (!p.success) return { ok: false, error: 'Invalid data' };
   const d = p.data;
   return withRequestTenant(async () => {
@@ -412,7 +425,7 @@ export async function addExpense(data: z.input<typeof UpdateSchema>): Promise<{ 
       vendorKey: vendorKey(d.vendor),
       category: explicit || rule?.category || inherited?.category || 'other',
       space: d.space.trim() || inherited?.space || '',
-      taxDeductible: d.taxDeductible || inherited?.taxDeductible || false,
+      taxDeductible: d.taxDeductible ?? (inherited?.taxDeductible || false),
       taxCategory: d.taxCategory.trim() || inherited?.taxCategory || '',
       amount: fx.amount,
       currency: fx.currency,
@@ -420,8 +433,12 @@ export async function addExpense(data: z.input<typeof UpdateSchema>): Promise<{ 
       fxRate: fx.fxRate,
       date,
       period: d.period || periodFrom(date),
-      recurring: d.recurring || rule?.recurring || inherited?.recurring || false,
-      recurringCycle: d.recurringCycle || rule?.recurringCycle || (inherited?.recurringCycle as typeof d.recurringCycle) || '',
+      recurring: d.recurring ?? (rule?.recurring || inherited?.recurring || false),
+      // An explicit "not recurring" takes no cycle from the rule or the series either.
+      recurringCycle:
+        d.recurring === false
+          ? d.recurringCycle
+          : d.recurringCycle || rule?.recurringCycle || (inherited?.recurringCycle as typeof d.recurringCycle) || '',
       paymentMethod: d.paymentMethod,
       notes: d.notes,
       split: cleanSplit(d.split),

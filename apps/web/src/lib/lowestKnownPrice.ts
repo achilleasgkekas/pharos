@@ -4,8 +4,15 @@ export type ItemPriceInput = {
 };
 
 /**
- * The lowest price we currently know for an item: its own `currentPrice` and every store link,
- * whichever is smallest. `null` when nothing has a usable price.
+ * The lowest price we currently know for an item: the cheapest priced store link, or, when no
+ * link carries a price, the item's own `currentPrice`. `null` when nothing has a usable price.
+ *
+ * Links win outright rather than competing with `currentPrice` (#212). That is the rule the
+ * item form already applies when it saves (`items/actions.ts`: once links carry prices the
+ * headline price is derived from them, and the manual field is only a fallback for link-less
+ * items) and the one the card's headline price shows. Taking the minimum of both let a stale
+ * hand-typed estimate, say 50 against a real best link of 80, keep an item "at target" long
+ * after no shop sold it at that price.
  *
  * It lives here, alone, because it used to live in THREE places — the "deal" badge in the items
  * list, the in-app bell (`notifications/actions.ts`) and the outbound push (`settings/actions.ts`)
@@ -19,11 +26,12 @@ export type ItemPriceInput = {
  * types and none of them should have to widen to share an answer.
  */
 export function lowestKnownPrice(item: ItemPriceInput): number | null {
-  let lo = (item.currentPrice ?? 0) > 0 ? (item.currentPrice as number) : Infinity;
+  let lo = Infinity;
   for (const l of item.links ?? []) {
     if (l.price && l.price > 0) {
       lo = Math.min(lo, l.price);
     }
   }
-  return lo < Infinity ? lo : null;
+  if (lo < Infinity) return lo;
+  return (item.currentPrice ?? 0) > 0 ? (item.currentPrice as number) : null;
 }
