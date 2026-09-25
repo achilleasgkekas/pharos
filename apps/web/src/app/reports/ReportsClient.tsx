@@ -22,6 +22,7 @@ import {
   Legend,
   CartesianGrid,
 } from 'recharts';
+import { keepSeriesOrder } from '@/lib/chartOrder';
 import { Store, Package, CalendarClock, Receipt as ReceiptIcon, Layers, ShieldCheck, TrendingUp, CreditCard, Wallet, Target, Plus, Trash2, X, Sparkles, AlertTriangle, Check, ArrowRight } from 'lucide-react';
 import { convertToBase } from '@/lib/fx';
 import { applyFxRate, applyFxRateToCurrency } from './fxActions';
@@ -580,8 +581,8 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
                 <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} width={44} tickFormatter={(v: number) => money(v, undefined, { notation: 'compact', minimumFractionDigits: 0, maximumFractionDigits: 1 })} />
-                <Tooltip contentStyle={tooltipStyle} formatter={(v, n) => [money(Number(v)), n]} cursor={{ fill: 'rgba(127,127,127,0.08)' }} />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Tooltip itemSorter={keepSeriesOrder} contentStyle={tooltipStyle} formatter={(v, n) => [money(Number(v)), n]} cursor={{ fill: 'rgba(127,127,127,0.08)' }} />
+                <Legend itemSorter={null} wrapperStyle={{ fontSize: 11 }} />
                 <Bar dataKey="income" name={t('nav.income')} radius={[5, 5, 0, 0]} fill="#00ff88" />
                 <Bar dataKey="expense" name={t('reports.expense')} radius={[5, 5, 0, 0]} fill="#ff4757" />
               </BarChart>
@@ -622,8 +623,8 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
               <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} width={44} tickFormatter={(v: number) => money(v, undefined, { notation: 'compact', minimumFractionDigits: 0, maximumFractionDigits: 1 })} />
-              <Tooltip contentStyle={tooltipStyle} formatter={(v, n) => [money(Number(v)), n]} cursor={{ fill: 'rgba(127,127,127,0.08)' }} />
-              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <Tooltip itemSorter={keepSeriesOrder} contentStyle={tooltipStyle} formatter={(v, n) => [money(Number(v)), n]} cursor={{ fill: 'rgba(127,127,127,0.08)' }} />
+              <Legend itemSorter={null} wrapperStyle={{ fontSize: 11 }} />
               <Bar dataKey="previous" name={t('reports.yoyLastYear')} radius={[5, 5, 0, 0]} fill="#4a4a4a" />
               <Bar dataKey="current" name={t('reports.yoyThisYear')} radius={[5, 5, 0, 0]} fill="#00d4ff" />
             </BarChart>
@@ -731,7 +732,7 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
                   ))}
                 </Pie>
                 <Tooltip contentStyle={tooltipStyle} formatter={(v) => [money(Number(v)), 'value']} />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Legend itemSorter={null} wrapperStyle={{ fontSize: 11 }} />
               </PieChart>
             </ResponsiveContainer>
           )}

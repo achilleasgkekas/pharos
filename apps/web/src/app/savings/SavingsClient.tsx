@@ -3,6 +3,7 @@ import { useMemo, useState, useTransition } from 'react';
 import { useLocale, useT, useMoney } from '@/components/LocaleProvider';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { ResponsiveContainer, AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, ReferenceLine, Legend } from 'recharts';
+import { keepSeriesOrder } from '@/lib/chartOrder';
 import { PiggyBank, Target, TrendingUp, Wallet, Plus, Trash2, Scissors, Check, AlertTriangle } from 'lucide-react';
 import {
   balanceOn,
@@ -262,8 +263,8 @@ export function SavingsClient({ data }: { data: SavingsData }) {
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
               <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#888' }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 10, fill: '#888' }} axisLine={false} tickLine={false} width={52} tickFormatter={(v: number) => money(v, undefined, { notation: 'compact', minimumFractionDigits: 0, maximumFractionDigits: 1 })} />
-              <Tooltip contentStyle={tooltipStyle} formatter={(v, n) => [money(Number(v)), n]} cursor={{ fill: 'rgba(127,127,127,0.08)' }} />
-              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <Tooltip itemSorter={keepSeriesOrder} contentStyle={tooltipStyle} formatter={(v, n) => [money(Number(v)), n]} cursor={{ fill: 'rgba(127,127,127,0.08)' }} />
+              <Legend itemSorter={null} wrapperStyle={{ fontSize: 11 }} />
               <Bar dataKey="income" name={t('sav.bIncome')} radius={[5, 5, 0, 0]} fill="#00ff88" />
               <Bar dataKey="expense" name={t('sav.bSpend')} radius={[5, 5, 0, 0]} fill="#ff4757" />
             </BarChart>

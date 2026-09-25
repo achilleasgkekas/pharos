@@ -1,6 +1,7 @@
 'use client';
 import { cur } from "@/lib/money";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from 'recharts';
+import { keepSeriesOrder } from '@/lib/chartOrder';
 import type { SerializedPriceEntry } from '@/types';
 import { formatDate, formatTime, formatDateTime } from '@/lib/i18n/format';
 import { useLocale } from '@/components/LocaleProvider';
@@ -75,12 +76,13 @@ export function PriceHistoryChart({ history }: { history: SerializedPriceEntry[]
           tickFormatter={(v: number) => `${cur()}${v}`}
         />
         <Tooltip
+          itemSorter={keepSeriesOrder}
           contentStyle={tooltipStyle}
           labelFormatter={(t) => fmtDate(Number(t), locale)}
           formatter={(v, name) => [`${cur()}${v}`, name]}
           cursor={{ stroke: 'var(--color-border-light)' }}
         />
-        {!single && <Legend wrapperStyle={{ fontSize: 11 }} iconType="plainline" />}
+        {!single && <Legend itemSorter={null} wrapperStyle={{ fontSize: 11 }} iconType="plainline" />}
         {stores.map((s, i) => (
           <Line
             key={s}
