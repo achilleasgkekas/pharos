@@ -7,6 +7,9 @@ on:
   # skipped by its `if` reports success, so the required "Type-check & build" check is satisfied
   # on a Markdown-only PR instead of never appearing (which forced an admin bypass).
   pull_request:
+  # Merge queue: the queue tests each PR on top of the ones ahead of it, so two green PRs that
+  # conflict semantically cannot both land. The `changes` job treats it like main (run everything).
+  merge_group:
   # Lets a human (or `gh workflow run CI`) re-run the gate on demand — e.g. to confirm
   # the pipeline is alive after it has been disabled, without pushing a dummy commit.
   workflow_dispatch:
@@ -21,7 +24,7 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
-# Read-only token: these jobs only check out, build and test.
+# Read-only token: these jobs only check out, build and test. (`nightly-report` asks for more.)
 permissions:
   contents: read
 
@@ -37,6 +40,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          persist-credentials: false
           fetch-depth: 0
       - id: f
         env:
@@ -58,8 +62,8 @@ jobs:
             echo "code=false" >> "$GITHUB_OUTPUT"
           fi
           out docker '^(apps/web/|docker-compose|\.github/workflows/ci\.yml)'
-          out docs '(\.md$|^docs/|^scripts/check-doc-links\.py$)'
-          out workflows '^\.github/workflows/'
+          out docs '(\.md$|^docs/|^scripts/check-doc-links\.py$|^\.github/workflows/ci\.yml$)'
+          out workflows '^\.github/(workflows/|zizmor\.yml$)'
 
   build:
     name: Type-check & build
@@ -75,6 +79,8 @@ jobs:
         ports: ['27017:27017']
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - name: Reject private operational files
         run: python3 ../../scripts/check-public-source.py
       - uses: actions/setup-node@v7
@@ -84,12 +90,30 @@ jobs:
           cache-dependency-path: apps/web/package-lock.json
       - run: npm ci
       - run: npm run type-check
-      - run: npm test
+      # The tests run with coverage on so the report comes for free; it is uploaded below and
+      # summarised on the run page. Report-only for now: no threshold fails the job.
+      - run: npm run test:coverage
+      - name: Coverage summary
+        if: always()
+        run: |
+          [ -f coverage/coverage-summary.json ] || exit 0
+          jq -r '.total | "### Unit test coverage (apps/web)\n\n| | % | covered |\n| --- | --- | --- |",
+            (["lines", "statements", "functions", "branches"][] as $k | "| \($k) | \(.[$k].pct)% | \(.[$k].covered) / \(.[$k].total) |")' \
+            coverage/coverage-summary.json >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: coverage-web
+          path: apps/web/coverage/
+          retention-days: 14
+          if-no-files-found: ignore
       # ESLint was its own workflow for a while, which meant a second runner doing its own
       # checkout and its own `npm ci` — about 80 seconds of setup to spend 15 on the actual lint,
       # on every push and every PR. Here it reuses the install that is already on disk. It runs
       # AFTER the tests and BEFORE the build so a lint error is reported once the informative
       # checks have had their say, without paying for the slowest step first.
+      # `npm run lint` carries `--max-warnings`: a ratchet, so the warning count can only go down.
+      # When you remove warnings, lower the number in package.json to lock the gain in.
       - run: npm run lint
       - run: npm run build
         env:
@@ -136,6 +160,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       # Build only (never pushed): catches Dockerfile / native-dependency breakage (sharp,
       # poppler, tesseract) on the PR instead of at release time.
@@ -163,6 +189,17 @@ jobs:
             sleep 2
           done
           docker logs web; exit 1
+      # Container scan of the image just built. Blocks only on a CRITICAL vulnerability that has
+      # a fix available (so bumping the base image or the package resolves it). HIGH findings are
+      # listed on the run page: several sit in the npm CLI bundled with node:24-alpine, which we
+      # cannot fix from here and which never runs in the container.
+      - name: Trivy (image scan)
+        run: |
+          curl -sSfL https://github.com/aquasecurity/trivy/releases/download/v0.74.0/trivy_0.74.0_Linux-64bit.tar.gz | tar xz trivy
+          ./trivy image --quiet --scanners vuln --ignore-unfixed --severity HIGH,CRITICAL \
+            --format table --output trivy.txt pharos-web:ci
+          { echo '### Trivy: HIGH and CRITICAL with a fix available'; echo '```'; cat trivy.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          ./trivy image --quiet --scanners vuln --ignore-unfixed --severity CRITICAL --exit-code 1 pharos-web:ci
 
   docs:
     name: Docs links
@@ -171,7 +208,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - run: python3 scripts/check-doc-links.py
+      # The OpenAPI document must be valid OpenAPI 3.1 (the route tests only compare its paths
+      # and fields with the code, not its structure). Warnings (e.g. missing operationId) do
+      # not fail the job.
+      - name: OpenAPI lint (redocly)
+        run: npx --yes @redocly/cli@2.54.3 lint docs/openapi.yaml --format=github-actions
 
   actionlint:
     name: Workflow lint
@@ -180,7 +224,62 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - name: actionlint
         run: |
           bash <(curl -sSfL https://raw.githubusercontent.com/rhysd/actionlint/v1.7.12/scripts/download-actionlint.bash) 1.7.12
           ./actionlint -color
+      # zizmor: workflow security lint (template injection, over-broad permissions, unpinned
+      # third-party actions, credential persistence). Policy in .github/zizmor.yml.
+      - name: zizmor
+        run: |
+          pipx run zizmor==1.30.1 --offline --config .github/zizmor.yml --min-severity medium \
+            --format github .github/workflows
+
+  # One check to mark as required in branch protection / the merge queue. It runs on every PR
+  # (docs-only included) and fails if any job the change selected failed or was cancelled, so a
+  # red Docker build or docs check blocks the merge too, not only "Type-check & build". A job
+  # the paths filter skipped counts as passing.
+  ci-passed:
+    name: CI passed
+    if: always()
+    needs: [changes, build, docker, docs, actionlint]
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          FAILED: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+        run: |
+          if [ "$FAILED" = "true" ]; then echo "A required CI job failed or was cancelled."; exit 1; fi
+          echo "All selected CI jobs passed."
+
+  # The nightly run has no PR to turn red, so a failure there would go unnoticed. Keep ONE open
+  # issue for it (like security.yml does for Semgrep): opened on the first failure, commented on
+  # while it keeps failing, closed by the first green night.
+  nightly-report:
+    name: Nightly report
+    if: always() && github.event_name == 'schedule'
+    needs: [changes, build, docker, docs, actionlint]
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RESULT: ${{ contains(needs.*.result, 'failure') && 'failure' || 'success' }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          TITLE="[ci] Nightly run on main is failing"
+          EXISTING=$(gh issue list --state open --search "in:title \"$TITLE\"" --json number --jq '.[0].number // empty')
+          if [ "$RESULT" = "success" ]; then
+            if [ -n "$EXISTING" ]; then gh issue close "$EXISTING" --comment "Green again: $RUN_URL"; fi
+            exit 0
+          fi
+          if [ -n "$EXISTING" ]; then
+            gh issue comment "$EXISTING" --body "Still failing ($(date -u +%F)): $RUN_URL"
+          else
+            gh issue create --title "$TITLE" --body "The nightly CI run on \`main\` failed ($(date -u +%F)): $RUN_URL
+
+          This issue is kept up to date by the \`Nightly report\` job in ci.yml and closes itself on the next green run."
+          fi

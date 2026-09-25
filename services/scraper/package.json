@@ -8,7 +8,8 @@
     "scrape:once": "tsx src/once.ts",
     "start": "tsx src/index.ts",
     "dev": "tsx watch src/index.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "mongoose": "^8.24.4",
@@ -19,6 +20,7 @@
   "devDependencies": {
     "@types/node": "^26.6.1",
     "tsx": "^4.23.13",
-    "typescript": "^5.6.3"
+    "typescript": "^5.6.3",
+    "vitest": "^5.0.2"
   }
 }

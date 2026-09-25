@@ -278,7 +278,7 @@ paths:
                 title: { type: string }
                 status: { type: string }
                 category: { type: string }
-                currentPrice: { type: number, description: The PRINTED price, as on create. }
+                currentPrice: { type: number, description: 'The PRINTED price, as on create.' }
                 targetPrice: { type: number }
                 specs: { type: string }
                 tags:
@@ -534,7 +534,7 @@ paths:
                 category: { type: string }
                 brand: { type: string }
                 note: { type: string }
-                restockIntervalDays: { type: integer, minimum: 1, maximum: 3650, nullable: true, description: 'Null removes recurrence.' }
+                restockIntervalDays: { type: [integer, 'null'], minimum: 1, maximum: 3650, description: 'Null removes recurrence.' }
       responses:
         '200':
           description: Updated list.
@@ -884,7 +884,7 @@ paths:
                   description: 'Who owes you part of this expense (P35). Income is never split.'
                   items: { $ref: '#/components/schemas/SplitEntry' }
                 taxDeductible: { type: boolean }
-                taxCategory: { type: string, description: Free-form tax bucket, capped at 60 chars. }
+                taxCategory: { type: string, description: 'Free-form tax bucket, capped at 60 chars.' }
                 currency: { type: string, description: 'Currency of the printed `amount` (P9). Omit for base currency.' }
                 fxRate: { type: number, description: 'Units of base currency per unit of `currency`. Required for a foreign amount to be counted in any total; 0 means unconverted.' }
       responses:
@@ -1167,13 +1167,13 @@ paths:
               type: object
               properties:
                 name: { type: string }
-                amount: { type: number, description: The PRINTED figure, as on create. }
+                amount: { type: number, description: 'The PRINTED figure, as on create.' }
                 billingCycle: { type: string, enum: [weekly, monthly, quarterly, yearly] }
                 nextRenewal: { type: string }
                 category: { type: string }
                 space: { type: string, description: 'Per-property ledger tag (P68); trimmed, max 40 chars. Empty = unassigned.' }
                 active: { type: boolean }
-                trialEndsAt: { type: string, nullable: true, description: 'Explicit null clears the free trial (P33).' }
+                trialEndsAt: { type: [string, 'null'], description: 'Explicit null clears the free trial (P33).' }
                 firstChargeAmount: { type: number }
                 currency: { type: string, description: 'P9. Sending `amount`, `firstChargeAmount`, `currency` or `fxRate` re-resolves the whole money set.' }
                 fxRate: { type: number, description: Units of base currency per unit of `currency`. }
@@ -1956,7 +1956,7 @@ paths:
                 autoAddStores: { type: boolean }
                 ntfyUrl: { type: string }
                 ntfyEnabled: { type: boolean }
-                budgetRollover: { type: boolean, description: Envelope mode, carries an unspent balance forward (P25). }
+                budgetRollover: { type: boolean, description: 'Envelope mode, carries an unspent balance forward (P25).' }
                 budgets:
                   type: object
                   description: >-
@@ -1994,7 +1994,7 @@ paths:
                   aiEnabled: { type: boolean }
                   provider: { type: string, enum: [ollama, anthropic, openai, gemini, openrouter, custom] }
                   model: { type: string, description: Model in play for the resolved provider. }
-                  visionModel: { type: string, description: Only meaningful on Ollama, sent unconditionally. }
+                  visionModel: { type: string, description: 'Only meaningful on Ollama, sent unconditionally.' }
                   ready: { type: boolean, description: 'false when the master switch is off (no probe is run).' }
                   canEdit: { type: boolean, description: Whether this user may PATCH (admin). }
                   features:
@@ -2234,18 +2234,18 @@ components:
         status: { type: string }
         category: { type: string }
         currentPrice: { type: number, description: Always the deployment's base currency. }
-        purchasedPrice: { type: number, nullable: true }
-        targetPrice: { type: number, nullable: true }
+        purchasedPrice: { type: [number, 'null'] }
+        targetPrice: { type: [number, 'null'] }
         currency: { type: string, description: Code the item was priced in abroad; empty on an ordinary item. }
         origAmount: { type: number, description: 'Printed anchor price on a foreign purchase; 0 otherwise.' }
         fxRate: { type: number, description: 'Base units per 1 unit of `currency`; 0 = not foreign, or no rate entered yet (then the price fields are still the printed ones and must not be summed as base).' }
         specs: { type: string }
-        warrantyUntil: { type: string, format: date-time, nullable: true }
+        warrantyUntil: { type: [string, 'null'], format: date-time }
         tags:
           type: array
           items: { type: string }
-        photo: { type: string, nullable: true, description: 'First photo path; fetch via GET /api/files/<photo> with the same Bearer token.' }
-        updatedAt: { type: string, format: date-time, nullable: true }
+        photo: { type: [string, 'null'], description: 'First photo path; fetch via GET /api/files/<photo> with the same Bearer token.' }
+        updatedAt: { type: [string, 'null'], format: date-time }
         deleted: { type: boolean, description: Present and true only in an updatedSince sync when the record was soft-deleted. }
     ShoppingListItem:
       type: object
@@ -2260,16 +2260,16 @@ components:
         note: { type: string }
         checked: { type: boolean }
         aiScanned: { type: boolean, description: True when the entry came from a product-photo scan. }
-        restockIntervalDays: { type: integer, nullable: true, description: Days after a purchase before the item returns unchecked. }
-        lastRestockedAt: { type: string, format: date-time, nullable: true }
+        restockIntervalDays: { type: [integer, 'null'], description: Days after a purchase before the item returns unchecked. }
+        lastRestockedAt: { type: [string, 'null'], format: date-time }
         createdAt: { type: string, format: date-time }
     LineItem:
       type: object
       additionalProperties: true
       properties:
-        name: { type: string, description: The AI-refined name when there is one, else the raw printed name. }
+        name: { type: string, description: 'The AI-refined name when there is one, else the raw printed name.' }
         qty: { type: number }
-        price: { type: number, description: Unit price NET of VAT, as stored. }
+        price: { type: number, description: 'Unit price NET of VAT, as stored.' }
         vatRate: { type: number }
         category: { type: string, description: "Optional spend category for this line (P64); empty string = untagged." }
     Receipt:
@@ -2278,8 +2278,8 @@ components:
       properties:
         id: { type: string }
         store: { type: string }
-        date: { type: string, format: date-time, nullable: true }
-        total: { type: number, description: Gross incl. VAT, always the deployment's base currency. }
+        date: { type: [string, 'null'], format: date-time }
+        total: { type: number, description: 'Gross incl. VAT, always the deployment''s base currency.' }
         subtotal: { type: number }
         vatAmount: { type: number }
         currency: { type: string, description: Code printed on the receipt. }
@@ -2291,16 +2291,16 @@ components:
         itemCount: { type: integer, description: Derived — number of stored line items. The list endpoint does not inline them; the detail endpoint returns `lineItems`. }
         verified: { type: boolean }
         archived: { type: boolean }
-        file: { type: string, nullable: true, description: 'Stored scan path; fetch via GET /api/files/<file> with the same Bearer token.' }
-        thumb: { type: string, nullable: true }
+        file: { type: [string, 'null'], description: 'Stored scan path; fetch via GET /api/files/<file> with the same Bearer token.' }
+        thumb: { type: [string, 'null'] }
         returnDaysLeft: { type: integer, description: 'Derived (PA3) — days left in the store return window. Omitted entirely on an archived receipt and on an updatedSince sync (the cross-doc lookups are skipped there); never stored.' }
-        updatedAt: { type: string, format: date-time, nullable: true }
+        updatedAt: { type: [string, 'null'], format: date-time }
         deleted: { type: boolean }
     SplitEntry:
       type: object
       description: 'One other person who owes you part of the expense (P35). Your own portion is implicit: amount − Σ share.'
       properties:
-        name: { type: string, description: Free-form name, not an app account. }
+        name: { type: string, description: 'Free-form name, not an app account.' }
         share: { type: number }
         settled: { type: boolean, description: True once they have paid you back. }
     Expense:
@@ -2316,14 +2316,14 @@ components:
         currency: { type: string, description: Code printed on the document. }
         origAmount: { type: number, description: 'Printed figure on a foreign document; 0 otherwise.' }
         fxRate: { type: number, description: 'Base units per 1 unit of `currency`; 0 = not foreign, or no rate entered yet (then `amount` is still the printed number and must not be summed as base).' }
-        date: { type: string, format: date-time, nullable: true }
+        date: { type: [string, 'null'], format: date-time }
         period: { type: string }
         recurring: { type: boolean }
         recurringCycle: { type: string }
         paymentMethod: { type: string }
         notes: { type: string }
-        file: { type: string, nullable: true, description: 'Stored scan path; fetch via GET /api/files/<file> with the same Bearer token.' }
-        thumb: { type: string, nullable: true }
+        file: { type: [string, 'null'], description: 'Stored scan path; fetch via GET /api/files/<file> with the same Bearer token.' }
+        thumb: { type: [string, 'null'] }
         verified: { type: boolean }
         split:
           type: array
@@ -2333,7 +2333,7 @@ components:
         anomaly:
           type: integer
           description: 'Derived ±% deviation from this vendor''s median (>30% only, series of ≥3 priced entries). Present only on a full list read — omitted on an updatedSince sync, where the partial slice would skew the median. Never stored.'
-        updatedAt: { type: string, format: date-time, nullable: true }
+        updatedAt: { type: [string, 'null'], format: date-time }
         deleted: { type: boolean }
     Statement:
       type: object
@@ -2343,8 +2343,8 @@ components:
         card: { type: string }
         last4: { type: string }
         period: { type: string }
-        statementDate: { type: string, format: date-time, nullable: true }
-        dueDate: { type: string, format: date-time, nullable: true }
+        statementDate: { type: [string, 'null'], format: date-time }
+        dueDate: { type: [string, 'null'], format: date-time }
         totalAmount: { type: number, description: Always the deployment's base currency. }
         minimumPayment: { type: number }
         paidAmount: { type: number }
@@ -2352,7 +2352,7 @@ components:
         origAmount: { type: number, description: 'Printed total on a foreign statement; 0 otherwise.' }
         fxRate: { type: number, description: 'Base units per 1 unit of `currency`; 0 = not foreign, or no rate entered yet.' }
         txnCount: { type: integer, description: Derived — number of stored transactions. The list endpoint does not inline them; the detail endpoint returns `transactions`. }
-        updatedAt: { type: string, format: date-time, nullable: true }
+        updatedAt: { type: [string, 'null'], format: date-time }
         deleted: { type: boolean }
     Subscription:
       type: object
@@ -2367,16 +2367,16 @@ components:
         origAmount: { type: number, description: 'Printed figure on a foreign-billed subscription; 0 otherwise.' }
         fxRate: { type: number, description: 'Base units per 1 unit of `currency`; 0 = not foreign, or no rate entered yet.' }
         billingCycle: { type: string, enum: [monthly, yearly, quarterly, weekly, lifetime] }
-        startDate: { type: string, format: date-time, nullable: true }
-        nextRenewal: { type: string, format: date-time, nullable: true }
+        startDate: { type: [string, 'null'], format: date-time }
+        nextRenewal: { type: [string, 'null'], format: date-time }
         active: { type: boolean }
         paymentMethod: { type: string }
         url: { type: string }
         notes: { type: string }
         space: { type: string, description: 'Per-property ledger tag (P68), same taxonomy as Settings → Spaces; empty = unassigned.' }
-        trialEndsAt: { type: string, format: date-time, nullable: true, description: 'Free-trial end (P33); the cancel-before-charge alert fires `trialAlertDays` before it.' }
+        trialEndsAt: { type: [string, 'null'], format: date-time, description: 'Free-trial end (P33); the cancel-before-charge alert fires `trialAlertDays` before it.' }
         firstChargeAmount: { type: number, description: 'What the first real charge will be when it differs from `amount`; 0 when it does not.' }
-        updatedAt: { type: string, format: date-time, nullable: true }
+        updatedAt: { type: [string, 'null'], format: date-time }
         deleted: { type: boolean }
     Voucher:
       type: object
@@ -2411,8 +2411,8 @@ components:
         currency: { type: string, description: Code printed on the invoice. }
         origAmount: { type: number, description: 'Printed figure on a foreign bill; 0 otherwise.' }
         fxRate: { type: number, description: 'Base units per 1 unit of `currency`; 0 = not foreign, or no rate entered yet (then `amount` is still the printed number and must not be summed as base).' }
-        dueDate: { type: string, format: date-time, nullable: true }
-        paidAt: { type: string, format: date-time, nullable: true }
+        dueDate: { type: [string, 'null'], format: date-time }
+        paidAt: { type: [string, 'null'], format: date-time }
         category: { type: string }
         cycle: { $ref: '#/components/schemas/BillCycle' }
         notes: { type: string }
@@ -2452,21 +2452,21 @@ components:
             currency so `remaining` stays plain subtraction on a foreign-currency bill.
             Empty for an ordinary one-payment bill.
           items: { $ref: '#/components/schemas/BillPayment' }
-        updatedAt: { type: string, format: date-time, nullable: true }
+        updatedAt: { type: [string, 'null'], format: date-time }
         deleted: { type: boolean }
     BillPayment:
       type: object
       properties:
         id: { type: string }
-        amount: { type: number, description: Base currency, same denomination as `Bill.amount`. }
-        date: { type: string, format: date-time, nullable: true }
+        amount: { type: number, description: 'Base currency, same denomination as `Bill.amount`.' }
+        date: { type: [string, 'null'], format: date-time }
         note: { type: string }
     GoalContribution:
       type: object
       properties:
         id: { type: string }
         amount: { type: number }
-        date: { type: string, format: date-time, nullable: true }
+        date: { type: [string, 'null'], format: date-time }
         note: { type: string }
     Goal:
       type: object
@@ -2475,7 +2475,7 @@ components:
         id: { type: string }
         title: { type: string }
         targetAmount: { type: number }
-        targetDate: { type: string, format: date-time, nullable: true }
+        targetDate: { type: [string, 'null'], format: date-time }
         category: { type: string }
         notes: { type: string }
         archived: { type: boolean }
@@ -2483,12 +2483,12 @@ components:
         remaining: { type: number, description: Derived. }
         pct: { type: number, description: Derived. }
         done: { type: boolean, description: Derived. }
-        monthsLeft: { type: integer, nullable: true, description: 'Derived from `targetDate`; null without a deadline.' }
-        perMonth: { type: number, nullable: true, description: Derived — what still has to be saved each month to land on time. }
+        monthsLeft: { type: [integer, 'null'], description: 'Derived from `targetDate`; null without a deadline.' }
+        perMonth: { type: [number, 'null'], description: Derived — what still has to be saved each month to land on time. }
         contributions:
           type: array
           items: { $ref: '#/components/schemas/GoalContribution' }
-        updatedAt: { type: string, format: date-time, nullable: true }
+        updatedAt: { type: [string, 'null'], format: date-time }
         deleted: { type: boolean }
     TaskStep:
       type: object
@@ -2511,9 +2511,9 @@ components:
         steps:
           type: array
           items: { $ref: '#/components/schemas/TaskStep' }
-        dueDate: { type: string, format: date-time, nullable: true }
-        completedAt: { type: string, format: date-time, nullable: true }
-        updatedAt: { type: string, format: date-time, nullable: true }
+        dueDate: { type: [string, 'null'], format: date-time }
+        completedAt: { type: [string, 'null'], format: date-time }
+        updatedAt: { type: [string, 'null'], format: date-time }
         deleted: { type: boolean }
     Notification:
       type: object

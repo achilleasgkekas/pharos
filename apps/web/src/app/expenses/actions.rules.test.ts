@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // Focused coverage for `applyCategoryRulesToExisting` (the category-rule backfill slice
 // of app/expenses/actions.ts, P15's "apply to what I already have" one-off). The manual
@@ -128,7 +128,7 @@ describe('applyCategoryRulesToExisting — per-row rule matching', () => {
     expect(expenseBulkWrite).toHaveBeenCalledTimes(1);
     const ops = expenseBulkWrite.mock.calls[0][0];
     expect(ops).toEqual([
-      { updateOne: { filter: { _id: 'e1' }, update: { $set: { category: 'utilities', recurring: true, recurringCycle: 'monthly' } } } },
+      { updateOne: { filter: { _id: 'e1' }, update: { $set: { category: 'utilities', recurring: true, recurringCycle: 'monthly', recurringFrom: expect.any(Date) } } } },
     ]);
   });
 
@@ -177,7 +177,31 @@ describe('applyCategoryRulesToExisting — recurring/recurringCycle delta', () =
     expenseFindLean.mockResolvedValue([existingRow({ vendor: 'Netflix', category: 'other' })]);
     await applyCategoryRulesToExisting();
     const ops = expenseBulkWrite.mock.calls[0][0];
-    expect(ops[0].updateOne.update.$set).toEqual({ category: 'subscriptions', recurring: true });
+    expect(ops[0].updateOne.update.$set).toEqual({ category: 'subscriptions', recurring: true, recurringFrom: expect.any(Date) });
+  });
+});
+
+describe('applyCategoryRulesToExisting — recurringFrom (#298)', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('stamps recurringFrom as today at UTC midnight when the rule turns a row recurring', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(Date.UTC(2026, 8, 25, 17, 30)));
+    getAppSettingsMock.mockResolvedValue({ categoryRules: [RULE_DEI] });
+    expenseFindLean.mockResolvedValue([existingRow()]);
+    await applyCategoryRulesToExisting();
+    const ops = expenseBulkWrite.mock.calls[0][0];
+    expect(ops[0].updateOne.update.$set.recurringFrom).toEqual(new Date(Date.UTC(2026, 8, 25)));
+  });
+
+  it('does not stamp recurringFrom on a row that was already recurring', async () => {
+    getAppSettingsMock.mockResolvedValue({ categoryRules: [RULE_DEI] });
+    expenseFindLean.mockResolvedValue([existingRow({ recurring: true, recurringCycle: 'monthly' })]);
+    await applyCategoryRulesToExisting();
+    const ops = expenseBulkWrite.mock.calls[0][0];
+    expect(ops[0].updateOne.update.$set).not.toHaveProperty('recurringFrom');
   });
 });
 

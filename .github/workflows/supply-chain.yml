@@ -4,6 +4,7 @@ name: Supply chain
 # covers our own code; this covers what we pull in and what we might accidentally push out.
 on:
   pull_request:
+  merge_group:
   push:
     branches: [main]
   schedule:
@@ -30,6 +31,8 @@ jobs:
         working-directory: ${{ matrix.pkg }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v7
         with:
           node-version: 24
@@ -46,6 +49,8 @@ jobs:
       pull-requests: write
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       # Blocks a PR that ADDS a dependency with a high-severity advisory or a licence that
       # cannot ship inside an AGPL-3.0 app.
       - uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4.9.0
@@ -60,6 +65,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          persist-credentials: false
           fetch-depth: 0
       - name: gitleaks
         env:

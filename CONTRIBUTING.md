@@ -38,17 +38,21 @@ If the two ever disagree, `npm run type-check:ts5` runs the old check. See issue
 
 | Workflow | Job | Runs when |
 | --- | --- | --- |
-| CI | **Type-check & build** (required): private-file guard, `tsc`, vitest, eslint, `next build`, then the production server starts against MongoDB and a browser smoke test (`apps/web/e2e/smoke.mjs`) runs first-time setup and opens every main page | any non-Markdown change (docs-only PRs skip it, which counts as passing) |
-| CI | Docker image builds and serves `/login` | `apps/web/`, compose files |
-| CI | Docs links (relative links and `#anchors`) | Markdown or `docs/` changes |
-| CI | Workflow lint (actionlint) | `.github/workflows/` changes |
-| CI | Everything above, nightly on `main` | 03:23 UTC |
+| CI | **CI passed** (the one to mark required): fails if any job below that the change selected failed | every PR, docs-only included |
+| CI | **Type-check & build**: private-file guard, `tsc`, vitest with coverage (report on the run page and as an artifact), eslint with a `--max-warnings` ratchet (lower the number in `apps/web/package.json` when you remove warnings), `next build`, then the production server starts against MongoDB and a browser smoke test (`apps/web/e2e/smoke.mjs`) runs first-time setup and opens every main page | any non-Markdown change (docs-only PRs skip it, which counts as passing) |
+| CI | Docker image builds and serves `/login`; Trivy scan fails on a CRITICAL vulnerability that has a fix | `apps/web/`, compose files |
+| CI | Docs links (relative links and `#anchors`); `docs/openapi.yaml` is valid OpenAPI 3.1 (redocly) | Markdown or `docs/` changes |
+| CI | Workflow lint: actionlint and zizmor (policy in `.github/zizmor.yml`) | `.github/workflows/` changes |
+| CI | Everything above, nightly on `main`; a failure opens (and a green night closes) one `[ci] Nightly run` issue | 03:23 UTC |
+| PR title | Title has the `type(scope): subject` shape (it becomes the squash commit) | every PR, bots skipped |
 | Supply chain | `npm audit` (production deps, high+) for web, landing and scraper | every PR, `main`, weekly |
 | Supply chain | Dependency review (new vulnerable or incompatible-licence deps) | every PR |
 | Supply chain | Secret scan (gitleaks) over the PR's commits | every PR, `main` |
-| Landing / Scraper / Extension | type-check and build of those packages | changes in them |
+| Landing / Extension | type-check and build / unit tests of those packages | changes in them |
+| Scraper | type-check and unit tests (`npm test` in `services/scraper`); the web tests also check its copies of `ssrf.ts`, `safeFetch.ts` and `shoppingRegion.ts` are identical to the web ones | changes in it |
 | CodeQL | security analysis | every PR, `main` |
 | Security scan | Semgrep, report-only weekly issue | Mondays |
+| Scorecard | OpenSSF Scorecard, results in the Security tab | Mondays |
 
 ## Code style
 

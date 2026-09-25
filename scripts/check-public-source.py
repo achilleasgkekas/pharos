@@ -29,7 +29,7 @@ for entry in entries.split(b'\0'):
     reasons = []
     if name in private_names or name.endswith('PROGRESS.md'):
         reasons.append('private work journal')
-    if any(part in {'.claude', '.codex', '.email-import', 'node_modules', 'backups', 'storage', '__pycache__', '.pytest_cache', '.vite'} for part in parts):
+    if any(part in {'.claude', '.codex', '.email-import', 'node_modules', 'backups', 'storage', '__pycache__', '.pytest_cache', '.vite', 'coverage'} for part in parts):
         reasons.append('local configuration, dependency, cache or user data directory')
     if (name == '.env' or name.startswith('.env.')) and not name.endswith('.example'):
         reasons.append('non-example environment file')

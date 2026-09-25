@@ -2,6 +2,7 @@ name: Scraper
 
 # The price-scraper worker runs on the server against real data and had no gate either: it is
 # TypeScript executed through tsx, so a type error only surfaced at 05:00 on the host (#136).
+# Unit tests (#331) pin the page parser and the SSRF guard, which run unattended.
 on:
   push:
     branches: [main]
@@ -27,6 +28,8 @@ jobs:
         working-directory: services/scraper
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v7
         with:
           node-version: 24
@@ -34,3 +37,4 @@ jobs:
           cache-dependency-path: services/scraper/package-lock.json
       - run: npm ci
       - run: npm run typecheck
+      - run: npm test

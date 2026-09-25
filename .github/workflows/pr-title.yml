@@ -1,0 +1,32 @@
+name: PR title
+
+# PRs are squash-merged, so the PR title becomes the commit subject on main. Keep it in the
+# shape the history already uses (#331): `type(scope): subject`, e.g. `fix(bills): ...`,
+# `feat: ...`, `docs: ...`. The type is any lowercase word (fix, feat, chore, docs, ci, ui, ...),
+# the scope is optional, `!` marks a breaking change. GitHub's own `Revert "..."` titles pass.
+# Bots (Dependabot) are skipped: their titles are generated.
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+concurrency:
+  group: pr-title-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  title:
+    name: PR title
+    if: github.event.pull_request.user.type != 'Bot'
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          if printf '%s' "$TITLE" | grep -Eq '^([a-z][a-z0-9-]*(\([^)]+\))?!?: [^ ]|Revert ")'; then
+            echo "OK: $TITLE"
+            exit 0
+          fi
+          echo "::error title=PR title::'$TITLE' should look like 'type(scope): subject', e.g. 'fix(bills): mark paid creates one expense'."
+          exit 1
