@@ -29,12 +29,16 @@ for entry in entries.split(b'\0'):
     reasons = []
     if name in private_names or name.endswith('PROGRESS.md'):
         reasons.append('private work journal')
-    if any(part in {'.claude', '.codex', '.email-import', 'node_modules', 'backups', 'storage'} for part in parts):
-        reasons.append('local configuration, dependency or user data directory')
+    if any(part in {'.claude', '.codex', '.email-import', 'node_modules', 'backups', 'storage', '__pycache__', '.pytest_cache', '.vite'} for part in parts):
+        reasons.append('local configuration, dependency, cache or user data directory')
     if (name == '.env' or name.startswith('.env.')) and not name.endswith('.example'):
         reasons.append('non-example environment file')
     if name.endswith(('.mbox', '.pem', '.p12', '.pfx', '.key')):
         reasons.append('mail archive or private key file')
+    if name.endswith(('.pyc', '.pyo', '.pyd')):
+        reasons.append('compiled Python bytecode')
+    if name in {'eslint_report.json'} or (name.startswith('lint_') and name.endswith(('.json', '.txt'))):
+        reasons.append('local lint report artifact')
     if mode == '120000':
         reasons.append('symlink: review and replace with portable source')
     content = subprocess.check_output(['git', 'cat-file', 'blob', oid], cwd=root)
