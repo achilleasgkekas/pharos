@@ -37,6 +37,14 @@ export function successorBillId(parentId: unknown): string {
   return createHash('sha256').update(`bill-successor:${String(parentId)}`).digest('hex').slice(0, 24);
 }
 
+export function billPaidExpenseId(billId: unknown): string {
+  return createHash('sha256').update(`bill-paid-expense:${String(billId)}`).digest('hex').slice(0, 24);
+}
+
+export function billPaymentExpenseId(paymentId: unknown): string {
+  return createHash('sha256').update(`bill-payment-expense:${String(paymentId)}`).digest('hex').slice(0, 24);
+}
+
 const isDuplicateKey = (err: unknown): boolean => (err as { code?: number } | null)?.code === 11000;
 
 /**

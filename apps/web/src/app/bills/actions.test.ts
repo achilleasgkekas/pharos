@@ -76,8 +76,9 @@ vi.mock('next/cache', () => ({ revalidatePath: (p: string) => revalidatePathMock
 
 import {
   createBill, updateBill, setBillArchived, deleteBill, markBillPaid, markBillUnpaid,
-  logBillPayment, removeBillPayment, billPaidExpenseId, billPaymentExpenseId,
+  logBillPayment, removeBillPayment,
 } from './actions';
+import { billPaidExpenseId, billPaymentExpenseId } from '@/lib/billRecurrence';
 
 function formData(fields: Record<string, string>): FormData {
   const fd = new FormData();

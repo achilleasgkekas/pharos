@@ -1,6 +1,5 @@
 'use server';
 import { Types } from 'mongoose';
-import { createHash } from 'node:crypto';
 import { connectDB } from '@/lib/db';
 import { RECURRING_CYCLE_VALUES } from '@/lib/billingCycle';
 import { Bill as BillModel } from '@/models/Bill';
@@ -8,7 +7,7 @@ import { withRequestTenant } from '@/lib/tenancy/request';
 import { currentModel } from '@/lib/tenancy/connection';
 import { billIsSettledByPayments, billPaidAmount, billRemaining } from '@/lib/bill';
 import { safeDateOrNull } from '@/lib/dates';
-import { spawnNextBillOnce } from '@/lib/billRecurrence';
+import { spawnNextBillOnce, billPaidExpenseId, billPaymentExpenseId } from '@/lib/billRecurrence';
 import { addExpense } from '@/app/expenses/actions';
 import { getAppSettings } from '@/lib/appSettings';
 import { resolveFx } from '@/lib/fx';
@@ -64,13 +63,6 @@ function printedAmount(bill: { amount?: number | null; origAmount?: number | nul
   return (Number(bill.origAmount) || 0) > 0 ? Number(bill.origAmount) : Number(bill.amount) || 0;
 }
 
-export function billPaidExpenseId(billId: unknown): string {
-  return createHash('sha256').update(`bill-paid-expense:${String(billId)}`).digest('hex').slice(0, 24);
-}
-
-export function billPaymentExpenseId(paymentId: unknown): string {
-  return createHash('sha256').update(`bill-payment-expense:${String(paymentId)}`).digest('hex').slice(0, 24);
-}
 
 export async function createBill(formData: FormData): Promise<{ ok: boolean; error?: string }> {
   await assertCanWrite();
