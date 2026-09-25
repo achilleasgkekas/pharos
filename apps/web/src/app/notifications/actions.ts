@@ -27,6 +27,8 @@ import { lowestKnownPrice } from '@/lib/lowestKnownPrice';
 import { marketFor } from '@/lib/shoppingRegion';
 import { collectSubscriptionReviews, type ReviewableSubscription } from '@/lib/subscriptionReview';
 import { collectExpiringDocuments, type ExpiringDocRow } from '@/lib/documentExpiry';
+import { collectVehicleDue, type VehicleDueRow } from '@/lib/vehicles';
+import { Vehicle as VehicleModel } from '@/models/Vehicle';
 import { collectUpcomingDates, type SpecialDateRow } from '@/lib/specialDates';
 import { AUTO_NOTIF_KINDS, type NotifKind } from '@/lib/notificationKinds';
 
@@ -64,7 +66,7 @@ async function computeAlerts(): Promise<Alert[]> {
   const s = await getAppSettings(); // also sets the currency symbol for cur()
   const now = Date.now();
   const alerts: Alert[] = [];
-  const [Item, Statement, Expense, Subscription, Bill, DocumentM, SpecialDateM] = await Promise.all([
+  const [Item, Statement, Expense, Subscription, Bill, DocumentM, SpecialDateM, VehicleM] = await Promise.all([
     currentModel(ItemModel),
     currentModel(StatementModel),
     currentModel(ExpenseModel),
@@ -72,6 +74,7 @@ async function computeAlerts(): Promise<Alert[]> {
     currentModel(BillModel),
     currentModel(DocumentModel),
     currentModel(SpecialDateModel),
+    currentModel(VehicleModel),
   ]);
 
   // Deals — a tracked item whose best price reached its target.
@@ -267,6 +270,26 @@ async function computeAlerts(): Promise<Alert[]> {
   for (const d of collectExpiringDocuments(docRows, s.documentAlertDays, now)) {
     // body = "<days>" (raw; negative = expired, formatted in the bell)
     alerts.push({ dedupeKey: `document:${String(d._id)}:${d.iso}`, kind: 'document', title: d.title, body: `${d.days}`, href: '/documents' });
+  }
+
+  // Vehicle dates (P110, #126): MOT/ΚΤΕΟ, insurance, road tax, emissions card. They share the
+  // documents' lead time, since they are the same kind of paper that lapses. The dedupeKey
+  // carries the date, so renewing (a new date) retires the alert.
+  const vehicleRows =
+    s.documentAlertDays > 0
+      ? ((await VehicleM.find({ archived: { $ne: true } })
+          .select('name plate motUntil insuranceUntil roadTaxUntil emissionsUntil')
+          .lean()) as VehicleDueRow[])
+      : [];
+  for (const v of collectVehicleDue(vehicleRows, s.documentAlertDays, now)) {
+    // body = "<days>|<kind>" (raw; negative = overdue, formatted in the bell)
+    alerts.push({
+      dedupeKey: `vehicle:${String(v._id)}:${v.kind}:${v.iso}`,
+      kind: 'vehicle',
+      title: v.plate ? `${v.name} (${v.plate})` : v.name,
+      body: `${v.days}|${v.kind}`,
+      href: '/vehicles',
+    });
   }
 
   // Birthdays / anniversaries within the lead window (P50, #197). The push keys these by id

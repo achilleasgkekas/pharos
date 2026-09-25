@@ -15,6 +15,8 @@ import { NetWorthSnapshot } from '@/models/NetWorthSnapshot';
 import { ShoppingListItem } from '@/models/ShoppingListItem';
 import { MeterReading } from '@/models/MeterReading';
 import { Conversation } from '@/models/Conversation';
+import { Vehicle } from '@/models/Vehicle';
+import { VehicleLog } from '@/models/VehicleLog';
 
 /**
  * The single source of truth for what the JSON backup (Settings → Storage & backup →
@@ -52,6 +54,9 @@ export const BACKUP_MODELS = {
   shoppingList: ShoppingListItem,
   meterReadings: MeterReading,
   conversations: Conversation,
+  // Added with P110 (#126): vehicles and their fuel/service log.
+  vehicles: Vehicle,
+  vehicleLogs: VehicleLog,
 } as const;
 
 export type BackupKey = keyof typeof BACKUP_MODELS;

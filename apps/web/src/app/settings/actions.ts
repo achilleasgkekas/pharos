@@ -14,6 +14,10 @@ import { Document as DocumentModel } from '@/models/Document';
 import { SpecialDate as SpecialDateModel } from '@/models/SpecialDate';
 import { billDaysUntilDue } from '@/lib/bill';
 import { collectExpiringDocuments } from '@/lib/documentExpiry';
+import { collectVehicleDue, type VehicleDueRow } from '@/lib/vehicles';
+import { Vehicle as VehicleModel } from '@/models/Vehicle';
+
+const VEHICLE_DUE_WORD = { motUntil: 'MOT', insuranceUntil: 'insurance', roadTaxUntil: 'road tax', emissionsUntil: 'emissions card' } as const;
 import { collectUpcomingDates } from '@/lib/specialDates';
 import { collectMaintenanceDue, MAINTENANCE_STATUSES, type MaintenanceRow } from '@/lib/maintenance';
 import { collectLendingOverdue, LENDING_STATUSES, type LendingRow } from '@/lib/lending';
@@ -730,6 +734,15 @@ export async function runAlertChecks(opts: { dedupe?: boolean } = {}): Promise<{
       : [];
   const documentsExpiring = collectExpiringDocuments(documentRows, s.documentAlertDays, now);
 
+  // Vehicle dates (P110): same collector and lead time as the bell (computeAlerts).
+  const vehicleRows =
+    s.documentAlertDays > 0
+      ? ((await (await scoped(VehicleModel)).find({ archived: { $ne: true } })
+          .select('name plate motUntil insuranceUntil roadTaxUntil emissionsUntil')
+          .lean()) as VehicleDueRow[])
+      : [];
+  const vehiclesDue = collectVehicleDue(vehicleRows, s.documentAlertDays, now);
+
   // Special dates (P50): birthdays / anniversaries within the lead window. Same collector
   // the /special-dates page uses. Zero = off, query skipped.
   const specialDateRows =
@@ -815,6 +828,7 @@ export async function runAlertChecks(opts: { dedupe?: boolean } = {}): Promise<{
   const reviewsSplit = splitFreshAlerts(nt.subscriptionReviews ? subscriptionReviews : [], (r) => `subreview:${String(r._id)}:${r.iso}`, previouslySent);
   const billsSplit = splitFreshAlerts(nt.bills ? billsDue : [], (b) => `bill:${String(b._id)}:${b.iso}`, previouslySent);
   const documentsSplit = splitFreshAlerts(nt.documents ? documentsExpiring : [], (d) => `document:${String(d._id)}:${d.iso}`, previouslySent);
+  const vehiclesSplit = splitFreshAlerts(nt.vehicles ? vehiclesDue : [], (v) => `vehicle:${String(v._id)}:${v.kind}:${v.iso}`, previouslySent);
   // Stable per-record key: fires once when the date enters the lead window and stays quiet
   // while it's in-window; after the day passes it leaves the live set (dropped from the
   // baseline), so next year it counts as fresh again and re-fires — same mechanic as warranty.
@@ -840,6 +854,7 @@ export async function runAlertChecks(opts: { dedupe?: boolean } = {}): Promise<{
     ...reviewsSplit.keys,
     ...billsSplit.keys,
     ...documentsSplit.keys,
+    ...vehiclesSplit.keys,
     ...specialDatesSplit.keys,
     ...maintenanceSplit.keys,
     ...lendingSplit.keys,
@@ -858,6 +873,7 @@ export async function runAlertChecks(opts: { dedupe?: boolean } = {}): Promise<{
   const freshSubscriptionReviews = reviewsSplit.fresh;
   const freshBillsDue = billsSplit.fresh;
   const freshDocumentsExpiring = documentsSplit.fresh;
+  const freshVehiclesDue = vehiclesSplit.fresh;
   const freshSpecialDates = specialDatesSplit.fresh;
   const freshMaintenanceDue = maintenanceSplit.fresh;
   const freshLendingDue = lendingSplit.fresh;
@@ -911,6 +927,13 @@ export async function runAlertChecks(opts: { dedupe?: boolean } = {}): Promise<{
       `🪪 ${freshDocumentsExpiring.length} document(s) expiring: ${freshDocumentsExpiring
         .slice(0, 5)
         .map((d) => `${d.title}${d.holder ? ` (${d.holder})` : ''} (${d.days < 0 ? `${-d.days}d ago` : `${d.days}d`})`)
+        .join(', ')}`
+    );
+  if (freshVehiclesDue.length)
+    lines.push(
+      `🚗 ${freshVehiclesDue.length} vehicle date(s) due: ${freshVehiclesDue
+        .slice(0, 5)
+        .map((v) => `${v.name} ${VEHICLE_DUE_WORD[v.kind]} (${v.days < 0 ? `${-v.days}d ago` : v.days === 0 ? 'today' : `${v.days}d`})`)
         .join(', ')}`
     );
   if (freshSpecialDates.length)
