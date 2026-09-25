@@ -30,27 +30,43 @@ const MISSING_CONFIG: DeliveryOutcome = { ok: false, error: 'Missing configurati
 
 /** POST JSON and turn the response (or the failure) into a DeliveryOutcome. A rejected
  *  SSRF check is `permanent` — retrying a private/internal target can never succeed. */
-async function postJson(url: string, payload: unknown, guard: boolean): Promise<DeliveryOutcome> {
-  if (guard) {
-    try {
-      await assertPublicUrl(url); // user-supplied webhook URL — refuse private/internal targets
-    } catch (err) {
-      return { ok: false, error: (err as Error).message, permanent: true };
-    }
-  }
+async function toOutcome(send: () => Promise<Response>): Promise<DeliveryOutcome> {
   try {
-    const init: RequestInit = {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(TIMEOUT),
-    };
-    // A guarded (user-supplied) URL goes through safeFetch so a redirect cannot reach an internal host.
-    const res = guard ? await safeFetch(url, init) : await fetch(url, init);
+    const res = await send();
     return res.ok ? { ok: true, ...(res.status ? { status: res.status } : {}) } : { ok: false, status: res.status, error: 'Rejected by receiver' };
   } catch (err) {
     return { ok: false, error: (err as Error)?.message || 'Network error' };
   }
+}
+
+function jsonInit(payload: unknown): RequestInit {
+  return {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(TIMEOUT),
+  };
+}
+
+/** A user-supplied webhook URL: refuse private/internal targets, and re-check every redirect
+ *  (safeFetch) so a public URL cannot bounce the request to an internal host. */
+async function postJson(url: string, payload: unknown): Promise<DeliveryOutcome> {
+  try {
+    await assertPublicUrl(url);
+  } catch (err) {
+    return { ok: false, error: (err as Error).message, permanent: true };
+  }
+  return toOutcome(() => safeFetch(url, jsonInit(payload)));
+}
+
+// Bot tokens look like `123456:AAH…`. Anything else (a slash, `?`, `#`, `@`, `%`) could steer
+// the path or query of the request, so it is refused before any URL is built.
+const TELEGRAM_TOKEN = /^[A-Za-z0-9:_-]+$/;
+
+/** Telegram's host is fixed (api.telegram.org); only the validated token goes into the path. */
+async function postTelegram(token: string, chatId: string, text: string): Promise<DeliveryOutcome> {
+  if (!TELEGRAM_TOKEN.test(token)) return { ok: false, error: 'Invalid bot token', permanent: true };
+  return toOutcome(() => fetch(`https://api.telegram.org/bot${token}/sendMessage`, jsonInit({ chat_id: chatId, text })));
 }
 
 /** One delivery attempt. Title is ASCII-only for ntfy; the body keeps any unicode (e.g. Greek). */
@@ -64,16 +80,14 @@ async function attemptOne(c: NotifierConfig, title: string, message: string): Pr
       return ok ? { ok: true } : { ok: false, error: 'ntfy delivery failed' };
     }
     case 'discord':
-      return c.url ? postJson(c.url, { content: `**${title}**\n${message}`.slice(0, 1900) }, true) : MISSING_CONFIG;
+      return c.url ? postJson(c.url, { content: `**${title}**\n${message}`.slice(0, 1900) }) : MISSING_CONFIG;
     case 'slack':
-      return c.url ? postJson(c.url, { text: `*${title}*\n${message}` }, true) : MISSING_CONFIG;
+      return c.url ? postJson(c.url, { text: `*${title}*\n${message}` }) : MISSING_CONFIG;
     case 'telegram':
       // Host is the hardcoded api.telegram.org, not user-supplied → no SSRF guard needed.
-      return c.token && c.target
-        ? postJson(`https://api.telegram.org/bot${c.token}/sendMessage`, { chat_id: c.target, text: `${title}\n${message}` }, false)
-        : MISSING_CONFIG;
+      return c.token && c.target ? postTelegram(c.token, c.target, `${title}\n${message}`) : MISSING_CONFIG;
     case 'webhook':
-      return c.url ? postJson(c.url, { title, message, ts: new Date().toISOString() }, true) : MISSING_CONFIG;
+      return c.url ? postJson(c.url, { title, message, ts: new Date().toISOString() }) : MISSING_CONFIG;
     default:
       return { ok: false, error: 'Unknown channel type', permanent: true };
   }
