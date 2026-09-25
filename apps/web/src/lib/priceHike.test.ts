@@ -166,3 +166,35 @@ describe('detectPriceHikes', () => {
     });
   });
 });
+
+describe('detectPriceHikes: named series under one vendor (#231)', () => {
+  const row = (series: string, seriesKey: string, amount: number, date: string) => ({
+    vendor: 'Apple', vendorKey: 'apple', series, seriesKey, amount, date, recurring: true, kind: 'expense',
+  });
+
+  it('two subscriptions from one vendor are not read as hikes against each other', () => {
+    const rows = [
+      row('iCloud', 'icloud', 2.99, '2026-01-05'),
+      row('TV+', 'tv', 9.99, '2026-01-12'),
+      row('iCloud', 'icloud', 2.99, '2026-02-05'),
+      row('TV+', 'tv', 9.99, '2026-02-12'),
+    ];
+    expect(detectPriceHikes(rows)).toEqual([]);
+  });
+
+  it('a real rise inside one named series is reported under that series', () => {
+    const rows = [
+      row('iCloud', 'icloud', 2.99, '2026-01-05'),
+      row('TV+', 'tv', 9.99, '2026-01-12'),
+      row('iCloud', 'icloud', 3.99, '2026-02-05'),
+    ];
+    const hikes = detectPriceHikes(rows);
+    expect(hikes).toHaveLength(1);
+    expect(hikes[0]).toMatchObject({ vendorKey: 'apple#icloud', vendor: 'Apple · iCloud', prev: 2.99, curr: 3.99, direction: 'up' });
+  });
+
+  it('an unnamed series keeps its old key and name, so existing alert keys do not change', () => {
+    const hikes = detectPriceHikes([row('', '', 10, '2026-01-01'), row('', '', 12, '2026-02-01')]);
+    expect(hikes[0]).toMatchObject({ vendorKey: 'apple', vendor: 'Apple' });
+  });
+});

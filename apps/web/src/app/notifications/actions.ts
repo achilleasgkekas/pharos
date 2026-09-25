@@ -119,7 +119,7 @@ async function computeAlerts(): Promise<Alert[]> {
   // even if an earlier one was dismissed, and it auto-expires once that amount
   // becomes the steady state.
   const hikeRows = (await Expense.find({ amount: { $gt: 0 } })
-    .select('vendor vendorKey amount origAmount date recurring kind')
+    .select('vendor vendorKey series seriesKey amount origAmount date recurring kind')
     .lean()) as HikeEntry[];
   for (const h of detectPriceHikes(hikeRows)) {
     // body = "<vendor>|<prev>|<curr>|<pct>" (raw; the bell formats with the symbol)

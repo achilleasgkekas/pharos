@@ -50,10 +50,15 @@ const {
   revalidatePathMock: vi.fn(),
 }));
 
+// #231: every inheritance lookup's filter, to check which series it reads from.
+const findOneFilters: Array<Record<string, unknown>> = [];
 const expenseModel = {
   create: expenseCreate,
   updateOne: expenseUpdateOne,
-  findOne: () => ({ sort: () => ({ lean: expenseFindOneSortLean }) }),
+  findOne: (filter: Record<string, unknown>) => {
+    findOneFilters.push(filter);
+    return { sort: () => ({ lean: expenseFindOneSortLean }) };
+  },
   find: () => ({ select: () => ({ lean: expenseFindSelectLean }) }),
   bulkWrite: expenseBulkWrite,
 };
@@ -84,6 +89,7 @@ const RULE_DEI = { id: 'r1', match: 'ΔΕΗ', matchType: 'vendor' as const, cate
 beforeEach(() => {
   vi.clearAllMocks();
   expenseFindOneSortLean.mockResolvedValue(null);
+  findOneFilters.length = 0;
   expenseFindSelectLean.mockResolvedValue([]);
   getAppSettingsMock.mockResolvedValue({ categoryRules: [] });
 });
@@ -363,5 +369,24 @@ describe('settlePerson', () => {
     expenseFindSelectLean.mockRejectedValueOnce(new Error('read timeout'));
     const res = await settlePerson('maria');
     expect(res).toEqual({ ok: false, settled: 0, error: 'read timeout' });
+  });
+});
+
+describe('addExpense: named series (#231)', () => {
+  it('stores the series name and its normalized key', async () => {
+    await addExpense({ date: '2026-06-15', vendor: 'Apple', series: ' iCloud ', recurring: true, recurringCycle: 'monthly' } as any);
+    const doc = expenseCreate.mock.calls[0][0];
+    expect(doc.series).toBe('iCloud');
+    expect(doc.seriesKey).toBe('icloud');
+  });
+
+  it('a named entry inherits only from that same series', async () => {
+    await addExpense({ date: '2026-06-15', vendor: 'Apple', series: 'iCloud' } as any);
+    expect(findOneFilters[0]).toEqual({ kind: 'expense', vendorKey: 'apple', seriesKey: 'icloud' });
+  });
+
+  it('an unnamed entry inherits only from the vendor\'s unnamed series, never from a named one', async () => {
+    await addExpense({ date: '2026-06-15', vendor: 'Apple' } as any);
+    expect(findOneFilters[0]).toEqual({ kind: 'expense', vendorKey: 'apple', seriesKey: { $in: ['', null] } });
   });
 });

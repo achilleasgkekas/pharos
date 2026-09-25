@@ -665,7 +665,7 @@ export async function runAlertChecks(opts: { dedupe?: boolean } = {}): Promise<{
   // charge (Netflix €13→€15, ΔΕΗ +18%). Deterministic, no AI — same vendorKey series
   // the anomaly/recurring logic uses.
   const hikeRows = (await (await scoped(Expense)).find({ amount: { $gt: 0 } })
-    .select('vendor vendorKey amount origAmount date recurring kind')
+    .select('vendor vendorKey series seriesKey amount origAmount date recurring kind')
     .lean()) as HikeEntry[];
   const hikes = detectPriceHikes(hikeRows);
 

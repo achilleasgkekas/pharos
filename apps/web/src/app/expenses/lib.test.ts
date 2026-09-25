@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { serializeExpense, vendorKey } from './lib';
+import { serializeExpense, vendorKey, seriesKeyOf, seriesGroupKey } from './lib';
 
 // expenses/lib.ts holds the two pure, DB-free helpers kept OUT of the 'use server'
 // actions module. vendorKey normalizes a provider name into a stable grouping key so
@@ -72,6 +72,8 @@ describe('serializeExpense', () => {
       kind: 'income',
       vendor: 'Acme',
       vendorKey: 'acme',
+      series: 'iCloud',
+      seriesKey: 'icloud',
       category: 'salary',
       space: 'Εξοχικό',
       taxDeductible: true,
@@ -103,6 +105,8 @@ describe('serializeExpense', () => {
       kind: 'income',
       vendor: 'Acme',
       vendorKey: 'acme',
+      series: 'iCloud',
+      seriesKey: 'icloud',
       category: 'salary',
       space: 'Εξοχικό',
       taxDeductible: true,
@@ -139,6 +143,8 @@ describe('serializeExpense', () => {
       kind: 'expense',
       vendor: '',
       vendorKey: '',
+      series: '',
+      seriesKey: '',
       category: 'other',
       space: '',
       taxDeductible: false,
@@ -188,5 +194,19 @@ describe('serializeExpense', () => {
     const idish = { toJSON: () => '507f1f77bcf86cd799439011' };
     expect(serializeExpense({ _id: idish })._id).toBe('507f1f77bcf86cd799439011');
     expect(serializeExpense({ _id: 42 })._id).toBe('42');
+  });
+});
+
+describe('series keys (#231)', () => {
+  it('normalizes a series name like a vendor, so casing and accents never split one series', () => {
+    expect(seriesKeyOf('iCloud')).toBe('icloud');
+    expect(seriesKeyOf(' ICLOUD ')).toBe('icloud');
+    expect(seriesKeyOf('')).toBe('');
+  });
+
+  it('the group key is the vendor key alone for an unnamed series, vendor#series for a named one', () => {
+    expect(seriesGroupKey({ vendorKey: 'apple' })).toBe('apple');
+    expect(seriesGroupKey({ vendorKey: 'apple', seriesKey: '' })).toBe('apple');
+    expect(seriesGroupKey({ vendorKey: 'apple', seriesKey: 'icloud' })).toBe('apple#icloud');
   });
 });
