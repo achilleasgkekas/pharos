@@ -50,7 +50,7 @@ export function UtilitiesClient({ readings, spaces }: { readings: ReadingLike[];
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
               <XAxis dataKey="readingAt" tickFormatter={(v) => new Date(v).toLocaleDateString()} tick={{ fontSize: 10 }} />
               <YAxis tick={{ fontSize: 10 }} width={48} />
-              <Tooltip labelFormatter={(v) => new Date(v).toLocaleDateString()} formatter={(v: number, name: string) => [v.toLocaleString(), name === 'value' ? t('util.reading') : t('util.consumption')]} />
+              <Tooltip labelFormatter={(v) => new Date(v as string | number).toLocaleDateString()} formatter={(v, name) => [Number(v).toLocaleString(), name === 'value' ? t('util.reading') : t('util.consumption')]} />
               <Line type="monotone" dataKey="value" stroke="#00d4ff" strokeWidth={2} dot={{ r: 3 }} connectNulls={false} />
             </LineChart>
           </ResponsiveContainer>
