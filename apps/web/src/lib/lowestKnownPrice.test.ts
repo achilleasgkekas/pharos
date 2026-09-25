@@ -24,14 +24,14 @@ describe('lowestKnownPrice', () => {
     ).toBe(80);
   });
 
-  it('returns the minimum between currentPrice and store links', () => {
-    // currentPrice is lower
+  it('prefers priced store links over currentPrice, even a lower one (#212)', () => {
+    // A stale hand-typed 50 must not make an item a deal when the best shop asks 75.
     expect(
       lowestKnownPrice({
         currentPrice: 50,
         links: [{ price: 100 }, { price: 75 }],
       })
-    ).toBe(50);
+    ).toBe(75);
 
     // store link is lower
     expect(
@@ -40,6 +40,10 @@ describe('lowestKnownPrice', () => {
         links: [{ price: 120 }, { price: 65 }],
       })
     ).toBe(65);
+  });
+
+  it('falls back to currentPrice when no link carries a price', () => {
+    expect(lowestKnownPrice({ currentPrice: 50, links: [{ price: null }, { price: 0 }] })).toBe(50);
   });
 
   it('ignores non-positive and invalid prices', () => {
