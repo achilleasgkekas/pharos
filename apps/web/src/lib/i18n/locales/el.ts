@@ -299,7 +299,6 @@ export const el: Partial<Dict> = {
   'cal.dueThisMonth': 'οφειλή αυτόν τον μήνα',
   'cal.month': 'Μήνας',
   'cal.agenda': 'Ατζέντα',
-  'cal.list': 'Λίστα',
   'cal.empty': 'Τίποτα προγραμματισμένο — ανανεώσεις, δόσεις, πάγιοι λογαριασμοί και λήξεις θα εμφανιστούν εδώ.',
   'cal.nothingDue': 'καμία οφειλή',
   'cal.nothingScheduled': 'Τίποτα προγραμματισμένο.',
