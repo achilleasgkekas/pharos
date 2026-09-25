@@ -1129,7 +1129,7 @@ function storeFromUrl(url: string): string {
     'fs.com': 'FS.com', 'eu.store.ui.com': 'EU Store (Ubiquiti)', 'store.ui.com': 'Ubiquiti Store',
   };
   if (map[host]) return map[host];
-  for (const key of Object.keys(map)) if (host.endsWith(key)) return map[key];
+  for (const key of Object.keys(map)) if (host.endsWith(`.${key}`)) return map[key];
   return host;
 }
 

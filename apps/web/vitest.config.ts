@@ -24,5 +24,12 @@ export default defineConfig({
     environment: 'node',
     include: ['src/**/*.test.ts'],
     globals: false,
+    // Only collected with `npm run test:coverage` (CI uploads the HTML report as an artifact).
+    coverage: {
+      provider: 'v8',
+      include: ['src/**/*.{ts,tsx}'],
+      exclude: ['src/**/*.test.ts', 'src/test/**'],
+      reporter: ['text-summary', 'html', 'json-summary'],
+    },
   },
 });
