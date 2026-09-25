@@ -46,8 +46,8 @@ const {
   // #33 respawn over a trashed successor (chained .setOptions({ withDeleted: true })).
   billReplaceOne: vi.fn(async (_filter: Record<string, any>, _doc: Record<string, any>) => ({ modifiedCount: 0 })),
   billFindByIdAndUpdate: vi.fn(async (_id: string, _update: Record<string, any>) => ({})),
-  billUpdateOne: vi.fn(async (_filter: Record<string, unknown>, _update: Record<string, any>) => ({})),
-  addExpenseMock: vi.fn(async (_data: Record<string, unknown>) => ({ ok: true, id: 'exp1' } as { ok: boolean; id?: string; error?: string })),
+  billUpdateOne: vi.fn(async (_filter: Record<string, unknown>, _update: Record<string, any>) => ({ modifiedCount: 1 }) as { modifiedCount?: number }),
+  addExpenseMock: vi.fn(async (_data: Record<string, unknown>, _opts?: { id?: string }) => ({ ok: true, id: 'exp1' } as { ok: boolean; id?: string; error?: string })),
   revalidatePathMock: vi.fn(),
   // P9: only the base currency matters here; lib/fx.ts itself runs un-mocked (it is pure).
   getAppSettingsMock: vi.fn(async () => ({ currency: 'EUR' }) as { currency: string }),
@@ -74,6 +74,7 @@ vi.mock('@/app/expenses/actions', () => ({ addExpense: addExpenseMock }));
 vi.mock('@/lib/appSettings', () => ({ getAppSettings: getAppSettingsMock }));
 vi.mock('next/cache', () => ({ revalidatePath: (p: string) => revalidatePathMock(p) }));
 
+import { billPaidExpenseId, billPaymentExpenseId, billPaymentId } from '@/lib/billExpenseId';
 import {
   createBill, updateBill, setBillArchived, deleteBill, markBillPaid, markBillUnpaid,
   logBillPayment, removeBillPayment,
@@ -100,7 +101,7 @@ beforeEach(() => {
   billFindOne.mockImplementation(async () => null);
   billReplaceOne.mockImplementation(async () => ({ modifiedCount: 0 }));
   billFindByIdAndUpdate.mockImplementation(async () => ({}));
-  billUpdateOne.mockImplementation(async () => ({}));
+  billUpdateOne.mockImplementation(async () => ({ modifiedCount: 1 }));
   addExpenseMock.mockImplementation(async () => ({ ok: true, id: 'exp1' }));
   revalidatePathMock.mockImplementation(() => undefined);
   getAppSettingsMock.mockImplementation(async () => ({ currency: 'EUR' }));
@@ -896,5 +897,71 @@ describe('per-space tag on bills (#14, P68 phase 3)', () => {
     });
     await markBillPaid('b1');
     expect(billCreate.mock.calls[0][0].space).toBe('Kalamos');
+  });
+});
+
+// #299 — the expense and the payment are two writes. A double-click used to run the pair twice
+// (two expenses in the ledger), and a failure between them left an expense with no payment.
+describe('bill payments are idempotent (#299)', () => {
+  it('"mark paid" pins its expense id to the bill, so a second attempt reuses the first entry', async () => {
+    billFindById.mockResolvedValue({ _id: 'b1', title: 'ΔΕΗ', vendor: 'ΔΕΗ', amount: 62, paidAt: null, cycle: '', linkedExpenseId: '', payments: [] });
+    await Promise.all([markBillPaid('b1', { logExpense: true }), markBillPaid('b1', { logExpense: true })]);
+    expect(addExpenseMock.mock.calls.map((c) => c[1]?.id)).toEqual([billPaidExpenseId('b1'), billPaidExpenseId('b1')]);
+  });
+
+  it('an instalment is pushed first, guarded on its own derived id, carrying its expense id', async () => {
+    billFindById
+      .mockResolvedValueOnce({ _id: 'b1', title: 'X', amount: 300, paidAt: null, payments: [] })
+      .mockResolvedValueOnce({ _id: 'b1', amount: 300, paidAt: null, payments: [{ amount: 50 }] });
+    await logBillPayment('b1', { amount: 50, logExpense: true, key: 'k1' });
+    const [filter, update] = billUpdateOne.mock.calls[0];
+    expect(filter).toEqual({ _id: 'b1', paidAt: null, 'payments._id': { $ne: billPaymentId('b1', 'k1') } });
+    expect(update.$push.payments._id).toBe(billPaymentId('b1', 'k1'));
+    expect(update.$push.payments.expenseId).toBe(billPaymentExpenseId('b1', 'k1'));
+    expect(addExpenseMock.mock.calls[0][1]).toEqual({ id: billPaymentExpenseId('b1', 'k1') });
+    expect(billUpdateOne.mock.invocationCallOrder[0]).toBeLessThan(addExpenseMock.mock.invocationCallOrder[0]);
+  });
+
+  it('a double-click that loses the push records nothing new and still reports success', async () => {
+    const pid = billPaymentId('b1', 'k1');
+    billFindById
+      .mockResolvedValueOnce({ _id: 'b1', title: 'X', amount: 300, paidAt: null, payments: [] })
+      // re-read after the guarded push matched nothing: the other click's instalment is there
+      .mockResolvedValueOnce({ _id: 'b1', amount: 300, paidAt: null, payments: [{ _id: pid, amount: 50 }] })
+      .mockResolvedValueOnce({ _id: 'b1', amount: 300, paidAt: null, payments: [{ _id: pid, amount: 50 }] });
+    billUpdateOne.mockResolvedValueOnce({ modifiedCount: 0 });
+    const res = await logBillPayment('b1', { amount: 50, logExpense: true, key: 'k1' });
+    expect(res).toEqual({ ok: true, settled: false });
+    expect(billUpdateOne).toHaveBeenCalledTimes(1);
+    // The expense write lands on the same pinned id, i.e. on the other click's entry.
+    expect(addExpenseMock.mock.calls[0][1]).toEqual({ id: billPaymentExpenseId('b1', 'k1') });
+  });
+
+  it('a repeat of an instalment that already settled the bill is not an error and does not re-stamp paidAt', async () => {
+    const pid = billPaymentId('b1', 'k1');
+    const settled = { _id: 'b1', title: 'X', amount: 100, paidAt: new Date('2026-07-01'), payments: [{ _id: pid, amount: 100 }] };
+    billFindById.mockResolvedValue(settled);
+    const res = await logBillPayment('b1', { amount: 100, key: 'k1' });
+    expect(res).toEqual({ ok: true, settled: true });
+    expect(billUpdateOne).not.toHaveBeenCalled();
+    expect(billFindByIdAndUpdate).not.toHaveBeenCalled();
+  });
+
+  it('when the expense cannot be written, the instalment is taken back out (no half-recorded payment)', async () => {
+    billFindById.mockResolvedValueOnce({ _id: 'b1', title: 'X', amount: 300, paidAt: null, payments: [] });
+    addExpenseMock.mockResolvedValueOnce({ ok: false, error: 'db down' });
+    const res = await logBillPayment('b1', { amount: 50, logExpense: true, key: 'k1' });
+    expect(res).toEqual({ ok: false, error: 'db down' });
+    expect(billUpdateOne.mock.calls[1][1]).toEqual({ $pull: { payments: { _id: billPaymentId('b1', 'k1') } } });
+  });
+
+  it('a push refused because the bill got paid meanwhile reports it as paid', async () => {
+    billFindById
+      .mockResolvedValueOnce({ _id: 'b1', title: 'X', amount: 300, paidAt: null, payments: [] })
+      .mockResolvedValueOnce({ _id: 'b1', amount: 300, paidAt: new Date(), payments: [] });
+    billUpdateOne.mockResolvedValueOnce({ modifiedCount: 0 });
+    const res = await logBillPayment('b1', { amount: 50, logExpense: true, key: 'k1' });
+    expect(res).toEqual({ ok: false, error: 'Bill is already paid' });
+    expect(addExpenseMock).not.toHaveBeenCalled();
   });
 });

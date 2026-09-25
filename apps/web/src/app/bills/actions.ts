@@ -8,6 +8,8 @@ import { billIsSettledByPayments, billPaidAmount, billRemaining } from '@/lib/bi
 import { safeDateOrNull } from '@/lib/dates';
 import { spawnNextBillOnce } from '@/lib/billRecurrence';
 import { addExpense } from '@/app/expenses/actions';
+import { billPaidExpenseId, billPaymentExpenseId, billPaymentId } from '@/lib/billExpenseId';
+import { randomUUID } from 'node:crypto';
 import { getAppSettings } from '@/lib/appSettings';
 import { resolveFx } from '@/lib/fx';
 import { revalidatePath } from 'next/cache';
@@ -174,6 +176,9 @@ export async function markBillPaid(
   const partlyPaid = billPaidAmount(bill.payments) > 0;
   const owed = billRemaining(bill.amount, bill.payments, null);
 
+  // #299: the expense is written before `paidAt`, so a double-click (both calls read the bill as
+  // unpaid) or a retry after the paidAt write failed would each log it again. Its `_id` is derived
+  // from the bill, so every later attempt lands on the first one's entry instead of copying it.
   let linkedExpenseId = bill.linkedExpenseId || '';
   if (opts?.logExpense && !wasPaid && !linkedExpenseId && partlyPaid && owed > 0) {
     const res = await addExpense({
@@ -185,7 +190,7 @@ export async function markBillPaid(
       date: paidAt.toISOString(),
       notes: `Bill: ${bill.title} (final payment)`,
       verified: true,
-    });
+    }, { id: billPaidExpenseId(id) });
     if (res.ok && res.id) linkedExpenseId = res.id;
   } else if (opts?.logExpense && !wasPaid && !linkedExpenseId && (bill.amount ?? 0) > 0) {
     // addExpense opens its OWN withRequestTenant, which re-resolves to the same context we are
@@ -205,7 +210,7 @@ export async function markBillPaid(
       date: paidAt.toISOString(),
       notes: `Bill: ${bill.title}`,
       verified: true,
-    });
+    }, { id: billPaidExpenseId(id) });
     if (res.ok && res.id) linkedExpenseId = res.id;
   }
 
@@ -242,6 +247,8 @@ const PaymentSchema = z.object({
   date: z.string().default(''),
   note: z.string().default(''),
   logExpense: z.boolean().default(false),
+  // #299: minted once by the payment form, so a double-click or a retry names the SAME instalment.
+  key: z.string().max(100).default(''),
 });
 
 /**
@@ -258,28 +265,56 @@ const PaymentSchema = z.object({
  */
 export async function logBillPayment(
   id: string,
-  data: { amount: number; date?: string; note?: string; logExpense?: boolean }
+  data: { amount: number; date?: string; note?: string; logExpense?: boolean; key?: string }
 ): Promise<{ ok: boolean; error?: string; settled?: boolean }> {
   await assertCanWrite();
   const parsed = PaymentSchema.safeParse(data);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message || 'Invalid payment' };
   const p = parsed.data;
 
+  // #299: the instalment and its expense get ids derived from the form's key. A caller without a
+  // key (nothing in the app today) still gets the ordering guarantees below, just not dedup.
+  const key = p.key || randomUUID();
+  const paymentId = billPaymentId(id, key);
+  const hasPayment = (b: { payments?: Array<{ _id?: unknown }> | null } | null) =>
+    !!b?.payments?.some((x) => String(x._id) === paymentId);
+
   const settleWith = await withRequestTenant(async () => {
     await connectDB();
     const Bill = await currentModel(BillModel);
     const bill = await Bill.findById(id).lean();
     if (!bill) return { ok: false as const, error: 'Bill not found' };
-    if (bill.paidAt) return { ok: false as const, error: 'Bill is already paid' };
+    // A repeat of an instalment that already landed (and may have settled the bill) is not an error.
+    const repeat = hasPayment(bill);
+    if (bill.paidAt && !repeat) return { ok: false as const, error: 'Bill is already paid' };
 
     const paidOn = safeDateOrNull(p.date) ?? new Date();
+    const expenseId = p.logExpense ? billPaymentExpenseId(id, key) : '';
 
-    let expenseId = '';
+    // The payment goes in FIRST, guarded on its own id: of two concurrent submissions exactly one
+    // matches, so the bill never gets the instalment twice. The expense follows, and is undone
+    // with the payment if it cannot be written, so neither half is ever left without the other.
+    let pushed = false;
+    if (!repeat) {
+      const res = await Bill.updateOne(
+        { _id: id, paidAt: null, 'payments._id': { $ne: paymentId } },
+        { $push: { payments: { _id: paymentId, amount: p.amount, date: paidOn, note: p.note, expenseId } } }
+      );
+      pushed = (res?.modifiedCount ?? 0) > 0;
+      if (!pushed) {
+        const now = await Bill.findById(id).lean();
+        if (!hasPayment(now)) return { ok: false as const, error: now ? 'Bill is already paid' : 'Bill not found' };
+      }
+    }
+
     if (p.logExpense) {
       // Instalments are stored base-denominated, so this is the plain single-currency
       // case: no currency/fxRate is handed over, and addExpense's own resolveFx passes
       // it straight through. Passing the bill's rate here would convert an already
       // converted figure a second time.
+      //
+      // Attempted on a repeat too: the pinned id makes it a no-op when the first attempt wrote
+      // it, and completes the pair when that attempt died between the two writes.
       const res = await addExpense({
         kind: 'expense',
         vendor: bill.vendor || bill.title,
@@ -289,25 +324,24 @@ export async function logBillPayment(
         date: paidOn.toISOString(),
         notes: `Bill: ${bill.title}${p.note ? ` (${p.note})` : ''}`,
         verified: true,
-      });
-      if (res.ok && res.id) expenseId = res.id;
+      }, { id: expenseId });
+      if (!res.ok) {
+        if (pushed) await Bill.updateOne({ _id: id }, { $pull: { payments: { _id: paymentId } } });
+        return { ok: false as const, error: res.error || 'Could not log the expense' };
+      }
     }
-
-    await Bill.updateOne(
-      { _id: id },
-      { $push: { payments: { amount: p.amount, date: paidOn, note: p.note, expenseId } } }
-    );
 
     const after = await Bill.findById(id).lean();
     const settled = !!after && billIsSettledByPayments(after.amount, after.payments);
     revalidatePath('/bills');
-    return { ok: true as const, settled, paidOn: settled ? paidOn.toISOString() : '' };
+    // A repeat that finds the bill already settled leaves its paidAt alone.
+    return { ok: true as const, settled, settle: settled && !after?.paidAt, paidOn: settled ? paidOn.toISOString() : '' };
   });
 
   if (!settleWith.ok) return settleWith;
   // Reuse the one-click path for the settling half (recurring spawn + paidAt stamp).
   // logExpense:false — this payment already logged its own, if it was asked to.
-  if (settleWith.settled) await markBillPaid(id, { logExpense: false, paidDate: settleWith.paidOn });
+  if (settleWith.settle) await markBillPaid(id, { logExpense: false, paidDate: settleWith.paidOn });
   return { ok: true, settled: settleWith.settled };
 }
 

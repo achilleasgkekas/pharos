@@ -410,12 +410,23 @@ const AddSchema = UpdateSchema.extend({
   recurring: z.boolean().optional(),
 });
 
-/** Manual entry (no file) — e.g. type in a salary or a cash expense. */
-export async function addExpense(data: z.input<typeof AddSchema>): Promise<{ ok: boolean; id?: string; error?: string }> {
+/**
+ * Manual entry (no file) — e.g. type in a salary or a cash expense.
+ *
+ * `opts.id` (#299) lets a caller that writes the expense as one half of a larger action (paying a
+ * bill) pin its `_id`. A second write with the same id then reports the existing entry instead of
+ * booking a copy, which is what makes a double-click or a retry harmless.
+ */
+export async function addExpense(
+  data: z.input<typeof AddSchema>,
+  opts?: { id?: string }
+): Promise<{ ok: boolean; id?: string; error?: string }> {
   await assertCanWrite();
   const p = AddSchema.safeParse(data);
   if (!p.success) return { ok: false, error: 'Invalid data' };
   const d = p.data;
+  const fixedId = opts?.id ?? '';
+  if (fixedId && !/^[0-9a-f]{24}$/.test(fixedId)) return { ok: false, error: 'Invalid data' };
   return withRequestTenant(async () => {
   try {
     await connectDB();
@@ -430,6 +441,7 @@ export async function addExpense(data: z.input<typeof AddSchema>): Promise<{ ok:
     const rule = explicit ? null : matchCategoryRule(settings.categoryRules, { vendor: d.vendor, description: d.notes });
     const fx = resolveFx({ amount: d.amount, currency: d.currency, fxRate: d.fxRate }, settings.currency);
     const exp = await Expense.create({
+      ...(fixedId ? { _id: fixedId } : {}),
       kind: d.kind,
       vendor: d.vendor,
       vendorKey: vendorKey(d.vendor),
@@ -461,6 +473,8 @@ export async function addExpense(data: z.input<typeof AddSchema>): Promise<{ ok:
     revalidatePath('/income');
     return { ok: true, id: String(exp._id) };
   } catch (err) {
+    // The pinned slot is already taken: an earlier attempt of the same action got there first.
+    if (fixedId && isDuplicateKey(err)) return { ok: true, id: fixedId };
     return { ok: false, error: (err as Error).message };
   }
   });

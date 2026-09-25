@@ -241,6 +241,21 @@ describe('addExpense', () => {
     expect(revalidatePathMock).toHaveBeenCalledWith('/income');
   });
 
+  // #299: a bill payment pins the id so a double-click or a retry cannot book a second copy.
+  it('a pinned id is used as _id, and a duplicate on it reports the existing entry instead of failing', async () => {
+    const id = 'a'.repeat(24);
+    await addExpense({ date: '2026-06-15' } as any, { id });
+    expect(expenseCreate.mock.calls[0][0]._id).toBe(id);
+    expenseCreate.mockRejectedValueOnce(Object.assign(new Error('E11000 duplicate key'), { code: 11000 }));
+    expect(await addExpense({ date: '2026-06-15' } as any, { id })).toEqual({ ok: true, id });
+  });
+
+  it('a duplicate key without a pinned id is still an error, and a malformed pinned id is refused', async () => {
+    expenseCreate.mockRejectedValueOnce(Object.assign(new Error('E11000 duplicate key'), { code: 11000 }));
+    expect((await addExpense({ date: '2026-06-15' } as any)).ok).toBe(false);
+    expect(await addExpense({ date: '2026-06-15' } as any, { id: 'nope' })).toEqual({ ok: false, error: 'Invalid data' });
+  });
+
   it('an explicit (non-"other") category wins over both a matching rule and the inherited series', async () => {
     getAppSettingsMock.mockResolvedValue({ categoryRules: [RULE_DEI] });
     expenseFindOneSortLean.mockResolvedValue({ category: 'from-series', recurring: false });
