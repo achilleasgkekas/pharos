@@ -1,5 +1,7 @@
 # Troubleshooting
 
+<sub>[📚 Docs home](README.md) · [✨ Features](features.md) · [🚀 Self-hosting](self-hosting.md) · [⚙️ Configuration](configuration.md) · [❓ FAQ](faq.md)</sub>
+
 A single place for the most common problems, grouped by area. Each item links
 back to the guide that covers the topic in depth. If something here contradicts a
 guide, the guide is authoritative — this page is a fast index.

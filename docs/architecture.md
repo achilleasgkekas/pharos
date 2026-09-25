@@ -1,5 +1,7 @@
 # Architecture
 
+<sub>[📚 Docs home](README.md) · [✨ Features](features.md) · [🚀 Self-hosting](self-hosting.md) · [⚙️ Configuration](configuration.md) · [❓ FAQ](faq.md)</sub>
+
 How the pieces of PHAROS fit together. This is a map for self-hosters who want to
 understand what runs on their box, and for contributors finding their way around
 the codebase. For running instructions see [Self-hosting](self-hosting.md); for the

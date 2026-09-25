@@ -1,5 +1,7 @@
 # Configuration
 
+<sub>[📚 Docs home](README.md) · [✨ Features](features.md) · [🚀 Self-hosting](self-hosting.md) · [⚙️ Configuration](configuration.md) · [❓ FAQ](faq.md)</sub>
+
 Almost everything in Pharos is configured from the **Settings** page inside the
 app (stored in the database, no restart needed). A handful of secrets and
 infrastructure defaults come from environment variables at boot. This guide
@@ -158,8 +160,12 @@ can never inject a path.
 
 ## Notifications
 
-Alerts (price-drop deals, installments due this month, warranties expiring) fan
-out to **every enabled channel**. All channels are plain HTTP POSTs, so no extra
+Alerts (price-drop deals, installments due, warranties, bills, trials, documents,
+vehicle dates, special dates, maintenance and more) fan out to **every enabled
+channel**. Each alert category has its own switch under **Settings →
+Notifications**, so you can, say, keep bills on your phone but leave price hikes
+to the in-app bell. Lead times (how many days ahead a bill, trial, document or
+birthday warns you) are set in **Settings → General**. All channels are plain HTTP POSTs, so no extra
 dependency is required. Email is reachable through a generic webhook
 (Zapier/Make/n8n) or a self-hosted relay.
 
@@ -175,6 +181,12 @@ in `notifiers` with `{ id, type, enabled, label, url?, token?, target? }`.
 | `slack`    | `url`                    | Slack incoming-webhook URL.                       |
 | `telegram` | `token` + `target`       | Bot token + chat id.                              |
 | `webhook`  | `url`                    | POSTs JSON `{ title, message, ts }`.              |
+
+**Web push** needs no third-party service. Open Settings → Notifications on each
+phone or browser that should get alerts and press **Enable browser push**.
+PHAROS generates its own VAPID key pair once and signs every push itself. On
+iPhone, add PHAROS to the home screen first (iOS only allows push for installed
+web apps).
 
 Use **Test** on a channel to send a one-off "Notifications are working" message
 before relying on it. ntfy titles are ASCII-only; message bodies keep unicode

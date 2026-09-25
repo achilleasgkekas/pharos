@@ -8,12 +8,14 @@ export const metadata: Metadata = {
   title: 'PHAROS · Personal Hub',
   // Google truncates around 155 characters; the old one ran to ~200 and lost its ending mid-list.
   description:
-    'A private personal hub for everything you own: inventory, AI receipts, expenses, installments and subscriptions. Self-hosted software with optional AI.',
+    'A self-hosted hub for your household: inventory, receipts, expenses, bills, subscriptions, vehicles and documents. Free software with optional AI.',
   keywords: [
     'self-hosted',
     'personal hub',
     'home dashboard',
     'receipt scanner',
+    'bill tracker',
+    'vehicle log',
     'expense tracker',
     'inventory',
     'homelab',

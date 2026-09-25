@@ -1,5 +1,7 @@
 # Backup & restore
 
+<sub>[📚 Docs home](README.md) · [✨ Features](features.md) · [🚀 Self-hosting](self-hosting.md) · [⚙️ Configuration](configuration.md) · [❓ FAQ](faq.md)</sub>
+
 Your Pharos data lives in two places, and a complete backup covers **both**:
 
 1. **The database** (`homepage` in MongoDB) — every record: items, receipts,
@@ -149,8 +151,9 @@ between instances, but it is **not** a substitute for the full dump above.
 What it includes — the documents (metadata) of every user-owned collection:
 `items`, `receipts`, `statements`, `subscriptions`, `vouchers`, `cards`, `tasks`,
 `stores`, `expenses` (covers income too — income is an `Expense` document with
-`kind: 'income'`), `bills`, `goals`, `giftCards`, `loyaltyCards`,
-`netWorthSnapshots`, `shoppingList`. The registry lives in one place
+`kind: 'income'`), `bills`, `documents`, `specialDates`, `goals`,
+`netWorthSnapshots`, `shoppingList`, `meterReadings`, `conversations` (AI chat
+history), `vehicles` and `vehicleLogs`. The registry lives in one place
 (`lib/backupModels.ts`) with a test that fails whenever a new model is added
 without an explicit include/exclude decision, so this list should not drift the
 way it once did.
@@ -163,11 +166,10 @@ What it deliberately does **not** include:
   Downloads folder and can be copied or mailed around, so nothing holding a
   secret goes into it; use the mongodump (section 1) for a full copy including
   settings.
-- **Logins** (`User`, and in SaaS mode `Account`) — password hashes.
+- **Logins** (`User`) — password hashes.
 - **Binary files** — only the paths are stored, not the receipt/PDF/photo bytes.
-- **Transient/regenerable state** — background jobs, notification instances, AI
-  chat history (`/history`), and the legacy `Phase` model from the original
-  tracker import.
+- **Transient/regenerable state** — background jobs, notification instances,
+  and the legacy `Phase` model from the original tracker import.
 
 ### Verify a backup before you need it
 

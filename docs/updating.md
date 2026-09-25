@@ -1,5 +1,7 @@
 # Updating PHAROS
 
+<sub>[📚 Docs home](README.md) · [✨ Features](features.md) · [🚀 Self-hosting](self-hosting.md) · [⚙️ Configuration](configuration.md) · [❓ FAQ](faq.md)</sub>
+
 How to move an existing instance to a newer version, safely and reversibly.
 This expands on the short "Updating" note in the [Self-hosting guide](self-hosting.md#8-updating).
 
