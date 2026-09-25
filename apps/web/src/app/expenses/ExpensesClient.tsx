@@ -1,6 +1,6 @@
 'use client';
 import { cur, currencySymbol, CURRENCIES } from '@/lib/money';
-import { isForeignCurrency, normalizeCurrency, convertToBase, deriveFxRate } from '@/lib/fx';
+import { isForeignCurrency, normalizeCurrency, convertToBase, deriveFxRate, sumBase } from '@/lib/fx';
 import { FxBadge } from '@/components/FxBadge';
 import { FxRateButton } from '@/components/FxRateButton';
 import { useState, useTransition, useRef, useMemo } from 'react';
@@ -107,8 +107,10 @@ export function ExpensesClient({ kind, expenses, cards, vendors, ollamaUp, categ
 
   const now = new Date();
   const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  const monthTotal = expenses.filter((e) => (e.period || e.date.slice(0, 7)) === monthKey).reduce((s, e) => s + (e.amount || 0), 0);
-  const yearTotal = expenses.filter((e) => e.date.slice(0, 4) === String(now.getFullYear())).reduce((s, e) => s + (e.amount || 0), 0);
+  // #297: an entry still waiting for its exchange rate holds the PRINTED foreign figure in
+  // `amount`, so it is left out of these base-currency totals and counted under them instead.
+  const monthSum = sumBase(expenses.filter((e) => (e.period || e.date.slice(0, 7)) === monthKey), fx.base);
+  const yearSum = sumBase(expenses.filter((e) => e.date.slice(0, 4) === String(now.getFullYear())), fx.base);
 
   const failed = useMemo(() => expenses.filter((e) => statusOf(e) === 'failed' && e.filePath), [expenses]);
   const seriesCount = useMemo(() => {
@@ -301,11 +303,13 @@ export function ExpensesClient({ kind, expenses, cards, vendors, ollamaUp, categ
           <div className="grid grid-cols-2 gap-3 mb-5">
             <div className="rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-4">
               <p className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)] mb-1" style={{ fontFamily: 'var(--font-mono)' }}>{t('ex.thisMonth')}</p>
-              <p className={cn('text-2xl font-bold', isIncome ? 'text-[color:var(--color-accent)]' : 'text-[color:var(--color-gold)]')} style={{ fontFamily: 'var(--font-display)' }}>{money(monthTotal)}</p>
+              <p className={cn('text-2xl font-bold', isIncome ? 'text-[color:var(--color-accent)]' : 'text-[color:var(--color-gold)]')} style={{ fontFamily: 'var(--font-display)' }}>{money(monthSum.total)}</p>
+              {monthSum.needsRate > 0 && <TotalsNoRate n={monthSum.needsRate} />}
             </div>
             <div className="rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-4">
               <p className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)] mb-1" style={{ fontFamily: 'var(--font-mono)' }}>{t('ex.thisYear')}</p>
-              <p className="text-2xl font-bold" style={{ fontFamily: 'var(--font-display)' }}>{money(yearTotal)}</p>
+              <p className="text-2xl font-bold" style={{ fontFamily: 'var(--font-display)' }}>{money(yearSum.total)}</p>
+              {yearSum.needsRate > 0 && <TotalsNoRate n={yearSum.needsRate} />}
             </div>
           </div>
 
@@ -622,6 +626,17 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 const selectCls = 'w-full bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[color:var(--color-accent)]';
 
 type FormState = Pick<SerializedExpense, 'kind' | 'vendor' | 'category' | 'space' | 'taxDeductible' | 'taxCategory' | 'currency' | 'date' | 'period' | 'recurring' | 'recurringCycle' | 'series' | 'paymentMethod' | 'notes' | 'verified'> & { amount: string; fxRate: string; split: SplitEntry[]; paymentSplits: PaymentSplitEntry[] };
+
+/** #297: says, under a total, how many entries it leaves out for lack of an exchange rate.
+ *  Visible text rather than a hover title, so it reads the same on a phone. */
+function TotalsNoRate({ n }: { n: number }) {
+  const t = useT();
+  return (
+    <p className="mt-1 text-[11px] text-[color:var(--color-gold)] flex items-center gap-1">
+      <AlertTriangle size={11} /> {t('ex.totalsNoRate', { n })}
+    </p>
+  );
+}
 
 /** The `amount` field always holds what is PRINTED on the document: the stored base-currency
  *  amount for a normal entry, `origAmount` for a foreign one. resolveFx() on the server does

@@ -549,6 +549,7 @@ export const el: Partial<Dict> = {
   'ex.fFxRate': 'Ισοτιμία ({base} ανά 1 {code})',
   'ex.fFxCharged': 'ή χρεώθηκε ({cur})',
   'ex.fxNoRate': 'καμία ισοτιμία ακόμα, κρατιέται όπως τυπώθηκε (χωρίς μετατροπή σε {base})',
+  'ex.totalsNoRate': '{n} χωρίς ισοτιμία, δεν περιλαμβάνονται',
   'ex.fDate': 'Ημερομηνία',
   // Προαιρετικό rate feed (P9 phase 2)
   'fx.marketRate': 'Τιμή αγοράς',

@@ -67,6 +67,11 @@ async function resolveBillFx(raw: { amount: number; currency: string; fxRate: nu
   return { amount: fx.amount, currency: fx.currency, origAmount: fx.origAmount, fxRate: fx.fxRate };
 }
 
+/** The deployment's base currency: what `amount`, and every instalment, is denominated in. */
+async function baseCurrency(): Promise<string> {
+  return (await getAppSettings()).currency;
+}
+
 /** The printed figure behind a stored bill: what a person reads off the paper. */
 function printedAmount(bill: { amount?: number | null; origAmount?: number | null }): number {
   return (Number(bill.origAmount) || 0) > 0 ? Number(bill.origAmount) : Number(bill.amount) || 0;
@@ -110,13 +115,41 @@ export async function updateBill(id: string, formData: FormData): Promise<{ ok: 
     // dated on the latest instalment, since that is when the money actually covered it.
     // Deliberately one-way: RAISING the amount never reopens a paid bill, because a bill
     // settled with "mark paid" on top of instalments looks identical here and must stay paid.
-    const after = await Bill.findById(id).lean();
-    if (after && !after.paidAt && billIsSettledByPayments(after.amount, after.payments)) {
-      const lastPaid = Math.max(...(after.payments ?? []).map((p) => new Date(p.date ?? 0).getTime() || 0));
-      await markBillPaid(id, { logExpense: false, paidDate: lastPaid > 0 ? new Date(lastPaid).toISOString() : '' });
-    }
+    //
+    // #297: the same applies when this edit supplies the exchange rate a foreign bill was
+    // missing. Until then its instalments could not be compared with its printed amount, so
+    // they never settled it; now that `amount` is base currency they can.
+    await settleIfCoveredByPayments(id, await baseCurrency());
     revalidatePath('/bills');
     return { ok: true };
+  });
+}
+
+/** Settle an open bill whose instalments already cover it, dated on the latest instalment.
+ *  Runs inside the caller's withRequestTenant. */
+async function settleIfCoveredByPayments(id: string, base: string): Promise<void> {
+  const Bill = await currentModel(BillModel);
+  const after = await Bill.findById(id).lean();
+  if (after && !after.paidAt && billIsSettledByPayments(after, base)) {
+    const lastPaid = Math.max(...(after.payments ?? []).map((p) => new Date(p.date ?? 0).getTime() || 0));
+    await markBillPaid(id, { logExpense: false, paidDate: lastPaid > 0 ? new Date(lastPaid).toISOString() : '' });
+  }
+}
+
+/**
+ * #297: settle the given bills if their instalments now cover them. For the /reports "apply an
+ * exchange rate" path, which converts a foreign bill in place without going through updateBill:
+ * instalments logged while the rate was missing could not settle it then, so they get their
+ * chance the moment the rate arrives.
+ */
+export async function settleBillsCoveredByPayments(ids: string[]): Promise<void> {
+  await assertCanWrite();
+  if (!ids.length) return;
+  return withRequestTenant(async () => {
+    await connectDB();
+    const base = await baseCurrency();
+    for (const id of ids) await settleIfCoveredByPayments(id, base);
+    revalidatePath('/bills');
   });
 }
 
@@ -172,15 +205,19 @@ export async function markBillPaid(
 
   // P61: when instalments were already logged, "mark paid" settles what is LEFT, so an
   // opt-in expense books the remaining balance rather than the full amount a second time.
-  // Such a bill is base-denominated by definition (see logBillPayment), hence no fx here.
+  // The balance is base currency (instalments are, see logBillPayment), hence no fx here.
+  // #297: unless the bill is still waiting for an exchange rate. Then its printed amount and
+  // its base-currency instalments cannot be subtracted, `owed` is null, and no final-payment
+  // expense is booked at all: logging the difference of two currencies would put a wrong
+  // figure into the ledger, where no audit would ever flag it.
   const partlyPaid = billPaidAmount(bill.payments) > 0;
-  const owed = billRemaining(bill.amount, bill.payments, null);
+  const owed = billRemaining({ ...bill, paidAt: null }, await baseCurrency());
 
   // #299: the expense is written before `paidAt`, so a double-click (both calls read the bill as
   // unpaid) or a retry after the paidAt write failed would each log it again. Its `_id` is derived
   // from the bill, so every later attempt lands on the first one's entry instead of copying it.
   let linkedExpenseId = bill.linkedExpenseId || '';
-  if (opts?.logExpense && !wasPaid && !linkedExpenseId && partlyPaid && owed > 0) {
+  if (opts?.logExpense && !wasPaid && !linkedExpenseId && partlyPaid && owed !== null && owed > 0) {
     const res = await addExpense({
       kind: 'expense',
       vendor: bill.vendor || bill.title,
@@ -192,7 +229,10 @@ export async function markBillPaid(
       verified: true,
     }, { id: billPaidExpenseId(id) });
     if (res.ok && res.id) linkedExpenseId = res.id;
-  } else if (opts?.logExpense && !wasPaid && !linkedExpenseId && (bill.amount ?? 0) > 0) {
+  } else if (opts?.logExpense && !wasPaid && !linkedExpenseId && !partlyPaid && (bill.amount ?? 0) > 0) {
+    // `!partlyPaid`: the full amount is only ever booked for a bill nobody has paid toward yet.
+    // Without it, a part-paid bill whose balance is unknown (#297) or already zero fell through
+    // to here and booked the whole bill a second time on top of its instalments.
     // addExpense opens its OWN withRequestTenant, which re-resolves to the same context we are
     // already inside (the wrapper is re-entrant and host-derived), so the logged expense lands
     // in the same tenant DB as the bill. Nothing extra needs threading through.
@@ -331,8 +371,10 @@ export async function logBillPayment(
       }
     }
 
+    // #297: `base` decides whether the bill's amount is comparable with the instalments at all;
+    // a foreign bill still waiting for its exchange rate is never settled by them.
     const after = await Bill.findById(id).lean();
-    const settled = !!after && billIsSettledByPayments(after.amount, after.payments);
+    const settled = !!after && billIsSettledByPayments(after, await baseCurrency());
     revalidatePath('/bills');
     // A repeat that finds the bill already settled leaves its paidAt alone.
     return { ok: true as const, settled, settle: settled && !after?.paidAt, paidOn: settled ? paidOn.toISOString() : '' };
@@ -364,7 +406,8 @@ export async function removeBillPayment(id: string, paymentId: string): Promise<
     // thing that distinguishes the two ways a bill gets a `paidAt`: an automatic settlement, which
     // this function is allowed to roll back, and a deliberate "Mark paid" click, which it is not —
     // removing a stray instalment must never quietly un-pay a bill the user said was paid.
-    const wasSettledByPayments = billIsSettledByPayments(bill.amount, bill.payments);
+    const base = await baseCurrency();
+    const wasSettledByPayments = billIsSettledByPayments(bill, base);
 
     await Bill.updateOne({ _id: id }, { $pull: { payments: { _id: paymentId } } });
 
@@ -374,7 +417,7 @@ export async function removeBillPayment(id: string, paymentId: string): Promise<
     // condition failed, and the bill stayed marked paid with nothing paid against it — the exact
     // opposite of what this function's own comment promises (#203).
     const after = await Bill.findById(id).lean();
-    if (after?.paidAt && wasSettledByPayments && !billIsSettledByPayments(after.amount, after.payments)) {
+    if (after?.paidAt && wasSettledByPayments && !billIsSettledByPayments(after, base)) {
       await Bill.updateOne({ _id: id }, { $set: { paidAt: null } });
     }
     revalidatePath('/bills');

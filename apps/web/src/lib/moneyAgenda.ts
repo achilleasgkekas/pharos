@@ -10,7 +10,9 @@ import { Statement as StatementModel } from '@/models/Statement';
 import { Expense as ExpenseModel } from '@/models/Expense';
 import { Bill as BillModel } from '@/models/Bill';
 import { Goal as GoalModel } from '@/models/Goal';
-import { billRemaining } from '@/lib/bill';
+import { billRemaining, type BillMoney } from '@/lib/bill';
+import { getAppSettings } from '@/lib/appSettings';
+import { formatMoney } from '@/lib/fx';
 import { computeInstallmentPlans } from '@/lib/installments';
 import type { SerializedStatement } from '@/types';
 import { formatDate } from '@/lib/i18n/format';
@@ -78,13 +80,16 @@ export async function computeMoneyAgenda(now: Date = new Date(), locale = 'en'):
       .lean(),
     // P67 — open payables (P28) and goal deadlines (P12), the two money dates the
     // agenda used to miss entirely. Both window-bounded like the expiries below.
+    // `currency origAmount fxRate`: without them billRemaining cannot see a foreign bill
+    // still waiting for its rate, and would count its printed figure as base currency (#297).
     Bill.find({ paidAt: null, archived: { $ne: true }, dueDate: { $gte: windowStart, $lt: windowEnd }, deletedAt: null })
-      .select('title vendor amount payments dueDate')
+      .select('title vendor amount currency origAmount fxRate payments dueDate')
       .lean(),
     Goal.find({ archived: { $ne: true }, targetDate: { $gte: windowStart, $lt: windowEnd }, deletedAt: null })
       .select('title targetAmount contributions targetDate')
       .lean(),
   ]);
+  const base = (await getAppSettings()).currency;
 
   const months: AgendaMonth[] = [0, 1, 2].map((i) => {
     const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
@@ -162,12 +167,15 @@ export async function computeMoneyAgenda(now: Date = new Date(), locale = 'en'):
   }
 
   // Open bills (P28) — what is still OWED, so a part-paid bill counts only the balance.
-  for (const b of bills as { title?: string; vendor?: string; amount?: number; payments?: { amount?: number }[]; dueDate?: Date }[]) {
-    const remaining = billRemaining(b.amount, b.payments, null);
+  // #297: a foreign bill with no exchange rate has no base-currency balance. It keeps its date
+  // with no amount, so neither the month total nor `dueThisMonth` adds dollars to euros, and
+  // the printed figure goes in the subtitle in its own currency.
+  for (const b of bills as (BillMoney & { title?: string; vendor?: string; dueDate?: Date })[]) {
+    const remaining = billRemaining({ ...b, paidAt: null }, base);
     push(new Date(b.dueDate as unknown as string), {
       kind: 'payable',
       label: b.title || b.vendor || 'Bill',
-      sub: 'Bill due',
+      sub: remaining === null ? `Bill due · ${formatMoney(Number(b.origAmount) || 0, b.currency || '', locale)}` : 'Bill due',
       amount: remaining,
     });
   }

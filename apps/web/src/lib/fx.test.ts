@@ -8,6 +8,7 @@ import {
   formatMoney,
   fxBadgeLabel,
   needsFxRate,
+  sumBase,
   toPrinted,
   resolveItemPrices,
   resolveStatementAmounts,
@@ -528,5 +529,22 @@ describe('effectiveCurrency / sameCurrency (P9 — comparing a quote to a record
     // A dollar quote is foreign to a EUR deployment and native to a USD one.
     expect(sameCurrency('USD', '', 'EUR')).toBe(false);
     expect(sameCurrency('USD', '', 'USD')).toBe(true);
+  });
+});
+
+describe('sumBase (#297)', () => {
+  it('sums base-currency and converted entries, and leaves out the ones still needing a rate', () => {
+    const docs = [
+      { amount: 20, currency: 'EUR', origAmount: 0, fxRate: 0 },   // base
+      { amount: 92, currency: 'USD', origAmount: 100, fxRate: 0.92 }, // converted
+      { amount: 10000, currency: 'JPY', origAmount: 10000, fxRate: 0 }, // printed yen, no rate
+      { amount: 5.5 },                                             // pre-P9 row
+    ];
+    expect(sumBase(docs, 'EUR')).toEqual({ total: 117.5, needsRate: 1 });
+  });
+
+  it('counts nothing as missing for a single-currency list', () => {
+    expect(sumBase([{ amount: 0.1 }, { amount: 0.2 }], 'EUR')).toEqual({ total: 0.3, needsRate: 0 });
+    expect(sumBase([], 'EUR')).toEqual({ total: 0, needsRate: 0 });
   });
 });

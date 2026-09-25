@@ -52,10 +52,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     // from the current doc — a partial PATCH must never leave a bill half-converted. Bodies
     // without any of these skip the extra read entirely.
     const touchesFx = set.amount != null || typeof b.currency === 'string' || b.fxRate != null;
+    const base = (await getAppSettings()).currency;
     if (touchesFx) {
       const existing = (await Bill.findById(id).lean()) as BillLean | null;
       if (!existing) return apiError('not found', 404);
-      const base = (await getAppSettings()).currency;
       // The printed amount of a foreign bill lives in origAmount; of a base-currency one, in amount.
       const wasForeign = isForeignCurrency(existing.currency, base);
       const printed =
@@ -92,7 +92,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (!Object.keys(set).length) return apiError('no valid fields');
     const doc = await Bill.findByIdAndUpdate(id, { $set: set }, { returnDocument: 'after' }).lean();
     if (!doc) return apiError('not found', 404);
-    return NextResponse.json({ bill: trim(doc as BillLean), spawnedNext });
+    return NextResponse.json({ bill: trim(doc as BillLean, base), spawnedNext });
   });
 }
 

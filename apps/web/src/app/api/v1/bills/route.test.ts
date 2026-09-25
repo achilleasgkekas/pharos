@@ -202,4 +202,18 @@ describe('POST multi-currency (P9)', () => {
     expect(json.data[0]).toMatchObject({ currency: 'USD', origAmount: 88, fxRate: 0.92 });
     expect(json.data[1]).toMatchObject({ currency: 'EUR', origAmount: 0, fxRate: 0 });
   });
+
+  // #297: a $100 bill with no rate stores 100 in `amount`. Reporting remaining 60 after a €40
+  // instalment (or paymentState "paid" after €100) would subtract euros from dollars.
+  it('GET flags a foreign bill with no rate and reports its remaining as null, not a mixed figure', async () => {
+    state.docs = [
+      { _id: 'b1', title: 'AWS', dueDate: new Date('2026-08-01'), amount: 100, currency: 'USD', origAmount: 100, fxRate: 0, payments: [{ amount: 100 }] },
+      { _id: 'b2', title: 'AWS', dueDate: new Date('2026-08-01'), amount: 92, currency: 'USD', origAmount: 100, fxRate: 0.92, payments: [{ amount: 40 }] },
+    ];
+    state.total = 2;
+    const res = await GET(makeReq());
+    const json = (await res.json()) as { data: { remaining: number | null; paymentState: string; needsFxRate: boolean }[] };
+    expect(json.data[0]).toMatchObject({ needsFxRate: true, remaining: null, paymentState: 'partially-paid' });
+    expect(json.data[1]).toMatchObject({ needsFxRate: false, remaining: 52, paymentState: 'partially-paid' });
+  });
 });
