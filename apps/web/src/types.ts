@@ -158,6 +158,8 @@ export type SerializedExpense = {
   kind: 'income' | 'expense';
   vendor: string;
   vendorKey: string;
+  series: string; // #231: named series under the vendor ('' = the vendor's unnamed series)
+  seriesKey: string;
   category: string;
   space: string; // per-property/context ledger tag (P34); '' = unassigned
   // Tax / deductible tagging (P8): taxDeductible gates inclusion in the year-end export,

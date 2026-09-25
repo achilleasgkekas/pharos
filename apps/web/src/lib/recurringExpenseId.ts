@@ -16,9 +16,14 @@ import { createHash } from 'node:crypto';
  * Deterministic in the series identity + the period, never the amount or the wording, so an edited
  * projection still occupies its slot.
  */
-export function recurringExpenseId(kind: string, vendorKey: string, period: string): string {
+export function recurringExpenseId(kind: string, vendorKey: string, period: string, seriesKey = ''): string {
+  // #231: a named series under the vendor gets its own slot, so two subscriptions from one
+  // vendor no longer compute the same id for the same month. With no series name the input is
+  // byte-for-byte the old one: every projection already in the ledger keeps its id, and the
+  // generator can never write a second copy of a month it already created.
+  const series = seriesKey ? `|series:${seriesKey}` : '';
   return createHash('sha256')
-    .update(`recurring-expense:${kind}|${vendorKey}|${period}`)
+    .update(`recurring-expense:${kind}|${vendorKey}|${period}${series}`)
     .digest('hex')
     .slice(0, 24);
 }

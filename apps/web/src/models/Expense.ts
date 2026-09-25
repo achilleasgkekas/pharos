@@ -12,6 +12,11 @@ const ExpenseSchema = new Schema(
     kind: { type: String, enum: ['income', 'expense'], default: 'expense', index: true },
     vendor: { type: String, default: '', index: true }, // ΔΕΗ, landlord, employer…
     vendorKey: { type: String, default: '', index: true }, // normalized vendor → groups a recurring series
+    // #231: a named series under one vendor ("Apple" → "iCloud" / "TV+"). Set ONLY by the user,
+    // never derived from the amount (a price change is still the same subscription). '' = the
+    // vendor's unnamed series, which keeps every pre-#231 entry and its projection ids unchanged.
+    series: { type: String, default: '', trim: true },
+    seriesKey: { type: String, default: '' }, // normalized `series`, same normalizer as vendorKey
     category: { type: String, default: 'other', index: true }, // rent/utilities/fuel/salary/insurance/…
     space: { type: String, default: '', index: true }, // per-property/context ledger tag (P34); '' = unassigned
 

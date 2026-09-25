@@ -276,3 +276,53 @@ describe('generateDueRecurring', () => {
     expect(revalidatePathMock).not.toHaveBeenCalled();
   });
 });
+
+describe('generateDueRecurring: two subscriptions from one vendor (#231)', () => {
+  // Same vendor, same amount, same cycle: only the user-given series name tells them apart.
+  const apple = (series: string, seriesKey: string, day: number) => ({
+    kind: 'expense', vendor: 'Apple', vendorKey: 'apple', series, seriesKey, category: 'subscriptions',
+    amount: 2.99, date: new Date(Date.UTC(2026, 1, day)), recurringCycle: 'monthly',
+  });
+
+  it('keeps both named series alive: one projection each for the due month, with distinct ids', async () => {
+    expenseFindSortLean.mockResolvedValue([apple('TV+', 'tv', 12), apple('iCloud', 'icloud', 5)]);
+    await generateDueRecurring();
+    const docs = expenseCreate.mock.calls.map((c) => c[0]);
+    expect(docs.map((d) => d.series).sort()).toEqual(['TV+', 'iCloud']);
+    expect(docs.map((d) => d._id).sort()).toEqual(
+      [recurringExpenseId('expense', 'apple', '2026-03', 'icloud'), recurringExpenseId('expense', 'apple', '2026-03', 'tv')].sort()
+    );
+    expect(docs.every((d) => d.seriesKey && d.vendorKey === 'apple')).toBe(true);
+  });
+
+  it('an unnamed series next to named ones keeps its legacy id', async () => {
+    expenseFindSortLean.mockResolvedValue([apple('iCloud', 'icloud', 5), apple('', '', 8)]);
+    await generateDueRecurring();
+    const ids = expenseCreate.mock.calls.map((c) => c[0]._id);
+    expect(ids).toContain(recurringExpenseId('expense', 'apple', '2026-03'));
+    expect(ids).toContain(recurringExpenseId('expense', 'apple', '2026-03', 'icloud'));
+    expect(ids).toHaveLength(2);
+  });
+
+  it('is idempotent: a second run over months that already exist creates nothing', async () => {
+    expenseFindSortLean.mockResolvedValue([apple('TV+', 'tv', 12), apple('iCloud', 'icloud', 5)]);
+    await generateDueRecurring();
+    const taken = new Set(expenseCreate.mock.calls.map((c) => c[0]._id));
+    expenseCreate.mockClear();
+    expenseCreate.mockImplementation(async (doc: Record<string, any>) => {
+      if (taken.has(doc._id)) throw Object.assign(new Error('E11000 duplicate key'), { code: 11000 });
+      return { _id: doc._id };
+    });
+    const r = await generateDueRecurring();
+    expect(r.created).toBe(0);
+    expect(expenseCreate).toHaveBeenCalledTimes(2); // both slots tried, both already owned
+  });
+
+  it('still collapses entries of the SAME named series to one seed (the latest)', async () => {
+    expenseFindSortLean.mockResolvedValue([apple('iCloud', 'icloud', 10), apple('iCloud', 'icloud', 5)]);
+    await generateDueRecurring();
+    // Only the Feb 10 seed steps to Mar 10; the older Feb 5 entry is not a second seed.
+    expect(expenseCreate).toHaveBeenCalledTimes(1);
+    expect(expenseCreate.mock.calls[0][0].date).toEqual(new Date(Date.UTC(2026, 2, 10)));
+  });
+});

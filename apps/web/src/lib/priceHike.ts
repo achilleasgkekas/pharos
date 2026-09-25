@@ -10,6 +10,9 @@
 export type HikeEntry = {
   vendor?: string | null;
   vendorKey?: string | null;
+  /** #231: a user-named series under the vendor ("iCloud" under "Apple"); '' = unnamed. */
+  series?: string | null;
+  seriesKey?: string | null;
   amount?: number | null;
   origAmount?: number | null;
   date?: string | Date | null;
@@ -18,6 +21,7 @@ export type HikeEntry = {
 };
 
 export type PriceHike = {
+  /** The series key: the vendorKey, plus `#<seriesKey>` for a named series (#231). */
   vendorKey: string;
   vendor: string;
   /** Previous charge in the series. */
@@ -79,7 +83,11 @@ export function detectPriceHikes(
   const byKey = new Map<string, Row[]>();
   for (const r of rows ?? []) {
     if (r.kind === 'income') continue;
-    const key = (r.vendorKey || '').trim();
+    // #231: a named series is its own timeline. Mixing "Apple · iCloud" (€2.99) with "Apple · TV+"
+    // (€9.99) would read every alternate charge as a +234% hike. Unnamed series keep the old key.
+    const vKey = (r.vendorKey || '').trim();
+    const sKey = (r.seriesKey || '').trim();
+    const key = vKey && sKey ? `${vKey}#${sKey}` : vKey;
     const origAmount = Number(r.origAmount ?? 0);
     const amount = origAmount > 0 ? origAmount : Number(r.amount ?? 0);
     const t = ts(r.date);
@@ -90,7 +98,7 @@ export function detectPriceHikes(
       printed: origAmount > 0,
       t,
       date: new Date(t).toISOString(),
-      vendor: (r.vendor || '').trim(),
+      vendor: [(r.vendor || '').trim(), (r.series || '').trim()].filter(Boolean).join(' · '),
       recurring: !!r.recurring,
     });
     byKey.set(key, arr);
