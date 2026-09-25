@@ -896,7 +896,6 @@ export const nl: Partial<Dict> = {
   'cal.dueThisMonth': 'te betalen deze maand',
   'cal.month': 'Maand',
   'cal.agenda': 'Agenda',
-  'cal.list': 'Lijst',
   'cal.empty': 'Niets gepland — verlengingen, termijnen, terugkerende rekeningen en vervaldatums verschijnen hier.',
   'cal.nothingDue': 'niets verschuldigd',
   'cal.nothingScheduled': 'Niets gepland.',

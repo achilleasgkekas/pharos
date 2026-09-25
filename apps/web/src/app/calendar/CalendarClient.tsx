@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useLocale, useT } from '@/components/LocaleProvider';
 import type { TKey } from '@/lib/i18n';
-import { CalendarClock, Layers, ShieldCheck, Ticket, Wallet, Banknote, Receipt, Target, CalendarDays, List, LayoutGrid, ChevronLeft, ChevronRight } from 'lucide-react';
+import { CalendarClock, Layers, ShieldCheck, Ticket, Wallet, Banknote, Receipt, Target, CalendarDays, LayoutGrid, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cur } from '@/lib/money';
 import { cn } from '@/components/ui/cn';
 import { formatDate, formatTime, formatDateTime } from '@/lib/i18n/format';
@@ -29,11 +29,12 @@ const KIND_META: Record<Kind, { icon: React.ReactNode; color: string; short: str
   voucher: { icon: <Ticket size={15} />, color: 'var(--color-gold)', short: 'voucher' },
 };
 
-type View = 'month' | 'agenda' | 'list';
+// A third 'List' view (one flat chronological list) was removed in #325: the Agenda view
+// already lists every entry, grouped by month, and reads better.
+type View = 'month' | 'agenda';
 const VIEWS: { id: View; label: string; icon: React.ReactNode }[] = [
   { id: 'month', label: 'Month', icon: <LayoutGrid size={14} /> },
   { id: 'agenda', label: 'Agenda', icon: <CalendarDays size={14} /> },
-  { id: 'list', label: 'List', icon: <List size={14} /> },
 ];
 
 const fmt = (n: number) => `${cur()}${n.toLocaleString('en-GB')}`;
@@ -55,8 +56,8 @@ function Amount({ e }: { e: Entry }) {
   );
 }
 
-/** One agenda/list row (icon · label/sub · date · amount). */
-function EntryRow({ e, showMonth }: { e: Entry; showMonth?: boolean }) {
+/** One agenda row (icon · label/sub · date · amount). */
+function EntryRow({ e }: { e: Entry }) {
   const locale = useLocale();
   const meta = KIND_META[e.kind];
   return (
@@ -179,11 +180,6 @@ export function CalendarClient({ months, dueThisMonth }: { months: MonthBlock[];
 
   const empty = months.every((m) => m.entries.length === 0);
   const m = months[monthIdx];
-  // Flat chronological list (List view): every dated entry across the window.
-  // `YYYY-MM-DD` sorts correctly as text, and unlike `new Date(...).getTime()` it cannot be
-  // nudged across a boundary by the viewer's timezone.
-  const flat = months.flatMap((mb) => mb.entries.filter((e) => !e.pinned)).sort((a, b) => a.date.localeCompare(b.date));
-  const recurringPinned = months[0].entries.filter((e) => e.pinned);
 
   return (
     <main className="max-w-[1400px] mx-auto px-4 py-6 pb-24">
@@ -239,7 +235,7 @@ export function CalendarClient({ months, dueThisMonth }: { months: MonthBlock[];
           </div>
           <MonthGrid month={m} />
         </section>
-      ) : view === 'agenda' ? (
+      ) : (
         months.map((mb) => (
           <section key={mb.key} className="mb-6">
             <div className="flex items-baseline justify-between mb-2 pb-1.5 border-b border-[color:var(--color-border)]">
@@ -258,11 +254,6 @@ export function CalendarClient({ months, dueThisMonth }: { months: MonthBlock[];
             )}
           </section>
         ))
-      ) : (
-        <section className="space-y-1.5">
-          {recurringPinned.map((e, i) => <EntryRow key={`p${i}`} e={e} />)}
-          {flat.map((e, i) => <EntryRow key={i} e={e} showMonth />)}
-        </section>
       )}
     </main>
   );
