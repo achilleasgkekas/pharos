@@ -23,6 +23,8 @@ jobs:
       packages: write # required to push to GHCR
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Log in to GHCR
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
@@ -64,3 +66,14 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # Report-only container scan of what was just published (the PR build already blocks on
+      # fixable CRITICAL findings). HIGH and CRITICAL with a fix available go on the run page.
+      - name: Trivy (image scan)
+        env:
+          IMAGE: ${{ fromJSON(steps.meta.outputs.json).tags[0] }}
+        run: |
+          curl -sSfL https://github.com/aquasecurity/trivy/releases/download/v0.74.0/trivy_0.74.0_Linux-64bit.tar.gz | tar xz trivy
+          ./trivy image --quiet --scanners vuln --ignore-unfixed --severity HIGH,CRITICAL \
+            --format table --output trivy.txt "$IMAGE"
+          { echo "### Trivy: $IMAGE"; echo '```'; cat trivy.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"

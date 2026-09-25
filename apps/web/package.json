@@ -12,7 +12,8 @@
     "type-check:ts5": "tsc --noEmit",
     "migrate": "tsx ../../scripts/migrate.ts",
     "seed": "tsx ../../scripts/seed.ts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.2",
@@ -50,6 +51,7 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@types/web-push": "^3.6.4",
+    "@vitest/coverage-v8": "^5.0.1",
     "eslint": "^10.11.0",
     "eslint-config-next": "^16.3.5",
     "postcss": "^8.5.28",

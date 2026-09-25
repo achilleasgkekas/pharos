@@ -11,6 +11,9 @@ build/
 *.tsbuildinfo
 next-env.d.ts
 
+# test coverage (npm run test:coverage)
+coverage/
+
 # env
 .env
 .env*.local

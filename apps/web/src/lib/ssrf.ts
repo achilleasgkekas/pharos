@@ -10,6 +10,9 @@ import { lookup } from 'node:dns/promises';
  * cloud metadata endpoints, or anything else on the LAN. assertPublicUrl()
  * resolves the host and rejects any private / loopback / link-local target,
  * which also defeats DNS-rebinding (we check the resolved IPs, not the name).
+ *
+ * services/scraper/src/ssrf.ts is a byte-for-byte copy (scraperCopies.parity.test.ts):
+ * edit here, then copy the file across.
  */
 
 function ip4IsPrivate(ip: string): boolean {

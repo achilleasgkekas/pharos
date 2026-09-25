@@ -1,0 +1,43 @@
+name: Scorecard
+
+# OpenSSF Scorecard (#331): a weekly grade of the repo's supply-chain hygiene (pinned actions,
+# token permissions, branch protection, dependency updates, ...). Results land in the Security
+# tab as code-scanning alerts; nothing here blocks a PR.
+on:
+  schedule:
+    - cron: '53 4 * * 1' # Monday, after security.yml and supply-chain.yml
+  push:
+    branches: [main]
+    paths: ['.github/workflows/scorecard.yml']
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  analysis:
+    name: Scorecard analysis
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+      security-events: write # upload the SARIF to code scanning
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: ossf/scorecard-action@2d1146689b8cda280b9bc96326124645441f03bc # v2.4.4
+        with:
+          results_file: results.sarif
+          results_format: sarif
+          # Not published to the public Scorecard API (that needs an id-token); the Security tab
+          # and the artifact below are where to read it.
+          publish_results: false
+      - uses: actions/upload-artifact@v7
+        with:
+          name: scorecard
+          path: results.sarif
+          retention-days: 14
+      - uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: results.sarif
+          category: scorecard
