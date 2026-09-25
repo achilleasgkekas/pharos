@@ -17,7 +17,7 @@ export default function License() {
         { icon: 'shield', color: 'var(--purple)', title: 'No warranty, no paid plans', body: 'The software is provided as is. There is no managed hosting, paid tier or hosted account registration.' },
       ]}
     >
-      <GithubLink kind="button" className="btn btn-ghost" href={`${GITHUB_URL}/blob/main/LICENSE`}>Read the full license</GithubLink>
+      <GithubLink className="btn btn-ghost" href={`${GITHUB_URL}/blob/main/LICENSE`}>Read the full license</GithubLink>
     </InfoPage>
   );
 }
