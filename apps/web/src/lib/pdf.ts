@@ -51,7 +51,8 @@ export async function extractPdfText(buffer: Buffer): Promise<string> {
   const loadingTask = pdfjs.getDocument({
     data: new Uint8Array(buffer),
     useSystemFonts: true,
-    isEvalSupported: false,
+    // No `isEvalSupported: false` any more: pdfjs 6 dropped eval-compiled fonts entirely, and
+    // the option with them (#175).
     disableFontFace: true,
   });
 
@@ -72,7 +73,8 @@ export async function extractPdfText(buffer: Buffer): Promise<string> {
     if (text) pages.push(text);
   }
 
-  await doc.destroy();
+  // pdfjs 6 tears down through the loading task; the document proxy no longer has destroy().
+  await loadingTask.destroy();
   return pages.join('\n\n');
 }
 
