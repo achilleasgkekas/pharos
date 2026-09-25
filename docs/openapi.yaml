@@ -2427,8 +2427,7 @@ components:
           enum: [paid, overdue, due-soon, upcoming]
         paidAmount: { type: number, description: 'Sum of the logged instalments, base currency. 0 for a bill paid in one go.' }
         remaining:
-          type: number
-          nullable: true
+          type: [number, 'null']
           description: >-
             Still owed in base currency (`amount` minus `paidAmount`, never negative). 0 once
             `paidAt` is set. `null` while `needsFxRate` is true: the printed foreign amount
