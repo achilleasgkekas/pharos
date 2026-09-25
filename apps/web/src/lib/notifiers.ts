@@ -66,7 +66,10 @@ const TELEGRAM_TOKEN = /^[A-Za-z0-9:_-]+$/;
 /** Telegram's host is fixed (api.telegram.org); only the validated token goes into the path. */
 async function postTelegram(token: string, chatId: string, text: string): Promise<DeliveryOutcome> {
   if (!TELEGRAM_TOKEN.test(token)) return { ok: false, error: 'Invalid bot token', permanent: true };
-  return toOutcome(() => fetch(`https://api.telegram.org/bot${token}/sendMessage`, jsonInit({ chat_id: chatId, text })));
+  // Each half is URI-encoded around the literal colon. For a valid token that changes nothing,
+  // but it keeps the path provably inert (and CodeQL can see that it is).
+  const safeToken = token.split(':').map(encodeURIComponent).join(':');
+  return toOutcome(() => fetch(`https://api.telegram.org/bot${safeToken}/sendMessage`, jsonInit({ chat_id: chatId, text })));
 }
 
 /** One delivery attempt. Title is ASCII-only for ntfy; the body keeps any unicode (e.g. Greek). */
