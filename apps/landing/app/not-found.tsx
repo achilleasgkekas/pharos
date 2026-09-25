@@ -57,7 +57,7 @@ export default function NotFound() {
 
         <div style={{ display: 'flex', gap: 14, justifyContent: 'center', flexWrap: 'wrap' }}>
           <a href="/" className="btn btn-primary">Back to home</a>
-          <GithubLink kind="button" className="btn btn-ghost">Self-host it free</GithubLink>
+          <GithubLink className="btn btn-ghost">Self-host it free</GithubLink>
         </div>
       </div>
     </main>

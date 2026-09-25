@@ -18,6 +18,7 @@ import { marketFor } from '@/lib/shoppingRegion';
 import { type ItemView } from '@/lib/itemStatus';
 import { saveFile, deleteFile } from '@/lib/storage';
 import { assertPublicUrl } from '@/lib/ssrf';
+import { safeFetch } from '@/lib/safeFetch';
 import { revalidatePath } from 'next/cache';
 import { safeRevalidate } from '@/lib/revalidate';
 import { Types } from 'mongoose';
@@ -588,9 +589,8 @@ async function attachImagesFromUrl(item: WithPhotos, url: string, max = 4): Prom
   let html: string;
   try {
     await assertPublicUrl(url);
-    const res = await fetch(url, {
+    const res = await safeFetch(url, {
       headers: { 'User-Agent': UA, Accept: 'text/html' },
-      redirect: 'follow',
       signal: AbortSignal.timeout(15000),
     });
     if (!res.ok) return 0;
@@ -604,7 +604,7 @@ async function attachImagesFromUrl(item: WithPhotos, url: string, max = 4): Prom
     if (added >= max) break;
     try {
       await assertPublicUrl(imgUrl);
-      const ir = await fetch(imgUrl, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(15000) });
+      const ir = await safeFetch(imgUrl, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(15000) });
       if (!ir.ok) continue;
       const ct = (ir.headers.get('content-type') || '').toLowerCase();
       if (!ct.startsWith('image/')) continue;
@@ -628,7 +628,7 @@ async function attachImagesFromUrl(item: WithPhotos, url: string, max = 4): Prom
 async function attachOneImage(item: WithPhotos, imgUrl: string): Promise<boolean> {
   try {
     await assertPublicUrl(imgUrl);
-    const ir = await fetch(imgUrl, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(15000) });
+    const ir = await safeFetch(imgUrl, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(15000) });
     if (!ir.ok) return false;
     const ct = (ir.headers.get('content-type') || '').toLowerCase();
     if (!ct.startsWith('image/')) return false;
@@ -1109,7 +1109,7 @@ function normUrl(u: string): string {
 
 /** Normalize a product title for fuzzy matching. */
 function normTitle(t: string): string {
-  return (t || '').toLowerCase().replace(/[^a-z0-9α-ωά-ώ]+/gi, ' ').replace(/\s+/g, ' ').trim();
+  return (t || '').toLowerCase().replace(/[^a-z0-9ά-ώ]+/gi, ' ').replace(/\s+/g, ' ').trim();
 }
 
 /** Map a URL host to a friendly store name — kept in sync with the scraper's

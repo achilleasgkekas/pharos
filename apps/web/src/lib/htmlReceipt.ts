@@ -15,20 +15,25 @@ export function htmlReceiptToText(html: string): string {
   const title = html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1]?.trim();
   return (title ? `[${title}]\n` : '')
     .concat(html)
-    .replace(/<(script|style|head)[^>]*>[\s\S]*?<\/\1>/gi, ' ')
+    .replace(/<(script|style|head)\b[^>]*>[\s\S]*?<\/\1\b[^>]*>/gi, ' ')
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<\/(p|div|tr|li|h[1-6]|td|table)>/gi, '\n')
     .replace(/<img\b[^>]*\balt=["']([^"']+)["'][^>]*>/gi, ' [logo: $1] ')
     .replace(/<[^>]+>/g, ' ')
-    .replace(/&nbsp;/gi, ' ')
-    .replace(/&amp;/gi, '&')
-    .replace(/&lt;/gi, '<')
-    .replace(/&gt;/gi, '>')
-    .replace(/&euro;/gi, '€')
-    .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(Number(d)))
-    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16)))
+    // Decode entities in ONE pass: sequential replaces would turn `&amp;lt;` into `<`.
+    .replace(/&(nbsp|amp|lt|gt|euro|#\d+|#x[0-9a-f]+);/gi, (_, e: string) => decodeEntity(e))
     .replace(/[ \t]+/g, ' ')
     .replace(/\n[ \t]*\n+/g, '\n')
     .trim()
     .slice(0, 16000); // keep within the text model's context
+}
+
+const NAMED: Record<string, string> = { nbsp: ' ', amp: '&', lt: '<', gt: '>', euro: '€' };
+
+function decodeEntity(e: string): string {
+  const lower = e.toLowerCase();
+  if (lower in NAMED) return NAMED[lower];
+  const code = lower.startsWith('#x') ? parseInt(lower.slice(2), 16) : Number(lower.slice(1));
+  // An out-of-range code point would make fromCodePoint throw and lose the whole body.
+  return Number.isInteger(code) && code >= 0 && code <= 0x10ffff ? String.fromCodePoint(code) : '';
 }

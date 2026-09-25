@@ -1,7 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { Bookmark, ChevronDown, Trash2, Plus, Check } from 'lucide-react';
-import { cn } from './cn';
 import { useT } from '@/components/LocaleProvider';
 
 /**

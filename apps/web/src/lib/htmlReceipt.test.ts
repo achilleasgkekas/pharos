@@ -108,3 +108,17 @@ describe('htmlReceiptToText — bounds & edge cases', () => {
     expect(htmlReceiptToText('   <p>  spaced  </p>   ')).toBe('spaced');
   });
 });
+
+describe('htmlReceiptToText — escaping edge cases (CodeQL)', () => {
+  it('drops a script whose end tag carries whitespace', () => {
+    expect(htmlReceiptToText('<p>Total</p><script>evil()</script ><p>€10</p>')).not.toContain('evil');
+  });
+
+  it('decodes entities once, so an escaped entity stays literal', () => {
+    expect(htmlReceiptToText('<p>a &amp;lt; b</p>')).toBe('a &lt; b');
+  });
+
+  it('ignores an out-of-range numeric entity instead of throwing', () => {
+    expect(htmlReceiptToText('<p>x&#99999999;y</p>')).toBe('xy');
+  });
+});

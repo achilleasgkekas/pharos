@@ -5,7 +5,7 @@ import type { TKey } from '@/lib/i18n';
 import { CalendarClock, Layers, ShieldCheck, Ticket, Wallet, Banknote, Receipt, Target, CalendarDays, List, LayoutGrid, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cur } from '@/lib/money';
 import { cn } from '@/components/ui/cn';
-import { formatDate, formatTime, formatDateTime } from '@/lib/i18n/format';
+import { formatDate } from '@/lib/i18n/format';
 import { dayOf } from '@/lib/calendarDay';
 
 export type Kind = 'renewal' | 'installments' | 'bill' | 'payable' | 'income' | 'goal' | 'warranty' | 'voucher';
