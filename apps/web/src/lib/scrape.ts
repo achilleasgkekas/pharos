@@ -4,6 +4,7 @@
  */
 
 import { assertPublicUrl } from '@/lib/ssrf';
+import { safeFetch } from '@/lib/safeFetch';
 
 export type ScrapedPage = {
   url: string;
@@ -142,14 +143,13 @@ export async function fetchPageText(url: string): Promise<ScrapedPage> {
   // (also covers the FlareSolverr retry path below, which fetches the same URL).
   await assertPublicUrl(url);
 
-  const res = await fetch(url, {
+  const res = await safeFetch(url, {
     headers: {
       // Some shops block default fetch agents
       'User-Agent':
         'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
       Accept: 'text/html,application/xhtml+xml',
     },
-    redirect: 'follow',
     signal: AbortSignal.timeout(15000),
   });
   let html = await res.text();
@@ -193,13 +193,12 @@ export async function fetchPageText(url: string): Promise<ScrapedPage> {
 
   // Cleaned visible text
   const cleaned = html
-    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
-    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<script\b[\s\S]*?<\/script\b[^>]*>/gi, ' ')
+    .replace(/<style\b[\s\S]*?<\/style\b[^>]*>/gi, ' ')
     .replace(/<!--[\s\S]*?-->/g, ' ')
     .replace(/<[^>]+>/g, ' ')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&euro;/g, '€')
+    // One pass, so a decoded '&' can never start a second entity (`&amp;nbsp;` stays literal).
+    .replace(/&(nbsp|amp|euro);/g, (_, e: string) => (e === 'nbsp' ? ' ' : e === 'amp' ? '&' : '€'))
     .replace(/\s+/g, ' ')
     .trim();
 

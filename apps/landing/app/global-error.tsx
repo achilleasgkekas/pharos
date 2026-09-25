@@ -141,9 +141,8 @@ export default function GlobalError({
             </a>
             {/* global-error replaces the whole document, so it cannot use the site's CSS classes
                 and carries its own inline styles; the link itself still goes through the shared
-                component, which hides it while the repo is private (#157). */}
+                component. */}
             <GithubLink
-              kind="button"
               style={{
                 fontFamily: font,
                 fontWeight: 600,

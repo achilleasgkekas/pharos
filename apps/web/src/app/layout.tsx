@@ -14,7 +14,6 @@ import { AiOnboardingBanner } from '@/components/AiOnboardingBanner';
 import { FirstRunTour } from '@/components/FirstRunTour';
 import { getServerT } from '@/lib/i18n/server';
 import { LocaleProvider } from '@/components/LocaleProvider';
-import { headers } from 'next/headers';
 import { sentryDsn, sentryEnvironment } from '@/lib/errorReporting';
 import { saasMode } from '@/lib/tenancy/saasMode';
 

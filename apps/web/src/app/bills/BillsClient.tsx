@@ -22,7 +22,7 @@ import {
   createBill, updateBill, deleteBill, setBillArchived, markBillPaid, markBillUnpaid,
   logBillPayment, removeBillPayment,
 } from './actions';
-import { formatDate, formatTime, formatDateTime } from '@/lib/i18n/format';
+import { formatDate } from '@/lib/i18n/format';
 import { useLocale } from '@/components/LocaleProvider';
 
 const money = (n: number) => `${cur()}${n.toFixed(2)}`;

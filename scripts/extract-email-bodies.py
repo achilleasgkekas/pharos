@@ -42,7 +42,7 @@ def has_attachment(msg):
                 if len(part.get_payload(decode=True) or b'') > 1000:
                     return True
             except Exception:
-                pass
+                pass  # a malformed part is treated as having no attachment
     return False
 
 
@@ -55,12 +55,12 @@ def best_body(msg):
             try:
                 html = (part.get_payload(decode=True) or b'').decode('utf-8', 'ignore')
             except Exception:
-                pass
+                pass  # undecodable body: keep looking in the other parts
         elif ct == 'text/plain' and not text:
             try:
                 text = (part.get_payload(decode=True) or b'').decode('utf-8', 'ignore')
             except Exception:
-                pass
+                pass  # undecodable body: keep looking in the other parts
     if html:
         return html
     if text:
@@ -108,7 +108,7 @@ try:
     with open(mpath, encoding='utf-8') as f:
         existing = json.load(f)
 except Exception:
-    pass
+    pass  # no manifest yet (or unreadable): start a fresh one
 with open(mpath, 'w', encoding='utf-8') as f:
     json.dump(existing + manifest, f, ensure_ascii=False, indent=1)
 

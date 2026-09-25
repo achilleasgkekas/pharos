@@ -3,7 +3,6 @@
 import { connectDB } from '@/lib/db';
 import { WARRANTY_ALERT_STATUSES } from '@/lib/itemStatus';
 import { getAppSettings } from '@/lib/appSettings';
-import { cur } from '@/lib/money';
 import { Item as ItemModel } from '@/models/Item';
 import { Statement as StatementModel } from '@/models/Statement';
 import { Expense as ExpenseModel } from '@/models/Expense';

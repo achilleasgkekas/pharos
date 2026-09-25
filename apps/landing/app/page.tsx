@@ -4,7 +4,7 @@ import { CopyButton } from './components/CopyButton';
 import { BackToTop } from './components/BackToTop';
 import { ScrollProgress } from './components/ScrollProgress';
 import { Icon } from './components/Icon';
-import { GITHUB_URL, REPO_PUBLIC } from './site';
+import { GITHUB_URL } from './site';
 
 const HERO_CHIPS = [
   { icon: 'server', label: 'Runs on your hardware', color: 'var(--accent)' },
@@ -95,7 +95,7 @@ export default function Home() {
             <a href="#ai" className="navlink">AI</a>
             <a href="#trust" className="navlink">Privacy</a>
             <a href="#self-host" className="navlink">Self-host</a>
-            {REPO_PUBLIC && <GithubLink kind="inline" className="navlink">GitHub</GithubLink>}
+            <GithubLink className="navlink">GitHub</GithubLink>
           </nav>
           <a href="#self-host" className="btn btn-primary top-cta">Self-host</a>
         </div>
@@ -122,7 +122,7 @@ export default function Home() {
           </p>
           <div style={{ display: 'flex', gap: 14, justifyContent: 'center', flexWrap: 'wrap' }}>
             <a href="#self-host" className="btn btn-primary">Get started</a>
-            <GithubLink kind="button" className="btn btn-ghost">View source</GithubLink>
+            <GithubLink className="btn btn-ghost">View source</GithubLink>
           </div>
           <ul className="hero-assurance" aria-label="What you get">
             {HERO_CHIPS.map((c) => (
@@ -195,11 +195,9 @@ export default function Home() {
               </article>
             ))}
           </div>
-          {REPO_PUBLIC && (
-            <p style={{ textAlign: 'center', marginTop: 28 }}>
-              <GithubLink kind="inline" href={`${GITHUB_URL}/blob/main/docs/features.md`}>See every feature in the docs</GithubLink>
-            </p>
-          )}
+          <p style={{ textAlign: 'center', marginTop: 28 }}>
+            <GithubLink className="inline-link" href={`${GITHUB_URL}/blob/main/docs/features.md`}>See every feature in the docs</GithubLink>
+          </p>
         </div>
       </section>
 
@@ -302,29 +300,20 @@ export default function Home() {
               </article>
             ))}
           </div>
-          {REPO_PUBLIC ? (
-            <>
-              <div className="code-wrap">
-                <CopyButton text={QUICKSTART} />
-                <pre className="code-block" aria-label="Docker quick start">
-                  <span className="tok-cmd">git clone</span> {GITHUB_URL}.git{'\n'}
-                  <span className="tok-cmd">cd</span> pharos{'\n'}
-                  <span className="tok-cmd">cp</span> .env.example .env   <span className="tok-comment"># set your secrets first</span>{'\n'}
-                  <span className="tok-cmd">docker compose up</span> -d --build{'\n'}
-                  {'\n'}
-                  <span className="tok-comment"># Open http://localhost:3000 and follow the setup wizard</span>
-                </pre>
-              </div>
-              <p style={{ textAlign: 'center', marginTop: 20 }}>
-                <GithubLink kind="inline" href={`${GITHUB_URL}/blob/main/docs/self-hosting.md`}>Read the complete installation guide</GithubLink>
-              </p>
-            </>
-          ) : (
-            <p className="repo-soon">
-              <span className="repo-soon-dot" aria-hidden="true" />
-              The public source release is being prepared. Installation links will appear here when it is available.
-            </p>
-          )}
+          <div className="code-wrap">
+            <CopyButton text={QUICKSTART} />
+            <pre className="code-block" aria-label="Docker quick start">
+              <span className="tok-cmd">git clone</span> {GITHUB_URL}.git{'\n'}
+              <span className="tok-cmd">cd</span> pharos{'\n'}
+              <span className="tok-cmd">cp</span> .env.example .env   <span className="tok-comment"># set your secrets first</span>{'\n'}
+              <span className="tok-cmd">docker compose up</span> -d --build{'\n'}
+              {'\n'}
+              <span className="tok-comment"># Open http://localhost:3000 and follow the setup wizard</span>
+            </pre>
+          </div>
+          <p style={{ textAlign: 'center', marginTop: 20 }}>
+            <GithubLink className="inline-link" href={`${GITHUB_URL}/blob/main/docs/self-hosting.md`}>Read the complete installation guide</GithubLink>
+          </p>
           <div className="deploy-strip">
             <p className="mono deploy-label">Runs anywhere Docker does</p>
             <ul className="deploy-pills">
@@ -362,12 +351,8 @@ export default function Home() {
               <p className="footer-heading mono">Project</p>
               <a href="/privacy" className="navlink">Privacy</a>
               <a href="/terms" className="navlink">License</a>
-              {REPO_PUBLIC && (
-                <>
-                  <a href={GITHUB_URL} className="navlink" target="_blank" rel="noopener noreferrer">GitHub</a>
-                  <a href={`${GITHUB_URL}/tree/main/docs`} className="navlink" target="_blank" rel="noopener noreferrer">Documentation</a>
-                </>
-              )}
+              <a href={GITHUB_URL} className="navlink" target="_blank" rel="noopener noreferrer">GitHub</a>
+              <a href={`${GITHUB_URL}/tree/main/docs`} className="navlink" target="_blank" rel="noopener noreferrer">Documentation</a>
             </div>
           </div>
           <div className="footer-bar">

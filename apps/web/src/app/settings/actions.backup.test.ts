@@ -641,7 +641,7 @@ describe('importData', () => {
     // The `$unset` rides along because this backup document carries no `deletedAt`: an export only
     // ever contains live documents, so a restore must pull the copy here back out of the Trash.
     expect(itemUpdateOneMock).toHaveBeenCalledWith(
-      { _id: 'i1' },
+      { _id: { $eq: 'i1' } },
       { $set: { title: 'Mouse' }, $unset: { deletedAt: '' } },
       { upsert: true }
     );
@@ -650,6 +650,14 @@ describe('importData', () => {
     // The payload carries no `receipts` key, so the restore correctly warns that the
     // collection will not be touched (an older backup predating a model looks like this).
     expect(result.warnings?.join(' ')).toMatch(/missing collection.*receipts/i);
+  });
+
+  it('skips a doc whose _id is a query object instead of letting it match other records', async () => {
+    const result = await importData(JSON.stringify({ collections: { items: [{ _id: { $ne: null }, title: 'Evil' }] } }));
+    expect(result.ok).toBe(true);
+    expect(result.restored).toBe(0);
+    expect(itemUpdateOneMock).not.toHaveBeenCalled();
+    expect(itemCreateMock).not.toHaveBeenCalled();
   });
 
   it('creates a doc WITHOUT an _id via Model.create, warning that it will not merge', async () => {
@@ -778,9 +786,9 @@ describe('exportDataEncrypted / importDataEncrypted (P54)', () => {
     const { _id: itemId, ...itemRest } = itemDoc;
     const { _id: receiptId, ...receiptRest } = receiptDoc;
     const untrash = { deletedAt: '' };
-    expect(itemUpdateOneMock).toHaveBeenCalledWith({ _id: itemId }, { $set: itemRest, $unset: untrash }, { upsert: true });
+    expect(itemUpdateOneMock).toHaveBeenCalledWith({ _id: { $eq: itemId } }, { $set: itemRest, $unset: untrash }, { upsert: true });
     expect(receiptUpdateOneMock).toHaveBeenCalledWith(
-      { _id: receiptId },
+      { _id: { $eq: receiptId } },
       { $set: receiptRest, $unset: untrash },
       { upsert: true }
     );

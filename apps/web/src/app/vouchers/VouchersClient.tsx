@@ -1,6 +1,6 @@
 'use client';
 import { useState, useTransition, useMemo, useRef } from 'react';
-import { Pencil, Trash2, ExternalLink, Copy, Check, Ticket, Search, Sparkles, Upload, Loader2 } from 'lucide-react';
+import { Pencil, Trash2, ExternalLink, Copy, Check, Search, Sparkles, Upload, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { PAGE_MAIN, PageHeader, ViewToggle, PrimaryAction, FilterLayout } from '@/components/ui/PageHeader';
 import { Input } from '@/components/ui/Input';

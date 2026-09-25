@@ -340,7 +340,7 @@ describe('importExpensesCsv — category/recurring resolution chain', () => {
 
   it('falls back to the inherited series when no rule matches', async () => {
     expenseFindOneLean.mockResolvedValue({ category: 'utilities-inherited', recurring: true, recurringCycle: 'quarterly' });
-    const res = await importExpensesCsv([row({ vendor: 'Unknown Vendor', category: '' })], { kind: 'expense', signSplit: false });
+    await importExpensesCsv([row({ vendor: 'Unknown Vendor', category: '' })], { kind: 'expense', signSplit: false });
     const doc = expenseInsertMany.mock.calls[0][0][0];
     expect(doc.category).toBe('utilities-inherited');
     expect(doc.recurring).toBe(true);
@@ -348,7 +348,7 @@ describe('importExpensesCsv — category/recurring resolution chain', () => {
   });
 
   it('defaults to "other" / not-recurring when neither a rule nor a prior series exists', async () => {
-    const res = await importExpensesCsv([row({ vendor: 'Brand New Vendor', category: '' })], { kind: 'expense', signSplit: false });
+    await importExpensesCsv([row({ vendor: 'Brand New Vendor', category: '' })], { kind: 'expense', signSplit: false });
     const doc = expenseInsertMany.mock.calls[0][0][0];
     expect(doc.category).toBe('other');
     expect(doc.recurring).toBe(false);

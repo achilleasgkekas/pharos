@@ -1,7 +1,7 @@
 'use client';
 import { useState, useRef, useEffect, useCallback, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Bell, Tag, ShieldCheck, CreditCard, TrendingUp, AlarmClock, Wallet, FileText, Wrench, Handshake, PackageOpen, IdCard, Cake, Car, X } from 'lucide-react';
+import { Bell, Tag, ShieldCheck, CreditCard, TrendingUp, AlarmClock, FileText, Wrench, Handshake, PackageOpen, IdCard, Cake, Car, X } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import { cur } from '@/lib/money';
 import { useT } from '@/components/LocaleProvider';

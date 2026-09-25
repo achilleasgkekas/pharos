@@ -82,7 +82,7 @@ export default function Error({
           <a href="/" className="btn btn-ghost">
             Back to home
           </a>
-          <GithubLink kind="button" className="btn btn-ghost">Self-host it free</GithubLink>
+          <GithubLink className="btn btn-ghost">Self-host it free</GithubLink>
         </div>
       </div>
     </main>

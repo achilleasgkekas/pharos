@@ -74,7 +74,6 @@ vi.mock('next/cache', () => ({ revalidatePath: (p: string) => revalidatePathMock
 
 import { attachStatementPdf, importStatementPdf } from './actions';
 
-const ITEM1 = '507f1f77bcf86cd799439011';
 const ITEM9 = '507f1f77bcf86cd799439019';
 
 function pdfFile(name = 'statement.pdf', bytes: number[] = [1, 2, 3], type = 'application/pdf') {

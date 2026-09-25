@@ -8,7 +8,7 @@ import { useRouter } from 'next/navigation';
 import { useLocale, useT, useMoney } from '@/components/LocaleProvider';
 import { findDuplicateExpenses, mergeExpenses } from './actions';
 import type { ExpenseDupeGroup } from '@/lib/expenseDupes';
-import { formatDate, formatTime, formatDateTime } from '@/lib/i18n/format';
+import { formatDate } from '@/lib/i18n/format';
 
 /**
  * Review-before-merge for duplicate expenses/income (P46) — the same shape as the

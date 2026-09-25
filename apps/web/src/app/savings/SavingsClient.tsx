@@ -15,7 +15,7 @@ import {
 } from '@/lib/savingsPlan';
 import { createGoal, addGoalContribution, deleteGoal } from '@/app/reports/goalsActions';
 import type { SavingsData, SavingsGoal } from './types';
-import { formatDate, formatTime, formatDateTime } from '@/lib/i18n/format';
+import { formatDate } from '@/lib/i18n/format';
 
 // The Save tab. Everything shown here is derived by lib/savingsPlan.ts from the ledger
 // the rest of the app already keeps — no new bookkeeping, and no number on this page is
