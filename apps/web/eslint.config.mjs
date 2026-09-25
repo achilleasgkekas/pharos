@@ -1,7 +1,7 @@
 import nextCoreWebVitals from 'eslint-config-next/core-web-vitals';
 import nextTypescript from 'eslint-config-next/typescript';
 
-// Flat config for ESLint 9. There was NO config file at all until #136: `next lint` was in
+// Flat config (ESLint 10; flat since 9). There was NO config file at all until #136: `next lint` was in
 // package.json but had nothing to run, so the linter had never guarded this repo.
 //
 // eslint-config-next 16 ships real flat configs, so they are imported directly; the FlatCompat
@@ -17,6 +17,10 @@ export default [
   ...nextCoreWebVitals,
   ...nextTypescript,
   {
+    // Pinned rather than 'detect': eslint-plugin-react 7.x (bundled by eslint-config-next) detects
+    // the version through context.getFilename(), which ESLint 10 removed, and crashes (#176).
+    // Keep this in step with `react` in package.json.
+    settings: { react: { version: '19.3' } },
     rules: {
       // Debt, not a defect: tracked as a warning so it stops growing silently without blocking CI.
       '@typescript-eslint/no-explicit-any': 'warn',

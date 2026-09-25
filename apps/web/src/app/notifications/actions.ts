@@ -42,6 +42,14 @@ export type SerializedNotification = {
 };
 
 type Alert = { dedupeKey: string; kind: NotifKind; title: string; body: string; href: string };
+
+/** The best price a deal alert carries: its body is "<bestPrice>|<target>". Read the same way
+ *  when the user dismisses the alert and when the reconcile asks whether today's price beats
+ *  that, so the two cannot disagree. Null for anything that is not a usable number. */
+function dealPrice(body: string | undefined): number | null {
+  const n = Number((body ?? '').split('|')[0]);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
 const AUTO_KINDS = AUTO_NOTIF_KINDS;
 
 /** Recompute the live alerts (deals / warranties / installments-due) — the same
@@ -307,12 +315,32 @@ export async function generateNotifications(): Promise<void> {
     // dismissed alert isn't recreated and an active one isn't duplicated.
     const existing = (await Notification.find({ kind: { $in: AUTO_KINDS } })
       .setOptions({ withDeleted: true })
-      .select('dedupeKey')
-      .lean()) as Array<{ dedupeKey: string }>;
+      .select('dedupeKey deletedAt dismissedAtPrice autoExpired')
+      .lean()) as Array<{ dedupeKey: string; deletedAt?: Date | null; dismissedAtPrice?: number | null; autoExpired?: boolean }>;
     const existingKeys = new Set(existing.map((e) => e.dedupeKey));
 
     const fresh = alerts.filter((a) => !existingKeys.has(a.dedupeKey));
     if (fresh.length) await Notification.insertMany(fresh.map((a) => ({ ...a, read: false })));
+
+    // A deal's key is `deal:<id>` with no price in it, so its soft-deleted row would block it
+    // forever. Two cases bring it back as a new, unread alert (#253):
+    //  - the reconcile retired it (the price rose above target) and the deal is live again;
+    //  - the USER dismissed it and the price has since dropped below the one they turned down.
+    //    Only a real improvement counts, so a scraper wobbling around the same figure never
+    //    re-alerts something the user said no to.
+    const retired = new Map(existing.filter((e) => e.deletedAt).map((e) => [e.dedupeKey, e]));
+    for (const a of alerts) {
+      if (a.kind !== 'deal') continue;
+      const row = retired.get(a.dedupeKey);
+      if (!row) continue;
+      const price = dealPrice(a.body);
+      const beatsDismissal = row.dismissedAtPrice != null && price != null && price < row.dismissedAtPrice;
+      if (!row.autoExpired && !beatsDismissal) continue;
+      await Notification.updateOne(
+        { dedupeKey: a.dedupeKey },
+        { $set: { title: a.title, body: a.body, href: a.href, read: false, deletedAt: null, dismissedAtPrice: null, autoExpired: false } }
+      ).setOptions({ withDeleted: true });
+    }
 
     // Refresh title/body of still-active (non-dismissed) ones — e.g. the warranty day count.
     for (const a of alerts) {
@@ -321,10 +349,11 @@ export async function generateNotifications(): Promise<void> {
       }
     }
 
-    // Auto-expire resolved alerts (price rose, warranty passed, month rolled over).
+    // Auto-expire resolved alerts (price rose, warranty passed, month rolled over). Marked as
+    // such so the deal revival above can tell "resolved on its own" from "the user said no".
     await Notification.updateMany(
       { kind: { $in: AUTO_KINDS }, dedupeKey: { $nin: currentKeys } },
-      { $set: { deletedAt: new Date() } }
+      { $set: { deletedAt: new Date(), autoExpired: true } }
     );
   });
 }
@@ -410,7 +439,12 @@ export async function dismissNotification(id: string): Promise<{ ok: boolean }> 
   return withRequestTenant(async () => {
     await connectDB();
     const Notification = await currentModel(NotificationModel);
-    await Notification.updateOne({ _id: id }, { $set: { deletedAt: new Date() } });
+    // A deal remembers the price it was dismissed at, so a later, lower price can bring it
+    // back (#253). Every other kind carries its own date in the key and needs nothing.
+    const [deal] = (await Notification.find({ _id: id, kind: 'deal' }).select('body').lean()) as Array<{ body?: string }>;
+    const $set: { deletedAt: Date; dismissedAtPrice?: number | null } = { deletedAt: new Date() };
+    if (deal) $set.dismissedAtPrice = dealPrice(deal.body);
+    await Notification.updateOne({ _id: id }, { $set });
     return { ok: true };
   });
 }
@@ -420,6 +454,11 @@ export async function clearAllNotifications(): Promise<{ ok: boolean }> {
   return withRequestTenant(async () => {
     await connectDB();
     const Notification = await currentModel(NotificationModel);
+    // Same as a single dismissal: each live deal keeps the price it was cleared at (#253).
+    const deals = (await Notification.find({ kind: 'deal' }).select('body').lean()) as Array<{ _id: string; body?: string }>;
+    for (const d of deals) {
+      await Notification.updateOne({ _id: d._id }, { $set: { dismissedAtPrice: dealPrice(d.body) } });
+    }
     await Notification.updateMany({}, { $set: { deletedAt: new Date() } });
     return { ok: true };
   });
