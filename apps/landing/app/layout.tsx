@@ -1,5 +1,36 @@
 import type { Metadata, Viewport } from 'next';
+import { IBM_Plex_Mono, Manrope, Outfit } from 'next/font/google';
 import './globals.css';
+
+// next/font downloads these at build time and serves them from this origin with a preload.
+// The old `@import` of fonts.googleapis.com in globals.css was render-blocking and chained
+// three requests (our CSS, Google's CSS, the font files) before the hero text could paint,
+// which is what held mobile LCP at ~3.6s (#158). Self-hosting also means no request to Google.
+//
+// The two hero faces use `optional`, not `swap`: a late swap re-lays out the headline, shifts the
+// hero paragraph (CLS) and counts as a new, later LCP paint. With the preload they normally
+// arrive in time; on a slow first visit the size-matched fallback stays up until the next load.
+const outfit = Outfit({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700', '800'],
+  display: 'optional',
+  variable: '--font-outfit',
+});
+const manrope = Manrope({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  display: 'optional',
+  variable: '--font-manrope',
+});
+const plexMono = IBM_Plex_Mono({
+  subsets: ['latin'],
+  weight: ['400', '500', '600'],
+  display: 'swap',
+  variable: '--font-plex-mono',
+  // Only small labels use the mono face, never the hero headline or paragraph, so its three
+  // static weights are not worth competing with the LCP fonts for early bandwidth.
+  preload: false,
+});
 
 const SITE_URL = 'https://ph-aros.com';
 
@@ -64,7 +95,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" className={`${outfit.variable} ${manrope.variable} ${plexMono.variable}`}>
       <body>{children}</body>
     </html>
   );
