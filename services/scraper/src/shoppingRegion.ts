@@ -18,7 +18,7 @@
 export type ShoppingMarket = {
   country: string; // ISO 3166-1 alpha-2, upper case
   language: string; // SearXNG `language` value, e.g. 'el-GR'
-  domains: string[]; // the country's own domain endings, e.g. ['gr'] or ['co.uk', 'uk']
+  domains: string[]; // the endings the country's shops use, e.g. ['gr'], or ['com', 'us'] for the US
   extraShops: string[]; // foreign shops that ship here, as bare hosts, e.g. ['amazon.de']
 };
 
@@ -49,7 +49,9 @@ export const SHOPPING_PRESETS: Record<string, Preset> = {
   BG: { language: 'bg-BG', domains: ['bg'], extraShops: ['amazon.de'] },
   HU: { language: 'hu-HU', domains: ['hu'], extraShops: ['amazon.de'] },
   GB: { language: 'en-GB', domains: ['uk'], extraShops: [] },
-  US: { language: 'en-US', domains: ['us'], extraShops: ['amazon.com', 'bestbuy.com', 'newegg.com', 'walmart.com'] },
+  // US retail lives on the generic .com (Target, B&H, Micro Center, manufacturer stores), not
+  // on .us, so .com counts as domestic here. Foreign stores (amazon.de, *.co.uk) still do not.
+  US: { language: 'en-US', domains: ['com', 'us'], extraShops: [] },
 };
 
 export const SHOPPING_COUNTRIES = Object.keys(SHOPPING_PRESETS);

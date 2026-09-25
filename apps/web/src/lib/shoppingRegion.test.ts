@@ -83,6 +83,15 @@ describe('marketRank', () => {
     expect(marketRank('not a url', GR)).toBeNull();
   });
 
+  it('treats .com as domestic for the US, where retail does not use .us', () => {
+    const us = marketFor('US', [])!;
+    for (const url of ['https://www.target.com/p/x', 'https://www.bhphotovideo.com/c/x', 'https://www.microcenter.com/x', 'https://www.newegg.com/p/x', 'https://store.example.us/x']) {
+      expect(marketRank(url, us), url).toBe(0);
+    }
+    expect(marketRank('https://www.amazon.de/dp/x', us)).toBeNull();
+    expect(marketRank('https://www.scan.co.uk/x', us)).toBeNull();
+  });
+
   it('matches multi-label country endings (co.uk)', () => {
     const uk = marketFor('GB', [])!;
     expect(marketRank('https://www.scan.co.uk/products/x', uk)).toBe(0);
