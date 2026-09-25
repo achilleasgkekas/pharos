@@ -41,6 +41,7 @@ import { QuickVerify } from './QuickVerify';
 import { useJobs } from '@/components/JobsProvider';
 import { enqueueRescanReceipts, getBulkAiGuard } from '@/app/jobActions';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
+import { NO_SPACE, matchesSpace, spaceFilterOptions } from '@/lib/spaceFilter';
 import { useLocale, useT } from '@/components/LocaleProvider';
 import { DuplicatesModal } from './DuplicatesModal';
 import { useRouter } from 'next/navigation';
@@ -108,6 +109,7 @@ export function ReceiptsClient({
   const [dateTo, setDateTo] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [paymentFilter, setPaymentFilter] = useState('');
+  const [spaceFilter, setSpaceFilter] = useState(''); // #146: same filter as Expenses
   const [layout, setLayout] = useState<'grid' | 'list'>('grid');
   const [showFilters, setShowFilters] = useState(false);
 
@@ -236,6 +238,7 @@ export function ReceiptsClient({
       }
       if (categoryFilter && !(r.lineItems ?? []).some((l) => l.category === categoryFilter)) return false;
       if (paymentFilter && !sameLabel(r.paymentMethod || '', paymentFilter)) return false;
+      if (!matchesSpace(r.space, spaceFilter)) return false;
       if (search.trim()) {
         // Everything printed on the receipt is searchable, not just the store, the notes
         // and one of the two name fields: BOTH the raw OCR name and the AI-refined one
@@ -269,7 +272,7 @@ export function ReceiptsClient({
           return new Date(b.date).getTime() - new Date(a.date).getTime();
       }
     });
-  }, [receipts, storeFilter, statusFilter, search, sortBy, dateFrom, dateTo, categoryFilter, paymentFilter]);
+  }, [receipts, storeFilter, statusFilter, search, sortBy, dateFrom, dateTo, categoryFilter, paymentFilter, spaceFilter]);
 
   // Deep-link from global search
   useOpenParam((id) => {
@@ -327,7 +330,7 @@ export function ReceiptsClient({
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
-  const anyRFilter = !!(storeFilter || statusFilter !== 'all' || search || sortBy !== 'recent' || dateFrom || dateTo || categoryFilter || paymentFilter);
+  const anyRFilter = !!(storeFilter || statusFilter !== 'all' || search || sortBy !== 'recent' || dateFrom || dateTo || categoryFilter || paymentFilter || spaceFilter);
   /** One-tap ranges for the two questions people actually ask a receipt archive. */
   const applyDatePreset = (preset: 'thisMonth' | 'lastMonth' | 'thisYear') => {
     const now = new Date();
@@ -345,6 +348,7 @@ export function ReceiptsClient({
 
   const resetRFilters = () => {
     setStoreFilter('');
+    setSpaceFilter('');
     setStatusFilter('all');
     setSearch('');
     setSortBy('recent');
@@ -413,6 +417,12 @@ export function ReceiptsClient({
         <div>
           <p className={labelCls} style={{ fontFamily: 'var(--font-mono)' }}>{t('rc.fltCategory')}</p>
           <SearchableSelect value={categoryFilter} onChange={setCategoryFilter} options={usedCategories} placeholder={t('rc.fltAllCategories')} clearable size="sm" className="w-full" />
+        </div>
+      )}
+      {spaces.length > 0 && (
+        <div>
+          <p className={labelCls} style={{ fontFamily: 'var(--font-mono)' }}>{t('ex.space')}</p>
+          <SearchableSelect value={spaceFilter} onChange={setSpaceFilter} options={spaceFilterOptions(spaces)} labels={{ [NO_SPACE]: t('ex.spaceNone') }} placeholder={t('ex.allSpaces')} clearable size="sm" className="w-full" />
         </div>
       )}
       {payments.length > 0 && (

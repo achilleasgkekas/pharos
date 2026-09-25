@@ -31,10 +31,10 @@ import { useLocale, useT, useMoney } from '@/components/LocaleProvider';
 import type { TKey } from '@/lib/i18n';
 import { formatDate, formatTime, formatDateTime, compareNames } from '@/lib/i18n/format';
 import { vendorKey, seriesGroupKey } from './lib';
+import { NO_SPACE, matchesSpace, spaceFilterOptions } from '@/lib/spaceFilter';
 
 const CYCLES = RECURRING_CYCLES;
 // Filter sentinel for "records with no space assigned" (distinct from '' = no filter).
-const NO_SPACE = '\x00none';
 
 function fileUrl(p: string) {
   return `/api/files/${p.split('/').map(encodeURIComponent).join('/')}`;
@@ -142,7 +142,7 @@ export function ExpensesClient({ kind, expenses, cards, vendors, ollamaUp, categ
     const q = search.trim().toLowerCase();
     const out = expenses.filter((e) => {
       if (catFilter && e.category !== catFilter) return false;
-      if (spaceFilter && (spaceFilter === NO_SPACE ? !!e.space : e.space !== spaceFilter)) return false;
+      if (!matchesSpace(e.space, spaceFilter)) return false;
       if (taxOnly && !e.taxDeductible) return false;
       if (statusFilter !== 'all' && statusOf(e) !== statusFilter) return false;
       if (q && !`${e.vendor} ${e.category} ${e.notes} ${e.space}`.toLowerCase().includes(q)) return false;
@@ -228,7 +228,7 @@ export function ExpensesClient({ kind, expenses, cards, vendors, ollamaUp, categ
       {hasSpaces && (
         <div>
           <p className={labelCls} style={{ fontFamily: 'var(--font-mono)' }}>{t('ex.space')}</p>
-          <SearchableSelect value={spaceFilter} onChange={setSpaceFilter} options={[...spaces, NO_SPACE]} labels={{ [NO_SPACE]: t('ex.spaceNone') }} placeholder={t('ex.allSpaces')} clearable size="sm" className="w-full" />
+          <SearchableSelect value={spaceFilter} onChange={setSpaceFilter} options={spaceFilterOptions(spaces)} labels={{ [NO_SPACE]: t('ex.spaceNone') }} placeholder={t('ex.allSpaces')} clearable size="sm" className="w-full" />
         </div>
       )}
       {!isIncome && (
