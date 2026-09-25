@@ -600,6 +600,7 @@ export function ItemsClient({
       )}
       <FilterGroup label={t('common.sort')}>
         <select
+          aria-label={t('common.sort')}
           value={sortBy}
           onChange={(e) => setSortBy(e.target.value as SortKey)}
           className="w-full bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-3 py-1.5 text-xs text-[color:var(--color-text-dim)] focus:outline-none focus:border-[color:var(--color-accent)]"

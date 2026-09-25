@@ -242,7 +242,7 @@ export function ExpensesClient({ kind, expenses, cards, vendors, ollamaUp, categ
       )}
       <div>
         <p className={labelCls} style={{ fontFamily: 'var(--font-mono)' }}>{t('common.sort')}</p>
-        <select value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)} className={selCls} style={{ fontFamily: 'var(--font-mono)' }}>
+        <select aria-label={t('common.sort')} value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)} className={selCls} style={{ fontFamily: 'var(--font-mono)' }}>
           <option value="recent">{t('ex.sortRecent')}</option>
           <option value="oldest">{t('ex.sortOldest')}</option>
           <option value="amount-desc">{t('ex.sortAmountDesc')}</option>
@@ -686,7 +686,7 @@ function FormFields({ form, set, cards, vendors, categories, spaces, fx, seriesB
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 items-end">
         <div className="flex items-center justify-between gap-2 rounded-lg border border-[color:var(--color-border)] px-3 py-2">
           <span className="text-xs font-medium flex items-center gap-1.5"><Repeat size={13} className="text-[color:var(--color-purple)]" /> {t('ex.recurring')}</span>
-          <button type="button" role="switch" aria-checked={form.recurring} onClick={() => set({ recurring: !form.recurring })} className={cn('relative w-9 h-5 rounded-full transition-colors shrink-0', form.recurring ? 'bg-[color:var(--color-accent)]' : 'bg-[color:var(--color-surface-3)] border border-[color:var(--color-border)]')}>
+          <button type="button" role="switch" aria-label={t('ex.recurring')} aria-checked={form.recurring} onClick={() => set({ recurring: !form.recurring })} className={cn('relative w-9 h-5 rounded-full transition-colors shrink-0', form.recurring ? 'bg-[color:var(--color-accent)]' : 'bg-[color:var(--color-surface-3)] border border-[color:var(--color-border)]')}>
             <span className={cn('absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform', form.recurring && 'translate-x-4')} />
           </button>
         </div>
@@ -717,7 +717,7 @@ function FormFields({ form, set, cards, vendors, categories, spaces, fx, seriesB
         <div className="grid grid-cols-2 gap-3 items-end">
           <div className="flex items-center justify-between gap-2 rounded-lg border border-[color:var(--color-border)] px-3 py-2">
             <span className="text-xs font-medium flex items-center gap-1.5"><Landmark size={13} className="text-[color:var(--color-gold)]" /> {t('ex.taxDeductible')}</span>
-            <button type="button" role="switch" aria-checked={form.taxDeductible} onClick={() => set({ taxDeductible: !form.taxDeductible })} className={cn('relative w-9 h-5 rounded-full transition-colors shrink-0', form.taxDeductible ? 'bg-[color:var(--color-gold)]' : 'bg-[color:var(--color-surface-3)] border border-[color:var(--color-border)]')}>
+            <button type="button" role="switch" aria-label={t('ex.taxDeductible')} aria-checked={form.taxDeductible} onClick={() => set({ taxDeductible: !form.taxDeductible })} className={cn('relative w-9 h-5 rounded-full transition-colors shrink-0', form.taxDeductible ? 'bg-[color:var(--color-gold)]' : 'bg-[color:var(--color-surface-3)] border border-[color:var(--color-border)]')}>
               <span className={cn('absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform', form.taxDeductible && 'translate-x-4')} />
             </button>
           </div>

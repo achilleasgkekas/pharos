@@ -90,7 +90,7 @@ configuration. Keep `.env`, database volumes and stored documents out of Git.
 docker compose up -d --build
 ```
 
-Open **http://localhost:3000** on the server, or its LAN address from another
+Open **<http://localhost:3000>** on the server, or its LAN address from another
 device. The first-run wizard creates the administrator account, then guides you
 through preferences and optional AI configuration. Add household users in Settings.
 

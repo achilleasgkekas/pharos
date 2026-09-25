@@ -37,3 +37,21 @@ jobs:
       - run: npm ci
       - run: npm run type-check
       - run: npm run build
+      # Lighthouse budgets (#331): performance, accessibility, best practices and SEO on the built
+      # site, median of 3 runs. Thresholds and the audits that only warn are in lighthouserc.json;
+      # the HTML reports are uploaded for a look when a score drops.
+      - name: Lighthouse CI
+        run: |
+          cp -r .next/static .next/standalone/.next/
+          cp -r public .next/standalone/
+          npx --yes @lhci/cli@0.15.1 autorun
+        env:
+          PORT: '3100'
+          HOSTNAME: 127.0.0.1
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: lighthouse-landing
+          path: apps/landing/.lighthouseci/
+          retention-days: 14
+          if-no-files-found: ignore

@@ -21,7 +21,7 @@ All responses are JSON. Errors are `{ "error": "message" }` with an appropriate 
 
 Store the token and send it on **every other request**:
 
-```
+```text
 Authorization: Bearer phk_…
 ```
 
@@ -41,10 +41,12 @@ List responses are wrapped: `{ "data": [ … ], "total": N, "limit": L, "offset"
 ## Endpoints
 
 ### Dashboard
+
 `GET /api/v1/overview`
 → `{ counts: { items, shoppingList, receipts, expenses, subscriptions, openTasks }, installmentsOwed, activeInstallmentPlans, currency }`
 
 ### Items (product tracker / inventory)
+
 - `GET /api/v1/items?status=shopping|inventory|all` (+ list params)
   → `{ items: [{ id, num, title, status, category, currentPrice, purchasedPrice, targetPrice, currency, origAmount, fxRate, specs, warrantyUntil, tags, photo, updatedAt, deleted }], total, limit, offset }`
   - `currentPrice`, `purchasedPrice` and `targetPrice` are ALWAYS in the deployment's base currency (Settings → Currency), so a client can sum them without conversion. On an item bought abroad, `origAmount` is the ANCHOR price as printed (what was paid when the item is owned, otherwise its asking price) and `fxRate` is base units per 1 unit of `currency`; divide any of the three price fields by `fxRate` to get its printed value, since one rate converts all of them. Both are `0` for an ordinary item. `fxRate: 0` with a foreign `currency` means no rate is known yet, so the prices are still the printed numbers: show them as unconverted rather than mixing them into a base-currency total. Note `priceHistory[].currency` is a separate, older per-store field and is not part of this.
@@ -55,12 +57,14 @@ List responses are wrapped: `{ "data": [ … ], "total": N, "limit": L, "offset"
 - `DELETE /api/v1/items/:id` → `{ ok }` (soft-delete → Trash)
 
 ### Tasks
+
 - `GET /api/v1/tasks?status=todo|in-progress|done|blocked` (+ list params) → `{ data: [{ id, title, status, priority, tags, content, dueDate, completedAt, updatedAt, deleted }], total, limit, offset }`
 - `POST /api/v1/tasks` `{ title, status?, priority?, tags?, content?, dueDate? }` → `{ task }`
 - `PATCH /api/v1/tasks/:id` `{ title?, status?, priority?, tags?, content?, dueDate? }` → `{ task }` (status `done` sets `completedAt`)
 - `DELETE /api/v1/tasks/:id` → `{ ok }`
 
 ### Expenses & income
+
 - `GET /api/v1/expenses?kind=expense|income` (+ list params) → `{ data: [{ id, kind, vendor, category, amount, currency, origAmount, fxRate, date, period, recurring, recurringCycle, paymentMethod, notes, file, thumb, verified, updatedAt, deleted }], total, limit, offset }`
   - `amount` is ALWAYS in the deployment's base currency (Settings → Currency), so a client can sum it without conversion. On a foreign-currency document, `origAmount` is the amount as printed and `fxRate` is base units per 1 unit of `currency` (`amount = origAmount * fxRate`). Both are `0` for an ordinary entry. `fxRate: 0` with a foreign `currency` means no rate is known yet, so `amount` is still the printed number: show it as unconverted rather than mixing it into a base-currency total.
 - `POST /api/v1/expenses` `{ vendor, amount, kind?, date?, category?, space?, period?, recurring?, recurringCycle?, notes?, split?, taxDeductible?, taxCategory?, currency?, fxRate? }` → `{ expense }` (groups into the vendor's recurring series automatically)
@@ -69,6 +73,7 @@ List responses are wrapped: `{ "data": [ … ], "total": N, "limit": L, "offset"
   - Sending ANY money field (`amount`, `currency`, `fxRate`) re-resolves all four stored fields against the current row, so a partial update can never leave it half-converted. `amount` is the printed figure here too, so edit a foreign expense from its `origAmount`, not from `amount`.
 
 ### Subscriptions
+
 - `GET /api/v1/subscriptions?active=1` (+ list params) → `{ data: [{ id, name, provider, category, amount, currency, origAmount, fxRate, billingCycle, startDate, nextRenewal, active, paymentMethod, url, notes, space, trialEndsAt, firstChargeAmount, updatedAt, deleted }], total, limit, offset }`
   - `amount` and `firstChargeAmount` are ALWAYS in the deployment's base currency (Settings → Currency), so a client can sum them without conversion. On a foreign-currency subscription, `origAmount` is the amount as printed on the invoice and `fxRate` is base units per 1 unit of `currency` (`amount = origAmount * fxRate`); divide `firstChargeAmount` by `fxRate` to get its printed value. Both are `0` for an ordinary subscription. `fxRate: 0` with a foreign `currency` means no rate is known yet, so `amount` is still the printed number: show it as unconverted rather than mixing it into a base-currency total.
   - `nextRenewal` is the date the subscription is next charged on, derived per request: the stored date while it is still ahead, otherwise the next occurrence of `billingCycle` after it. Nothing advances the stored date when a renewal comes round, so a value that has gone by is stale rather than overdue — an active monthly subscription whose stored date was in April reads as the coming month's date, not as three months late. A `lifetime` subscription never rolls (it has no next charge) and a subscription with no renewal date still serves `null`.
@@ -79,6 +84,7 @@ List responses are wrapped: `{ "data": [ … ], "total": N, "limit": L, "offset"
   - Sending ANY money field (`amount`, `currency`, `fxRate`, `firstChargeAmount`) re-resolves the whole set against the current row, so a partial update can never leave it half-converted. `trialEndsAt: null` explicitly clears the trial. A `nextRenewal` you send is stored verbatim; the response echoes the derived date, so posting a past one reads back rolled forward.
 
 ### Receipts (read)
+
 - `GET /api/v1/receipts?store=&archived=1` (+ list params) → `{ data: [{ id, store, date, total, subtotal, vatAmount, currency, origAmount, fxRate, paymentMethod, warrantyMonths, space, itemCount, verified, archived, file, thumb, updatedAt, deleted }], total, limit, offset }`
   - `total`, `subtotal`, `vatAmount` and the line prices are ALWAYS in the deployment's base currency (Settings → Currency), so a client can sum them without conversion. On a foreign-currency receipt, `origAmount` is the TOTAL as printed and `fxRate` is base units per 1 unit of `currency` (`total = origAmount * fxRate`); divide the other money fields by `fxRate` to get their printed values. Both are `0` for an ordinary receipt. `fxRate: 0` with a foreign `currency` means no rate is known yet, so the amounts are still the printed numbers: show them as unconverted rather than mixing them into a base-currency total.
 - `GET /api/v1/receipts/:id` → `{ receipt: { …, notes, lineItems: [{ name, qty, price, vatRate }] } }`
@@ -89,6 +95,7 @@ List responses are wrapped: `{ "data": [ … ], "total": N, "limit": L, "offset"
 Creating a receipt is file-based (upload + AI scan); a multipart `scan/receipt` endpoint is the next addition (mirrors `scan/product`).
 
 ### AI scan
+
 - `POST /api/v1/scan/product` — multipart, field **`file`** = product photo
   → `{ data: { name, brand, category, quantity, notes } }`
   *Suggestion only* (no save); have the user confirm, then `POST /api/v1/shopping-list`.
@@ -106,16 +113,20 @@ Creating a receipt is file-based (upload + AI scan); a multipart `scan/receipt` 
   | `502` | No product database could be reached. Retryable. |
 
 ### Shopping list (quick to-buy)
+
 - `GET /api/v1/shopping-list` → `{ items: [{ id, name, quantity, category, brand, note, checked, aiScanned, createdAt }] }`
 - `POST /api/v1/shopping-list` `{ name, quantity?, category?, brand?, note? }` → `{ items }`
 - `PATCH /api/v1/shopping-list/:id` `{ checked?, name?, quantity?, category?, brand?, note? }` → `{ ok }`
 - `DELETE /api/v1/shopping-list/:id` → `{ ok }`
 
 ### Files (images / PDFs)
+
 Paths returned by the API (an item's `photo`, a receipt's `file`/`thumb`) are served from `GET /api/files/<path>`. **Send the same `Authorization: Bearer` token** — the route accepts either the web session cookie or a bearer token. Fetch the bytes and render them (a native `<img src>` can't attach the header).
 
 ## MCP connector (drive Pharos from Claude)
+
 `POST /api/mcp` — a JSON-RPC 2.0 (Streamable-HTTP) MCP server, same bearer token. Methods: `initialize`, `tools/list`, `tools/call`, `ping`. Add it in Claude as a custom connector (URL `https://<host>/api/mcp`) or test with MCP Inspector / Claude Code. See **Settings → API / MCP**.
 
 ## Roadmap (next additions)
+
 - Optional per-token scopes.

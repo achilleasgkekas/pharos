@@ -402,7 +402,7 @@ function AiMasterAndFeatures({ ai, canEdit }: { ai: AiInfo; canEdit: boolean }) 
           <div className="text-xs text-[color:var(--color-text-faint)]">{t('set.enableAiDesc')}</div>
         </div>
         {canEdit ? (
-          <Switch checked={enabled} onChange={toggleMaster} />
+          <Switch label={t('set.enableAi')} checked={enabled} onChange={toggleMaster} />
         ) : (
           <span className="text-xs text-[color:var(--color-text-faint)]">{enabled ? t('set.on') : t('set.off')}</span>
         )}
@@ -424,7 +424,7 @@ function AiMasterAndFeatures({ ai, canEdit }: { ai: AiInfo; canEdit: boolean }) 
                     </div>
                     <div className="text-xs text-[color:var(--color-text-faint)]">{t(('af.' + f.key + 'Desc') as TKey)}</div>
                   </div>
-                  {canEdit && <Switch checked={features[f.key] !== false} onChange={(v) => toggleFeature(f.key, v)} />}
+                  {canEdit && <Switch label={t(('af.' + f.key) as TKey)} checked={features[f.key] !== false} onChange={(v) => toggleFeature(f.key, v)} />}
                 </div>
               ))}
             </div>
@@ -977,6 +977,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
           <button
             type="button"
             role="switch"
+            aria-label={t('set.confirmBulk')}
             aria-checked={confirmBulk}
             onClick={() => {
               const v = !confirmBulk;
@@ -1147,6 +1148,7 @@ function ScraperAiSettings({ scraperAi, installed, hasAnthropicKey }: { scraperA
         <button
           type="button"
           role="switch"
+          aria-label={t('set.scraperEnabled')}
           aria-checked={enabled}
           onClick={() => setEnabled((v) => !v)}
           className={cn(
@@ -1602,7 +1604,7 @@ function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Inf
           {backend === 'ftp' && (
             <div className="flex items-center justify-between sm:col-span-2">
               <span className="text-xs text-[color:var(--color-text-dim)]">{t('set.ftpsTls')}</span>
-              <Switch checked={secure} onChange={setSecure} />
+              <Switch label={t('set.ftpsTls')} checked={secure} onChange={setSecure} />
             </div>
           )}
         </div>
@@ -1635,7 +1637,7 @@ function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Inf
             <p className="text-xs font-medium">{t('set.autoMirror')}</p>
             <p className="text-[10px] text-[color:var(--color-text-faint)] mt-0.5">{t('set.autoMirrorDesc')}</p>
           </div>
-          <Switch checked={mirror} onChange={setMirror} />
+          <Switch label={t('set.autoMirror')} checked={mirror} onChange={setMirror} />
         </div>
       )}
 
@@ -1696,7 +1698,7 @@ function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Inf
               {m2Backend === 'ftp' && (
                 <div className="flex items-center justify-between sm:col-span-2">
                   <span className="text-xs text-[color:var(--color-text-dim)]">{t('set.ftpsTls')}</span>
-                  <Switch checked={m2Secure} onChange={setM2Secure} />
+                  <Switch label={t('set.ftpsTls')} checked={m2Secure} onChange={setM2Secure} />
                 </div>
               )}
               <div className="sm:col-span-2 flex items-center gap-2 flex-wrap">
@@ -1773,11 +1775,14 @@ function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Inf
 
 // ─── Defaults & alerts + Notifications ───────────────────────────────────────
 
-function Switch({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+/** `label` is required: a bare switch has no text, so without it a screen reader announces an
+ *  unnamed toggle (the e2e axe check fails on it). Pass the setting's visible name. */
+function Switch({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
   return (
     <button
       type="button"
       role="switch"
+      aria-label={label}
       aria-checked={checked}
       onClick={() => onChange(!checked)}
       className={cn(
@@ -1888,7 +1893,7 @@ function BudgetsManager({ settings }: { settings: AppSettings }) {
           <span className="text-xs font-medium block">{t('set.budgetRollover')}</span>
           <span className="text-[10px] text-[color:var(--color-text-faint)] block">{t('set.budgetRolloverDesc')}</span>
         </span>
-        <Switch checked={rollover} onChange={toggleRollover} />
+        <Switch label={t('set.budgetRollover')} checked={rollover} onChange={toggleRollover} />
       </label>
     </Section>
   );
@@ -2125,7 +2130,7 @@ function DepreciationManager({ settings }: { settings: AppSettings }) {
       <p className="text-xs text-[color:var(--color-text-dim)] mb-3">{t('set.depreciationDesc')}</p>
       <label className="flex items-center justify-between gap-3 mb-3">
         <span className="text-xs text-[color:var(--color-text-dim)]">{t('set.depreciationEnabled')}</span>
-        <Switch checked={enabled} onChange={setEnabled} />
+        <Switch label={t('set.depreciationEnabled')} checked={enabled} onChange={setEnabled} />
       </label>
       {enabled && (
         <>
@@ -2340,7 +2345,7 @@ function DefaultsManager({ settings }: { settings: AppSettings }) {
             <span className="text-xs font-medium block">{t('set.autoAddStores')}</span>
             <span className="text-[10px] text-[color:var(--color-text-faint)] block">{t('set.autoAddStoresDesc')}</span>
           </span>
-          <Switch checked={autoAdd} onChange={setAutoAdd} />
+          <Switch label={t('set.autoAddStores')} checked={autoAdd} onChange={setAutoAdd} />
         </div>
         {/* P9 opt-in: keeps the currency + FX-rate fields out of the way for the
             single-currency majority. Totals always stay in the base currency above. */}
@@ -2349,7 +2354,7 @@ function DefaultsManager({ settings }: { settings: AppSettings }) {
             <span className="text-xs font-medium block">{t('set.multiCurrency')}</span>
             <span className="text-[10px] text-[color:var(--color-text-faint)] block">{t('set.multiCurrencyDesc', { code: currency })}</span>
           </span>
-          <Switch checked={multiCurrency} onChange={setMultiCurrency} />
+          <Switch label={t('set.multiCurrency')} checked={multiCurrency} onChange={setMultiCurrency} />
         </div>
       </div>
       <div className="flex items-center gap-3 pt-3 border-t border-[color:var(--color-border)] mt-1">
@@ -2439,7 +2444,7 @@ function ChannelCard({
           placeholder={t('set.chLabelOptional')}
           className={cn(inputClass, 'flex-1')}
         />
-        <Switch checked={ch.enabled} onChange={(v) => set({ enabled: v })} />
+        <Switch label={ch.label || ch.type} checked={ch.enabled} onChange={(v) => set({ enabled: v })} />
         <button type="button" onClick={onRemove} className="p-1.5 rounded-lg text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)]" aria-label="Remove channel">
           <Trash2 size={14} />
         </button>
@@ -2704,7 +2709,7 @@ function WebhookCard({
           placeholder="Label (optional)"
           className={cn(inputClass, 'flex-1')}
         />
-        <Switch checked={sub.enabled} onChange={(v) => set({ enabled: v })} />
+        <Switch label={sub.label || 'Webhook'} checked={sub.enabled} onChange={(v) => set({ enabled: v })} />
         <button type="button" onClick={onRemove} className="p-1.5 rounded-lg text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)]" aria-label="Remove webhook">
           <Trash2 size={14} />
         </button>
@@ -3061,7 +3066,7 @@ function ImapImportManager({ imap }: { imap: ImapInfo }) {
 
       <div className="flex items-center justify-between gap-3">
         <span className="text-xs font-medium">{t('set.imapEnabled')}</span>
-        <Switch checked={enabled} onChange={setEnabled} />
+        <Switch label={t('set.imapEnabled')} checked={enabled} onChange={setEnabled} />
       </div>
 
       <div className="grid sm:grid-cols-2 gap-3 pt-1">
@@ -3082,7 +3087,7 @@ function ImapImportManager({ imap }: { imap: ImapInfo }) {
         </Field>
         <div className="flex items-center justify-between">
           <span className="text-xs text-[color:var(--color-text-dim)]">{t('set.imapSecure')}</span>
-          <Switch checked={secure} onChange={setSecure} />
+          <Switch label={t('set.imapSecure')} checked={secure} onChange={setSecure} />
         </div>
       </div>
       <p className="text-[10px] text-[color:var(--color-text-faint)]">{t('set.imapAppPasswordHint')}</p>
@@ -3460,6 +3465,7 @@ function BackupRestore() {
       </p>
       <div className="flex items-center gap-2 flex-wrap mt-3 pt-3 border-t border-[color:var(--color-border)]">
         <select
+          aria-label={t('set.taxYear')}
           value={taxYear}
           onChange={(e) => setTaxYear(Number(e.target.value))}
           className="text-xs px-2 py-1.5 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)]"
@@ -3680,7 +3686,7 @@ function CardsManager({ cards }: { cards: SerializedCard[] }) {
                 {c.type} · {c.kind}{c.last4 ? ` · ••${c.last4}` : ''}
               </span>
             </div>
-            <Switch checked={c.active} onChange={(v) => startTransition(() => void toggleCardActive(c._id, v))} />
+            <Switch label={c.name} checked={c.active} onChange={(v) => startTransition(() => void toggleCardActive(c._id, v))} />
             <button onClick={() => openEdit(c)} className="text-[color:var(--color-text-faint)] hover:text-[color:var(--color-accent)] p-1"><Pencil size={13} /></button>
             <button onClick={() => remove(c)} className="text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] p-1"><Trash2 size={13} /></button>
           </div>
@@ -4198,14 +4204,16 @@ const selectClass =
 const inputClass =
   'w-full bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[color:var(--color-accent)]';
 
+/** The label WRAPS the control so it names it (a sibling <label> without htmlFor names nothing,
+ *  and every settings input read as unlabeled to a screen reader). */
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="min-w-0">
-      <label className="block text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider mb-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
+    <label className="block min-w-0">
+      <span className="block text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider mb-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
         {label}
-      </label>
+      </span>
       {children}
-    </div>
+    </label>
   );
 }
 

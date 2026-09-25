@@ -74,7 +74,7 @@ const WarrantyClaimSchema = new Schema(
 const ItemSchema = new Schema(
   {
     num: { type: String, default: '' },
-    title: { type: String, required: true, index: 'text' },
+    title: { type: String, required: true }, // text-indexed with specs + notes below (one text index per collection)
     category: {
       type: String,
       // Relaxed from an enum → free string so users can add custom categories

@@ -13,6 +13,7 @@ next-env.d.ts
 
 # test coverage (npm run test:coverage)
 coverage/
+.lighthouseci/
 
 # env
 .env

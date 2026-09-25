@@ -144,6 +144,7 @@ total) with keyboard shortcuts, so you can clear a backlog fast. See
 
 **Receipt status.** Every receipt is in one of four states, used by the status
 filter:
+
 - **verified** — you confirmed it (done).
 - **parsed** — AI read it, needs review (has a total or line items).
 - **failed** — genuinely empty: not verified, not archived, no total, no items.
@@ -158,8 +159,6 @@ users and notifications), **member** (add and edit records) or **viewer** (read
 only, enforced on the server). See [Features → Accounts](features.md#accounts--household).
 
 ## S
-
-
 
 **Signature (installment).** A stable identity for a plan across statements and
 links: `merchant | total | origin`. Charges sharing a signature are recognised as
@@ -182,8 +181,6 @@ carry. Reports break spending down by space. Define spaces in Settings → Money
 **Target price.** The price you are willing to pay for a shopping item. When the
 best known price reaches it, the item shows a "deal" verdict and can trigger a
 notification.
-
-
 
 **Trash.** The soft-delete bin. Deleted items (across most modules) sit here and
 can be restored or purged; entries auto-purge after 30 days. Distinct from a

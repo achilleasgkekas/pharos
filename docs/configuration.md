@@ -282,7 +282,7 @@ events show up alongside the rest of your calendar, refreshing automatically.
 2. Click **Generate** (labelled **Rotate** if you already have one). A subscribe
    URL appears in the form:
 
-   ```
+   ```text
    https://your-pharos-host/api/calendar.ics?token=<calendarToken>
    ```
 
@@ -343,7 +343,7 @@ update / search records, get an overview, and so on).
    a new one at any time.
 3. Note the connector URL shown next to it:
 
-   ```
+   ```text
    https://your-pharos-host/api/mcp
    ```
 

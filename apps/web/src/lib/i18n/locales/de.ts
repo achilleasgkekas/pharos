@@ -539,6 +539,7 @@ export const de: Partial<Dict> = {
   'set.insuranceExportDesc': 'Ein ZIP mit CSV + druckbarem HTML-Bericht jedes eigenen Objekts (Wert, Seriennummer, Garantie) samt Fotos, Anleitungen und Belegen — alles, was eine Versicherung nach einem Schaden verlangt.',
   'set.insuranceExportDone': '✓ {n} Objekte · {total} versicherter Gesamtwert',
   'set.taxExport': 'Steuer-Export (ZIP)',
+  'set.taxYear': 'Steuerjahr',
   'set.taxExportDesc': 'Ein ZIP mit CSV + druckbarem HTML-Bericht jeder steuerlich absetzbaren Ausgabe des gewählten Jahres, nach Steuerkategorie gruppiert, samt Original-Rechnungen/-Belegen — alles für Steuerberater oder Steuererklärung.',
   'set.taxExportDone': '✓ {n} Ausgaben · {total} gesamt',
   'set.sampleData': 'Beispieldaten',

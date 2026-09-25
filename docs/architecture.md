@@ -28,7 +28,7 @@ it being present.
 
 ## Deployment topology
 
-```
+```text
                         host machine (Docker Desktop / Linux)
   ┌──────────────────────────────────────────────────────────────────────┐
   │                                                                        │
@@ -168,7 +168,6 @@ Details in [Configuration → AI providers](configuration.md).
   shops like Skroutz through flaresolverr), extracts prices, appends price history,
   and can fire ntfy alerts on drops. Opt-in because the pair is heavy.
 - **mongo-express** — a browser DB admin UI for debugging, bound to loopback.
-
 
 ## Where things live (quick map)
 
