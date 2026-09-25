@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   countryFromLanguageTag,
+  isInMarket,
   marketFor,
   marketRank,
   normalizeShopHost,
@@ -126,5 +127,16 @@ describe('countryFromLanguageTag', () => {
 
   it('suggests nothing without a region, or for a region with no preset', () => {
     for (const tag of ['el', '', undefined, 'en-JP', 'zh-Hant-TW', 'es-419']) expect(countryFromLanguageTag(tag)).toBe('');
+  });
+});
+
+describe('isInMarket', () => {
+  it('everything counts with no market; an empty URL always counts; otherwise marketRank decides', () => {
+    expect(isInMarket('https://www.newegg.com/p/1', null)).toBe(true);
+    expect(isInMarket('', GR)).toBe(true);
+    expect(isInMarket(undefined, GR)).toBe(true);
+    expect(isInMarket('https://www.skroutz.gr/s/1', GR)).toBe(true);
+    expect(isInMarket('https://www.amazon.de/dp/1', GR)).toBe(true);
+    expect(isInMarket('https://www.newegg.com/p/1', GR)).toBe(false);
   });
 });

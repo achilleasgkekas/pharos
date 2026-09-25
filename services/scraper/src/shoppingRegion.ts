@@ -134,6 +134,14 @@ export function marketRank(url: string, market: ShoppingMarket): 0 | 1 | null {
 }
 
 /**
+ * Whether a URL counts for this market. True with no market (the feature is off) and for an
+ * empty URL (nothing to judge, e.g. a hand-logged price), else `marketRank(url) !== null`.
+ */
+export function isInMarket(url: string | null | undefined, market: ShoppingMarket | null): boolean {
+  return !market || !url || marketRank(url, market) !== null;
+}
+
+/**
  * Keep only in-market results, the country's own shops first, then the foreign ones, each in
  * the order the search returned them. Duplicate URLs are dropped.
  */

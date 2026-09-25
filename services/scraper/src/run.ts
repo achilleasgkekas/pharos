@@ -3,7 +3,7 @@ import { Item } from './db.js';
 import { fetchPageText, storeFromUrl } from './scrape.js';
 import { extractPrice, isOllamaHealthy } from './extract.js';
 import { getScraperAiConfig, getShoppingMarket } from './appConfig.js';
-import { marketRank } from './shoppingRegion.js';
+import { isInMarket } from './shoppingRegion.js';
 import { notify } from './notify.js';
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -30,7 +30,7 @@ export async function runOnce(): Promise<{ items: number; checks: number; update
   // Shopping market (#319): alerts only count shops the user can buy from. Prices from every
   // link are still recorded and still set currentPrice; only the alert decisions are filtered.
   const market = await getShoppingMarket();
-  const inMarket = (url: string | undefined | null) => !market || !url || marketRank(url, market) !== null;
+  const inMarket = (url: string | undefined | null) => isInMarket(url, market);
   if (market) console.log(`[scrape] alerts limited to the ${market.country} market`);
 
   const query = Item.find({ 'links.0': { $exists: true } }).sort({ updatedAt: 1 });
