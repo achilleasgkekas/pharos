@@ -1,5 +1,7 @@
 # Self-hosting PHAROS
 
+<sub>[📚 Docs home](README.md) · [✨ Features](features.md) · [🚀 Self-hosting](self-hosting.md) · [⚙️ Configuration](configuration.md) · [❓ FAQ](faq.md)</sub>
+
 This guide takes you from an empty host to a running PHAROS instance with your
 own admin account. It targets Docker Compose, which is the supported way to run
 PHAROS in production.
@@ -132,25 +134,6 @@ On a shared or public deployment, rate limit API calls to prevent brute-force lo
 | `API_RATE_LIMIT` | (disabled) | Max requests per window (e.g. `120`). Empty or `0` disables rate limiting. |
 | `API_RATE_WINDOW_MS` | `60000` | Time window for rate limiting (in milliseconds). `60000` = 1 minute. |
 
-### SaaS-only (ignored in self-hosted)
-
-**Self-hosted deployments should leave all of these blank.** These variables only matter when running the paid, multi-tenant SaaS version.
-
-| Variable | Purpose |
-|---|---|
-| `SAAS_MODE` | Set to `"true"` to enable multi-tenant mode. Anything else keeps single-user mode (the default). |
-| `SAAS_BASE_DOMAIN` | Apex domain for tenant subdomains (e.g. `ph-aros.com`). Default `ph-aros.com`. |
-| `SAAS_PUBLIC_URL` | Public origin for links in transactional emails and Stripe redirects. Falls back to `APP_URL`, then the request origin. |
-| `APP_URL` | Fallback app origin. |
-| `SAAS_SESSION_IDLE_HOURS` | Session timeout for hosted accounts (default `12`). Clamped 0.25–8760 hours. |
-| `SAAS_SUPERADMIN_EMAILS` | Comma/semicolon-separated allowlist of operator emails for the superadmin console. Empty disables the console. |
-| `CRON_SECRET` | Shared secret for the SaaS cron endpoints (usage sampling, trial sweep). Also used self-hosted by the alert sweep, so it is listed under "integration & scraping" too. |
-| `STRIPE_SECRET_KEY` | Stripe secret API key from the Stripe dashboard. |
-| `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret. |
-| `STRIPE_PRICE_SHARED` | Stripe price ID for the shared-account tier (price_...). |
-| `STRIPE_PRICE_DEDICATED` | Stripe price ID for the dedicated-account tier (price_...). |
-| `RESEND_API_KEY` | Resend API key for transactional emails (verification, password reset, invites). |
-
 > Never commit `.env`. It holds your database password and secrets.
 
 If you use the prebuilt image and want to pin a version instead of `latest`, add
@@ -272,10 +255,12 @@ exports, the storage mirror, and Trash — see the dedicated
 ## Scheduling the alert sweep
 
 PHAROS can warn you about price targets being hit, installments due this month,
-warranties and gift cards about to expire, return windows closing, recurring
-charges that went up, free trials about to convert, unpaid bills, and budgets
-you have blown through. It sends that summary to whatever you configured in
-Settings → Notifications (ntfy, Discord, Slack, Telegram, outgoing webhooks),
+warranties about to expire, return windows closing, recurring charges that went
+up, free trials about to convert, unpaid bills, documents and vehicle dates
+(MOT, insurance, road tax) coming due, birthdays, maintenance, lent items, and
+budgets you have blown through. It sends that summary to whatever you configured
+in Settings → Notifications (ntfy, Discord, Slack, Telegram, web push, outgoing
+webhooks),
 plus the in-app bell wherever you're signed in.
 
 **Nothing runs this scan on its own.** Out of the box the only trigger is the
@@ -312,8 +297,7 @@ in the log on purpose, so you can tell "checked, nothing changed" apart from
 `"sent": false` with an all-clear summary is a healthy run that simply found
 nothing to report, not a failure. A `401` means the token does not match, a
 `500` with `CRON_SECRET is not configured` means the variable never reached the
-container, and a `404` means the instance is running in SaaS mode (hosted
-workspaces get their own per-tenant sweep instead).
+container.
 
 The button in Settings keeps working exactly as before; it just stops being the
 only way the scan ever runs.

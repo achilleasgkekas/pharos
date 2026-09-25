@@ -1,5 +1,7 @@
 # Features
 
+<sub>[📚 Docs home](README.md) · [✨ Features](features.md) · [🚀 Self-hosting](self-hosting.md) · [⚙️ Configuration](configuration.md) · [❓ FAQ](faq.md)</sub>
+
 PHAROS is a self-hosted personal hub. It keeps track of the things you own, the
 money you spend and earn, the documents that prove it (receipts, statements),
 and the small logistics of running a household or a home lab. Optional AI reads
@@ -23,26 +25,33 @@ subscriptions, upcoming bills/renewals), recent activity, and module shortcuts.
 
 ## Contents
 
-- [Inventory & Shopping (Items)](#inventory--shopping-items)
-- [Shopping list](#shopping-list)
-- [Receipts](#receipts)
-- [Expenses & Income](#expenses--income)
-- [Statements & installments](#statements--installments)
-- [Subscriptions](#subscriptions)
-- [Bills & payables](#bills--payables)
-- [Vouchers](#vouchers)
-- [Calendar](#calendar)
-- [Save (savings forecast)](#save-savings-forecast)
-- [Reports](#reports)
-- [Tasks](#tasks)
-- [Network (UniFi)](#network-unifi)
-- [AI command bar & history](#ai-command-bar--history)
-- [Search](#search)
-- [Notifications](#notifications)
-- [Trash (soft delete)](#trash-soft-delete)
-- [Settings](#settings)
+| 🏠 Own & buy | 💶 Money | 📅 Life admin | 🧰 Everywhere |
+| --- | --- | --- | --- |
+| [Accounts & household](#accounts--household) | [Expenses & Income](#expenses--income) | [Utilities](#utilities-meter-readings) | [AI command bar](#ai-command-bar--history) |
+| [Inventory & Shopping](#inventory--shopping-items) | [Statements & installments](#statements--installments) | [Vehicles](#vehicles) | [Search](#search) |
+| [Shopping list](#shopping-list) | [Subscriptions](#subscriptions) | [Documents](#documents) | [Notifications](#notifications) |
+| [Receipts](#receipts) | [Bills & payables](#bills--payables) | [Special dates](#special-dates) | [Backup & restore](#backup--restore-json) |
+| | [Vouchers](#vouchers) | [Calendar](#calendar) | [Trash](#trash-soft-delete) |
+| | [Save (savings forecast)](#save-savings-forecast) | [Tasks](#tasks) | [Settings](#settings) |
+| | [Reports](#reports) | | |
 
 ---
+
+## Accounts & household
+
+PHAROS is one private hub for a household, with one login per person. On first
+launch a **setup wizard** creates the administrator account, then walks through
+language, currency, your shopping country and optional AI. After that, an admin
+adds people in **Settings → Users** with one of three roles:
+
+| Role | Can do |
+| --- | --- |
+| **Admin** | Everything, including users, notifications, AI toggles and system status. |
+| **Member** | Add, edit and delete records. |
+| **Viewer** | Read only. Every write is refused on the server, not just hidden in the UI. |
+
+Each person can change their own password and turn on two-factor authentication
+(TOTP) in Settings → General.
 
 ## Inventory & Shopping (Items)
 
@@ -72,6 +81,18 @@ Highlights:
 - **Bulk actions.** Select multiple items and run AI fill on the selection.
 - **List / grid** layouts, a left filter sidebar (search, status, store, category,
   sort, flag chips such as "has photo", "under warranty", "deals only").
+- **Shopping country.** Pick the country you shop in (Settings → General, or the
+  setup wizard) and price searches only look at shops that sell there: the
+  country's own shops plus the foreign shops you add (Amazon.de by default for
+  most of the EU). A Newegg price for someone in Greece is dropped before it costs
+  a page fetch. Existing store links outside your market get a **"not in your
+  market"** badge and are left out of deal checks.
+- **Maintenance.** Give an owned item an interval (for example "clean the filter
+  every 90 days") and it tells you when it is due, with an alert.
+- **Lending.** Mark an item as lent to someone, with a due-back date; overdue loans
+  raise an alert.
+- **Warranty claims (RMA).** Log a claim on an item and follow it until it is
+  resolved; a claim with no movement for a while raises an alert.
 - **Convert to task** for items that need follow-up work.
 - **Link to installment plans** so a purchase on your credit-card statement points
   back at the product it paid for (see Statements below).
@@ -390,12 +411,34 @@ Highlights:
 
 Deleting a bill is a soft delete, so it lands in Trash and can be restored.
 
-## Vouchers & Payment methods
+## Utilities (meter readings)
 
-A unified wallet for payment-related items (`/vouchers`), organised into three
-tabs:
+Log cumulative meter readings (`/utilities`) for electricity, water, gas or any
+other meter. Each reading has a meter name, a utility type, a unit and a date.
+PHAROS works out the consumption between readings and draws the trend, so you can
+see what is behind each bill. Readings can be tagged to a space (for example a
+second home).
 
-### Coupons & discount codes
+## Vehicles
+
+Track cars and motorbikes (`/vehicles`): name, plate, make, model, year and space.
+
+- **Fuel log.** Log each fill with the odometer, litres and cost. Consumption
+  (L/100 km) uses the full-to-full method: a partial fill rolls into the next full
+  one, so the figure stays honest.
+- **Service log.** What was done, the garage, the cost and the odometer.
+- **Running cost.** Fuel spent, service spent and cost per km, worked out from
+  the logs. Nothing is stored, so correcting an old entry fixes every figure.
+- **Renewal dates.** MOT / inspection (ΚΤΕΟ), insurance, road tax and the
+  emissions card show as badges (orange when due soon, red when overdue) and raise
+  alerts using the same lead time as Documents.
+- **Also log as expense.** A fill lands in Expenses under `fuel` and a service
+  under `transport`, in the vehicle's space.
+- **Archive** a vehicle you sold; its history stays.
+
+## Vouchers
+
+Coupons and discount codes (`/vouchers`). Payment cards live in Settings → Money.
 
 Discount codes and promotional offers: title, code, store, discount %/amount,
 expiry date, URL, and notes. **AI fill** reads a pasted message or a screenshot
@@ -403,39 +446,24 @@ and extracts the fields (for example "15% off Skroutz code SUMMER15 until
 31/12/2026 min 50 euros"). Expiring coupons surface in the Calendar and can
 trigger notifications; archive or delete expired ones.
 
-### Gift cards & store credit
+## Documents
 
-A balance tracker for gift cards, prepaid cards, and store credit that deplete
-as you spend them. Each card holds an initial amount, an optional expiry date,
-and a spending history: title, store, card code, initial balance, and notes.
+Personal papers that expire (`/documents`): passport, ID card, driving licence,
+residence permit, policies. Each has a title, a free-form type, an optional
+holder (for households), a number, and an expiry date. The list shows how long
+each one has left, and an alert fires ahead of the expiry (lead time in
+Settings → General) and keeps nagging once it has lapsed.
 
-- **Balance calculation.** The live balance is the initial amount minus all
-  recorded spends, plus any reloads / top-ups (negative spends). Never stored,
-  always computed.
-- **Spending log.** Record each purchase that uses the card, with the amount and
-  date. Mark money back as a negative spend (reload).
-- **Expiry tracking.** Gift cards expiring within 60 days show a warning badge;
-  they also surface in the Calendar so you don't forget to use them.
-- **Notifications.** A card running low (<10% balance) or expiring soon can
-  trigger a reminder.
+## Special dates
 
-### Loyalty & membership cards
-
-Membership cards and loyalty programs that track a card number but no monetary
-balance: title, store, card number, and notes. The app guesses the barcode format
-from the card number's shape (EAN13 for 13 digits, UPC for 12, CODE128 otherwise).
-
-- **Tap to scan.** Tap any loyalty card to show a full-screen barcode your phone
-  can display at checkout. The barcode always renders black-on-white so a
-  real scanner can read it reliably.
-- **Quick edit.** A small hover icon opens the card's edit form (title, store,
-  number, notes).
-- **Notifications.** Archive a card if you no longer use that loyalty program; it
-  soft-deletes to Trash so you can restore it later.
+Birthdays, anniversaries and namedays (`/special-dates`). Stored as a day and a
+month, with an optional year so the reminder can say how old someone turns. An
+alert fires a few days ahead (lead time in Settings → General).
 
 ## Calendar
 
-A three-month agenda (`/calendar`) that unifies everything with a date:
+One calendar (`/calendar`), with **Month** and **Agenda** views, that unifies
+everything with a date:
 
 - subscription renewals (repeated per cycle),
 - credit-card installments aggregated per month,
@@ -566,16 +594,6 @@ plus a list view. Quick-add with `#tag` parsing, drag-and-drop or arrow-key move
 between columns, and a per-project progress bar when you filter by tag. Items from
 Inventory / Shopping can be converted into tasks.
 
-## Network (UniFi)
-
-An optional dashboard (`/network`) that reads your local UniFi controller
-(read-only) and shows: WAN status / ISP / public IP / latency, per-device health
-(gateways, switches, APs) with uptime / clients / CPU / RAM / temperature, WiFi
-radios per band, active PoE ports, a searchable / sortable client table with
-top-talkers, VPN status, and the last speedtest (with a "run speedtest" button).
-Offline devices or a WAN outage can trigger notifications. Requires UniFi host and
-a local (non-SSO) user configured in Settings.
-
 ## AI command bar & history
 
 A conversational command bar (in the navbar) lets you type natural-language
@@ -591,9 +609,9 @@ Search and edit/delete cover almost the same ground, with two deliberate gaps:
 receipts and statements are findable (so "find my Kotsovolos receipt" works) but
 not editable through the assistant, since both are parsed from a scanned
 document and statements can't be soft-deleted (re-import instead of asking the
-assistant to fix or remove one). A gift card's usage log and a goal's
-contributions are also off-limits as a raw edit, since their balance is derived
-from that log; the assistant reports this instead of silently skipping it.
+assistant to fix or remove one). A goal's contributions are also
+off-limits as a raw edit, since its balance is derived from that log; the
+assistant reports this instead of silently skipping it.
 
 The command bar has a **Search / AI toggle**: in Search mode it is the global
 search below; in AI mode it is the assistant. The AI command bar requires an
@@ -602,8 +620,7 @@ Anthropic-capable provider (see [Configuration → AI providers](configuration.m
 ## Search
 
 Global search across items, receipts, statements, tasks, subscriptions,
-expenses, income, vouchers, bills, goals, gift cards, loyalty cards, and the
-shopping list. Results deep-link to the matching record where the page supports
+expenses, income, vouchers, bills, goals, and the shopping list. Results deep-link to the matching record where the page supports
 it (for example `/items?open=<id>`), or to the section that holds it when there
 is no per-row detail view (goals link to `/reports#goals`, shopping-list lines
 to `/shopping-list`).
@@ -615,10 +632,13 @@ Pharos has two notification systems:
 ### Alert summaries
 
 Alert checks scan for deals (target price hit), installments due this month,
-budgets exceeded, warranties expiring within your lead time, bills that are overdue or due soon,
-price hikes, trials ending, expiring gift cards, and network issues, then send a
+budgets exceeded, warranties expiring, return windows closing, bills that are
+overdue or due soon, price hikes, trials ending, subscriptions due a usage review,
+documents expiring, vehicle dates due, special dates coming up, maintenance due,
+lent items due back, warranty claims with no movement, and a remote backup that
+has fallen behind. The in-app **bell** shows all of them. The same checks send a
 human-readable summary through your configured channel (ntfy, Discord, Slack, Telegram,
-or a generic webhook; see
+web push, or a generic webhook), and each category can be switched off on its own; see
 [Configuration → Notifications](configuration.md#notifications)). You can trigger
 a check on demand or send a test message from Settings.
 
@@ -640,8 +660,9 @@ scans, item photos, statement PDFs) are not in the JSON, they stay on disk (or o
 your configured remote), and the JSON keeps the paths that point at them.
 
 What the file carries: items, receipts, statements, subscriptions, vouchers,
-payment cards, tasks, stores, expenses / income, bills, goals, gift cards, loyalty
-cards, net-worth snapshots, and the shopping list.
+payment cards, tasks, stores, expenses / income, bills, documents, special dates,
+goals, net-worth snapshots, the shopping list, meter readings, vehicles and their
+fuel / service logs, and AI conversations.
 
 What it deliberately leaves out:
 
@@ -649,9 +670,8 @@ What it deliberately leaves out:
   folder, and this record holds live secrets (AI provider keys, SMB/FTP password,
   OneDrive refresh token). Budgets, prompts and taxonomies live here too, so they
   are not restored by the JSON either.
-- **Logins** (users, and the SaaS account/tenant records), which hold password
-  hashes.
-- **Transient state**: background jobs, notification instances, and AI chat history.
+- **Logins** (users), which hold password hashes.
+- **Transient state**: background jobs and notification instances.
 
 For a genuine full-instance copy including settings and logins, use a database
 dump (`scripts/backup.sh` runs `mongodump`) rather than the JSON export.
@@ -659,7 +679,7 @@ dump (`scripts/backup.sh` runs `mongodump`) rather than the JSON export.
 ## Trash (soft delete)
 
 Most deletes are reversible. Items, receipts, expenses, subscriptions, vouchers,
-bills, and tasks are **soft-deleted** (hidden, files and references kept) and land in
+bills, tasks, documents, special dates, meter readings and vehicles are **soft-deleted** (hidden, files and references kept) and land in
 **Trash** (Settings → Storage) where you can restore them or delete them forever.
 Trash auto-purges entries older than 30 days. (Statements are hard-deleted, to
 avoid blocking a re-import of the same month.)
@@ -683,14 +703,17 @@ Configuration is grouped into tabs:
   (scan, parse, fill, search, summarize, translate, categorize, etc.) with status
   indicators (disabled / no-provider / ready); only admins may edit toggles, but
   all users see their status (to understand why a feature is unavailable).
-- **Network** — UniFi host / user / connection test.
 - **Storage & backup** — file storage backend (local / SMB / FTP / OneDrive),
   folder / filename templates, mirror-on-verify, sync, backup / restore, CSV
   export, **insurance export (ZIP)** with inventory manifest, photos, and
   printable receipts report, **migration import** (YNAB and other tools), and Trash.
 - **Stores & lists** — known stores (with duplicate detection / merge) and the
   editable dropdown taxonomies (item / expense / subscription categories).
-- **Notifications** — alert channels (ntfy, Discord, Slack, Telegram, webhook), test and check-now buttons; outbound event webhooks for automation platforms.
+- **Notifications** (admin) — alert channels (ntfy, Discord, Slack, Telegram,
+  web push, webhook), per-category switches, lead times, test and check-now
+  buttons; outbound event webhooks for automation platforms.
+- **Users** (admin) — add household members and viewers, change roles.
+- **System status** (admin) — database latency, free disk space and the job queue.
 
 See the [Configuration guide](configuration.md) for the details of AI providers,
 storage backends, notifications, and internationalisation.

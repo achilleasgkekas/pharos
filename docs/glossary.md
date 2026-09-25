@@ -1,5 +1,7 @@
 # Glossary
 
+<sub>[📚 Docs home](README.md) · [✨ Features](features.md) · [🚀 Self-hosting](self-hosting.md) · [⚙️ Configuration](configuration.md) · [❓ FAQ](faq.md)</sub>
+
 Pharos-specific terms, in plain language. Where a term has a precise meaning in
 the code or UI, this page gives the practical definition and links to the guide
 that covers it in depth. Alphabetical.
@@ -52,14 +54,22 @@ records at once, with a rough cost estimate (cloud) or a "free but slow" note
 
 ## C
 
-**Calendar (money agenda).** A rolling 3-month view that merges subscription
+**Calendar (money agenda).** A rolling view (Month or Agenda) that merges subscription
 renewals, card installments per month, projected recurring bills/income, and
 warranty/voucher expiries. Everything is derived live; nothing is stored. See
 [Features → Calendar](features.md#calendar).
 
-**Currency symbol.** Pharos is single-currency per deployment. Changing the
-currency in Settings swaps the displayed symbol everywhere; it does **not**
-convert existing amounts. See [Configuration](configuration.md).
+**Base currency.** The one currency every total, budget and report is kept in
+(Settings → General). Records in a foreign currency keep their printed amount and
+rate next to the converted base amount (multi-currency is opt-in). Changing the
+base currency does **not** convert existing amounts. See
+[Features → Multi-currency](features.md#multi-currency-support-p9).
+
+## F
+
+**Full-to-full (fuel).** How Vehicles measures consumption: the litres put in
+between two full-tank fills, divided by the distance driven. A partial fill rolls
+into the next full one. See [Features → Vehicles](features.md#vehicles).
 
 ## I
 
@@ -96,6 +106,10 @@ follow the binding. "Unmerge" clears it.
 **Mirror.** A push-only copy of your files to a remote backend (SMB, FTP, or
 OneDrive). Can run automatically when a receipt is verified, or on demand via
 "Sync now". See [Configuration → Storage backends](configuration.md).
+
+**Market (shopping country).** The shops a price search counts: your country's
+own shops plus the foreign shops you add (Amazon.de by default for most of the
+EU). Links outside it get a "not in your market" badge and skip deal checks.
 
 ## O
 
@@ -139,6 +153,10 @@ filter:
 `weekly`, `monthly`, `quarterly`, or `yearly`. Drives the calendar projection and
 recurring auto-generation.
 
+**Role.** What a household account may do: **admin** (everything, including
+users and notifications), **member** (add and edit records) or **viewer** (read
+only, enforced on the server). See [Features → Accounts](features.md#accounts--household).
+
 ## S
 
 
@@ -154,6 +172,10 @@ so files and references are kept for a lossless restore. See **Trash**.
 Greek→Latin, domain/legal-suffix removed) so that variants ("iStorm",
 "istorm.gr", "i-Storm") map to one store. Powers duplicate-store merging and
 **auto-add stores**.
+
+**Space.** An optional label for a separate context, usually a property ("Athens
+flat", "Kalamos house"), that expenses, bills, meter readings and vehicles can
+carry. Reports break spending down by space. Define spaces in Settings → Money.
 
 ## T
 
