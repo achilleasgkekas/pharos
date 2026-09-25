@@ -1,6 +1,7 @@
 'use client';
+import { PAGE_MAIN, PageHeader, HeaderButton, PrimaryAction } from '@/components/ui/PageHeader';
 import { useState, useMemo, useTransition } from 'react';
-import { Plus, Trash2, Check, Archive, ArchiveRestore, Pencil, X, Cake, Gift } from 'lucide-react';
+import { Trash2, Check, Archive, ArchiveRestore, Pencil, X, Gift } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
@@ -67,29 +68,19 @@ export function SpecialDatesClient({ dates, leadDays }: { dates: SerializedSpeci
   }
 
   return (
-    <main className="max-w-[1000px] mx-auto px-4 py-6 pb-24">
-      <div className="mb-6 pb-4 border-b border-[color:var(--color-border)] flex items-end justify-between gap-4 flex-wrap">
-        <div className="flex items-baseline gap-3 flex-wrap">
-          <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2" style={{ fontFamily: 'var(--font-display)' }}>
-            <Cake size={26} className="text-[color:var(--color-accent)]" /> Special dates
-          </h1>
-          <span className="text-sm text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>{rows.length} shown</span>
-        </div>
-        <div className="flex items-center gap-2">
-          {archivedCount > 0 && (
-            <button onClick={() => setShowArchived((v) => !v)} className="text-xs text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] px-2" style={{ fontFamily: 'var(--font-mono)' }}>
-              {showArchived ? 'hide archived' : `show archived (${archivedCount})`}
-            </button>
-          )}
-          <Button variant="primary" onClick={() => { setError(''); setEditing({}); }}>
-            <Plus size={16} strokeWidth={2.5} /> New date
-          </Button>
-        </div>
-      </div>
-
-      <p className="text-xs text-[color:var(--color-text-dim)] -mt-3 mb-5">
-        Birthdays, anniversaries, namedays — anything that comes round every year. You get a reminder {leadDays} days ahead (Settings → Notifications).
-      </p>
+    <main className={PAGE_MAIN}>
+      <PageHeader
+        title="Special dates"
+        count={`${rows.length} shown`}
+        subtitle={<>Birthdays, anniversaries, namedays — anything that comes round every year. You get a reminder {leadDays} days ahead (Settings → General).</>}
+      >
+        {archivedCount > 0 && (
+          <HeaderButton onClick={() => setShowArchived((v) => !v)}>
+            {showArchived ? 'Hide archived' : `Show archived (${archivedCount})`}
+          </HeaderButton>
+        )}
+        <PrimaryAction onClick={() => { setError(''); setEditing({}); }} />
+      </PageHeader>
 
       {rows.length === 0 ? (
         <div className="py-20 text-center text-[color:var(--color-text-faint)]">

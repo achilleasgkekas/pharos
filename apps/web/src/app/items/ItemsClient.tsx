@@ -1,38 +1,11 @@
 'use client';
+import { PAGE_MAIN, PageHeader, ViewToggle, PrimaryAction, FilterLayout } from '@/components/ui/PageHeader';
 import { cur } from "@/lib/money";
 import { createContext, useContext, useState, useTransition, useMemo } from 'react';
 import { ShoppingMarketProvider, useShoppingMarket } from '@/components/ShoppingMarketContext';
 import { isInMarket, marketRank, type ShoppingMarket } from '@/lib/shoppingRegion';
 import { useRouter } from 'next/navigation';
-import {
-  Search,
-  Plus,
-  Trash2,
-  X,
-  Loader2,
-  Sparkles,
-  Link2,
-  ExternalLink,
-  Wand2,
-  ListPlus,
-  Check,
-  FileText,
-  TrendingDown,
-  TrendingUp,
-  Target,
-  LayoutGrid,
-  List as ListIcon,
-  SlidersHorizontal,
-  Merge,
-  Columns3,
-  ImagePlus,
-  Pencil,
-  Truck,
-  Printer,
-  Wrench,
-  HandHelping,
-  ShieldAlert,
-} from 'lucide-react';
+import { Search, Plus, Trash2, X, Loader2, Sparkles, Link2, ExternalLink, Wand2, ListPlus, Check, FileText, TrendingDown, TrendingUp, Target, Merge, Columns3, ImagePlus, Pencil, Truck, Printer, Wrench, HandHelping, ShieldAlert } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -310,7 +283,6 @@ export function ItemsClient({
   const [search, setSearch] = useState('');
   const [selectMode, setSelectMode] = useState(false);
   const [layout, setLayout] = useState<'grid' | 'list'>(defaultView);
-  const [showFilters, setShowFilters] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [printingTags, setPrintingTags] = useState(false);
   const toggleSelect = (id: string) =>
@@ -680,25 +652,8 @@ export function ItemsClient({
   return (
     <ItemCategoriesContext.Provider value={configuredCategories}>
     <ShoppingMarketProvider value={shoppingMarket}>
-    <main className="max-w-[1400px] mx-auto px-4 py-6 pb-24">
-      {/* Page header */}
-      <div className="mb-6 pb-4 border-b border-[color:var(--color-border)]">
-        <div className="flex items-end justify-between gap-4 flex-wrap">
-          <div className="flex items-baseline gap-3 flex-wrap">
-            <h1
-              className="text-2xl md:text-3xl font-bold"
-              style={{ fontFamily: 'var(--font-display)' }}
-            >
-              {viewName}
-            </h1>
-            <span
-              className="text-xs text-[color:var(--color-text-faint)] tracking-[0.1em]"
-              style={{ fontFamily: 'var(--font-mono)' }}
-            >
-              {items.length} {items.length === 1 ? t('it.item') : t('it.items')}
-            </span>
-          </div>
-          <div className="flex items-center gap-3 flex-wrap">
+    <main className={PAGE_MAIN}>
+      <PageHeader title={viewName} count={`${items.length} ${items.length === 1 ? t('it.item') : t('it.items')}`}>
             {items.length > 0 && view === 'shopping' && (
               <div className="text-xs text-[color:var(--color-text-dim)]" style={{ fontFamily: 'var(--font-mono)' }}>
                 {t('it.cost')}{' '}
@@ -797,51 +752,11 @@ export function ItemsClient({
                 <Merge size={14} /> {t('it.duplicates')}
               </button>
             )}
-            {/* Grid / list toggle */}
-            <div className="flex bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg p-0.5">
-              {([
-                ['grid', <LayoutGrid key="g" size={15} />],
-                ['list', <ListIcon key="l" size={15} />],
-              ] as const).map(([v, icon]) => (
-                <button
-                  key={v}
-                  onClick={() => setLayout(v)}
-                  title={v === 'grid' ? t('v.grid') : t('v.list')}
-                  className={cn(
-                    'px-2.5 py-1.5 rounded-md transition-colors',
-                    layout === v ? 'bg-[color:var(--color-accent)] text-black' : 'text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]'
-                  )}
-                >
-                  {icon}
-                </button>
-              ))}
-            </div>
-            <Button variant="primary" onClick={() => setShowCreate(true)}>
-              <Plus size={16} strokeWidth={2.5} /> {t('common.new')}
-            </Button>
-          </div>
-        </div>
-      </div>
+            <ViewToggle value={layout} onChange={setLayout} />
+            <PrimaryAction onClick={() => setShowCreate(true)} />
+      </PageHeader>
 
-      {/* E-shop body: left filter sidebar + product area */}
-      <div className="flex gap-6 items-start">
-        <aside className="hidden lg:block w-56 shrink-0 sticky top-4 self-start">{filterControls}</aside>
-
-        <div className="flex-1 min-w-0">
-          {/* Mobile filter toggle + drawer */}
-          <div className="lg:hidden mb-4">
-            <button
-              onClick={() => setShowFilters((v) => !v)}
-              className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-text-dim)]"
-              style={{ fontFamily: 'var(--font-mono)' }}
-            >
-              <SlidersHorizontal size={14} /> {t('ex.filters')} {anyFilterActive && <span className="text-[color:var(--color-accent)]">•</span>}
-            </button>
-            {showFilters && (
-              <div className="mt-3 p-3 rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)]">{filterControls}</div>
-            )}
-          </div>
-
+      <FilterLayout filters={filterControls} active={anyFilterActive}>
           {filtered.length === 0 ? (
             <div className="text-center py-24 text-[color:var(--color-text-faint)]">
               <p className="text-5xl mb-4">{cfg.emptyEmoji}</p>
@@ -880,8 +795,7 @@ export function ItemsClient({
               ))}
             </div>
           )}
-        </div>
-      </div>
+      </FilterLayout>
 
       {/* Detail modal */}
       {selectedItem && (

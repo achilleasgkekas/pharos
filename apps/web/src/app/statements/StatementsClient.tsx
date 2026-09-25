@@ -1,4 +1,5 @@
 'use client';
+import { PAGE_MAIN, PageHeader, HeaderButton, HeaderStat, PrimaryAction } from '@/components/ui/PageHeader';
 import { cur, currencySymbol, CURRENCIES } from "@/lib/money";
 import { todayLocal } from "@/lib/dates";
 import { useState, useTransition, useMemo, useRef } from 'react';
@@ -235,40 +236,16 @@ export function StatementsClient({
   });
 
   return (
-    <main className="min-w-0 max-w-[1400px] mx-auto px-4 py-6 pb-24">
-      {/* Header */}
-      <div className="mb-5">
-        <div className="flex items-end justify-between gap-4 flex-wrap">
-          <h1 className="text-2xl md:text-3xl font-bold" style={{ fontFamily: 'var(--font-display)' }}>
-            {t('nav.statements')}
-            <span
-              className="ml-3 text-sm font-normal text-[color:var(--color-text-faint)]"
-              style={{ fontFamily: 'var(--font-mono)' }}
-            >
-              {statements.length}
-            </span>
-          </h1>
-          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-            {statements.length > 0 && (
-              <div className="flex flex-wrap gap-4 text-xs tabular-nums text-[color:var(--color-text-dim)]" style={{ fontFamily: 'var(--font-mono)' }}>
-                <span>{t('payments.due')}: <strong className="text-[color:var(--color-red)]">{cur()}{balances.due.toFixed(2)}</strong></span>
-                {balances.credit > 0 && <span>{t('payments.credit')}: <strong className="text-[color:var(--color-accent)]">{cur()}{balances.credit.toFixed(2)}</strong></span>}
-              </div>
-            )}
-            {statements.length > 0 && (
-              <Button variant="secondary" size="sm" onClick={() => setShowReconcile(true)}>
-                <Link2 size={14} /> {t('rec.title')}
-              </Button>
-            )}
-            <Button variant="secondary" size="sm" onClick={() => setShowCards(true)}>
-              <Wallet size={14} /> {t('st.cards', { n: cards.length })}
-            </Button>
-            <Button variant="primary" size="sm" onClick={() => setShowCreate(true)}>
-              <Plus size={14} strokeWidth={2.5} /> {t('common.new')}
-            </Button>
-          </div>
-        </div>
-      </div>
+    <main className={`min-w-0 ${PAGE_MAIN}`}>
+      <PageHeader title={t('nav.statements')} count={statements.length}>
+        {statements.length > 0 && <HeaderStat label={`${t('payments.due')}:`} value={`${cur()}${balances.due.toFixed(2)}`} color="var(--color-red)" />}
+        {statements.length > 0 && balances.credit > 0 && <HeaderStat label={`${t('payments.credit')}:`} value={`${cur()}${balances.credit.toFixed(2)}`} color="var(--color-accent)" />}
+        {statements.length > 0 && (
+          <HeaderButton icon={<Link2 size={14} />} onClick={() => setShowReconcile(true)}>{t('rec.title')}</HeaderButton>
+        )}
+        <HeaderButton icon={<Wallet size={14} />} onClick={() => setShowCards(true)}>{t('st.cards', { n: cards.length })}</HeaderButton>
+        <PrimaryAction onClick={() => setShowCreate(true)} />
+      </PageHeader>
 
       {/* PDF import dropzone */}
       <div

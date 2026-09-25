@@ -973,6 +973,7 @@ export const nl: Partial<Dict> = {
   'tk.board': 'Kanban-bord',
   'tk.newTask': 'Nieuwe taak',
   'tk.allTags': 'alle tags',
+  'tk.tags': 'Tags',
   'tk.todo': 'Te doen',
   'tk.inProgress': 'Bezig',
   'tk.blocked': 'Geblokkeerd',

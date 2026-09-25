@@ -1,6 +1,7 @@
 'use client';
+import { PAGE_MAIN, PageHeader, PrimaryAction } from '@/components/ui/PageHeader';
 import { useMemo, useState, useTransition } from 'react';
-import { Gauge, Plus, Trash2, X } from 'lucide-react';
+import { Trash2, X } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { useT } from '@/components/LocaleProvider';
 import { withConsumption, type ReadingLike } from '@/lib/meterReadings';
@@ -29,18 +30,10 @@ export function UtilitiesClient({ readings, spaces }: { readings: ReadingLike[];
   }
 
   return (
-    <main className="max-w-[1200px] mx-auto px-4 py-6 pb-24">
-      <div className="flex items-start justify-between gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2" style={{ fontFamily: 'var(--font-display)' }}>
-            <Gauge className="text-[color:var(--color-accent)]" /> {t('util.title')}
-          </h1>
-          <p className="text-xs text-[color:var(--color-text-dim)] mt-1">{t('util.subtitle')}</p>
-        </div>
-        <button onClick={() => { setReadingAt(todayLocal()); setOpen(true); }} className="flex items-center gap-1.5 rounded-lg bg-[color:var(--color-accent)] text-black px-3 py-2 text-sm font-semibold">
-          <Plus size={16} /> {t('util.add')}
-        </button>
-      </div>
+    <main className={PAGE_MAIN}>
+      <PageHeader title={t('util.title')} count={readings.length} subtitle={t('util.subtitle')}>
+        <PrimaryAction onClick={() => { setReadingAt(todayLocal()); setOpen(true); }} />
+      </PageHeader>
 
       <section className="bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-2xl p-4 mb-4">
         <h2 className="text-sm font-semibold mb-3">{t('util.trend')}</h2>

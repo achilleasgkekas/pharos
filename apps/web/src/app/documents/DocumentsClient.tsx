@@ -1,6 +1,7 @@
 'use client';
+import { PAGE_MAIN, PageHeader, HeaderButton, PrimaryAction } from '@/components/ui/PageHeader';
 import { useState, useMemo, useTransition } from 'react';
-import { Plus, Trash2, Check, Archive, ArchiveRestore, Pencil, X, FileCheck2, IdCard } from 'lucide-react';
+import { Trash2, Check, Archive, ArchiveRestore, Pencil, X, FileCheck2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { DateInput } from '@/components/ui/DateInput';
 import { Input } from '@/components/ui/Input';
@@ -92,36 +93,19 @@ export function DocumentsClient({ documents, leadDays }: { documents: Serialized
   }
 
   return (
-    <main className="max-w-[1100px] mx-auto px-4 py-6 pb-24">
-      <div className="mb-6 pb-4 border-b border-[color:var(--color-border)] flex items-end justify-between gap-4 flex-wrap">
-        <div className="flex items-baseline gap-3 flex-wrap">
-          <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2" style={{ fontFamily: 'var(--font-display)' }}>
-            <IdCard size={26} className="text-[color:var(--color-accent)]" /> Documents
-          </h1>
-          <span className="text-sm text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
-            {visible.length} shown
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
-          {archivedCount > 0 && (
-            <button
-              onClick={() => setShowArchived((v) => !v)}
-              className="text-xs text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] px-2"
-              style={{ fontFamily: 'var(--font-mono)' }}
-            >
-              {showArchived ? 'hide archived' : `show archived (${archivedCount})`}
-            </button>
-          )}
-          <Button variant="primary" onClick={openNew}>
-            <Plus size={16} strokeWidth={2.5} /> New document
-          </Button>
-        </div>
-      </div>
-
-      <p className="text-xs text-[color:var(--color-text-dim)] -mt-3 mb-5">
-        Passports, IDs, driving licences, residence permits, vehicle registration/MOT — anything with a renewal deadline.
-        You get an alert when one is within {leadDays} days of expiring (Settings → Notifications).
-      </p>
+    <main className={PAGE_MAIN}>
+      <PageHeader
+        title="Documents"
+        count={`${visible.length} shown`}
+        subtitle={<>Passports, IDs, driving licences, residence permits, vehicle registration/MOT — anything with a renewal deadline. You get an alert when one is within {leadDays} days of expiring (Settings → General).</>}
+      >
+        {archivedCount > 0 && (
+          <HeaderButton onClick={() => setShowArchived((v) => !v)}>
+            {showArchived ? 'Hide archived' : `Show archived (${archivedCount})`}
+          </HeaderButton>
+        )}
+        <PrimaryAction onClick={openNew} />
+      </PageHeader>
 
       {visible.length === 0 ? (
         <div className="py-20 text-center text-[color:var(--color-text-faint)]">

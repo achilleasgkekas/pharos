@@ -385,6 +385,7 @@ export const el: Partial<Dict> = {
   'tk.board': 'Πίνακας Kanban',
   'tk.newTask': 'Νέα εργασία',
   'tk.allTags': 'όλες οι ετικέτες',
+  'tk.tags': 'Ετικέτες',
   'tk.todo': 'Προς εκτέλεση',
   'tk.inProgress': 'Σε εξέλιξη',
   'tk.blocked': 'Μπλοκαρισμένο',

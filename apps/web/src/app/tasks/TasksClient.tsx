@@ -1,4 +1,5 @@
 'use client';
+import { PAGE_MAIN, PageHeader, ViewToggle, PrimaryAction, FilterLayout, FilterSection, FilterOptions } from '@/components/ui/PageHeader';
 import { useState, useTransition, useMemo, useEffect } from 'react';
 import {
   Plus,
@@ -136,198 +137,154 @@ export function TasksClient({ tasks }: { tasks: SerializedTask[] }) {
   const openCount = localTasks.filter((t) => t.status !== 'done').length;
 
   return (
-    <main className="max-w-[1400px] mx-auto px-4 py-6 pb-24">
-      {/* Page header */}
-      <div className="mb-5 flex items-end justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold" style={{ fontFamily: 'var(--font-display)' }}>
-            {t('nav.tasks')}
-            <span className="ml-3 text-sm font-normal text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
-              {t('tk.openTotal', { open: openCount, total: localTasks.length })}
-            </span>
-          </h1>
-        </div>
-        <div className="flex items-center gap-2">
-          {/* Board / List toggle */}
-          <div className="flex bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg p-0.5">
-            {([
-              ['board', <LayoutGrid key="b" size={15} />],
-              ['list', <ListIcon key="l" size={15} />],
-            ] as const).map(([v, icon]) => (
-              <button
-                key={v}
-                onClick={() => setView(v)}
-                title={v === 'board' ? t('tk.board') : t('v.list')}
-                className={cn(
-                  'px-2.5 py-1.5 rounded-md transition-colors',
-                  view === v ? 'bg-[color:var(--color-accent)] text-black' : 'text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]'
-                )}
-              >
-                {icon}
-              </button>
-            ))}
-          </div>
-          <Button variant="primary" onClick={() => setShowCreate(true)}>
-            <Plus size={16} strokeWidth={2.5} /> {t('tk.newTask')}
-          </Button>
-        </div>
-      </div>
+    <main className={PAGE_MAIN}>
+      <PageHeader title={t('nav.tasks')} count={t('tk.openTotal', { open: openCount, total: localTasks.length })}>
+        <ViewToggle
+          value={view}
+          onChange={setView}
+          options={[
+            { value: 'board', icon: <LayoutGrid size={15} />, title: t('tk.board') },
+            { value: 'list', icon: <ListIcon size={15} />, title: t('v.list') },
+          ]}
+        />
+        <PrimaryAction onClick={() => setShowCreate(true)} />
+      </PageHeader>
 
-      {/* Tag filter (applies to both views) */}
-      {allTags.length > 0 && (
-        <div className="flex gap-1.5 overflow-x-auto pb-1 mb-5 no-scrollbar">
-          <button
-            onClick={() => setTagFilter('')}
-            className={cn(
-              'shrink-0 px-2.5 py-1 rounded-full text-[10px] font-semibold transition-all',
-              tagFilter === ''
-                ? 'bg-[color:var(--color-surface-2)] text-[color:var(--color-text)] border border-[color:var(--color-border-light)]'
-                : 'text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text-dim)]'
-            )}
-            style={{ fontFamily: 'var(--font-mono)' }}
-          >
-            {t('tk.allTags')}
-          </button>
-          {allTags.map((tag) => (
-            <button
-              key={tag}
-              onClick={() => setTagFilter(tagFilter === tag ? '' : tag)}
-              className={cn(
-                'shrink-0 px-2.5 py-1 rounded-full text-[10px] font-semibold transition-all',
-                tagFilter === tag ? 'text-[color:var(--color-accent)]' : 'text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text-dim)]'
-              )}
-              style={{
-                fontFamily: 'var(--font-mono)',
-                ...(tagFilter === tag ? { background: '#00ff8820', border: '1px solid #00ff8840' } : {}),
-              }}
-            >
-              #{tag}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Project progress — a selected tag behaves like a project/phase (the old /phases). */}
-      {tagFilter && (() => {
-        const proj = localTasks.filter((t) => t.tags.includes(tagFilter));
-        if (!proj.length) return null;
-        const done = proj.filter((t) => t.status === 'done').length;
-        const pct = Math.round((done / proj.length) * 100);
-        return (
-          <div className="mb-5 -mt-2">
-            <div className="flex items-center justify-between text-[10px] mb-1" style={{ fontFamily: 'var(--font-mono)' }}>
-              <span className="text-[color:var(--color-text-dim)]">#{tagFilter} · {t('tk.projectProgress')}</span>
-              <span className="text-[color:var(--color-accent)]">{t('tk.donePct', { done, total: proj.length, pct })}</span>
-            </div>
-            <div className="h-1.5 rounded-full bg-[color:var(--color-surface-2)] overflow-hidden">
-              <div className="h-full rounded-full bg-[color:var(--color-accent)] transition-all" style={{ width: `${pct}%` }} />
-            </div>
-          </div>
-        );
-      })()}
-
-      {view === 'board' ? (
-        // ─── Kanban board ───────────────────────────────────────────────
-        <div className="flex gap-3 overflow-x-auto pb-4 -mx-1 px-1 snap-x">
-          {COLUMNS.map((col, colIndex) => {
-            const list = byCol[col.value] ?? [];
-            const isOver = overCol === col.value;
+      {/* Tag filter (applies to both views), in the same sidebar every list page uses. */}
+      <FilterLayout
+        active={!!tagFilter}
+        filters={
+          <FilterSection label={t('tk.tags')}>
+            <FilterOptions
+              value={tagFilter}
+              onChange={(v) => setTagFilter(v)}
+              options={[{ value: '', label: t('tk.allTags') }, ...allTags.map((tag) => ({ value: tag, label: `#${tag}` }))]}
+            />
+          </FilterSection>
+        }
+      >
+          {/* Project progress — a selected tag behaves like a project/phase (the old /phases). */}
+          {tagFilter && (() => {
+            const proj = localTasks.filter((t) => t.tags.includes(tagFilter));
+            if (!proj.length) return null;
+            const done = proj.filter((t) => t.status === 'done').length;
+            const pct = Math.round((done / proj.length) * 100);
             return (
-              <div
-                key={col.value}
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  if (overCol !== col.value) setOverCol(col.value);
-                }}
-                onDragLeave={(e) => {
-                  // only clear if we actually left the column (not a child)
-                  if (!e.currentTarget.contains(e.relatedTarget as Node)) setOverCol((c) => (c === col.value ? null : c));
-                }}
-                onDrop={() => handleDropCol(col.value)}
-                className={cn(
-                  'shrink-0 w-[290px] sm:w-[300px] snap-start rounded-2xl border p-2.5 flex flex-col transition-colors',
-                  isOver
-                    ? 'border-[color:var(--color-accent)] bg-[color:var(--color-surface-2)]'
-                    : 'border-[color:var(--color-border)] bg-[color:var(--color-surface)]'
-                )}
-              >
-                <div className="flex items-center justify-between px-1.5 py-1 mb-1.5">
-                  <span
-                    className="text-[0.7rem] font-bold uppercase tracking-[0.1em] flex items-center gap-1.5"
-                    style={{ fontFamily: 'var(--font-mono)', color: col.accent }}
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: col.accent }} />
-                    {t(STATUS_KEY[col.value] ?? 'tk.todo')}
-                  </span>
-                  <span className="text-[10px] text-[color:var(--color-text-faint)] tabular-nums" style={{ fontFamily: 'var(--font-mono)' }}>
-                    {list.length}
-                  </span>
+              <div className="mb-5 -mt-2">
+                <div className="flex items-center justify-between text-[10px] mb-1" style={{ fontFamily: 'var(--font-mono)' }}>
+                  <span className="text-[color:var(--color-text-dim)]">#{tagFilter} · {t('tk.projectProgress')}</span>
+                  <span className="text-[color:var(--color-accent)]">{t('tk.donePct', { done, total: proj.length, pct })}</span>
                 </div>
-                <div className="flex flex-col gap-2 min-h-[120px] flex-1">
-                  {list.length === 0 ? (
-                    <div className="flex-1 grid place-items-center text-[10px] text-[color:var(--color-text-faint)] italic py-6" style={{ fontFamily: 'var(--font-mono)' }}>
-                      {isOver ? t('tk.dropHere') : '—'}
-                    </div>
-                  ) : (
-                    list.map((task) => (
-                      <TaskCard
-                        key={task._id}
-                        task={task}
-                        colIndex={colIndex}
-                        dragging={dragId === task._id}
-                        onOpen={() => setSelected(task)}
-                        onMove={moveTask}
-                        onDelete={removeTask}
-                        onDragStart={() => setDragId(task._id)}
-                        onDragEnd={() => {
-                          setDragId(null);
-                          setOverCol(null);
-                        }}
-                      />
-                    ))
-                  )}
+                <div className="h-1.5 rounded-full bg-[color:var(--color-surface-2)] overflow-hidden">
+                  <div className="h-full rounded-full bg-[color:var(--color-accent)] transition-all" style={{ width: `${pct}%` }} />
                 </div>
               </div>
             );
-          })}
-        </div>
-      ) : (
-        // ─── List view ──────────────────────────────────────────────────
-        <>
-          <div className="flex gap-2 overflow-x-auto pb-1 mb-3 no-scrollbar">
-            {STATUS_FILTERS.map((f) => (
-              <button
-                key={f.value}
-                onClick={() => setStatusFilter(f.value)}
-                className={cn(
-                  'shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap',
-                  statusFilter === f.value
-                    ? 'bg-[color:var(--color-accent)] text-black'
-                    : 'bg-[color:var(--color-surface)] text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] border border-[color:var(--color-border)]'
-                )}
-                style={{ fontFamily: 'var(--font-mono)' }}
-              >
-                {f.value === '' ? t('common.all') : t(STATUS_KEY[f.value] ?? 'tk.todo')}
-              </button>
-            ))}
-          </div>
-          <div className="text-xs text-[color:var(--color-text-faint)] mb-3" style={{ fontFamily: 'var(--font-mono)' }}>
-            {t('tk.tasksCount', { n: listFiltered.length, total: localTasks.length })}
-          </div>
-          {listFiltered.length === 0 ? (
-            <div className="text-center py-20 text-[color:var(--color-text-faint)]">
-              <p className="text-5xl mb-4">✅</p>
-              <p className="text-sm">{localTasks.length === 0 ? 'No tasks yet.' : 'No tasks match these filters.'}</p>
+          })()}
+
+          {view === 'board' ? (
+            // ─── Kanban board ───────────────────────────────────────────────
+            <div className="flex gap-3 overflow-x-auto pb-4 -mx-1 px-1 snap-x">
+              {COLUMNS.map((col, colIndex) => {
+                const list = byCol[col.value] ?? [];
+                const isOver = overCol === col.value;
+                return (
+                  <div
+                    key={col.value}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      if (overCol !== col.value) setOverCol(col.value);
+                    }}
+                    onDragLeave={(e) => {
+                      // only clear if we actually left the column (not a child)
+                      if (!e.currentTarget.contains(e.relatedTarget as Node)) setOverCol((c) => (c === col.value ? null : c));
+                    }}
+                    onDrop={() => handleDropCol(col.value)}
+                    className={cn(
+                      'shrink-0 w-[290px] sm:w-[300px] lg:w-auto lg:flex-1 lg:min-w-[220px] snap-start rounded-2xl border p-2.5 flex flex-col transition-colors',
+                      isOver
+                        ? 'border-[color:var(--color-accent)] bg-[color:var(--color-surface-2)]'
+                        : 'border-[color:var(--color-border)] bg-[color:var(--color-surface)]'
+                    )}
+                  >
+                    <div className="flex items-center justify-between px-1.5 py-1 mb-1.5">
+                      <span
+                        className="text-[0.7rem] font-bold uppercase tracking-[0.1em] flex items-center gap-1.5"
+                        style={{ fontFamily: 'var(--font-mono)', color: col.accent }}
+                      >
+                        <span className="w-1.5 h-1.5 rounded-full" style={{ background: col.accent }} />
+                        {t(STATUS_KEY[col.value] ?? 'tk.todo')}
+                      </span>
+                      <span className="text-[10px] text-[color:var(--color-text-faint)] tabular-nums" style={{ fontFamily: 'var(--font-mono)' }}>
+                        {list.length}
+                      </span>
+                    </div>
+                    <div className="flex flex-col gap-2 min-h-[120px] flex-1">
+                      {list.length === 0 ? (
+                        <div className="flex-1 grid place-items-center text-[10px] text-[color:var(--color-text-faint)] italic py-6" style={{ fontFamily: 'var(--font-mono)' }}>
+                          {isOver ? t('tk.dropHere') : '—'}
+                        </div>
+                      ) : (
+                        list.map((task) => (
+                          <TaskCard
+                            key={task._id}
+                            task={task}
+                            colIndex={colIndex}
+                            dragging={dragId === task._id}
+                            onOpen={() => setSelected(task)}
+                            onMove={moveTask}
+                            onDelete={removeTask}
+                            onDragStart={() => setDragId(task._id)}
+                            onDragEnd={() => {
+                              setDragId(null);
+                              setOverCol(null);
+                            }}
+                          />
+                        ))
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           ) : (
-            <div className="space-y-1.5">
-              {listFiltered.map((task) => (
-                <TaskRow key={task._id} task={task} onOpen={() => setSelected(task)} />
-              ))}
-            </div>
+            // ─── List view ──────────────────────────────────────────────────
+            <>
+              <div className="flex gap-2 overflow-x-auto pb-1 mb-3 no-scrollbar">
+                {STATUS_FILTERS.map((f) => (
+                  <button
+                    key={f.value}
+                    onClick={() => setStatusFilter(f.value)}
+                    className={cn(
+                      'shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap',
+                      statusFilter === f.value
+                        ? 'bg-[color:var(--color-accent)] text-black'
+                        : 'bg-[color:var(--color-surface)] text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] border border-[color:var(--color-border)]'
+                    )}
+                    style={{ fontFamily: 'var(--font-mono)' }}
+                  >
+                    {f.value === '' ? t('common.all') : t(STATUS_KEY[f.value] ?? 'tk.todo')}
+                  </button>
+                ))}
+              </div>
+              <div className="text-xs text-[color:var(--color-text-faint)] mb-3" style={{ fontFamily: 'var(--font-mono)' }}>
+                {t('tk.tasksCount', { n: listFiltered.length, total: localTasks.length })}
+              </div>
+              {listFiltered.length === 0 ? (
+                <div className="text-center py-20 text-[color:var(--color-text-faint)]">
+                  <p className="text-5xl mb-4">✅</p>
+                  <p className="text-sm">{localTasks.length === 0 ? 'No tasks yet.' : 'No tasks match these filters.'}</p>
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  {listFiltered.map((task) => (
+                    <TaskRow key={task._id} task={task} onOpen={() => setSelected(task)} />
+                  ))}
+                </div>
+              )}
+            </>
           )}
-        </>
-      )}
+      </FilterLayout>
 
       <Modal open={showCreate} onClose={() => setShowCreate(false)} title={t('tk.newTask')} size="xl">
         <TaskCreateForm onClose={() => setShowCreate(false)} />

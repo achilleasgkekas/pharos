@@ -1,6 +1,7 @@
 'use client';
+import { PAGE_MAIN, PageHeader, HeaderButton, PrimaryAction } from '@/components/ui/PageHeader';
 import { useMemo, useState, useTransition } from 'react';
-import { Archive, ArchiveRestore, Car, Fuel, Pencil, Plus, Trash2, Wrench, X } from 'lucide-react';
+import { Archive, ArchiveRestore, Fuel, Pencil, Trash2, Wrench, X } from 'lucide-react';
 import { useLocale, useT } from '@/components/LocaleProvider';
 import { DateInput } from '@/components/ui/DateInput';
 import { formatMoney } from '@/lib/fx';
@@ -67,24 +68,15 @@ export function VehiclesClient({ vehicles, logs, spaces, currency, leadDays }: {
   const shown = vehicles.filter((v) => showArchived || !v.archived);
 
   return (
-    <main className="max-w-[1200px] mx-auto px-4 py-6 pb-24">
-      <div className="flex items-start justify-between gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2" style={{ fontFamily: 'var(--font-display)' }}>
-            <Car className="text-[color:var(--color-accent)]" /> {t('veh.title')}
-          </h1>
-          <p className="text-xs text-[color:var(--color-text-dim)] mt-1">{t('veh.subtitle')}</p>
-        </div>
-        <button onClick={() => setEditing('new')} className="flex items-center gap-1.5 rounded-lg bg-[color:var(--color-accent)] text-black px-3 py-2 text-sm font-semibold shrink-0">
-          <Plus size={16} /> {t('veh.add')}
-        </button>
-      </div>
-
-      {archivedCount > 0 && (
-        <label className="flex items-center gap-2 text-xs text-[color:var(--color-text-dim)] mb-3">
-          <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} /> {t('veh.showArchived')} ({archivedCount})
-        </label>
-      )}
+    <main className={PAGE_MAIN}>
+      <PageHeader title={t('veh.title')} count={shown.length} subtitle={t('veh.subtitle')}>
+        {archivedCount > 0 && (
+          <HeaderButton icon={<Archive size={14} />} aria-pressed={showArchived} onClick={() => setShowArchived((v) => !v)}>
+            {t('veh.showArchived')} ({archivedCount})
+          </HeaderButton>
+        )}
+        <PrimaryAction onClick={() => setEditing('new')} />
+      </PageHeader>
 
       {shown.length === 0 ? (
         <p className={`${card} p-10 text-center text-sm text-[color:var(--color-text-dim)]`}>{t('veh.empty')}</p>

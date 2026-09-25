@@ -1,4 +1,5 @@
 'use client';
+import { PAGE_MAIN, PageHeader } from '@/components/ui/PageHeader';
 import { useState, useTransition } from 'react';
 import { StatementPaymentReport } from '@/components/StatementPaymentReport';
 import type { StatementPaymentReport as PaymentReport } from '@/lib/statementPayments';
@@ -372,13 +373,10 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
 
   return (
     <main
-      className={`max-w-[1400px] mx-auto px-4 py-6 pb-24 transition-opacity ${periodPending ? 'opacity-60' : ''}`}
+      className={`${PAGE_MAIN} transition-opacity ${periodPending ? 'opacity-60' : ''}`}
       aria-busy={periodPending}
     >
-      <div className="mb-6 flex items-end justify-between gap-4 flex-wrap">
-        <h1 className="text-2xl md:text-3xl font-bold" style={{ fontFamily: 'var(--font-display)' }}>
-          {t('nav.reports')}
-        </h1>
+      <PageHeader title={t('nav.reports')}>
         <div className="flex bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg p-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
           {[6, 12, 24].map((m) => (
             <a
@@ -398,7 +396,7 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
             </a>
           ))}
         </div>
-      </div>
+      </PageHeader>
 
       {/* Missing exchange rates (P9 slice 7) — foreign records saved without a rate keep
           their PRINTED amount, so they are silently mixed into every figure below. Shown

@@ -973,6 +973,7 @@ export const it: Partial<Dict> = {
   'tk.board': 'Bacheca Kanban',
   'tk.newTask': 'Nuova attività',
   'tk.allTags': 'tutte le etichette',
+  'tk.tags': 'Tag',
   'tk.todo': 'Da fare',
   'tk.inProgress': 'In corso',
   'tk.blocked': 'Bloccata',

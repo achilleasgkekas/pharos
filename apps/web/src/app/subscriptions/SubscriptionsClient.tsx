@@ -8,12 +8,13 @@ import { isForeignCurrency, normalizeCurrency, convertToBase, deriveFxRate, toPr
 import { FxBadge } from '@/components/FxBadge';
 import { FxRateButton } from '@/components/FxRateButton';
 import { useState, useTransition, useMemo, useEffect } from 'react';
-import { Plus, Pencil, Trash2, ExternalLink, Power, Sparkles, Loader2, Search, LayoutGrid, List as ListIcon, SlidersHorizontal, Radar, X, Split as SplitIcon, CheckCircle2, Copy } from 'lucide-react';
+import { Plus, Pencil, Trash2, ExternalLink, Power, Sparkles, Loader2, Search, Radar, X, Split as SplitIcon, CheckCircle2, Copy } from 'lucide-react';
 import { SubscriptionDuplicatesModal } from './SubscriptionDuplicatesModal';
 import { SavedViews } from '@/components/ui/SavedViews';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { NO_SPACE, matchesSpace, spaceFilterOptions } from '@/lib/spaceFilter';
 import { Button } from '@/components/ui/Button';
+import { PAGE_MAIN, PageHeader, HeaderButton, HeaderStat, ViewToggle, PrimaryAction, FilterLayout } from '@/components/ui/PageHeader';
 import { Input } from '@/components/ui/Input';
 import { DateInput } from '@/components/ui/DateInput';
 import { Modal } from '@/components/ui/Modal';
@@ -129,7 +130,6 @@ export function SubscriptionsClient({
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'cancelled'>('all');
   const [sortBy, setSortBy] = useState<'name' | 'amount' | 'renewal'>('name');
   const [layout, setLayout] = useState<'grid' | 'list'>('grid');
-  const [showFilters, setShowFilters] = useState(false);
 
   const active = subscriptions.filter((s) => s.active);
   const categories = useMemo(() => [...new Set(subscriptions.map((s) => s.category).filter(Boolean))].sort(), [subscriptions]);
@@ -252,155 +252,97 @@ export function SubscriptionsClient({
   );
 
   return (
-    <main className="max-w-[1400px] mx-auto px-4 py-6 pb-24">
-      {/* Header */}
-      <div className="mb-5">
-        <div className="flex items-end justify-between gap-4 flex-wrap">
-          <h1 className="text-2xl md:text-3xl font-bold" style={{ fontFamily: 'var(--font-display)' }}>
-            {t('nav.subscriptions')}
-            <span
-              className="ml-3 text-sm font-normal text-[color:var(--color-text-faint)]"
-              style={{ fontFamily: 'var(--font-mono)' }}
-            >
-              {t('v.activeCount', { n: active.length })}
-            </span>
-          </h1>
-          <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
-            <div
-              className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-[color:var(--color-text-dim)]"
-              style={{ fontFamily: 'var(--font-mono)' }}
-            >
-              <span>
-                {t('sub.monthly')}{' '}
-                <span className="text-[color:var(--color-accent)] font-semibold">
-                  {money(monthlyTotal)}
-                </span>
-              </span>
-              <span>
-                {t('sub.yearly')}{' '}
-                <span className="text-[color:var(--color-gold)] font-semibold">
-                  {money(yearlyTotal)}
-                </span>
-              </span>
-            </div>
-            <div className="flex bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg p-0.5">
-              {([['grid', <LayoutGrid key="g" size={14} />], ['list', <ListIcon key="l" size={14} />]] as const).map(([v, icon]) => (
-                <button
-                  key={v}
-                  onClick={() => setLayout(v)}
-                  title={v === 'grid' ? t('v.grid') : t('v.list')}
-                  className={cn('px-2 py-1.5 rounded-md transition-colors', layout === v ? 'bg-[color:var(--color-accent)] text-black' : 'text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]')}
-                >
-                  {icon}
-                </button>
-              ))}
-            </div>
-            <Button variant="ghost" onClick={() => setFindingDupes(true)} title={t('subdup.title')}>
-              <Copy size={16} /> {t('subdup.find')}
-            </Button>
-            <Button variant="primary" onClick={() => setShowCreate(true)}>
-              <Plus size={16} strokeWidth={2.5} /> {t('common.new')}
-            </Button>
-          </div>
-        </div>
-      </div>
+    <main className={PAGE_MAIN}>
+      <PageHeader title={t('nav.subscriptions')} count={t('v.activeCount', { n: active.length })}>
+        <HeaderStat label={t('sub.monthly')} value={money(monthlyTotal)} color="var(--color-accent)" />
+        <HeaderStat label={t('sub.yearly')} value={money(yearlyTotal)} color="var(--color-gold)" />
+        <HeaderButton icon={<Copy size={14} />} onClick={() => setFindingDupes(true)} title={t('subdup.title')} className="hidden sm:flex">
+          {t('subdup.find')}
+        </HeaderButton>
+        <ViewToggle value={layout} onChange={setLayout} />
+        <PrimaryAction onClick={() => setShowCreate(true)} />
+      </PageHeader>
 
       {findingDupes && <SubscriptionDuplicatesModal onClose={() => setFindingDupes(false)} />}
 
-      {/* Upcoming renewals strip */}
-      {upcoming.length > 0 && (
-        <div className="mb-6 bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-xl p-4">
-          <h3
-            className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-[0.15em] mb-3"
-            style={{ fontFamily: 'var(--font-mono)' }}
-          >
-            {t('sub.upcoming')}
-          </h3>
-          <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
-            {upcoming.map((s) => {
-              const d = renewalDaysUntil(s.nextRenewal)!;
-              return (
-                <button
-                  key={s._id}
-                  onClick={() => setEditing(s)}
-                  className="shrink-0 flex flex-col items-start gap-1 bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-3 py-2 min-w-[120px] hover:border-[color:var(--color-border-light)] transition-colors text-left"
-                >
-                  <span className="text-sm font-semibold truncate max-w-[140px]">{s.name}</span>
-                  <span
-                    className={cn(
-                      'text-[10px]',
-                      d <= 3 ? 'text-[color:var(--color-red)]' : 'text-[color:var(--color-gold)]'
-                    )}
-                    style={{ fontFamily: 'var(--font-mono)' }}
-                  >
-                    {d === 0 ? 'today' : d === 1 ? 'tomorrow' : `in ${d} days`} · {money(s.amount)}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Discovered untracked recurring charges (P7) */}
-      {visibleCandidates.length > 0 && (
-        <div className="mb-6 bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-xl p-4">
-          <h3
-            className="flex items-center gap-1.5 text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-[0.15em] mb-3"
-            style={{ fontFamily: 'var(--font-mono)' }}
-          >
-            <Radar size={12} /> {t('sub.discoveredTitle', { n: visibleCandidates.length })}
-          </h3>
-          <div className="flex flex-col gap-2">
-            {visibleCandidates.map((c) => (
-              <div
-                key={c.vendorKey}
-                className="flex items-center gap-3 flex-wrap bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-3 py-2"
+      <FilterLayout filters={filterControls} active={anyF}>
+          {/* Upcoming renewals strip */}
+          {upcoming.length > 0 && (
+            <div className="mb-6 bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-xl p-4">
+              <h3
+                className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-[0.15em] mb-3"
+                style={{ fontFamily: 'var(--font-mono)' }}
               >
-                <span className="text-sm font-semibold flex-1 min-w-[100px] truncate">{c.vendor || c.vendorKey}</span>
-                <span className="text-xs text-[color:var(--color-text-dim)]" style={{ fontFamily: 'var(--font-mono)' }}>
-                  ~{money(c.avgAmount)} · {t(`sub.${c.cycle}` as TKey)} · {t('sub.discoveredOccurrences', { n: c.occurrences })}
-                </span>
-                <div className="flex items-center gap-1.5 ml-auto">
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={() => handleTrack(c)}
-                    disabled={trackingKey === c.vendorKey}
-                  >
-                    {trackingKey === c.vendorKey ? <Loader2 size={13} className="animate-spin" /> : null}
-                    {t('sub.discoveredTrack')}
-                  </Button>
-                  <button
-                    onClick={() => setHiddenCandidates((prev) => new Set(prev).add(c.vendorKey))}
-                    title={t('sub.discoveredDismiss')}
-                    className="p-1.5 rounded-md text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface-3)] transition-colors"
-                  >
-                    <X size={14} />
-                  </button>
-                </div>
+                {t('sub.upcoming')}
+              </h3>
+              <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                {upcoming.map((s) => {
+                  const d = renewalDaysUntil(s.nextRenewal)!;
+                  return (
+                    <button
+                      key={s._id}
+                      onClick={() => setEditing(s)}
+                      className="shrink-0 flex flex-col items-start gap-1 bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-3 py-2 min-w-[120px] hover:border-[color:var(--color-border-light)] transition-colors text-left"
+                    >
+                      <span className="text-sm font-semibold truncate max-w-[140px]">{s.name}</span>
+                      <span
+                        className={cn(
+                          'text-[10px]',
+                          d <= 3 ? 'text-[color:var(--color-red)]' : 'text-[color:var(--color-gold)]'
+                        )}
+                        style={{ fontFamily: 'var(--font-mono)' }}
+                      >
+                        {d === 0 ? 'today' : d === 1 ? 'tomorrow' : `in ${d} days`} · {money(s.amount)}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
-            ))}
-          </div>
-        </div>
-      )}
+            </div>
+          )}
 
-      {/* E-shop body: filter sidebar + subscriptions */}
-      <div className="flex gap-6 items-start">
-        <aside className="hidden lg:block w-56 shrink-0 sticky top-4 self-start">{filterControls}</aside>
-
-        <div className="flex-1 min-w-0">
-          {/* Mobile filter toggle + drawer */}
-          <div className="lg:hidden mb-4">
-            <button
-              onClick={() => setShowFilters((v) => !v)}
-              className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-text-dim)]"
-              style={{ fontFamily: 'var(--font-mono)' }}
-            >
-              <SlidersHorizontal size={14} /> Filters {anyF && <span className="text-[color:var(--color-accent)]">•</span>}
-            </button>
-            {showFilters && <div className="mt-3 p-3 rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)]">{filterControls}</div>}
-          </div>
+          {/* Discovered untracked recurring charges (P7) */}
+          {visibleCandidates.length > 0 && (
+            <div className="mb-6 bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-xl p-4">
+              <h3
+                className="flex items-center gap-1.5 text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-[0.15em] mb-3"
+                style={{ fontFamily: 'var(--font-mono)' }}
+              >
+                <Radar size={12} /> {t('sub.discoveredTitle', { n: visibleCandidates.length })}
+              </h3>
+              <div className="flex flex-col gap-2">
+                {visibleCandidates.map((c) => (
+                  <div
+                    key={c.vendorKey}
+                    className="flex items-center gap-3 flex-wrap bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-3 py-2"
+                  >
+                    <span className="text-sm font-semibold flex-1 min-w-[100px] truncate">{c.vendor || c.vendorKey}</span>
+                    <span className="text-xs text-[color:var(--color-text-dim)]" style={{ fontFamily: 'var(--font-mono)' }}>
+                      ~{money(c.avgAmount)} · {t(`sub.${c.cycle}` as TKey)} · {t('sub.discoveredOccurrences', { n: c.occurrences })}
+                    </span>
+                    <div className="flex items-center gap-1.5 ml-auto">
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={() => handleTrack(c)}
+                        disabled={trackingKey === c.vendorKey}
+                      >
+                        {trackingKey === c.vendorKey ? <Loader2 size={13} className="animate-spin" /> : null}
+                        {t('sub.discoveredTrack')}
+                      </Button>
+                      <button
+                        onClick={() => setHiddenCandidates((prev) => new Set(prev).add(c.vendorKey))}
+                        title={t('sub.discoveredDismiss')}
+                        className="p-1.5 rounded-md text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface-3)] transition-colors"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {visible.length === 0 ? (
             <div className="text-center py-20 text-[color:var(--color-text-faint)]">
@@ -420,8 +362,7 @@ export function SubscriptionsClient({
               ))}
             </div>
           )}
-        </div>
-      </div>
+      </FilterLayout>
 
       {/* Create */}
       <Modal open={showCreate} onClose={() => setShowCreate(false)} title={t('sub.newSubscription')} size="xl">

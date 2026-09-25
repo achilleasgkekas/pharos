@@ -1,4 +1,5 @@
 'use client';
+import { PAGE_MAIN, PageHeader, HeaderStat } from '@/components/ui/PageHeader';
 import { useState, useEffect } from 'react';
 import { useLocale, useT } from '@/components/LocaleProvider';
 import type { TKey } from '@/lib/i18n';
@@ -186,16 +187,10 @@ export function CalendarClient({ months, dueThisMonth }: { months: MonthBlock[];
   const recurringPinned = months[0].entries.filter((e) => e.pinned);
 
   return (
-    <main className="max-w-[1400px] mx-auto px-4 py-6 pb-24">
-      <div className="mb-5 flex items-end justify-between gap-4 flex-wrap">
-        <h1 className="text-2xl md:text-3xl font-bold" style={display}>
-          {t('nav.calendar')}
-          <span className="ml-3 text-sm font-normal text-[color:var(--color-text-faint)]" style={mono}>{t('cal.next3')}</span>
-        </h1>
-        <span className="text-xs text-[color:var(--color-text-dim)]" style={mono}>
-          {t('cal.dueThisMonth')} <span className="text-[color:var(--color-gold)] font-bold">{fmt(dueThisMonth)}</span>
-        </span>
-      </div>
+    <main className={PAGE_MAIN}>
+      <PageHeader title={t('nav.calendar')} count={t('cal.next3')}>
+        <HeaderStat label={t('cal.dueThisMonth')} value={fmt(dueThisMonth)} color="var(--color-gold)" />
+      </PageHeader>
 
       {/* View toggle */}
       <div className="flex items-center gap-1.5 mb-5">

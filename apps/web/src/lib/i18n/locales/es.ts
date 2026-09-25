@@ -973,6 +973,7 @@ export const es: Partial<Dict> = {
   'tk.board': 'Tablero Kanban',
   'tk.newTask': 'Nueva tarea',
   'tk.allTags': 'todas las etiquetas',
+  'tk.tags': 'Etiquetas',
   'tk.todo': 'Pendiente',
   'tk.inProgress': 'En progreso',
   'tk.blocked': 'Bloqueada',

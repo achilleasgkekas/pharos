@@ -1,30 +1,12 @@
 'use client';
+import { PAGE_MAIN, PageHeader, HeaderButton, ViewToggle, PrimaryAction, FilterLayout } from '@/components/ui/PageHeader';
 import { cur, currencySymbol, CURRENCIES } from "@/lib/money";
 import { matchesQuery, haystack, fold, sameLabel } from '@/lib/searchText';
 import { isForeignCurrency, normalizeCurrency, convertToBase, deriveFxRate, formatMoney, toPrinted } from '@/lib/fx';
 import { FxBadge } from '@/components/FxBadge';
 import { FxRateButton } from '@/components/FxRateButton';
 import { useState, useTransition, useRef, useMemo } from 'react';
-import {
-  Upload,
-  Sparkles,
-  Trash2,
-  CheckCircle2,
-  AlertTriangle,
-  Plus,
-  X,
-  FileText,
-  Loader2,
-  PackagePlus,
-  Mail,
-  Search,
-  LayoutGrid,
-  List as ListIcon,
-  SlidersHorizontal,
-  Archive,
-  Zap,
-  Undo2,
-} from 'lucide-react';
+import { Upload, Sparkles, Trash2, CheckCircle2, AlertTriangle, Plus, X, FileText, Loader2, PackagePlus, Mail, Search, Archive, Zap, Undo2, Copy } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
@@ -111,7 +93,6 @@ export function ReceiptsClient({
   const [paymentFilter, setPaymentFilter] = useState('');
   const [spaceFilter, setSpaceFilter] = useState(''); // #146: same filter as Expenses
   const [layout, setLayout] = useState<'grid' | 'list'>('grid');
-  const [showFilters, setShowFilters] = useState(false);
 
   // Ingest the staged Gmail attachments (from scripts/extract-email-receipts.py) as
   // draft receipts. They then appear as "failed" → use "re-scan all" to AI-parse.
@@ -450,175 +431,108 @@ export function ReceiptsClient({
   );
 
   return (
-    <main className="max-w-[1400px] mx-auto px-4 py-6 pb-24">
-      {/* Header */}
-      <div className="mb-5">
-        <div className="flex items-end justify-between gap-4 flex-wrap">
-          <h1 className="text-2xl md:text-3xl font-bold" style={{ fontFamily: 'var(--font-display)' }}>
-            {t('nav.receipts')}
-            <span
-              className="ml-3 text-sm font-normal text-[color:var(--color-text-faint)]"
-              style={{ fontFamily: 'var(--font-mono)' }}
-            >
-              {receipts.length}
-            </span>
-          </h1>
+    <main className={PAGE_MAIN}>
+      <PageHeader title={t('nav.receipts')} count={receipts.length}>
+        {importMsg && <span className="text-xs text-[color:var(--color-text-faint)]">{importMsg}</span>}
+        {toVerify.length > 0 && (
+          <HeaderButton tone="accent" icon={<Zap size={14} />} onClick={() => setQuickVerify(true)} title={t('rc.quickVerifyTitle')}>
+            {t('rc.quickVerify', { n: toVerify.length })}
+          </HeaderButton>
+        )}
+        {failedCount > 0 && (
+          <HeaderButton tone="cyan" onClick={handleRescanFailed} disabled={rescanBusy} title={t('rc.rescanTitle')}>
+            {rescanBusy ? t('rc.rescanning') : t('rc.failedRescan', { n: failedCount })}
+          </HeaderButton>
+        )}
+        {emailInboxCount > 0 && (
+          <HeaderButton tone="purple" onClick={handleImportEmail} disabled={importing} title={t('rc.importEmailTitle')}>
+            {importing ? t('rc.importing') : t('rc.importEmail', { n: emailInboxCount })}
+          </HeaderButton>
+        )}
+        <HeaderButton icon={<Copy size={14} />} onClick={() => setShowDupes(true)} title={t('rc.findDupTitle')} className="hidden sm:flex">
+          {t('rc.findDuplicates')}
+        </HeaderButton>
+        <ViewToggle value={layout} onChange={setLayout} />
+        <PrimaryAction icon={<Upload size={16} strokeWidth={2.5} />} onClick={() => !uploading && fileInputRef.current?.click()}>
+          {t('common.add')}
+        </PrimaryAction>
+      </PageHeader>
+
+      <FilterLayout filters={filterControls} active={anyRFilter}>
+          {/* Dropzone */}
           <div
-            className="flex items-center gap-2 sm:gap-4 flex-wrap text-xs text-[color:var(--color-text-dim)]"
-            style={{ fontFamily: 'var(--font-mono)' }}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragOver(true);
+            }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDragOver(false);
+              handleFiles(e.dataTransfer.files);
+            }}
+            onClick={() => !uploading && fileInputRef.current?.click()}
+            className={cn(
+              'border-2 border-dashed rounded-2xl p-8 mb-6 text-center cursor-pointer transition-all',
+              dragOver
+                ? 'border-[color:var(--color-accent)] bg-[#00ff8808]'
+                : 'border-[color:var(--color-border)] hover:border-[color:var(--color-border-light)]',
+              uploading && 'pointer-events-none opacity-70'
+            )}
           >
-            <div className="flex bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg p-0.5">
-              {([
-                ['grid', <LayoutGrid key="g" size={14} />],
-                ['list', <ListIcon key="l" size={14} />],
-              ] as const).map(([v, icon]) => (
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*,application/pdf,.pdf"
+              multiple
+              className="hidden"
+              onChange={(e) => handleFiles(e.target.files)}
+            />
+            {uploading ? (
+              <div className="flex flex-col items-center gap-2 text-[color:var(--color-cyan)]">
+                <Loader2 size={28} className="animate-spin" />
+                <p className="text-sm">{uploadMsg}</p>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-2 text-[color:var(--color-text-dim)]">
+                <Upload size={28} />
+                <p className="text-sm font-medium text-[color:var(--color-text)]">
+                  {t('rc.dropReceipts')}
+                </p>
+                <p className="text-xs text-[color:var(--color-text-faint)]">
+                  {ollamaUp
+                    ? t('rc.aiAutoParse')
+                    : t('rc.manualEntry')}
+                </p>
                 <button
-                  key={v}
-                  onClick={() => setLayout(v)}
-                  title={v === 'grid' ? t('v.grid') : t('v.list')}
-                  className={cn(
-                    'px-2 py-1 rounded-md transition-colors',
-                    layout === v ? 'bg-[color:var(--color-accent)] text-black' : 'text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]'
-                  )}
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    cameraInputRef.current?.click();
+                  }}
+                  className="mt-2 flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-text)] hover:border-[color:var(--color-accent)] transition-colors"
                 >
-                  {icon}
+                  <Camera size={14} /> {t('ex.takePhoto')}
                 </button>
-              ))}
+              </div>
+            )}
+            {/* Camera capture (opens the camera on mobile); resized client-side */}
+            <input
+              ref={cameraInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={(e) => handleFiles(e.target.files)}
+            />
+          </div>
+
+          {uploadMsg && !uploading && (
+            <div className="mb-4 text-sm text-[color:var(--color-red)] flex items-start gap-2">
+              <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+              <span className="break-words">{uploadMsg}</span>
             </div>
-            <button
-              onClick={() => setShowDupes(true)}
-              className="text-[color:var(--color-text-dim)] hover:text-[color:var(--color-accent)] transition-colors"
-              title={t('rc.findDupTitle')}
-            >
-              {t('rc.findDuplicates')}
-            </button>
-            {toVerify.length > 0 && (
-              <button
-                onClick={() => setQuickVerify(true)}
-                className="flex items-center gap-1.5 text-[color:var(--color-accent)] hover:opacity-80 transition-opacity font-semibold"
-                title={t('rc.quickVerifyTitle')}
-              >
-                <Zap size={13} /> {t('rc.quickVerify', { n: toVerify.length })}
-              </button>
-            )}
-            {failedCount > 0 && (
-              <button
-                onClick={handleRescanFailed}
-                disabled={rescanBusy}
-                className="text-[color:var(--color-cyan)] hover:text-[color:var(--color-accent)] disabled:opacity-60"
-                title={t('rc.rescanTitle')}
-              >
-                {rescanBusy ? t('rc.rescanning') : t('rc.failedRescan', { n: failedCount })}
-              </button>
-            )}
-            {emailInboxCount > 0 && (
-              <button
-                onClick={handleImportEmail}
-                disabled={importing}
-                className="text-[color:var(--color-purple)] hover:text-[color:var(--color-accent)] disabled:opacity-60"
-                title={t('rc.importEmailTitle')}
-              >
-                {importing ? t('rc.importing') : t('rc.importEmail', { n: emailInboxCount })}
-              </button>
-            )}
-            {importMsg && <span className="text-[color:var(--color-text-faint)]">{importMsg}</span>}
-          </div>
-        </div>
-      </div>
-
-      {/* Dropzone */}
-      <div
-        onDragOver={(e) => {
-          e.preventDefault();
-          setDragOver(true);
-        }}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={(e) => {
-          e.preventDefault();
-          setDragOver(false);
-          handleFiles(e.dataTransfer.files);
-        }}
-        onClick={() => !uploading && fileInputRef.current?.click()}
-        className={cn(
-          'border-2 border-dashed rounded-2xl p-8 mb-6 text-center cursor-pointer transition-all',
-          dragOver
-            ? 'border-[color:var(--color-accent)] bg-[#00ff8808]'
-            : 'border-[color:var(--color-border)] hover:border-[color:var(--color-border-light)]',
-          uploading && 'pointer-events-none opacity-70'
-        )}
-      >
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*,application/pdf,.pdf"
-          multiple
-          className="hidden"
-          onChange={(e) => handleFiles(e.target.files)}
-        />
-        {uploading ? (
-          <div className="flex flex-col items-center gap-2 text-[color:var(--color-cyan)]">
-            <Loader2 size={28} className="animate-spin" />
-            <p className="text-sm">{uploadMsg}</p>
-          </div>
-        ) : (
-          <div className="flex flex-col items-center gap-2 text-[color:var(--color-text-dim)]">
-            <Upload size={28} />
-            <p className="text-sm font-medium text-[color:var(--color-text)]">
-              {t('rc.dropReceipts')}
-            </p>
-            <p className="text-xs text-[color:var(--color-text-faint)]">
-              {ollamaUp
-                ? t('rc.aiAutoParse')
-                : t('rc.manualEntry')}
-            </p>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                cameraInputRef.current?.click();
-              }}
-              className="mt-2 flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-text)] hover:border-[color:var(--color-accent)] transition-colors"
-            >
-              <Camera size={14} /> {t('ex.takePhoto')}
-            </button>
-          </div>
-        )}
-        {/* Camera capture (opens the camera on mobile); resized client-side */}
-        <input
-          ref={cameraInputRef}
-          type="file"
-          accept="image/*"
-          capture="environment"
-          className="hidden"
-          onChange={(e) => handleFiles(e.target.files)}
-        />
-      </div>
-
-      {uploadMsg && !uploading && (
-        <div className="mb-4 text-sm text-[color:var(--color-red)] flex items-start gap-2">
-          <AlertTriangle size={14} className="shrink-0 mt-0.5" />
-          <span className="break-words">{uploadMsg}</span>
-        </div>
-      )}
-
-      {/* E-shop body: filter sidebar + receipts */}
-      <div className="flex gap-6 items-start">
-        <aside className="hidden lg:block w-56 shrink-0 sticky top-4 self-start">{filterControls}</aside>
-
-        <div className="flex-1 min-w-0">
-          {/* Mobile filter toggle + drawer */}
-          <div className="lg:hidden mb-4">
-            <button
-              onClick={() => setShowFilters((v) => !v)}
-              className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-text-dim)]"
-              style={{ fontFamily: 'var(--font-mono)' }}
-            >
-              <SlidersHorizontal size={14} /> {t('ex.filters')} {anyRFilter && <span className="text-[color:var(--color-accent)]">•</span>}
-            </button>
-            {showFilters && (
-              <div className="mt-3 p-3 rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)]">{filterControls}</div>
-            )}
-          </div>
+          )}
 
           <div className="flex items-center justify-between mb-3">
             <span className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
@@ -645,8 +559,7 @@ export function ReceiptsClient({
               ))}
             </div>
           )}
-        </div>
-      </div>
+      </FilterLayout>
 
       {/* Detail modal */}
       {selected && (
