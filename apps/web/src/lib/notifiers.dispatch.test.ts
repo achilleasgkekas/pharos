@@ -147,6 +147,11 @@ describe('testNotifier — telegram', () => {
     expect(await testNotifier(cfg({ type: 'telegram', token: 'BOT123', target: '' }))).toBe(false);
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
+  it('refuses a token that could change the request path or host', async () => {
+    expect(await testNotifier(cfg({ type: 'telegram', token: 'x@evil.example/', target: '99887' }))).toBe(false);
+    expect(await testNotifier(cfg({ type: 'telegram', token: '1:ab/../../x?y', target: '99887' }))).toBe(false);
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
 });
 
 describe('testNotifier — webhook', () => {

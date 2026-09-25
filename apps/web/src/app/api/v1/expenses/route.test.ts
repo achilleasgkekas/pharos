@@ -213,7 +213,7 @@ describe('POST validation', () => {
     appSettingsState.categoryRules = [
       { id: 'r1', match: 'grocery run', matchType: 'text', category: 'groceries', recurring: false, recurringCycle: '' },
     ];
-    const res = await POST(makeReq({ body: { vendor: 'Corner Store', amount: 22, notes: 'weekly grocery run' } }));
+    await POST(makeReq({ body: { vendor: 'Corner Store', amount: 22, notes: 'weekly grocery run' } }));
     expect((state.lastCreate as Record<string, unknown>).category).toBe('groceries');
   });
 

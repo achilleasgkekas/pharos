@@ -1,6 +1,6 @@
 'use client';
 import { useState, useTransition, useMemo, useRef } from 'react';
-import { Plus, Pencil, Trash2, ExternalLink, Copy, Check, Ticket, Search, LayoutGrid, List as ListIcon, SlidersHorizontal, Sparkles, Upload, Loader2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, ExternalLink, Copy, Check, Search, LayoutGrid, List as ListIcon, SlidersHorizontal, Sparkles, Upload, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';

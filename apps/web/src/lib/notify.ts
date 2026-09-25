@@ -1,5 +1,6 @@
 import { getAppSettings } from './appSettings';
 import { assertPublicUrl } from './ssrf';
+import { safeFetch } from './safeFetch';
 
 type NtfyOpts = { priority?: number; tags?: string[] };
 
@@ -17,7 +18,7 @@ export async function sendNtfyTo(url: string, title: string, message: string, op
     if (asciiTitle) headers.Title = asciiTitle;
     if (opts?.priority) headers.Priority = String(opts.priority);
     if (opts?.tags?.length) headers.Tags = opts.tags.join(',');
-    const res = await fetch(url, {
+    const res = await safeFetch(url, {
       method: 'POST',
       headers,
       body: message,

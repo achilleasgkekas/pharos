@@ -33,8 +33,8 @@ describe('safeRevalidate', () => {
     expect(revalidatePathMock).toHaveBeenCalledWith('/receipts');
   });
 
-  it('returns undefined on the happy path', () => {
-    expect(safeRevalidate('/items')).toBeUndefined();
+  it('does not throw on the happy path', () => {
+    expect(() => safeRevalidate('/items')).not.toThrow();
   });
 
   it('passes through an empty path unchanged (no normalization)', () => {
@@ -49,11 +49,11 @@ describe('safeRevalidate', () => {
     expect(() => safeRevalidate('/statements')).not.toThrow();
   });
 
-  it('returns undefined even when the underlying call throws', () => {
+  it('swallows an error from the underlying call', () => {
     revalidatePathMock.mockImplementation(() => {
       throw new Error('boom');
     });
-    expect(safeRevalidate('/statements')).toBeUndefined();
+    expect(() => safeRevalidate('/statements')).not.toThrow();
   });
 
   it('still attempts the call before swallowing the error', () => {

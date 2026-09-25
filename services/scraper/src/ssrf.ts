@@ -61,3 +61,25 @@ export async function assertPublicUrl(url: string): Promise<void> {
     throw new Error('Host resolves to a private address');
   }
 }
+
+/**
+ * `fetch` with the guard applied to every redirect hop (same as the web app's lib/safeFetch.ts).
+ * Letting fetch follow redirects after checking only the first URL would let a public page
+ * bounce the scraper to an internal address.
+ */
+export async function safeFetch(url: string, init: RequestInit = {}, maxRedirects = 5): Promise<Response> {
+  let current = url;
+  let req: RequestInit = { ...init, redirect: 'manual' };
+  for (let hop = 0; ; hop++) {
+    await assertPublicUrl(current);
+    const res = await fetch(current, req);
+    const location = res.status >= 300 && res.status < 400 ? res.headers.get('location') : null;
+    if (!location) return res;
+    if (hop >= maxRedirects) throw new Error('Too many redirects');
+    current = new URL(location, current).toString();
+    const method = (req.method || 'GET').toUpperCase();
+    if (res.status === 303 || ((res.status === 301 || res.status === 302) && method === 'POST')) {
+      req = { ...req, method: 'GET', body: undefined };
+    }
+  }
+}

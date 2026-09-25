@@ -35,7 +35,7 @@ export function normalizeInstallmentDesc(s: string): string {
     .replace(/δοση\s*\d+\s*\/\s*\d+/gi, '')
     .replace(/installment\s*\d+\s*\/\s*\d+/gi, '')
     .replace(/\d+\s*\/\s*\d+/g, '')
-    .replace(/[^a-zα-ωά-ώ0-9 ]/gi, ' ')
+    .replace(/[^a-zά-ώ0-9 ]/gi, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }

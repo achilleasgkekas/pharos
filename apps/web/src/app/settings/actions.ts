@@ -22,7 +22,6 @@ import { collectUpcomingDates } from '@/lib/specialDates';
 import { collectMaintenanceDue, MAINTENANCE_STATUSES, type MaintenanceRow } from '@/lib/maintenance';
 import { collectLendingOverdue, LENDING_STATUSES, type LendingRow } from '@/lib/lending';
 import { collectStaleClaims, CLAIM_STATUSES_APPLY_TO, DEFAULT_STALE_CLAIM_DAYS, type StaleClaimRow } from '@/lib/warrantyClaims';
-import { Card } from '@/models/Card';
 import { Task } from '@/models/Task';
 import { Expense } from '@/models/Expense';
 import { Goal } from '@/models/Goal';
@@ -62,7 +61,7 @@ import { suggestBudgetsFromExpenses, type BudgetExpenseRow } from '@/lib/budgetS
 import { resolveCategoryRules } from '@/lib/categoryRules';
 import { detectPriceHikes, type HikeEntry } from '@/lib/priceHike';
 import { anthropicTest } from '@/lib/anthropic';
-import { getAppSettings, invalidateAppSettings, invalidateAppSettingsForRequest } from '@/lib/appSettings';
+import { getAppSettings, invalidateAppSettingsForRequest } from '@/lib/appSettings';
 import { assertCanWrite, requireAdmin } from '@/lib/auth';
 import { AI_FEATURE_KEYS, type AiFeatureKey } from '@/lib/aiFeatures';
 import { PROVIDER_RECOMMEND, priceForModel, looksVisionModel, type FetchedModel, type AiProviderId } from '@/lib/aiModels';
@@ -136,6 +135,14 @@ function scoped<T>(model: Model<T>): Promise<Model<T>> {
 
 
 const OLLAMA_HOST = process.env.OLLAMA_HOST ?? 'http://localhost:11434';
+
+
+/** A user-typed key for a stored map (budget category, account name, depreciation category).
+ *  `__proto__` and friends would rewrite the object's prototype instead of adding a key, and
+ *  MongoDB refuses field names that start with `$` or contain a dot. */
+function isSafeMapKey(key: string): boolean {
+  return !!key && key !== '__proto__' && key !== 'constructor' && key !== 'prototype' && !key.startsWith('$') && !key.includes('.');
+}
 
 export type OllamaModel = { name: string; sizeGB: number };
 
@@ -1911,7 +1918,8 @@ export async function exportTaxBundle(year: number): Promise<{ base64: string; i
   const y = Number.isFinite(year) ? Math.trunc(year) : new Date().getFullYear();
   const from = new Date(Date.UTC(y, 0, 1));
   const to = new Date(Date.UTC(y + 1, 0, 1));
-  const [settings, rows] = await Promise.all([
+  // getAppSettings() also sets the currency symbol cur() prints in the HTML report below.
+  const [, rows] = await Promise.all([
     getAppSettings(),
     (await scoped(Expense)).find({ kind: 'expense', taxDeductible: true, date: { $gte: from, $lt: to } })
       .select('vendor category taxCategory amount date notes filePath')
@@ -1962,12 +1970,12 @@ export async function exportTaxBundle(year: number): Promise<{ base64: string; i
 export async function saveBudgets(budgets: Record<string, number>): Promise<{ ok: boolean }> {
   await assertCanWrite();
   await connectDB();
-  const clean: Record<string, number> = {};
+  const clean = new Map<string, number>();
   for (const [k, v] of Object.entries(budgets || {})) {
     const n = Number(v);
-    if (k && Number.isFinite(n) && n > 0) clean[k.trim()] = Math.round(n * 100) / 100;
+    if (isSafeMapKey(k.trim()) && Number.isFinite(n) && n > 0) clean.set(k.trim(), Math.round(n * 100) / 100);
   }
-  await (await scoped(AppConfig)).updateOne({ key: 'singleton' }, { $set: { budgets: clean } }, { upsert: true });
+  await (await scoped(AppConfig)).updateOne({ key: 'singleton' }, { $set: { budgets: Object.fromEntries(clean) } }, { upsert: true });
   await invalidateAppSettingsForRequest();
   revalidatePath('/reports');
   revalidatePath('/settings');
@@ -2017,16 +2025,17 @@ export async function suggestBudgets(): Promise<{ suggestions: Record<string, nu
 export async function saveAssetAccounts(accounts: Record<string, number>): Promise<{ ok: boolean }> {
   await assertCanWrite();
   await connectDB();
-  const clean: Record<string, number> = {};
+  const clean = new Map<string, number>();
   for (const [k, v] of Object.entries(accounts || {})) {
     const n = Number(v);
     // `>= 0`, not `> 0`: a zero balance is a real state (an emptied cash envelope, a closed-out
     // account kept for the record), and dropping it here deleted the account behind the user's
     // back — the same bug the editor had on the client side. Removal is the X button, and it
     // sends the account absent from the map, which this loop still honours.
-    if (k.trim() && Number.isFinite(n) && n >= 0) clean[k.trim().slice(0, 60)] = Math.round(n * 100) / 100;
+    const key = k.trim().slice(0, 60);
+    if (isSafeMapKey(key) && Number.isFinite(n) && n >= 0) clean.set(key, Math.round(n * 100) / 100);
   }
-  await (await scoped(AppConfig)).updateOne({ key: 'singleton' }, { $set: { assetAccounts: clean } }, { upsert: true });
+  await (await scoped(AppConfig)).updateOne({ key: 'singleton' }, { $set: { assetAccounts: Object.fromEntries(clean) } }, { upsert: true });
   await invalidateAppSettingsForRequest();
   revalidatePath('/reports');
   revalidatePath('/settings');
@@ -2047,12 +2056,13 @@ export async function saveDepreciation(cfg: {
   await assertCanWrite();
   await connectDB();
   const clampPct = (n: unknown) => Math.min(100, Math.max(0, Number(n) || 0));
-  const rates: Record<string, number> = {};
+  const rateMap = new Map<string, number>();
   for (const [k, v] of Object.entries(cfg?.rates || {})) {
-    const key = k.trim();
+    const key = k.trim().slice(0, 60);
     const n = Number(v);
-    if (key && Number.isFinite(n) && n >= 0) rates[key.slice(0, 60)] = Math.min(100, n);
+    if (isSafeMapKey(key) && Number.isFinite(n) && n >= 0) rateMap.set(key, Math.min(100, n));
   }
+  const rates = Object.fromEntries(rateMap);
   const clean = {
     enabled: cfg?.enabled !== false,
     floorPct: clampPct(cfg?.floorPct),
@@ -2104,7 +2114,10 @@ export async function importData(json: string): Promise<{ ok: boolean; restored:
     const ScopedModel = await scoped(Model as typeof Item);
     for (const raw of docs) {
       if (!raw || typeof raw !== 'object') continue;
-      const { _id, __v, createdAt, updatedAt, ...rest } = raw as Record<string, unknown>;
+      const { _id, __v, createdAt, updatedAt, ...fields } = raw as Record<string, unknown>;
+      // Field names only: a `$…` key would be read as an update operator and a dotted one as a
+      // path into another field, neither of which an export ever writes.
+      const rest = Object.fromEntries(Object.entries(fields).filter(([k]) => !k.startsWith('$') && !k.includes('.')));
       void __v;
       void createdAt;
       void updatedAt;
@@ -2126,8 +2139,13 @@ export async function importData(json: string): Promise<{ ok: boolean; restored:
       const update: Record<string, unknown> = { $set: rest };
       if (!('deletedAt' in rest)) update.$unset = { deletedAt: '' };
       try {
-        if (_id) await ScopedModel.updateOne({ _id }, update, { upsert: true }).setOptions({ withDeleted: true });
-        else await ScopedModel.create(rest);
+        // A backup is user-supplied JSON: an `_id` that is an object ({"$ne": null}) would turn
+        // the filter into a query operator and upsert over whichever record matched it. Only a
+        // plain id is a filter; `$eq` keeps it a literal match.
+        if (!_id) await ScopedModel.create(rest);
+        else if (typeof _id === 'string') {
+          await ScopedModel.updateOne({ _id: { $eq: _id } }, update, { upsert: true }).setOptions({ withDeleted: true });
+        } else continue;
         restored++;
       } catch {
         /* skip a doc that won't validate */

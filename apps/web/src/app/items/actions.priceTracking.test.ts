@@ -252,7 +252,7 @@ describe('searchItemPriceCandidates', () => {
     const fetchedUrls = fetchPageTextMock.mock.calls.map((c) => c[0]);
     expect(fetchedUrls).not.toContain('https://youtube.com/watch?v=1');
     expect(fetchedUrls).not.toContain('ftp://shop1.example.com/x');
-    expect(fetchedUrls.filter((u) => u.includes('shop2.example.com')).length).toBe(1);
+    expect(fetchedUrls.filter((u) => new URL(u).hostname === 'shop2.example.com').length).toBe(1);
   });
 
   it('skips a candidate whose page does not match the item (relevance guard)', async () => {

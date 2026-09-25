@@ -45,7 +45,7 @@ import { NO_SPACE, matchesSpace, spaceFilterOptions } from '@/lib/spaceFilter';
 import { useLocale, useT } from '@/components/LocaleProvider';
 import { DuplicatesModal } from './DuplicatesModal';
 import { useRouter } from 'next/navigation';
-import { formatDate, formatTime, formatDateTime, compareNames } from '@/lib/i18n/format';
+import { formatDate, compareNames } from '@/lib/i18n/format';
 
 function fileUrl(filePath: string) {
   const u = `/api/files/${filePath.split('/').map(encodeURIComponent).join('/')}`;
@@ -279,8 +279,6 @@ export function ReceiptsClient({
     const found = receipts.find((r) => r._id === id);
     if (found) setSelected(found);
   });
-
-  const unverified = visible.filter((r) => !r.verified).length;
 
   async function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return;

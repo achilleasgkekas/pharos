@@ -293,7 +293,7 @@ describe('rescanStatement — cross-statement link inheritance by signature', ()
     parseStatementTextMock.mockResolvedValue({
       parsed: { transactions: [{ date: '2026-06-05', description: 'KOTSOVOLOS', amount: 25.25 }] },
     });
-    const res = await rescanStatement('s1', true);
+    await rescanStatement('s1', true);
     expect(new Set(stmt.transactions[0].matchedItemIds.map(String))).toEqual(new Set([ITEM1, ITEM9]));
   });
 
@@ -306,7 +306,7 @@ describe('rescanStatement — cross-statement link inheritance by signature', ()
     parseStatementTextMock.mockResolvedValue({
       parsed: { transactions: [{ date: '2026-06-05', description: 'KOTSOVOLOS', amount: 25.25, currentInstallment: 7, totalInstallments: 36 }] },
     });
-    const res = await rescanStatement('s1', true);
+    await rescanStatement('s1', true);
     expect(stmt.transactions[0].matchedItemIds).toEqual([]);
   });
 

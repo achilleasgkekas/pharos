@@ -29,7 +29,7 @@ import { ExpenseDuplicatesModal } from './ExpenseDuplicatesModal';
 import { OpenInOneDriveButton } from '@/components/OpenInOneDriveButton';
 import { useLocale, useT, useMoney } from '@/components/LocaleProvider';
 import type { TKey } from '@/lib/i18n';
-import { formatDate, formatTime, formatDateTime, compareNames } from '@/lib/i18n/format';
+import { formatDate, compareNames } from '@/lib/i18n/format';
 import { vendorKey, seriesGroupKey } from './lib';
 import { NO_SPACE, matchesSpace, spaceFilterOptions } from '@/lib/spaceFilter';
 

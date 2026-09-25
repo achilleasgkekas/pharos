@@ -5,7 +5,9 @@
 // Reuses lib/auth.ts's scrypt hashPassword/verifyPassword AS-IS (it hashes any plaintext string,
 // not just account passwords) instead of duplicating a KDF — recovery codes get the exact same
 // at-rest protection with zero new crypto surface to review.
-import { randomBytes } from 'node:crypto';
+// randomInt, not `byte % 31`: 256 is not a multiple of 31, so the modulo made the first 8
+// characters of the alphabet slightly more likely than the rest.
+import { randomInt } from 'node:crypto';
 import { hashPassword, verifyPassword } from '@/lib/auth';
 
 // Excludes 0/O/1/I/L — characters that are easy to mistype from a printed or handwritten copy.
@@ -13,9 +15,8 @@ const CODE_ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
 
 /** One human-typeable recovery code, "XXXX-XXXX" (8 chars from a look-alike-free alphabet). */
 function oneCode(): string {
-  const bytes = randomBytes(8);
   let s = '';
-  for (const b of bytes) s += CODE_ALPHABET[b % CODE_ALPHABET.length];
+  for (let i = 0; i < 8; i++) s += CODE_ALPHABET[randomInt(CODE_ALPHABET.length)];
   return `${s.slice(0, 4)}-${s.slice(4)}`;
 }
 

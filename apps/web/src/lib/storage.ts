@@ -26,7 +26,7 @@ export function activeStorageRoot(): string {
  * source (route params, DB-stored filePath that a restore/import could have tampered with).
  * Throws if it escapes the root.
  */
-function resolveWithinStorage(relativePath: string): string {
+export function resolveWithinStorage(relativePath: string): string {
   const root = path.resolve(activeStorageRoot());
   const full = path.resolve(root, relativePath || '');
   const rel = path.relative(root, full);
@@ -51,7 +51,9 @@ export async function saveFile(
 
   const hash = crypto.randomBytes(8).toString('hex');
   const timestamp = now.toISOString().split('T')[0];
-  const ext = extension.startsWith('.') ? extension : `.${extension}`;
+  // The extension can come from a remote server's Content-Type, so it may only be a plain token.
+  const bare = extension.replace(/^\./, '');
+  const ext = `.${/^[a-z0-9]{1,8}$/i.test(bare) ? bare.toLowerCase() : 'bin'}`;
   const filename = `${timestamp}_${hash}${ext}`;
 
   const filePath = path.join(dir, filename);

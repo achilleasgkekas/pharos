@@ -16,8 +16,6 @@ function fileUrl(filePath: string) {
   return /\.html?$/i.test(filePath) ? `${u}?v=2` : u;
 }
 
-const money = (n: number) => `${cur()}${Math.round(n * 100) / 100}`;
-
 /** Rapid review queue: one unverified receipt at a time, fix the 3 headline
  *  fields if needed, then Verify (Enter) / Skip (→) / Edit / Archive (A). */
 export function QuickVerify({
