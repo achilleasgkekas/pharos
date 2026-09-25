@@ -16,6 +16,7 @@ export const ALERT_TYPES = [
   { key: 'subscriptionReviews', label: 'Subscriptions needing a usage review' },
   { key: 'bills', label: 'Bills due / overdue' },
   { key: 'documents', label: 'Documents expiring (passport, ID, licence…)' },
+  { key: 'vehicles', label: 'Vehicle dates due (MOT/ΚΤΕΟ, insurance, road tax)' },
   { key: 'specialDates', label: 'Birthdays & anniversaries coming up' },
   { key: 'maintenance', label: 'Maintenance due on owned items' },
   { key: 'lending', label: 'Lent items due back' },

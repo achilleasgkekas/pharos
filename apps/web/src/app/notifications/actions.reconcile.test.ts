@@ -24,6 +24,7 @@ const {
   billFind,
   documentFind,
   specialDateFind,
+  vehicleFind,
   notificationFind,
   notificationInsertMany,
   notificationUpdateOne,
@@ -38,6 +39,7 @@ const {
     bills: unknown[];
     documents: unknown[];
     specialDates: unknown[];
+    vehicles: unknown[];
     existingNotifications: Array<{ dedupeKey: string; deletedAt?: Date | null; dismissedAtPrice?: number | null; autoExpired?: boolean }>;
   } = {
     items: [],
@@ -47,6 +49,7 @@ const {
     bills: [],
     documents: [],
     specialDates: [],
+    vehicles: [],
     existingNotifications: [],
   };
 
@@ -76,6 +79,7 @@ const {
     billFind: vi.fn(() => leanQuery(() => state.bills)),
     documentFind: vi.fn(() => leanQuery(() => state.documents)),
     specialDateFind: vi.fn(() => leanQuery(() => state.specialDates)),
+    vehicleFind: vi.fn(() => leanQuery(() => state.vehicles)),
     notificationFind: vi.fn(() => leanQuery(() => state.existingNotifications)),
     notificationInsertMany: vi.fn(async (_docs: unknown[]) => undefined),
     // Awaitable like a Query, and chainable for the one call that opts into trashed rows.
@@ -102,6 +106,7 @@ vi.mock('@/models/Subscription', () => ({ Subscription: { find: subscriptionFind
 vi.mock('@/models/Bill', () => ({ Bill: { find: billFind } }));
 vi.mock('@/models/Document', () => ({ Document: { find: documentFind } }));
 vi.mock('@/models/SpecialDate', () => ({ SpecialDate: { find: specialDateFind } }));
+vi.mock('@/models/Vehicle', () => ({ Vehicle: { find: vehicleFind } }));
 vi.mock('@/models/Notification', () => ({
   Notification: {
     find: notificationFind,
@@ -123,6 +128,7 @@ function resetState() {
   state.bills = [];
   state.documents = [];
   state.specialDates = [];
+  state.vehicles = [];
   state.existingNotifications = [];
 }
 
@@ -333,6 +339,29 @@ describe('generateNotifications — document expiry alert kind', () => {
   });
 });
 
+describe('generateNotifications — vehicle date alert kind (P110)', () => {
+  const withDocWindow = (days: number) =>
+    getAppSettingsMock.mockResolvedValue({ warrantyAlertDays: 90, trialAlertDays: 2, billAlertDays: 5, subscriptionReviewIntervalDays: 0, documentAlertDays: days, specialDateAlertDays: 0 });
+
+  it('fires per due date, keyed by vehicle, kind and date, overdue ones included', async () => {
+    withDocWindow(30);
+    state.vehicles = [{ _id: 'v1', name: 'Golf', plate: 'ABC-1234', motUntil: '2026-08-04', insuranceUntil: '2026-07-10', roadTaxUntil: '2027-01-01' }];
+    await generateNotifications();
+    expect(notificationInsertMany).toHaveBeenCalledWith([
+      expect.objectContaining({ dedupeKey: 'vehicle:v1:insuranceUntil:2026-07-10', kind: 'vehicle', title: 'Golf (ABC-1234)', body: '-10|insuranceUntil', href: '/vehicles' }),
+      expect.objectContaining({ dedupeKey: 'vehicle:v1:motUntil:2026-08-04', body: '15|motUntil' }),
+    ]);
+  });
+
+  it('skips the query when the documents lead time is 0 (alert off)', async () => {
+    withDocWindow(0);
+    state.vehicles = [{ _id: 'v1', name: 'Golf', motUntil: '2026-07-25' }];
+    await generateNotifications();
+    expect(vehicleFind).not.toHaveBeenCalled();
+    expect(notificationInsertMany).not.toHaveBeenCalled();
+  });
+});
+
 describe('generateNotifications — special date alert kind', () => {
   const withDateWindow = (days: number) =>
     getAppSettingsMock.mockResolvedValue({ warrantyAlertDays: 90, trialAlertDays: 2, billAlertDays: 5, subscriptionReviewIntervalDays: 0, documentAlertDays: 0, specialDateAlertDays: days });
@@ -391,7 +420,7 @@ describe('generateNotifications — reconcile shape (insert / refresh / auto-exp
     state.existingNotifications = [{ dedupeKey: 'deal:i1' }];
     await generateNotifications();
     expect(notificationUpdateMany).toHaveBeenCalledWith(
-      { kind: { $in: ['deal', 'installment', 'warranty', 'pricehike', 'trialend', 'subreview', 'bill', 'maintenance', 'lending', 'claim', 'document', 'specialdate'] }, dedupeKey: { $nin: [] } },
+      { kind: { $in: ['deal', 'installment', 'warranty', 'pricehike', 'trialend', 'subreview', 'bill', 'maintenance', 'lending', 'claim', 'document', 'vehicle', 'specialdate'] }, dedupeKey: { $nin: [] } },
       { $set: { deletedAt: expect.any(Date), autoExpired: true } }
     );
   });

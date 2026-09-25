@@ -1,7 +1,7 @@
 'use client';
 import { useState, useRef, useEffect, useCallback, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Bell, Tag, ShieldCheck, CreditCard, TrendingUp, AlarmClock, Wallet, FileText, Wrench, Handshake, PackageOpen, IdCard, Cake, X } from 'lucide-react';
+import { Bell, Tag, ShieldCheck, CreditCard, TrendingUp, AlarmClock, Wallet, FileText, Wrench, Handshake, PackageOpen, IdCard, Cake, Car, X } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import { cur } from '@/lib/money';
 import { useT } from '@/components/LocaleProvider';
@@ -16,7 +16,8 @@ import {
   type NotifKind,
 } from '@/app/notifications/actions';
 
-const KIND_ICON: Record<NotifKind, typeof Bell> = { deal: Tag, warranty: ShieldCheck, installment: CreditCard, pricehike: TrendingUp, trialend: AlarmClock, subreview: AlarmClock, bill: FileText, maintenance: Wrench, lending: Handshake, claim: PackageOpen, document: IdCard, specialdate: Cake, system: Bell };
+const KIND_ICON: Record<NotifKind, typeof Bell> = { deal: Tag, warranty: ShieldCheck, installment: CreditCard, pricehike: TrendingUp, trialend: AlarmClock, subreview: AlarmClock, bill: FileText, maintenance: Wrench, lending: Handshake, claim: PackageOpen, document: IdCard, vehicle: Car, specialdate: Cake, system: Bell };
+const VEHICLE_WHAT = { motUntil: 'veh.mot', insuranceUntil: 'veh.insurance', roadTaxUntil: 'veh.roadTax', emissionsUntil: 'veh.emissions' } as const;
 const KIND_COLOR: Record<NotifKind, string> = {
   deal: 'var(--color-accent)',
   warranty: 'var(--color-gold)',
@@ -29,6 +30,7 @@ const KIND_COLOR: Record<NotifKind, string> = {
   lending: 'var(--color-purple)',
   claim: 'var(--color-orange)',
   document: 'var(--color-gold)',
+  vehicle: 'var(--color-orange)',
   specialdate: 'var(--color-purple)',
   system: 'var(--color-text-dim)',
 };
@@ -145,6 +147,14 @@ export function NotificationBell({ open, onOpenChange }: { open: boolean; onOpen
       const d = Number(n.body);
       const key = d < 0 ? 'notif.documentExpiredSub' : d === 0 ? 'notif.documentTodaySub' : 'notif.documentSub';
       return { heading: n.title, sub: t(key, { days: Math.abs(d) }) };
+    }
+    if (n.kind === 'vehicle') {
+      // body = "<days>|<kind>", kind one of VEHICLE_DUE_KINDS
+      const [days, which] = n.body.split('|');
+      const d = Number(days);
+      const what = VEHICLE_WHAT[which as keyof typeof VEHICLE_WHAT] ? t(VEHICLE_WHAT[which as keyof typeof VEHICLE_WHAT]) : '';
+      const key = d < 0 ? 'notif.vehicleOverdueSub' : d === 0 ? 'notif.vehicleTodaySub' : 'notif.vehicleSub';
+      return { heading: n.title, sub: t(key, { days: Math.abs(d), what }) };
     }
     if (n.kind === 'specialdate') {
       // body = "<days>|<years>"; years is empty when the year is unknown, and then the

@@ -73,6 +73,7 @@ const {
   billFind,
   documentFind,
   specialDateFind,
+  vehicleFind,
   getStoresMock,
   effectiveReturnWindowMock,
   returnDaysLeftMock,
@@ -96,6 +97,7 @@ const {
   billFind: vi.fn(),
   documentFind: vi.fn(),
   specialDateFind: vi.fn(),
+  vehicleFind: vi.fn(),
   getStoresMock: vi.fn(async () => [] as unknown[]),
   effectiveReturnWindowMock: vi.fn(() => 14),
   returnDaysLeftMock: vi.fn(() => null as number | null),
@@ -122,6 +124,7 @@ vi.mock('@/models/Voucher', () => ({ Voucher: {} }));
 vi.mock('@/models/Bill', () => ({ Bill: { find: billFind } }));
 vi.mock('@/models/Document', () => ({ Document: { find: documentFind } }));
 vi.mock('@/models/SpecialDate', () => ({ SpecialDate: { find: specialDateFind } }));
+vi.mock('@/models/Vehicle', () => ({ Vehicle: { find: vehicleFind } }));
 vi.mock('@/lib/bill', () => ({ billDaysUntilDue: billDaysUntilDueMock }));
 vi.mock('@/models/Card', () => ({ Card: {} }));
 vi.mock('@/models/Task', () => ({ Task: {} }));
@@ -256,6 +259,7 @@ beforeEach(() => {
   billFind.mockReturnValue(chainSelectLean([]));
   documentFind.mockReturnValue(chainSelectLean([]));
   specialDateFind.mockReturnValue(chainSelectLean([]));
+  vehicleFind.mockReturnValue(chainSelectLean([]));
   getStoresMock.mockImplementation(async () => []);
   effectiveReturnWindowMock.mockImplementation(() => 14);
   returnDaysLeftMock.mockImplementation(() => null);

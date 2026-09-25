@@ -19,6 +19,7 @@ export const AUTO_NOTIF_KINDS = [
   'lending',
   'claim',
   'document',
+  'vehicle',
   'specialdate',
 ] as const;
 
