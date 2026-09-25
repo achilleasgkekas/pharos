@@ -12,7 +12,7 @@ import { useLocale, useT } from '@/components/LocaleProvider';
 import type { TKey } from '@/lib/i18n';
 import { formatDate, formatTime, formatDateTime } from '@/lib/i18n/format';
 import { useShoppingMarket } from '@/components/ShoppingMarketContext';
-import { marketRank, type ShoppingMarket } from '@/lib/shoppingRegion';
+import { isInMarket, marketRank, type ShoppingMarket } from '@/lib/shoppingRegion';
 
 const VERDICT_KEY: Record<string, TKey> = { deal: 'pp.vDeal', dropping: 'pp.vDropping', rising: 'pp.vRising', good: 'pp.vGood', high: 'pp.vHigh' };
 
@@ -46,20 +46,25 @@ function priceStatus(item: SerializedItem, market: ShoppingMarket | null) {
   // prices — it only fills in when there are no priced links at all.
   // With a shopping market (#319) the headline and the deal verdict come from the cheapest shop
   // the user can buy from. The list below still shows every link, out-of-market ones badged.
-  const inMarket = market ? stores.filter((st) => !st.url || marketRank(st.url, market) !== null) : stores;
+  const inMarket = stores.filter((st) => isInMarket(st.url, market));
   const best = inMarket[0] ?? stores[0];
   let bestNow: { price: number; store: string; url?: string } | null = best ? { ...best } : null;
   if (!bestNow && item.currentPrice > 0) bestNow = { price: item.currentPrice, store: '' };
   // Only out-of-market shops priced: show the cheapest, but it can never make this a deal.
   const dealEligible = inMarket.length > 0 || stores.length === 0;
 
-  const hist = [...(item.priceHistory ?? [])].filter((h) => h.price > 0).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  // The price summary (lowest/highest seen, lowest ever, trend) reads in-market history only, so
+  // an old Newegg low cannot make a normal Greek price look "high". The full per-store history
+  // further down still lists every check, out-of-market shops included (#319).
+  const hist = [...(item.priceHistory ?? [])]
+    .filter((h) => h.price > 0 && isInMarket(h.url, market))
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   const prices = hist.map((h) => h.price);
   if (bestNow) prices.push(bestNow.price);
   const lowestEver = hist.length ? hist.reduce((lo, h) => (h.price < lo.price ? h : lo), hist[0]) : null;
   const lo = prices.length ? Math.min(...prices) : null;
   const hi = prices.length ? Math.max(...prices) : null;
-  const rawTrend = calculatePriceTrend(item.priceHistory, bestNow);
+  const rawTrend = calculatePriceTrend(hist, bestNow);
   const trend = rawTrend ?? 0;
 
   const target = item.targetPrice && item.targetPrice > 0 ? item.targetPrice : null;

@@ -2,7 +2,7 @@
 import { cur } from "@/lib/money";
 import { createContext, useContext, useState, useTransition, useMemo } from 'react';
 import { ShoppingMarketProvider, useShoppingMarket } from '@/components/ShoppingMarketContext';
-import { marketRank, type ShoppingMarket } from '@/lib/shoppingRegion';
+import { isInMarket, marketRank, type ShoppingMarket } from '@/lib/shoppingRegion';
 import { useRouter } from 'next/navigation';
 import {
   Search,
@@ -1329,7 +1329,8 @@ import { calculatePriceTrend } from '@/lib/priceTrend';
 /** Signed change between the two most recent price-history points for the best store link (latest − prev). */
 function priceTrend(item: SerializedItem, market: ShoppingMarket | null): number | null {
   const best = bestLinkPrice(item, market);
-  return calculatePriceTrend(item.priceHistory, best);
+  // In-market history only (#319), so the arrow agrees with the price panel's trend.
+  return calculatePriceTrend(item.priceHistory.filter((h) => isInMarket(h.url, market)), best);
 }
 
 /** True when a target is set and the lowest known price has reached it. */
