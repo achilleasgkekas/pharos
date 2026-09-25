@@ -896,7 +896,6 @@ export const fr: Partial<Dict> = {
   'cal.dueThisMonth': 'à payer ce mois-ci',
   'cal.month': 'Mois',
   'cal.agenda': 'Agenda',
-  'cal.list': 'Liste',
   'cal.empty': "Rien de prévu — renouvellements, échéances, factures récurrentes et expirations apparaîtront ici.",
   'cal.nothingDue': 'rien à payer',
   'cal.nothingScheduled': 'Rien de prévu.',

@@ -3,13 +3,17 @@ name: CI
 on:
   push:
     branches: [main]
-    # docs/openapi.yaml is not excluded: route coverage tests read it.
-    paths-ignore: ['**/*.md']
+  # Every PR, docs-only included: the `changes` job decides what actually runs, and a job that is
+  # skipped by its `if` reports success, so the required "Type-check & build" check is satisfied
+  # on a Markdown-only PR instead of never appearing (which forced an admin bypass).
   pull_request:
-    paths-ignore: ['**/*.md']
   # Lets a human (or `gh workflow run CI`) re-run the gate on demand — e.g. to confirm
   # the pipeline is alive after it has been disabled, without pushing a dummy commit.
   workflow_dispatch:
+  # Nightly full run on main: catches breakage that arrives without a commit (a dependency
+  # yanked, a base image changed, a date-sensitive test).
+  schedule:
+    - cron: '23 3 * * *'
 
 # One run per branch/PR: a new push cancels the stale run instead of queueing behind it.
 # `main` is excluded from cancellation so a deploy-triggering run always finishes.
@@ -17,17 +21,58 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
-# Read-only token: these jobs only check out and build.
+# Read-only token: these jobs only check out, build and test.
 permissions:
   contents: read
 
 jobs:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.f.outputs.code }}
+      docker: ${{ steps.f.outputs.docker }}
+      docs: ${{ steps.f.outputs.docs }}
+      workflows: ${{ steps.f.outputs.workflows }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: f
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          if [ "$EVENT" = "pull_request" ]; then
+            files=$(git diff --name-only "origin/$BASE_REF...HEAD")
+          else
+            files=ALL
+          fi
+          printf 'Changed files:\n%s\n' "$files"
+          has() { [ "$files" = ALL ] || printf '%s\n' "$files" | grep -Eq "$1"; }
+          out() { if has "$2"; then echo "$1=true"; else echo "$1=false"; fi >> "$GITHUB_OUTPUT"; }
+          # Anything that is not Markdown can affect the app (openapi.yaml is read by route tests).
+          if [ "$files" = ALL ] || printf '%s\n' "$files" | grep -Evq '\.md$'; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "code=false" >> "$GITHUB_OUTPUT"
+          fi
+          out docker '^(apps/web/|docker-compose|\.github/workflows/ci\.yml)'
+          out docs '(\.md$|^docs/|^scripts/check-doc-links\.py$)'
+          out workflows '^\.github/workflows/'
+
   build:
     name: Type-check & build
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: apps/web
+    services:
+      mongo:
+        image: mongo:7
+        ports: ['27017:27017']
     steps:
       - uses: actions/checkout@v7
       - name: Reject private operational files
@@ -52,3 +97,90 @@ jobs:
           # consumed at runtime, not during `next build`.
           AUTH_SECRET: ci-placeholder-secret-do-not-use-in-production
           NEXT_SERVER_ACTIONS_ENCRYPTION_KEY: ci-placeholder-encryption-key-000000
+      # Smoke + browser test against the build that was just made, with a real MongoDB: the
+      # production server must start, and every main page must render for a fresh admin.
+      - name: Start the production server
+        run: |
+          cp -r .next/static .next/standalone/.next/
+          cp -r public .next/standalone/
+          mkdir -p "$RUNNER_TEMP/storage"
+          (cd .next/standalone && nohup node server.js > "$RUNNER_TEMP/server.log" 2>&1 &)
+          for _ in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/login || true)
+            [ "$code" != "000" ] && echo "server up ($code)" && exit 0
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/server.log"; exit 1
+        env:
+          PORT: '3000'
+          HOSTNAME: 127.0.0.1
+          MONGO_URI: mongodb://127.0.0.1:27017/pharos_ci
+          STORAGE_ROOT: ${{ runner.temp }}/storage
+          AUTH_SECRET: ci-placeholder-secret-do-not-use-in-production
+          NEXT_SERVER_ACTIONS_ENCRYPTION_KEY: ci-placeholder-encryption-key-000000
+      - name: Browser smoke test (setup + every page)
+        run: |
+          npm install --no-save playwright@1
+          npx playwright install --with-deps chromium
+          node e2e/smoke.mjs
+        env:
+          BASE_URL: http://127.0.0.1:3000
+      - name: Server log
+        if: failure()
+        run: cat "$RUNNER_TEMP/server.log" || true
+
+  docker:
+    name: Docker image builds
+    needs: changes
+    if: needs.changes.outputs.docker == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      # Build only (never pushed): catches Dockerfile / native-dependency breakage (sharp,
+      # poppler, tesseract) on the PR instead of at release time.
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: ./apps/web
+          file: ./apps/web/Dockerfile
+          push: false
+          load: true
+          tags: pharos-web:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Image starts and serves the login page
+        run: |
+          docker network create ci
+          docker run -d --name mongo --network ci mongo:7
+          docker run -d --name web --network ci -p 3000:3000 \
+            -e MONGO_URI=mongodb://mongo:27017/pharos_ci \
+            -e AUTH_SECRET=ci-placeholder-secret-do-not-use-in-production \
+            -e NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=ci-placeholder-encryption-key-000000 \
+            pharos-web:ci
+          for _ in $(seq 1 45); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/login || true)
+            if [ "$code" = "200" ] || [ "$code" = "307" ]; then echo "image serves /login ($code)"; exit 0; fi
+            sleep 2
+          done
+          docker logs web; exit 1
+
+  docs:
+    name: Docs links
+    needs: changes
+    if: needs.changes.outputs.docs == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: python3 scripts/check-doc-links.py
+
+  actionlint:
+    name: Workflow lint
+    needs: changes
+    if: needs.changes.outputs.workflows == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: actionlint
+        run: |
+          bash <(curl -sSfL https://raw.githubusercontent.com/rhysd/actionlint/v1.7.12/scripts/download-actionlint.bash) 1.7.12
+          ./actionlint -color

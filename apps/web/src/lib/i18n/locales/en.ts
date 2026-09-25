@@ -321,7 +321,6 @@ export const en = {
   'cal.dueThisMonth': 'due this month',
   'cal.month': 'Month',
   'cal.agenda': 'Agenda',
-  'cal.list': 'List',
   'cal.empty': 'Nothing scheduled — renewals, installments, recurring bills and expiries will show up here.',
   'cal.nothingDue': 'nothing due',
   'cal.nothingScheduled': 'Nothing scheduled.',
