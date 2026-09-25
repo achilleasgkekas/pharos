@@ -1,10 +1,49 @@
-# PHAROS
+<div align="center">
+
+<img src="docs/banner.png" alt="PHAROS - Personal Hub, Asset and Resource Oversight System" width="100%">
+
+<p>
+  <a href="LICENSE"><img alt="License: AGPL-3.0" src="https://img.shields.io/badge/license-AGPL--3.0-00ff88"></a>
+  <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-000000?logo=next.js">
+  <img alt="MongoDB 7" src="https://img.shields.io/badge/MongoDB-7-13aa52?logo=mongodb&logoColor=white">
+  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white">
+  <img alt="Self-hosted" src="https://img.shields.io/badge/self--hosted-yes-a55eea">
+</p>
 
 **A self-hosted personal hub for everything you own and spend.**
+
+*Inventory · receipts · expenses · bills · subscriptions · statements · documents · backups, with optional AI that reads your paperwork for you.*
+
+</div>
+
+---
+
+## What it is
 
 Keep inventory, receipts, expenses, bills, subscriptions, documents and backups
 in one place. Run it for yourself or your household on your own server, with
 individual user accounts. AI is optional: every core workflow has a manual path.
+
+## Highlights
+
+- **Household accounts**: a first-run wizard creates the administrator; add
+  members and read-only viewers from Settings. One private hub, one login each.
+- **Optional AI document reading**: drop in a receipt photo or statement PDF and
+  AI extracts the store, date, totals, VAT, line items and installment plans. Use a
+  local Ollama model or your own cloud key, or switch AI off per feature or entirely.
+- **Inventory & shopping**: what you own and what you want, with multi-store price
+  tracking, target-price deal alerts and price history, limited to the shops in
+  your shopping country if you like.
+- **Expenses & income**: recurring series (including several subscriptions from
+  one vendor), unusual-amount flags, price-hike alerts and monthly budgets.
+- **Bills, subscriptions & statements**: due dates and partial payments, renewal
+  and trial reminders, and card installment plans tracked month by month.
+- **Money calendar & reports**: one agenda of what is due, plus cash flow,
+  year-over-year and per-space breakdowns.
+- **Documents & warranties**: passports, licences and policies with expiry alerts,
+  and warranties tracked against the items they cover.
+- **Built for safety**: soft-delete Trash with 30-day recovery, JSON backup and
+  restore, and optional mirroring of your files to a NAS.
 
 ## Screenshots
 
