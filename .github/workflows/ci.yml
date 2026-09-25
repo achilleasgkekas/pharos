@@ -105,7 +105,7 @@ jobs:
           cp -r public .next/standalone/
           mkdir -p "$RUNNER_TEMP/storage"
           (cd .next/standalone && nohup node server.js > "$RUNNER_TEMP/server.log" 2>&1 &)
-          for i in $(seq 1 30); do
+          for _ in $(seq 1 30); do
             code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/login || true)
             [ "$code" != "000" ] && echo "server up ($code)" && exit 0
             sleep 1
@@ -157,7 +157,7 @@ jobs:
             -e AUTH_SECRET=ci-placeholder-secret-do-not-use-in-production \
             -e NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=ci-placeholder-encryption-key-000000 \
             pharos-web:ci
-          for i in $(seq 1 45); do
+          for _ in $(seq 1 45); do
             code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/login || true)
             if [ "$code" = "200" ] || [ "$code" = "307" ]; then echo "image serves /login ($code)"; exit 0; fi
             sleep 2
