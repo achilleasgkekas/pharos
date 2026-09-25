@@ -1,7 +1,8 @@
 'use client';
 import { useState, useTransition, useMemo, useRef } from 'react';
-import { Plus, Pencil, Trash2, ExternalLink, Copy, Check, Search, LayoutGrid, List as ListIcon, SlidersHorizontal, Sparkles, Upload, Loader2 } from 'lucide-react';
+import { Pencil, Trash2, ExternalLink, Copy, Check, Search, Sparkles, Upload, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { PAGE_MAIN, PageHeader, ViewToggle, PrimaryAction, FilterLayout } from '@/components/ui/PageHeader';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
@@ -35,7 +36,6 @@ export function VouchersClient({ vouchers }: { vouchers: SerializedVoucher[] }) 
   const [storeFilter, setStoreFilter] = useState('');
   const [sortBy, setSortBy] = useState<'expiry' | 'store' | 'title'>('expiry');
   const [layout, setLayout] = useState<'grid' | 'list'>('grid');
-  const [showFilters, setShowFilters] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [editing, setEditing] = useState<SerializedVoucher | null>(null);
 
@@ -121,52 +121,13 @@ export function VouchersClient({ vouchers }: { vouchers: SerializedVoucher[] }) 
   );
 
   return (
-    <main className="max-w-[1400px] mx-auto px-4 py-6 pb-24">
-      <div className="mb-5 flex items-end justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold" style={{ fontFamily: 'var(--font-display)' }}>
-            {t('nav.vouchers')}
-            <span className="ml-3 text-sm font-normal text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
-              {t('v.activeCount', { n: vouchers.filter((v) => !v.used).length })}
-            </span>
-          </h1>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="flex bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg p-0.5">
-            {([['grid', <LayoutGrid key="g" size={14} />], ['list', <ListIcon key="l" size={14} />]] as const).map(([v, icon]) => (
-              <button
-                key={v}
-                onClick={() => setLayout(v)}
-                title={v === 'grid' ? t('v.grid') : t('v.list')}
-                className={cn('px-2 py-1.5 rounded-md transition-colors', layout === v ? 'bg-[color:var(--color-accent)] text-black' : 'text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]')}
-              >
-                {icon}
-              </button>
-            ))}
-          </div>
-          <Button variant="primary" onClick={() => setShowCreate(true)}>
-            <Plus size={16} strokeWidth={2.5} /> {t('v.newVoucher')}
-          </Button>
-        </div>
-      </div>
+    <main className={PAGE_MAIN}>
+      <PageHeader title={t('nav.vouchers')} count={t('v.activeCount', { n: vouchers.filter((v) => !v.used).length })}>
+        <ViewToggle value={layout} onChange={setLayout} />
+        <PrimaryAction onClick={() => setShowCreate(true)} />
+      </PageHeader>
 
-      {/* E-shop body: filter sidebar + vouchers */}
-      <div className="flex gap-6 items-start">
-        <aside className="hidden lg:block w-56 shrink-0 sticky top-4 self-start">{filterControls}</aside>
-
-        <div className="flex-1 min-w-0">
-          {/* Mobile filter toggle + drawer */}
-          <div className="lg:hidden mb-4">
-            <button
-              onClick={() => setShowFilters((v) => !v)}
-              className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-text-dim)]"
-              style={{ fontFamily: 'var(--font-mono)' }}
-            >
-              <SlidersHorizontal size={14} /> Filters {anyF && <span className="text-[color:var(--color-accent)]">•</span>}
-            </button>
-            {showFilters && <div className="mt-3 p-3 rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)]">{filterControls}</div>}
-          </div>
-
+      <FilterLayout filters={filterControls} active={anyF}>
           {visible.length === 0 ? (
             <div className="text-center py-20 text-[color:var(--color-text-faint)]">
               <p className="text-5xl mb-4">🎟️</p>
@@ -183,8 +144,7 @@ export function VouchersClient({ vouchers }: { vouchers: SerializedVoucher[] }) 
               )}
             </div>
           )}
-        </div>
-      </div>
+      </FilterLayout>
 
       <Modal open={showCreate} onClose={() => setShowCreate(false)} title={t('v.newVoucher')} size="xl">
         <VoucherForm onSuccess={() => setShowCreate(false)} />

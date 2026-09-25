@@ -411,6 +411,7 @@ export const en = {
   'tk.board': 'Kanban board',
   'tk.newTask': 'New task',
   'tk.allTags': 'all tags',
+  'tk.tags': 'Tags',
   'tk.todo': 'Todo',
   'tk.inProgress': 'In Progress',
   'tk.blocked': 'Blocked',

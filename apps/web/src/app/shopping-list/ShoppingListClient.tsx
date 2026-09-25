@@ -1,9 +1,10 @@
 'use client';
 import { useState, useRef, useTransition, useMemo } from 'react';
-import { Camera, Plus, Check, Loader2, Trash2, Sparkles, ShoppingBasket, LayoutGrid, List as ListIcon, Search, SlidersHorizontal, CheckSquare, Repeat2 } from 'lucide-react';
+import { Camera, Plus, Check, Loader2, Trash2, Sparkles, ShoppingBasket, Search, CheckSquare, Repeat2 } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
+import { PAGE_MAIN, PageHeader, HeaderButton, ViewToggle, PrimaryAction, FilterLayout } from '@/components/ui/PageHeader';
 import { Input } from '@/components/ui/Input';
 import { useT } from '@/components/LocaleProvider';
 import { shrinkImage } from '@/lib/clientImage';
@@ -61,7 +62,6 @@ export function ShoppingListClient({ initialItems }: { initialItems: SerializedL
   const [catFilter, setCatFilter] = useState('');
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState<SortKey>('recent');
-  const [showFilters, setShowFilters] = useState(false);
 
   // Bulk select
   const [selectMode, setSelectMode] = useState(false);
@@ -276,77 +276,37 @@ export function ShoppingListClient({ initialItems }: { initialItems: SerializedL
   );
 
   return (
-    <main className="max-w-[1400px] mx-auto px-4 py-6 pb-24">
-      <div className="mb-5 flex items-end justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold" style={{ fontFamily: 'var(--font-display)' }}>
-            {t('nav.shoppingList')}
-            {todo.length > 0 && (
-              <span className="ml-3 text-sm font-normal text-[color:var(--color-text-faint)]" style={mono}>
-                {t('sl.toBuy', { n: todo.length })}
-              </span>
-            )}
-          </h1>
-        </div>
-
+    <main className={PAGE_MAIN}>
+      <PageHeader title={t('nav.shoppingList')} count={todo.length > 0 ? t('sl.toBuy', { n: todo.length }) : undefined}>
         {selectMode ? (
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm text-[color:var(--color-text-dim)]" style={mono}>{t('sl.selected', { n: selectedIds.size })}</span>
-            <Button variant="secondary" size="sm" onClick={bulkBought} disabled={!selectedIds.size}>
-              <Check size={14} /> {t('sl.markBought')}
-            </Button>
-            <Button variant="danger" size="sm" onClick={bulkDelete} disabled={!selectedIds.size}>
-              <Trash2 size={14} /> {t('common.delete')}
-            </Button>
-            <Button variant="ghost" size="sm" onClick={exitSelect}>{t('common.cancel')}</Button>
-          </div>
-        ) : (
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="flex bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg p-0.5">
-              {(['grid', 'list'] as const).map((v) => (
-                <button
-                  key={v}
-                  onClick={() => setLayout(v)}
-                  title={v === 'grid' ? t('v.grid') : t('v.list')}
-                  className={cn('px-2 py-1.5 rounded-md transition-colors', layout === v ? 'bg-[color:var(--color-accent)] text-black' : 'text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]')}
-                >
-                  {v === 'grid' ? <LayoutGrid size={14} /> : <ListIcon size={14} />}
-                </button>
-              ))}
-            </div>
-            {items.length > 0 && (
-              <Button variant="ghost" size="sm" onClick={() => setSelectMode(true)}>
-                <CheckSquare size={14} /> {t('sl.select')}
-              </Button>
-            )}
-            <Button variant="secondary" onClick={() => cameraRef.current?.click()} disabled={scanning}>
-              {scanning ? <Loader2 size={16} className="animate-spin" /> : <Camera size={16} />} {scanning ? t('sl.scanning') : t('sl.scanProduct')}
-            </Button>
-            <Button variant="primary" onClick={() => { setAddForm(emptyDraft); setShowAdd(true); }}>
-              <Plus size={16} strokeWidth={2.5} /> {t('common.new')}
-            </Button>
-          </div>
-        )}
-        <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => onPhoto(e.target.files?.[0])} />
-      </div>
-
-      {/* E-shop body: filter sidebar + items */}
-      <div className="flex gap-6 items-start">
-        <aside className="hidden lg:block w-56 shrink-0 sticky top-4 self-start">{filterControls}</aside>
-
-        <div className="flex-1 min-w-0">
-          {/* Mobile filter toggle + drawer */}
-          <div className="lg:hidden mb-4">
-            <button
-              onClick={() => setShowFilters((v) => !v)}
-              className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-text-dim)]"
-              style={mono}
-            >
-              <SlidersHorizontal size={14} /> Filters {anyF && <span className="text-[color:var(--color-accent)]">•</span>}
+          <>
+            <span className="text-xs text-[color:var(--color-text-dim)]">{t('sl.selected', { n: selectedIds.size })}</span>
+            <HeaderButton tone="accent" icon={<Check size={14} />} onClick={bulkBought} disabled={!selectedIds.size}>
+              {t('sl.markBought')}
+            </HeaderButton>
+            <HeaderButton className="!border-[color:var(--color-red)] !text-[color:var(--color-red)]" icon={<Trash2 size={14} />} onClick={bulkDelete} disabled={!selectedIds.size}>
+              {t('common.delete')}
+            </HeaderButton>
+            <button onClick={exitSelect} className="text-xs text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)] px-2">
+              {t('common.cancel')}
             </button>
-            {showFilters && <div className="mt-3 p-3 rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)]">{filterControls}</div>}
-          </div>
+          </>
+        ) : (
+          <>
+            {items.length > 0 && (
+              <HeaderButton icon={<CheckSquare size={14} />} onClick={() => setSelectMode(true)}>{t('sl.select')}</HeaderButton>
+            )}
+            <HeaderButton icon={scanning ? <Loader2 size={14} className="animate-spin" /> : <Camera size={14} />} onClick={() => cameraRef.current?.click()} disabled={scanning}>
+              {scanning ? t('sl.scanning') : t('sl.scanProduct')}
+            </HeaderButton>
+            <ViewToggle value={layout} onChange={setLayout} />
+            <PrimaryAction onClick={() => { setAddForm(emptyDraft); setShowAdd(true); }} />
+          </>
+        )}
+      </PageHeader>
+      <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => onPhoto(e.target.files?.[0])} />
 
+      <FilterLayout filters={filterControls} active={anyF}>
           {scanErr && <p className="mb-3 text-xs text-[color:var(--color-red)]">{scanErr}</p>}
 
           {/* Items */}
@@ -374,8 +334,7 @@ export function ShoppingListClient({ initialItems }: { initialItems: SerializedL
               </button>
             </div>
           )}
-        </div>
-      </div>
+      </FilterLayout>
 
       {/* Add an item (matches the other pages' "+ New" modal) */}
       {showAdd && (

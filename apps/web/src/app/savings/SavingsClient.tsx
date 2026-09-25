@@ -1,10 +1,11 @@
 'use client';
+import { PAGE_MAIN, PageHeader } from '@/components/ui/PageHeader';
 import { useMemo, useState, useTransition } from 'react';
 import { useLocale, useT, useMoney } from '@/components/LocaleProvider';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { ResponsiveContainer, AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, ReferenceLine, Legend } from 'recharts';
 import { keepSeriesOrder } from '@/lib/chartOrder';
-import { PiggyBank, Target, TrendingUp, Wallet, Plus, Trash2, Scissors, Check, AlertTriangle } from 'lucide-react';
+import { Target, TrendingUp, Wallet, Plus, Trash2, Scissors, Check, AlertTriangle } from 'lucide-react';
 import {
   balanceOn,
   planForTarget,
@@ -106,13 +107,8 @@ export function SavingsClient({ data }: { data: SavingsData }) {
         : t('sav.basisHistory', { n: baseline.months });
 
   return (
-    <main className="max-w-[1400px] mx-auto px-4 py-6 pb-24">
-      <div className="mb-6">
-        <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2" style={{ fontFamily: 'var(--font-display)' }}>
-          <PiggyBank size={24} className="text-[color:var(--color-accent)]" /> {t('sav.title')}
-        </h1>
-        <p className="text-xs text-[color:var(--color-text-dim)] mt-1">{t('sav.subtitle')}</p>
-      </div>
+    <main className={PAGE_MAIN}>
+      <PageHeader title={t('sav.title')} subtitle={t('sav.subtitle')} />
 
       {/* Honesty first: a forecast built on nothing, or on a balance the app does not
           know, is worth saying out loud ABOVE the number it would otherwise flatter. */}

@@ -2,8 +2,9 @@
 import { ymd } from '@/lib/calendarDay';
 import { useState, useTransition, useMemo } from 'react';
 import { RECURRING_CYCLES, type RecurringCycle } from '@/lib/billingCycle';
-import { Plus, Trash2, Check, Undo2, Archive, ArchiveRestore, CalendarClock, RotateCw, Coins } from 'lucide-react';
+import { Trash2, Check, Undo2, Archive, ArchiveRestore, CalendarClock, RotateCw, Coins } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { PAGE_MAIN, PageHeader, HeaderStat, PrimaryAction, FilterLayout, FilterSection, FilterOptions } from '@/components/ui/PageHeader';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
@@ -142,56 +143,30 @@ export function BillsClient({
   ];
 
   return (
-    <main className="max-w-[1400px] mx-auto px-4 py-6 pb-24">
-      <div className="mb-5 flex items-end justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold" style={{ fontFamily: 'var(--font-display)' }}>
-            Bills
-            <span className="ml-3 text-sm font-normal text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
-              {openBills.length} open
-            </span>
-          </h1>
-          <p className="mt-1 text-sm text-[color:var(--color-text-dim)]">
-            {totalDue > 0 && (
-              <>
-                <span className="text-[color:var(--color-text)] font-semibold">{money(totalDue)}</span> to pay
-              </>
-            )}
-            {overdueCount > 0 && (
-              <span className="ml-2 text-[color:var(--color-red)] font-semibold">· {overdueCount} overdue</span>
-            )}
-          </p>
-        </div>
-        <Button variant="primary" onClick={() => setShowCreate(true)}>
-          <Plus size={16} strokeWidth={2.5} /> New bill
-        </Button>
-      </div>
+    <main className={PAGE_MAIN}>
+      <PageHeader title="Bills" count={`${openBills.length} open`}>
+        {totalDue > 0 && <HeaderStat label="to pay" value={money(totalDue)} color="var(--color-text)" />}
+        {overdueCount > 0 && <HeaderStat label="overdue" value={overdueCount} color="var(--color-red)" />}
+        <PrimaryAction onClick={() => setShowCreate(true)} />
+      </PageHeader>
 
-      <div className="mb-4 flex items-center gap-1.5 flex-wrap">
-        {FILTERS.map((f) => (
-          <button
-            key={f.key}
-            onClick={() => setFilter(f.key)}
-            className={cn(
-              'text-xs px-3 py-1.5 rounded-lg border transition-colors',
-              filter === f.key
-                ? 'border-[color:var(--color-accent)] text-[color:var(--color-accent)]'
-                : 'border-[color:var(--color-border)] text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]'
+      <FilterLayout
+        active={filter !== 'open' || !!spaceFilter}
+        filters={
+          <div className="space-y-4">
+            <FilterSection label="Status">
+              <FilterOptions value={filter} onChange={setFilter} options={FILTERS.map((f) => ({ value: f.key, label: f.label }))} />
+            </FilterSection>
+            {/* #146: hidden until a space is named, like the space field on the form. Inline English,
+                as the rest of this page (see CYCLE_LABELS). */}
+            {spaces.length > 0 && (
+              <FilterSection label="Space">
+                <SearchableSelect value={spaceFilter} onChange={setSpaceFilter} options={spaceFilterOptions(spaces)} labels={{ [NO_SPACE]: 'Unassigned' }} placeholder="All spaces" clearable size="sm" className="w-full" />
+              </FilterSection>
             )}
-            style={{ fontFamily: 'var(--font-mono)' }}
-          >
-            {f.label}
-          </button>
-        ))}
-        {/* #146: hidden until a space is named, like the space field on the form. Inline English,
-            as the rest of this page (see CYCLE_LABELS). */}
-        {spaces.length > 0 && (
-          <div className="ml-auto w-44">
-            <SearchableSelect value={spaceFilter} onChange={setSpaceFilter} options={spaceFilterOptions(spaces)} labels={{ [NO_SPACE]: 'Unassigned' }} placeholder="All spaces" clearable size="sm" className="w-full" />
           </div>
-        )}
-      </div>
-
+        }
+      >
       {visible.length === 0 ? (
         <div className="text-center py-20 text-[color:var(--color-text-faint)]">
           <p className="text-5xl mb-4">🧾</p>
@@ -218,6 +193,7 @@ export function BillsClient({
           ))}
         </div>
       )}
+      </FilterLayout>
 
       <Modal open={showCreate} onClose={() => setShowCreate(false)} title="New bill" size="lg">
         <BillForm categories={categories} spaces={spaces} fx={fx} onSuccess={() => setShowCreate(false)} />

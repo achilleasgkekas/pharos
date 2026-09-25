@@ -4,10 +4,8 @@ import { isForeignCurrency, normalizeCurrency, convertToBase, deriveFxRate } fro
 import { FxBadge } from '@/components/FxBadge';
 import { FxRateButton } from '@/components/FxRateButton';
 import { useState, useTransition, useRef, useMemo } from 'react';
-import {
-  Upload, Loader2, Trash2, CheckCircle2, AlertTriangle, FileText, FileSpreadsheet, Repeat, Wallet, Search, Plus, X, Camera, Sparkles,
-  LayoutGrid, List as ListIcon, SlidersHorizontal, MapPin, Users, Split as SplitIcon, Landmark, Copy, Check, Pencil, CreditCard,
-} from 'lucide-react';
+import { Upload, Loader2, Trash2, CheckCircle2, AlertTriangle, FileText, FileSpreadsheet, Repeat, Wallet, Search, Plus, X, Camera, Sparkles, MapPin, Users, Split as SplitIcon, Landmark, Copy, Check, Pencil, CreditCard } from 'lucide-react';
+import { PAGE_MAIN, PageHeader, HeaderButton, ViewToggle, PrimaryAction, FilterLayout } from '@/components/ui/PageHeader';
 import { Modal } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
@@ -81,7 +79,6 @@ export function ExpensesClient({ kind, expenses, cards, vendors, ollamaUp, categ
   const [statusFilter, setStatusFilter] = useState<'all' | Status>('all');
   const [sortBy, setSortBy] = useState<'recent' | 'oldest' | 'amount-desc' | 'amount-asc' | 'vendor'>('recent');
   const [layout, setLayout] = useState<'grid' | 'list'>('grid');
-  const [showFilters, setShowFilters] = useState(false);
   const [rescanning, setRescanning] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
@@ -258,100 +255,80 @@ export function ExpensesClient({ kind, expenses, cards, vendors, ollamaUp, categ
   );
 
   return (
-    <main className="max-w-[1400px] mx-auto px-4 py-6 pb-24">
-      {/* Header */}
-      <div className="mb-5">
-        <div className="flex items-end justify-between gap-4 flex-wrap">
-          <h1 className="text-2xl md:text-3xl font-bold" style={{ fontFamily: 'var(--font-display)' }}>
-            {label}<span className="ml-3 text-sm font-normal text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>{expenses.length}</span>
-          </h1>
-          <div className="flex items-center gap-2 sm:gap-4 flex-wrap text-xs text-[color:var(--color-text-dim)]" style={{ fontFamily: 'var(--font-mono)' }}>
-            <button onClick={() => setCreating(true)} className="flex items-center gap-1 text-[color:var(--color-accent)] hover:opacity-80"><Plus size={13} /> {t('common.add')}</button>
-            <button onClick={() => setImportingCsv(true)} className="flex items-center gap-1 text-[color:var(--color-text-dim)] hover:text-[color:var(--color-accent)]" title={t('csv.title')}><FileSpreadsheet size={13} /> {t('csv.button')}</button>
-            <button onClick={() => setFindingDupes(true)} className="flex items-center gap-1 text-[color:var(--color-text-dim)] hover:text-[color:var(--color-accent)]" title={t(isIncome ? 'exdup.titleIncome' : 'exdup.title')}><Copy size={13} /> {t('exdup.button')}</button>
-            {!isIncome && balances.length > 0 && (
-              <button onClick={() => setShowBalances(true)} className="flex items-center gap-1 text-[color:var(--color-cyan)] hover:opacity-80" title={t('ex.balancesTitle')}>
-                <Users size={13} /> {t('ex.balancesBtn')}{totalOwedToYou > 0.009 ? ` · ${money(totalOwedToYou)}` : ''}
-              </button>
-            )}
-            <div className="flex bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg p-0.5">
-              {([['grid', <LayoutGrid key="g" size={14} />], ['list', <ListIcon key="l" size={14} />]] as const).map(([v, icon]) => (
-                <button key={v} onClick={() => setLayout(v)} className={cn('px-2 py-1 rounded-md transition-colors', layout === v ? 'bg-[color:var(--color-accent)] text-black' : 'text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]')}>{icon}</button>
-              ))}
-            </div>
-            {visible.length > 0 && (
-              selectMode ? (
-                <>
-                  {selectedIds.size > 0 && (
-                    <button onClick={openBulkEdit} title={t('ex.bulkEditTitle')} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap bg-[color:var(--color-surface-2)] border border-[color:var(--color-cyan)] text-[color:var(--color-cyan)] hover:opacity-80 transition-colors">
-                      <Pencil size={14} /> {t('ex.editN', { n: selectedIds.size })}
-                    </button>
-                  )}
-                  <button onClick={selectedIds.size === visible.length ? clearSelection : selectAllFiltered} className="px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] transition-colors">
-                    {selectedIds.size === visible.length ? t('common.deselectAll') : t('trash.selectAllN', { n: visible.length })}
-                  </button>
-                  <button onClick={exitSelectMode} className="text-xs text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)] px-2">
-                    {t('common.cancel')}
-                  </button>
-                </>
-              ) : (
-                <button onClick={() => setSelectMode(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-text-dim)] hover:text-[color:var(--color-accent)] hover:border-[color:var(--color-accent)] transition-colors">
-                  <Check size={14} /> {t('ex.select')}
-                </button>
-              )
-            )}
-            {failed.length > 0 && (
-              <button onClick={rescanAllFailed} disabled={rescanning} className="text-[color:var(--color-cyan)] hover:text-[color:var(--color-accent)] disabled:opacity-60" title="Re-scan empty records (amount 0) with OCR">
-                {rescanning ? t('ex.rescanning') : t('ex.failedRescan', { n: failed.length })}
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Totals */}
-      <div className="grid grid-cols-2 gap-3 mb-5">
-        <div className="rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-4">
-          <p className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)] mb-1" style={{ fontFamily: 'var(--font-mono)' }}>{t('ex.thisMonth')}</p>
-          <p className={cn('text-2xl font-bold', isIncome ? 'text-[color:var(--color-accent)]' : 'text-[color:var(--color-gold)]')} style={{ fontFamily: 'var(--font-display)' }}>{money(monthTotal)}</p>
-        </div>
-        <div className="rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-4">
-          <p className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)] mb-1" style={{ fontFamily: 'var(--font-mono)' }}>{t('ex.thisYear')}</p>
-          <p className="text-2xl font-bold" style={{ fontFamily: 'var(--font-display)' }}>{money(yearTotal)}</p>
-        </div>
-      </div>
-
-      {/* Dropzone */}
-      <div
-        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={(e) => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }}
-        onClick={() => !uploading && fileRef.current?.click()}
-        className={cn('border-2 border-dashed rounded-2xl p-8 mb-6 text-center cursor-pointer transition-all', dragOver ? 'border-[color:var(--color-accent)] bg-[#00ff8808]' : 'border-[color:var(--color-border)] hover:border-[color:var(--color-border-light)]', uploading && 'pointer-events-none opacity-70')}
-      >
-        <input ref={fileRef} type="file" accept="image/*,application/pdf,.pdf" multiple className="hidden" onChange={(e) => handleFiles(e.target.files)} />
-        {uploading ? (
-          <div className="flex flex-col items-center gap-2 text-[color:var(--color-cyan)]"><Loader2 size={28} className="animate-spin" /><p className="text-sm">{uploadMsg}</p></div>
-        ) : (
-          <div className="flex flex-col items-center gap-2 text-[color:var(--color-text-dim)]">
-            <Upload size={28} />
-            <p className="text-sm font-medium text-[color:var(--color-text)]">{t('ex.dropBill', { doc: isIncome ? t('ex.payslip') : t('ex.invoice') })}</p>
-            <p className="text-xs text-[color:var(--color-text-faint)]">{ollamaUp ? t('ex.aiReads') : t('ex.manualEntry')}</p>
-            <button type="button" onClick={(e) => { e.stopPropagation(); cameraRef.current?.click(); }} className="mt-2 flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-text)] hover:border-[color:var(--color-accent)] transition-colors"><Camera size={14} /> {t('ex.takePhoto')}</button>
-          </div>
+    <main className={PAGE_MAIN}>
+      <PageHeader title={label} count={expenses.length}>
+        {!isIncome && balances.length > 0 && (
+          <HeaderButton tone="cyan" icon={<Users size={14} />} onClick={() => setShowBalances(true)} title={t('ex.balancesTitle')}>
+            {t('ex.balancesBtn')}{totalOwedToYou > 0.009 ? ` · ${money(totalOwedToYou)}` : ''}
+          </HeaderButton>
         )}
-        <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => handleFiles(e.target.files)} />
-      </div>
+        {failed.length > 0 && (
+          <HeaderButton tone="cyan" onClick={rescanAllFailed} disabled={rescanning} title="Re-scan empty records (amount 0) with OCR">
+            {rescanning ? t('ex.rescanning') : t('ex.failedRescan', { n: failed.length })}
+          </HeaderButton>
+        )}
+        {visible.length > 0 && (
+          selectMode ? (
+            <>
+              {selectedIds.size > 0 && (
+                <HeaderButton tone="cyan" icon={<Pencil size={14} />} onClick={openBulkEdit} title={t('ex.bulkEditTitle')}>
+                  {t('ex.editN', { n: selectedIds.size })}
+                </HeaderButton>
+              )}
+              <HeaderButton onClick={selectedIds.size === visible.length ? clearSelection : selectAllFiltered}>
+                {selectedIds.size === visible.length ? t('common.deselectAll') : t('trash.selectAllN', { n: visible.length })}
+              </HeaderButton>
+              <button onClick={exitSelectMode} className="text-xs text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)] px-2">
+                {t('common.cancel')}
+              </button>
+            </>
+          ) : (
+            <HeaderButton icon={<Check size={14} />} onClick={() => setSelectMode(true)}>{t('ex.select')}</HeaderButton>
+          )
+        )}
+        <HeaderButton icon={<Copy size={14} />} onClick={() => setFindingDupes(true)} title={t(isIncome ? 'exdup.titleIncome' : 'exdup.title')} className="hidden sm:flex">
+          {t('exdup.button')}
+        </HeaderButton>
+        <HeaderButton icon={<FileSpreadsheet size={14} />} onClick={() => setImportingCsv(true)} title={t('csv.title')}>
+          {t('csv.button')}
+        </HeaderButton>
+        <ViewToggle value={layout} onChange={setLayout} />
+        <PrimaryAction onClick={() => setCreating(true)} />
+      </PageHeader>
 
-      {/* E-shop body */}
-      <div className="flex gap-6 items-start">
-        <aside className="hidden lg:block w-56 shrink-0 sticky top-4 self-start">{filterControls}</aside>
-        <div className="flex-1 min-w-0">
-          <div className="lg:hidden mb-4">
-            <button onClick={() => setShowFilters((v) => !v)} className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-text-dim)]" style={{ fontFamily: 'var(--font-mono)' }}>
-              <SlidersHorizontal size={14} /> {t('ex.filters')} {anyFilter && <span className="text-[color:var(--color-accent)]">•</span>}
-            </button>
-            {showFilters && <div className="mt-3 p-3 rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)]">{filterControls}</div>}
+      <FilterLayout filters={filterControls} active={anyFilter}>
+          {/* Totals */}
+          <div className="grid grid-cols-2 gap-3 mb-5">
+            <div className="rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-4">
+              <p className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)] mb-1" style={{ fontFamily: 'var(--font-mono)' }}>{t('ex.thisMonth')}</p>
+              <p className={cn('text-2xl font-bold', isIncome ? 'text-[color:var(--color-accent)]' : 'text-[color:var(--color-gold)]')} style={{ fontFamily: 'var(--font-display)' }}>{money(monthTotal)}</p>
+            </div>
+            <div className="rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-4">
+              <p className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)] mb-1" style={{ fontFamily: 'var(--font-mono)' }}>{t('ex.thisYear')}</p>
+              <p className="text-2xl font-bold" style={{ fontFamily: 'var(--font-display)' }}>{money(yearTotal)}</p>
+            </div>
+          </div>
+
+          {/* Dropzone */}
+          <div
+            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={(e) => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }}
+            onClick={() => !uploading && fileRef.current?.click()}
+            className={cn('border-2 border-dashed rounded-2xl p-8 mb-6 text-center cursor-pointer transition-all', dragOver ? 'border-[color:var(--color-accent)] bg-[#00ff8808]' : 'border-[color:var(--color-border)] hover:border-[color:var(--color-border-light)]', uploading && 'pointer-events-none opacity-70')}
+          >
+            <input ref={fileRef} type="file" accept="image/*,application/pdf,.pdf" multiple className="hidden" onChange={(e) => handleFiles(e.target.files)} />
+            {uploading ? (
+              <div className="flex flex-col items-center gap-2 text-[color:var(--color-cyan)]"><Loader2 size={28} className="animate-spin" /><p className="text-sm">{uploadMsg}</p></div>
+            ) : (
+              <div className="flex flex-col items-center gap-2 text-[color:var(--color-text-dim)]">
+                <Upload size={28} />
+                <p className="text-sm font-medium text-[color:var(--color-text)]">{t('ex.dropBill', { doc: isIncome ? t('ex.payslip') : t('ex.invoice') })}</p>
+                <p className="text-xs text-[color:var(--color-text-faint)]">{ollamaUp ? t('ex.aiReads') : t('ex.manualEntry')}</p>
+                <button type="button" onClick={(e) => { e.stopPropagation(); cameraRef.current?.click(); }} className="mt-2 flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-text)] hover:border-[color:var(--color-accent)] transition-colors"><Camera size={14} /> {t('ex.takePhoto')}</button>
+              </div>
+            )}
+            <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => handleFiles(e.target.files)} />
           </div>
           <div className="flex items-center justify-between mb-3">
             <span className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
@@ -396,8 +373,7 @@ export function ExpensesClient({ kind, expenses, cards, vendors, ollamaUp, categ
               ))}
             </div>
           )}
-        </div>
-      </div>
+      </FilterLayout>
 
       {selected && (
         <ExpenseDetail expense={selected} cards={cards} vendors={vendors} categories={categories} spaces={spaces} fx={fx} seriesCount={selected.vendorKey ? seriesCount[seriesGroupKey(selected)] || 1 : 1} seriesByVendor={seriesByVendor} onClose={() => setSelected(null)} onChanged={() => router.refresh()} confirm={confirm} />
