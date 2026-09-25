@@ -580,6 +580,7 @@ export const en = {
   'ex.fFxRate': 'Rate ({base} per 1 {code})',
   'ex.fFxCharged': 'or charged ({cur})',
   'ex.fxNoRate': 'no rate yet, kept as printed (not converted to {base})',
+  'ex.totalsNoRate': '{n} without an exchange rate, not included',
   // Optional rate feed (P9 phase 2) — a suggestion the user accepts, never auto-applied.
   'fx.marketRate': 'Market rate',
   'fx.marketRateHint': 'Fetch the ECB reference rate (a suggestion, not what your card was charged)',

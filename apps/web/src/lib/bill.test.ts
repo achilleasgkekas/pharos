@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   billDaysUntilDue, billStatus, billIsOpen, nextBillDue,
-  billPaidAmount, billRemaining, billPaymentState, billIsSettledByPayments,
+  billPaidAmount, billNeedsRate, billRemaining, billPaymentState, billIsSettledByPayments,
 } from './bill';
 
 const DAY = 86400000;
@@ -76,44 +76,44 @@ describe('billPaidAmount', () => {
 
 describe('billRemaining', () => {
   it('is the full amount when nothing was paid', () => {
-    expect(billRemaining(120, [])).toBe(120);
+    expect(billRemaining({ amount: 120, payments: [] }, 'EUR')).toBe(120);
   });
   it('subtracts the instalments', () => {
-    expect(billRemaining(120, [{ amount: 50 }, { amount: 20 }])).toBe(50);
+    expect(billRemaining({ amount: 120, payments: [{ amount: 50 }, { amount: 20 }] }, 'EUR')).toBe(50);
   });
   it('never goes negative on an overpayment', () => {
-    expect(billRemaining(100, [{ amount: 150 }])).toBe(0);
+    expect(billRemaining({ amount: 100, payments: [{ amount: 150 }] }, 'EUR')).toBe(0);
   });
   it('is zero once the bill is explicitly paid', () => {
-    expect(billRemaining(100, [{ amount: 20 }], iso(-1))).toBe(0);
+    expect(billRemaining({ amount: 100, payments: [{ amount: 20 }], paidAt: iso(-1) }, 'EUR')).toBe(0);
   });
 });
 
 describe('billPaymentState', () => {
   it('unpaid when nothing was logged', () => {
-    expect(billPaymentState(100, [])).toBe('unpaid');
+    expect(billPaymentState({ amount: 100, payments: [] }, 'EUR')).toBe('unpaid');
   });
   it('partially-paid while a balance remains', () => {
-    expect(billPaymentState(100, [{ amount: 40 }])).toBe('partially-paid');
+    expect(billPaymentState({ amount: 100, payments: [{ amount: 40 }] }, 'EUR')).toBe('partially-paid');
   });
   it('paid once the instalments cover the amount', () => {
-    expect(billPaymentState(100, [{ amount: 60 }, { amount: 40 }])).toBe('paid');
-    expect(billPaymentState(100, [{ amount: 120 }])).toBe('paid');
+    expect(billPaymentState({ amount: 100, payments: [{ amount: 60 }, { amount: 40 }] }, 'EUR')).toBe('paid');
+    expect(billPaymentState({ amount: 100, payments: [{ amount: 120 }] }, 'EUR')).toBe('paid');
   });
   it('an explicit paidAt wins over the instalments', () => {
-    expect(billPaymentState(100, [{ amount: 40 }], iso(-1))).toBe('paid');
+    expect(billPaymentState({ amount: 100, payments: [{ amount: 40 }], paidAt: iso(-1) }, 'EUR')).toBe('paid');
   });
   it('a zero-amount bill is never auto-settled by a payment', () => {
-    expect(billPaymentState(0, [{ amount: 10 }])).toBe('partially-paid');
+    expect(billPaymentState({ amount: 0, payments: [{ amount: 10 }] }, 'EUR')).toBe('partially-paid');
   });
 });
 
 describe('billIsSettledByPayments', () => {
   it('true only when a real total is covered', () => {
-    expect(billIsSettledByPayments(100, [{ amount: 100 }])).toBe(true);
-    expect(billIsSettledByPayments(100, [{ amount: 99.99 }])).toBe(false);
-    expect(billIsSettledByPayments(0, [{ amount: 5 }])).toBe(false);
-    expect(billIsSettledByPayments(100, [])).toBe(false);
+    expect(billIsSettledByPayments({ amount: 100, payments: [{ amount: 100 }] }, 'EUR')).toBe(true);
+    expect(billIsSettledByPayments({ amount: 100, payments: [{ amount: 99.99 }] }, 'EUR')).toBe(false);
+    expect(billIsSettledByPayments({ amount: 0, payments: [{ amount: 5 }] }, 'EUR')).toBe(false);
+    expect(billIsSettledByPayments({ amount: 100, payments: [] }, 'EUR')).toBe(false);
   });
 });
 
@@ -121,7 +121,39 @@ describe('billStatus with partial payments (orthogonality)', () => {
   it('a half-paid overdue bill still reports overdue, not progress', () => {
     // billStatus knows nothing about payments by design — urgency is never masked.
     expect(billStatus(iso(-5), null, NOW)).toBe('overdue');
-    expect(billPaymentState(100, [{ amount: 40 }])).toBe('partially-paid');
+    expect(billPaymentState({ amount: 100, payments: [{ amount: 40 }] }, 'EUR')).toBe('partially-paid');
+  });
+});
+
+describe('#297: a foreign bill with no exchange rate', () => {
+  // $100 printed, no rate: `amount` still holds 100, but it is dollars, not euros.
+  const noRate = { amount: 100, currency: 'USD', origAmount: 100, fxRate: 0 };
+
+  it('is flagged by billNeedsRate, and stops being flagged once a rate is in', () => {
+    expect(billNeedsRate(noRate, 'EUR')).toBe(true);
+    expect(billNeedsRate({ ...noRate, amount: 92, fxRate: 0.92 }, 'EUR')).toBe(false);
+    // Printed in the base currency after all: nothing to convert.
+    expect(billNeedsRate(noRate, 'USD')).toBe(false);
+  });
+
+  it('has no base-currency remaining, rather than the printed figure', () => {
+    expect(billRemaining(noRate, 'EUR')).toBeNull();
+    expect(billRemaining({ ...noRate, payments: [{ amount: 40 }] }, 'EUR')).toBeNull();
+    // Once explicitly paid there is nothing left, whatever the currency.
+    expect(billRemaining({ ...noRate, paidAt: iso(-1) }, 'EUR')).toBe(0);
+  });
+
+  it('is never settled by base-currency instalments that numerically reach the printed amount', () => {
+    const paid = { ...noRate, payments: [{ amount: 60 }, { amount: 40 }] };
+    expect(billIsSettledByPayments(paid, 'EUR')).toBe(false);
+    expect(billPaymentState(paid, 'EUR')).toBe('partially-paid');
+    expect(billPaymentState(noRate, 'EUR')).toBe('unpaid');
+  });
+
+  it('settles normally once converted: EUR 92 of instalments cover $100 @ 0.92', () => {
+    const converted = { ...noRate, amount: 92, fxRate: 0.92, payments: [{ amount: 92 }] };
+    expect(billIsSettledByPayments(converted, 'EUR')).toBe(true);
+    expect(billRemaining({ ...converted, payments: [{ amount: 50 }] }, 'EUR')).toBe(42);
   });
 });
 

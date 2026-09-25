@@ -197,6 +197,7 @@ export const de: Partial<Dict> = {
   'ex.fFxRate': 'Kurs ({base} pro 1 {code})',
   'ex.fFxCharged': 'oder belastet ({cur})',
   'ex.fxNoRate': 'noch kein Kurs, wie gedruckt behalten (nicht in {base} umgerechnet)',
+  'ex.totalsNoRate': '{n} ohne Wechselkurs, nicht enthalten',
   'fx.marketRate': 'Marktkurs',
   'fx.marketRateHint': 'Den EZB-Referenzkurs abrufen (ein Vorschlag, nicht der deiner Karte belastete Betrag)',
   'fx.rateAsOf': 'EZB {date}',

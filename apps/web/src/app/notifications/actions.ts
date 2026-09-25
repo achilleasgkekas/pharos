@@ -14,7 +14,7 @@ import { SpecialDate as SpecialDateModel } from '@/models/SpecialDate';
 import { withRequestTenant, resolveRequestTenantOrNull } from '@/lib/tenancy/request';
 import { currentModel } from '@/lib/tenancy/connection';
 import { currentTenant, withTenant } from '@/lib/tenancy/current';
-import { billDaysUntilDue, billRemaining } from '@/lib/bill';
+import { billDaysUntilDue, billRemaining, type BillMoney } from '@/lib/bill';
 import { collectMaintenanceDue, MAINTENANCE_STATUSES, type MaintenanceRow } from '@/lib/maintenance';
 import { collectLendingOverdue, LENDING_STATUSES, type LendingRow } from '@/lib/lending';
 import { collectStaleClaims, CLAIM_STATUSES_APPLY_TO, type StaleClaimRow } from '@/lib/warrantyClaims';
@@ -179,8 +179,11 @@ async function computeAlerts(): Promise<Alert[]> {
   // re-alerts; it auto-expires once the bill is paid (leaves the query). Overdue
   // ones keep nagging (no lower bound) until paid.
   const openBills = (await Bill.find({ paidAt: null, archived: { $ne: true } })
-    .select('title vendor amount dueDate payments')
-    .lean()) as Array<{ _id: unknown; title: string; vendor?: string; amount?: number; dueDate?: string | Date | null; payments?: { amount?: number }[] }>;
+    // `currency origAmount fxRate`: billRemaining needs them to tell a base-currency amount from
+    // a printed foreign one still waiting for its rate (#297). Leaving them out of the projection
+    // would make every bill look base-denominated.
+    .select('title vendor amount currency origAmount fxRate dueDate payments')
+    .lean()) as Array<BillMoney & { _id: unknown; title: string; vendor?: string; dueDate?: string | Date | null }>;
   for (const b of openBills) {
     const days = billDaysUntilDue(b.dueDate ?? null, now);
     if (days === null || days > s.billAlertDays) continue;
@@ -189,11 +192,15 @@ async function computeAlerts(): Promise<Alert[]> {
     // body = "<days>|<amount>" (raw; days<0 = overdue; the bell formats with the symbol).
     // P61: the figure is what is STILL OWED, so an alert on a part-paid bill quotes the
     // balance you actually have to hand over, not the original total.
+    // #297: a foreign bill with no exchange rate has no base-currency balance, so the alert
+    // quotes its PRINTED total with its own code ("<days>|<amount>|<ISO>") instead of passing
+    // dollars off as euros under the base symbol.
+    const remaining = billRemaining({ ...b, paidAt: null }, s.currency);
     alerts.push({
       dedupeKey: `bill:${id}:${iso}`,
       kind: 'bill',
       title: b.title,
-      body: `${days}|${billRemaining(b.amount, b.payments, null)}`,
+      body: remaining === null ? `${days}|${Number(b.origAmount) || 0}|${b.currency}` : `${days}|${remaining}`,
       href: '/bills',
     });
   }

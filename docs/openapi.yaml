@@ -2426,11 +2426,24 @@ components:
             `overdue`. Use `paymentState` for how much of it has been settled.
           enum: [paid, overdue, due-soon, upcoming]
         paidAmount: { type: number, description: 'Sum of the logged instalments, base currency. 0 for a bill paid in one go.' }
-        remaining: { type: number, description: 'Still owed (`amount` minus `paidAmount`, never negative). 0 once `paidAt` is set.' }
+        remaining:
+          type: [number, 'null']
+          description: >-
+            Still owed in base currency (`amount` minus `paidAmount`, never negative). 0 once
+            `paidAt` is set. `null` while `needsFxRate` is true: the printed foreign amount
+            cannot be netted against base-currency instalments, so leave the bill out of any
+            base-currency total rather than add it in.
         paymentState:
           type: string
-          description: Payment progress, derived from `amount`, `payments` and `paidAt`.
+          description: >-
+            Payment progress, derived from `amount`, `payments` and `paidAt`. A bill with
+            `needsFxRate` is never `paid` through its instalments alone.
           enum: [unpaid, partially-paid, paid]
+        needsFxRate:
+          type: boolean
+          description: >-
+            Foreign bill saved without an exchange rate: `amount` still holds the printed
+            figure in `currency`, not base currency. Set `fxRate` to convert it.
         payments:
           type: array
           description: >-

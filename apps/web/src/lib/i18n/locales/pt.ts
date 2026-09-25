@@ -197,6 +197,7 @@ export const pt: Partial<Dict> = {
   'ex.fFxRate': 'Taxa ({base} por 1 {code})',
   'ex.fFxCharged': 'ou cobrado ({cur})',
   'ex.fxNoRate': 'ainda sem taxa, mantido como impresso (não convertido para {base})',
+  'ex.totalsNoRate': '{n} sem taxa de câmbio, não incluídos',
   'fx.marketRate': 'Taxa de mercado',
   'fx.marketRateHint': 'Obtém a taxa de referência do BCE (uma sugestão, não o que foi cobrado ao teu cartão)',
   'fx.rateAsOf': 'BCE {date}',
