@@ -37,6 +37,19 @@ backups/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+.lock-*
+
+# python / test / build caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.venv/
+venv/
+.vite/
+lint_*.json
+lint_*.txt
+eslint_report.json
 
 # data exports
 tracker-export.json

@@ -6,7 +6,6 @@ on:
     # docs/openapi.yaml is not excluded: route coverage tests read it.
     paths-ignore: ['**/*.md']
   pull_request:
-    paths-ignore: ['**/*.md']
   # Lets a human (or `gh workflow run CI`) re-run the gate on demand — e.g. to confirm
   # the pipeline is alive after it has been disabled, without pushing a dummy commit.
   workflow_dispatch:
