@@ -66,6 +66,10 @@ const AppConfigSchema = new Schema(
     multiCurrency: { type: Boolean, default: false },
     defaultVatRate: { type: Number, default: 24 }, // fallback VAT/sales-tax % when a receipt doesn't show one
     defaultReturnWindowDays: { type: Number, default: 14 }, // return window (days) unless a store overrides it; 0 = off
+    // Shopping country (#319): price searches keep only this country's shops plus the foreign
+    // shops listed below that ship there. '' = off, search everywhere as before.
+    shoppingCountry: { type: String, default: '' },
+    shoppingExtraShops: { type: [String], default: [] },
     // User-editable dropdown lists (category taxonomies). Map taxonomyKey → string[].
     lists: { type: Schema.Types.Mixed, default: {} },
 

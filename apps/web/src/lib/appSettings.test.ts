@@ -44,6 +44,13 @@ describe('numMap', () => {
 });
 
 describe('normalizeSettings', () => {
+  it('keeps a known shopping country and cleans its shop list; an unknown country is off (#319)', () => {
+    const on = normalizeSettings({ shoppingCountry: 'gr', shoppingExtraShops: ['https://www.amazon.de/', 'bogus', 'amazon.de'] });
+    expect(on.shoppingCountry).toBe('GR');
+    expect(on.shoppingExtraShops).toEqual(['amazon.de']);
+    expect(normalizeSettings({ shoppingCountry: 'XX' }).shoppingCountry).toBe('');
+  });
+
   it('returns all hard defaults for null/undefined/empty doc', () => {
     const expected = {
       defaultItemView: 'grid',
@@ -65,6 +72,8 @@ describe('normalizeSettings', () => {
       multiCurrency: false,
       defaultVatRate: 24,
       defaultReturnWindowDays: 14,
+      shoppingCountry: '',
+      shoppingExtraShops: [],
       expenseCategories: DEFAULT_EXPENSE_CATEGORIES,
       itemCategories: DEFAULT_ITEM_CATEGORIES,
       subscriptionCategories: DEFAULT_SUBSCRIPTION_CATEGORIES,

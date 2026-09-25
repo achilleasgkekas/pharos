@@ -227,6 +227,14 @@ beforeEach(() => {
 });
 
 describe('saveDefaults', () => {
+  it('stores the shopping country and a cleaned shop list; an unknown country turns it off (#319)', async () => {
+    await saveDefaults(formData({ shoppingCountry: 'gr', shoppingExtraShops: 'https://www.amazon.de/, amazon.it, not a shop' }));
+    await saveDefaults(formData({ shoppingCountry: 'XX', shoppingExtraShops: 'amazon.de' }));
+    const set = (i: number) => (appConfigUpdateOne.mock.calls[i][1] as { $set: Record<string, unknown> }).$set;
+    expect(set(0)).toMatchObject({ shoppingCountry: 'GR', shoppingExtraShops: ['amazon.de', 'amazon.it'] });
+    expect(set(1)).toMatchObject({ shoppingCountry: '', shoppingExtraShops: [] });
+  });
+
   it('is gated by assertCanWrite, not requireAdmin', async () => {
     await saveDefaults(formData({}));
     expect(assertCanWriteMock).toHaveBeenCalledTimes(1);
@@ -269,6 +277,8 @@ describe('saveDefaults', () => {
       multiCurrency: false,
       defaultVatRate: 24,
       defaultReturnWindowDays: 0,
+      shoppingCountry: '',
+      shoppingExtraShops: [],
     });
   });
 

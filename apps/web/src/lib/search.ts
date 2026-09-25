@@ -19,10 +19,11 @@ async function searxJson(params: Record<string, string>): Promise<{ results?: Re
   return res.json();
 }
 
-/** General web search → top results (title, url, snippet). */
-export async function searchWeb(query: string, max = 6): Promise<WebResult[]> {
+/** General web search → top results (title, url, snippet). `language` (e.g. 'el-GR') asks
+ *  SearXNG for results in that language/region (#319); omitted = SearXNG's own default. */
+export async function searchWeb(query: string, max = 6, opts: { language?: string } = {}): Promise<WebResult[]> {
   try {
-    const data = await searxJson({ q: query });
+    const data = await searxJson(opts.language ? { q: query, language: opts.language } : { q: query });
     return (data.results ?? [])
       .filter((r) => typeof r.url === 'string')
       .slice(0, max)
