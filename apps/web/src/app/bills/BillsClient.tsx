@@ -9,6 +9,8 @@ import { Modal } from '@/components/ui/Modal';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { useOpenParam } from '@/components/useOpenParam';
 import { cn } from '@/components/ui/cn';
+import { SearchableSelect } from '@/components/ui/SearchableSelect';
+import { NO_SPACE, matchesSpace, spaceFilterOptions } from '@/lib/spaceFilter';
 import { cur, currencySymbol, CURRENCIES } from '@/lib/money';
 import { convertToBase, deriveFxRate, formatMoney, isForeignCurrency, normalizeCurrency } from '@/lib/fx';
 import { FxBadge } from '@/components/FxBadge';
@@ -78,6 +80,7 @@ export function BillsClient({
   const [showCreate, setShowCreate] = useState(false);
   const [editing, setEditing] = useState<SerializedBill | null>(null);
   const [filter, setFilter] = useState<Filter>('open');
+  const [spaceFilter, setSpaceFilter] = useState(''); // #146: same filter as Expenses
   const [pending, startTransition] = useTransition();
 
   // `/bills?open=<id>` opens that bill's edit modal — the convention every other money view
@@ -108,6 +111,7 @@ export function BillsClient({
 
   const visible = useMemo(() => {
     const rows = withStatus.filter(({ b, status, partPaid }) => {
+      if (!matchesSpace(b.space, spaceFilter)) return false;
       if (b.archived) return filter === 'all';
       if (filter === 'open') return status !== 'paid';
       if (filter === 'overdue') return status === 'overdue';
@@ -121,7 +125,7 @@ export function BillsClient({
       if (rank[x.status] !== rank[y.status]) return rank[x.status] - rank[y.status];
       return new Date(x.b.dueDate || 0).getTime() - new Date(y.b.dueDate || 0).getTime();
     });
-  }, [withStatus, filter]);
+  }, [withStatus, filter, spaceFilter]);
 
   const markPaid = (id: string, logExpense: boolean) =>
     startTransition(async () => {
@@ -179,6 +183,13 @@ export function BillsClient({
             {f.label}
           </button>
         ))}
+        {/* #146: hidden until a space is named, like the space field on the form. Inline English,
+            as the rest of this page (see CYCLE_LABELS). */}
+        {spaces.length > 0 && (
+          <div className="ml-auto w-44">
+            <SearchableSelect value={spaceFilter} onChange={setSpaceFilter} options={spaceFilterOptions(spaces)} labels={{ [NO_SPACE]: 'Unassigned' }} placeholder="All spaces" clearable size="sm" className="w-full" />
+          </div>
+        )}
       </div>
 
       {visible.length === 0 ? (

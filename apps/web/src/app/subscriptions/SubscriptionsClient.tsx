@@ -12,6 +12,7 @@ import { Plus, Pencil, Trash2, ExternalLink, Power, Sparkles, Loader2, Search, L
 import { SubscriptionDuplicatesModal } from './SubscriptionDuplicatesModal';
 import { SavedViews } from '@/components/ui/SavedViews';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
+import { NO_SPACE, matchesSpace, spaceFilterOptions } from '@/lib/spaceFilter';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { DateInput } from '@/components/ui/DateInput';
@@ -107,6 +108,7 @@ export function SubscriptionsClient({
   const [editing, setEditing] = useState<SerializedSubscription | null>(null);
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
+  const [spaceFilter, setSpaceFilter] = useState(''); // #146: same filter as Expenses
   const t = useT();
   const money = useMoney();
   // Discovered untracked recurring charges (P7). Ephemeral hide list — "dismiss" is
@@ -162,6 +164,7 @@ export function SubscriptionsClient({
       if (statusFilter === 'active' && !s.active) return false;
       if (statusFilter === 'cancelled' && s.active) return false;
       if (categoryFilter && s.category !== categoryFilter) return false;
+      if (!matchesSpace(s.space, spaceFilter)) return false;
       // P68: "Kalamos" finds every subscription charged to the summer house.
       if (q && !`${s.name} ${s.provider} ${s.notes} ${s.space || ''}`.toLowerCase().includes(q)) return false;
       return true;
@@ -177,17 +180,18 @@ export function SubscriptionsClient({
           return compareNames(a.name, b.name, locale);
       }
     });
-  }, [subscriptions, search, categoryFilter, statusFilter, sortBy, locale]);
+  }, [subscriptions, search, categoryFilter, spaceFilter, statusFilter, sortBy, locale]);
 
-  const anyF = !!(search || categoryFilter || statusFilter !== 'all' || sortBy !== 'name');
+  const anyF = !!(search || categoryFilter || spaceFilter || statusFilter !== 'all' || sortBy !== 'name');
   const fLabel = 'text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-[0.12em] mb-1.5';
 
   // P87: saved filter presets for Subscriptions (same reusable primitive as Items).
-  const currentView = { search, categoryFilter, statusFilter, sortBy };
+  const currentView = { search, categoryFilter, spaceFilter, statusFilter, sortBy };
   type SubsView = typeof currentView;
   const applyView = (v: SubsView) => {
     setSearch(v.search ?? '');
     setCategoryFilter(v.categoryFilter ?? '');
+    setSpaceFilter(v.spaceFilter ?? ''); // views saved before #146 have none
     setStatusFilter((v.statusFilter as typeof statusFilter) ?? 'all');
     setSortBy((v.sortBy as typeof sortBy) ?? 'name');
   };
@@ -218,6 +222,12 @@ export function SubscriptionsClient({
           <SearchableSelect value={categoryFilter} onChange={setCategoryFilter} options={categories} placeholder={t('sub.allCategories')} clearable size="sm" className="w-full" />
         </div>
       )}
+      {spaces.length > 0 && (
+        <div>
+          <p className={fLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('ex.space')}</p>
+          <SearchableSelect value={spaceFilter} onChange={setSpaceFilter} options={spaceFilterOptions(spaces)} labels={{ [NO_SPACE]: t('ex.spaceNone') }} placeholder={t('ex.allSpaces')} clearable size="sm" className="w-full" />
+        </div>
+      )}
       <div>
         <p className={fLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('common.sort')}</p>
         <select value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)} className={selectClass} style={{ fontFamily: 'var(--font-mono)' }}>
@@ -230,7 +240,7 @@ export function SubscriptionsClient({
         <SavedViews<SubsView> moduleKey="subscriptions" current={currentView} canSave={anyF} onApply={applyView} />
         {anyF && (
           <button
-            onClick={() => { setSearch(''); setCategoryFilter(''); setStatusFilter('all'); setSortBy('name'); }}
+            onClick={() => { setSearch(''); setCategoryFilter(''); setSpaceFilter(''); setStatusFilter('all'); setSortBy('name'); }}
             className="text-[0.65rem] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] underline"
             style={{ fontFamily: 'var(--font-mono)' }}
           >
