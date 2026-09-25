@@ -326,3 +326,63 @@ describe('generateDueRecurring: two subscriptions from one vendor (#231)', () =>
     expect(expenseCreate.mock.calls[0][0].date).toEqual(new Date(Date.UTC(2026, 2, 10)));
   });
 });
+
+describe('generateDueRecurring — recurringFrom cutoff (#298)', () => {
+  const dei = (date: Date, recurringFrom: Date | null, cycle = 'monthly') => ({
+    kind: 'expense',
+    vendor: 'DEI',
+    vendorKey: 'dei',
+    category: 'utilities',
+    amount: 80,
+    date,
+    recurringCycle: cycle,
+    recurringFrom,
+  });
+
+  it('does not backfill a series that stopped two years before a rule made it recurring', async () => {
+    // Last DEI bill Jan 2024; a rule turned it recurring on 2026-03-01. Without the cutoff this
+    // would create 26 phantom bills (Feb 2024 .. Mar 2026).
+    expenseFindSortLean.mockResolvedValue([dei(new Date(Date.UTC(2024, 0, 10)), new Date(Date.UTC(2026, 2, 1)))]);
+    const res = await generateDueRecurring();
+    expect(res).toEqual({ created: 1 });
+    expect(expenseCreate.mock.calls[0][0].date).toEqual(new Date(Date.UTC(2026, 2, 10)));
+  });
+
+  it('walks past more than 36 skipped cycles without hitting the creation cap', async () => {
+    // Weekly series last seen in 2020: ~300 cycles before the cutoff. The skip must not consume
+    // the 36-entry guard, or the series would be stuck creating nothing forever.
+    expenseFindSortLean.mockResolvedValue([
+      dei(new Date(Date.UTC(2020, 0, 6)), new Date(Date.UTC(2026, 1, 20)), 'weekly'),
+    ]);
+    const res = await generateDueRecurring();
+    // Mondays from 2020-01-06 on or after 2026-02-20: Feb 23, Mar 2, Mar 9 (Mar 16 is after now).
+    expect(res).toEqual({ created: 3 });
+    expect(expenseCreate.mock.calls.map((c) => c[0].date)).toEqual([
+      new Date(Date.UTC(2026, 1, 23)),
+      new Date(Date.UTC(2026, 2, 2)),
+      new Date(Date.UTC(2026, 2, 9)),
+    ]);
+  });
+
+  it('keeps the seed calendar: a yearly Jan 1 series stays on Jan 1 after the cutoff', async () => {
+    expenseFindSortLean.mockResolvedValue([
+      dei(new Date(Date.UTC(2022, 0, 1)), new Date(Date.UTC(2025, 8, 25)), 'yearly'),
+    ]);
+    const res = await generateDueRecurring();
+    expect(res).toEqual({ created: 1 });
+    expect(expenseCreate.mock.calls[0][0].date).toEqual(new Date(Date.UTC(2026, 0, 1)));
+  });
+
+  it('still projects a period that falls due on the cutoff day itself', async () => {
+    expenseFindSortLean.mockResolvedValue([dei(new Date(Date.UTC(2025, 0, 10)), new Date(Date.UTC(2026, 2, 10)))]);
+    const res = await generateDueRecurring();
+    expect(res).toEqual({ created: 1 });
+    expect(expenseCreate.mock.calls[0][0].date).toEqual(new Date(Date.UTC(2026, 2, 10)));
+  });
+
+  it('a null recurringFrom keeps the old backfill behaviour', async () => {
+    expenseFindSortLean.mockResolvedValue([dei(new Date(Date.UTC(2025, 11, 10)), null)]);
+    const res = await generateDueRecurring();
+    expect(res).toEqual({ created: 3 }); // Jan, Feb, Mar 2026
+  });
+});

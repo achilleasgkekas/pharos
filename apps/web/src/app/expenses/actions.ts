@@ -163,6 +163,18 @@ export async function generateDueRecurring(): Promise<{ created: number }> {
   for (const seed of seeds) {
     const cycle = String(seed.recurringCycle);
     let next = addCycleUTC(new Date(seed.date), cycle);
+    // #298: periods before `recurringFrom` predate the series being recurring; step past them
+    // on the seed's own calendar (so a yearly Jan 1 bill stays on Jan 1) without creating
+    // anything. This walk does not count against the 36-entry cap below, or a series whose
+    // cutoff sits more than 36 cycles past its last entry would never reach it.
+    if (seed.recurringFrom) {
+      const cutoff = new Date(seed.recurringFrom).getTime();
+      let skip = 0;
+      while (next.getTime() < cutoff && skip < 10000) {
+        next = addCycleUTC(next, cycle);
+        skip++;
+      }
+    }
     let guard = 0;
     while (next.getTime() <= now && guard < 36) {
       guard++;
@@ -753,13 +765,19 @@ export async function applyCategoryRulesToExisting(): Promise<{ ok: boolean; upd
         .select('vendor notes category recurring recurringCycle')
         .lean();
       const ops: AnyBulkWriteOperation<ExpenseDoc>[] = [];
+      // UTC midnight, the same shape as stored dates, so a period falling due today still projects.
+      const t = new Date();
+      const recurringFromToday = new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate()));
       for (const r of rows) {
         const rule = matchCategoryRule(rules, { vendor: r.vendor, description: r.notes });
         if (!rule || rule.category === r.category) continue;
-        const set: Partial<Pick<ExpenseDoc, 'category' | 'recurring' | 'recurringCycle'>> = { category: rule.category };
+        const set: Partial<Pick<ExpenseDoc, 'category' | 'recurring' | 'recurringCycle' | 'recurringFrom'>> = { category: rule.category };
         if (rule.recurring && !r.recurring) {
           set.recurring = true;
           if (rule.recurringCycle) set.recurringCycle = rule.recurringCycle;
+          // #298: the series is recurring from today, not from its old entries. Without this the
+          // next page load backfills every missed period since the series stopped (up to 36).
+          set.recurringFrom = recurringFromToday;
         }
         ops.push({ updateOne: { filter: { _id: r._id }, update: { $set: set } } });
       }
