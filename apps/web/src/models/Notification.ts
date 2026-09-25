@@ -14,6 +14,10 @@ const NotificationSchema = new Schema(
     body: { type: String, default: '' },
     href: { type: String, default: '' }, // deep-link opened on click
     read: { type: Boolean, default: false, index: true },
+    // Deals only: the best price at the moment the user dismissed the alert. The key stays
+    // `deal:<id>`, so a dismissal would otherwise silence the item forever; with this, the
+    // reconcile brings the alert back only when the price beats what was turned down (#253).
+    dismissedAtPrice: { type: Number, default: null },
   },
   { timestamps: true }
 );
