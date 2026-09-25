@@ -2,7 +2,8 @@ import { config } from './config.js';
 import { Item } from './db.js';
 import { fetchPageText, storeFromUrl } from './scrape.js';
 import { extractPrice, isOllamaHealthy } from './extract.js';
-import { getScraperAiConfig } from './appConfig.js';
+import { getScraperAiConfig, getShoppingMarket } from './appConfig.js';
+import { isInMarket } from './shoppingRegion.js';
 import { notify } from './notify.js';
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -26,6 +27,12 @@ export async function runOnce(): Promise<{ items: number; checks: number; update
     console.log(`[scrape] AI: Ollama · ${ai.model}`);
   }
 
+  // Shopping market (#319): alerts only count shops the user can buy from. Prices from every
+  // link are still recorded and still set currentPrice; only the alert decisions are filtered.
+  const market = await getShoppingMarket();
+  const inMarket = (url: string | undefined | null) => isInMarket(url, market);
+  if (market) console.log(`[scrape] alerts limited to the ${market.country} market`);
+
   const query = Item.find({ 'links.0': { $exists: true } }).sort({ updatedAt: 1 });
   if (config.limit > 0) query.limit(config.limit);
   const items = await query;
@@ -36,13 +43,15 @@ export async function runOnce(): Promise<{ items: number; checks: number; update
     if (links.length === 0) continue;
     stats.items++;
 
-    const known = (item.priceHistory ?? [])
-      .map((p) => p.price)
-      .filter((n): n is number => typeof n === 'number' && n > 0);
-    const lowestBefore = known.length ? Math.min(...known) : (item.currentPrice || Infinity);
+    const priced = (item.priceHistory ?? []).filter((p) => typeof p.price === 'number' && p.price > 0);
+    const known = priced.filter((p) => inMarket(p.url)).map((p) => p.price as number);
+    // History exists but none of it is in the market: nothing to compare against yet. Falling
+    // back to currentPrice would reuse an out-of-market price and hide the first real crossing.
+    const lowestBefore = known.length ? Math.min(...known) : priced.length ? Infinity : (item.currentPrice || Infinity);
 
-    let bestNow = Infinity;
-    let bestUrl = '';
+    let bestNow = Infinity; // cheapest price this pass, any shop: becomes currentPrice
+    let alertPrice = Infinity; // cheapest in-market price this pass: what the alerts judge
+    let alertUrl = '';
     for (const link of links) {
       stats.checks++;
       try {
@@ -59,9 +68,10 @@ export async function runOnce(): Promise<{ items: number; checks: number; update
           });
           // Keep the per-link latest price fresh (shown next to each URL in the app)
           link.price = price;
-          if (price < bestNow) {
-            bestNow = price;
-            bestUrl = link.url!;
+          if (price < bestNow) bestNow = price;
+          if (price < alertPrice && inMarket(link.url)) {
+            alertPrice = price;
+            alertUrl = link.url!;
           }
           console.log(`  ✓ ${item.title} @ ${storeFromUrl(link.url!)}: €${price}${inStock ? '' : ' (out of stock)'}`);
         } else {
@@ -82,28 +92,28 @@ export async function runOnce(): Promise<{ items: number; checks: number; update
       // Deal alert: the best price just reached the user's target. Fire only on the
       // crossing (was above target, now at/below) so it doesn't repeat every pass.
       const target = item.targetPrice;
-      if (target != null && target > 0 && bestNow <= target && lowestBefore > target) {
+      if (target != null && target > 0 && alertPrice <= target && lowestBefore > target) {
         stats.alerts++;
         await notify({
           title: `🎯 Target hit: ${item.title}`,
-          message: `€${bestNow.toFixed(2)} ≤ your target €${target.toFixed(2)} at ${storeFromUrl(bestUrl)}`,
+          message: `€${alertPrice.toFixed(2)} ≤ your target €${target.toFixed(2)} at ${storeFromUrl(alertUrl)}`,
           tags: ['dart'],
           priority: 5,
-          click: bestUrl,
+          click: alertUrl,
         });
-        console.log(`  🎯 target hit: ${item.title} €${bestNow}`);
+        console.log(`  🎯 target hit: ${item.title} €${alertPrice}`);
       }
 
       // Alert on a meaningful new low vs the lowest we'd seen before this pass
-      if (lowestBefore < Infinity && bestNow <= lowestBefore * (1 - config.dropAlertPct / 100)) {
-        const pct = Math.round((1 - bestNow / lowestBefore) * 100);
+      if (lowestBefore < Infinity && alertPrice <= lowestBefore * (1 - config.dropAlertPct / 100)) {
+        const pct = Math.round((1 - alertPrice / lowestBefore) * 100);
         stats.alerts++;
         await notify({
           title: `💸 Price drop: ${item.title}`,
-          message: `€${bestNow.toFixed(2)} at ${storeFromUrl(bestUrl)} (was €${lowestBefore.toFixed(2)}, -${pct}%)`,
+          message: `€${alertPrice.toFixed(2)} at ${storeFromUrl(alertUrl)} (was €${lowestBefore.toFixed(2)}, -${pct}%)`,
           tags: ['chart_with_downwards_trend'],
           priority: 4,
-          click: bestUrl,
+          click: alertUrl,
         });
         console.log(`  🔔 alert: ${item.title} -${pct}%`);
       }

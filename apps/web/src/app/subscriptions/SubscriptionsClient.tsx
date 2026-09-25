@@ -7,7 +7,7 @@ import { renewalDaysUntil } from '@/lib/subscriptionRenewal';
 import { isForeignCurrency, normalizeCurrency, convertToBase, deriveFxRate, toPrinted } from '@/lib/fx';
 import { FxBadge } from '@/components/FxBadge';
 import { FxRateButton } from '@/components/FxRateButton';
-import { useState, useTransition, useMemo } from 'react';
+import { useState, useTransition, useMemo, useEffect } from 'react';
 import { Plus, Pencil, Trash2, ExternalLink, Power, Sparkles, Loader2, Search, LayoutGrid, List as ListIcon, SlidersHorizontal, Radar, X, Split as SplitIcon, CheckCircle2, Copy } from 'lucide-react';
 import { SubscriptionDuplicatesModal } from './SubscriptionDuplicatesModal';
 import { SavedViews } from '@/components/ui/SavedViews';
@@ -98,7 +98,9 @@ export function SubscriptionsClient({
   multiCurrency?: boolean;
 }) {
   const locale = useLocale();
-  if (categoryList.length) _subCats = categoryList;
+  useEffect(() => {
+    if (categoryList.length) _subCats = categoryList;
+  }, [categoryList]);
   const fx: FxCtx = { base: baseCurrency, enabled: multiCurrency };
   const [showCreate, setShowCreate] = useState(false);
   const [findingDupes, setFindingDupes] = useState(false); // P85

@@ -199,6 +199,36 @@ describe('GET serialization', () => {
 });
 
 describe('GET priceStatus (the PricePanel picture)', () => {
+  // An old out-of-market low (Newegg €500) in the history; the Greek shop has been €900 → €850.
+  const historyWithForeignLow = () =>
+    itemDoc({
+      links: [{ label: 'Skroutz', url: 'https://www.skroutz.gr/s/1', price: 850 }],
+      priceHistory: [
+        { price: 500, store: 'Newegg', url: 'https://www.newegg.com/p/1', date: '2025-12-01' },
+        { price: 900, store: 'Skroutz', url: 'https://www.skroutz.gr/s/1', date: '2026-01-01' },
+        { price: 850, store: 'Skroutz', url: 'https://www.skroutz.gr/s/1', date: '2026-02-01' },
+        { price: 850, store: 'Skroutz', url: 'https://www.skroutz.gr/s/1', date: '2026-03-01' },
+      ],
+    });
+
+  it('without a shopping market, an out-of-market low still sets the range (unchanged behaviour)', async () => {
+    findByIdState.doc = historyWithForeignLow();
+    const { item } = await (await GET(makeReq(), ctx(OID))).json();
+    expect(item.price.lo).toBe(500);
+    expect(item.price.verdict).toBe('high');
+  });
+
+  it('with a shopping market, the range and verdict read in-market history only (#319)', async () => {
+    getAppSettingsMock.mockResolvedValue({ currency: 'EUR', shoppingCountry: 'GR', shoppingExtraShops: ['amazon.de'] } as typeof settingsState);
+    findByIdState.doc = historyWithForeignLow();
+    const { item } = await (await GET(makeReq(), ctx(OID))).json();
+    expect(item.price.lo).toBe(850);
+    expect(item.price.hi).toBe(900);
+    expect(item.price.verdict).toBe('good');
+    // The returned history itself is untouched: every check is still listed.
+    expect(item.priceHistory).toHaveLength(4);
+  });
+
   it('where-to-buy lists only priced links, cheapest first; best-now = cheapest link', async () => {
     findByIdState.doc = itemDoc({
       currentPrice: 500,

@@ -5,6 +5,7 @@ import { currentModel } from '@/lib/tenancy/connection';
 import { ItemsClient } from '../items/ItemsClient';
 import { SHOPPING_STATUSES } from '@/lib/itemStatus';
 import { getAppSettings } from '@/lib/appSettings';
+import { marketFor } from '@/lib/shoppingRegion';
 import type { SerializedItem } from '@/types';
 
 export const dynamic = 'force-dynamic';
@@ -30,6 +31,7 @@ export default async function ShoppingPage() {
       categoryList={settings.itemCategories}
       baseCurrency={settings.currency}
       multiCurrency={settings.multiCurrency} // P9: off = no per-item currency controls at all
+      shoppingMarket={marketFor(settings.shoppingCountry, settings.shoppingExtraShops)}
     />
   );
 }

@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { createHash } from 'node:crypto';
 import { recurringExpenseId, isDuplicateKey } from './recurringExpenseId';
 
 // #69: two concurrent runs of generateDueRecurring must not both insert the same projection. The
@@ -25,5 +26,21 @@ describe('recurringExpenseId', () => {
     expect(isDuplicateKey({ code: 121 })).toBe(false);
     expect(isDuplicateKey(new Error('network'))).toBe(false);
     expect(isDuplicateKey(null)).toBe(false);
+  });
+});
+
+describe('recurringExpenseId with a named series (#231)', () => {
+  it('without a series name it is EXACTLY the pre-#231 id, so no existing projection moves', () => {
+    const legacy = createHash('sha256').update('recurring-expense:expense|apple|2026-04').digest('hex').slice(0, 24);
+    expect(recurringExpenseId('expense', 'apple', '2026-04')).toBe(legacy);
+    expect(recurringExpenseId('expense', 'apple', '2026-04', '')).toBe(legacy);
+  });
+
+  it('two named series under one vendor get different ids for the same month', () => {
+    const icloud = recurringExpenseId('expense', 'apple', '2026-04', 'icloud');
+    const tv = recurringExpenseId('expense', 'apple', '2026-04', 'tv');
+    expect(icloud).not.toBe(tv);
+    expect(icloud).not.toBe(recurringExpenseId('expense', 'apple', '2026-04'));
+    expect(icloud).toBe(recurringExpenseId('expense', 'apple', '2026-04', 'icloud'));
   });
 });

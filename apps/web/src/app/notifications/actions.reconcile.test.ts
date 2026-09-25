@@ -474,3 +474,31 @@ describe('generateNotifications — a dismissed deal comes back only at a better
     expect(revived()).toEqual([]);
   });
 });
+
+describe('generateNotifications : deals only count shops in the shopping market (#319)', () => {
+  const inGreece = () =>
+    getAppSettingsMock.mockResolvedValue({
+      warrantyAlertDays: 90, trialAlertDays: 2, billAlertDays: 5, subscriptionReviewIntervalDays: 0, documentAlertDays: 0, specialDateAlertDays: 0,
+      shoppingCountry: 'GR', shoppingExtraShops: ['amazon.de'],
+    } as Awaited<ReturnType<typeof getAppSettingsMock>>);
+
+  it('no deal when only an out-of-market shop is under target', async () => {
+    inGreece();
+    state.items = [{ _id: 'i1', title: 'RTX 5080', targetPrice: 800, currentPrice: 760, links: [
+      { url: 'https://www.newegg.com/p/1', price: 760 },
+      { url: 'https://www.skroutz.gr/s/1', price: 850 },
+    ] }];
+    await generateNotifications();
+    expect(notificationInsertMany).not.toHaveBeenCalled();
+  });
+
+  it('a deal from an in-market shop quotes the price of that shop', async () => {
+    inGreece();
+    state.items = [{ _id: 'i1', title: 'RTX 5080', targetPrice: 800, currentPrice: 700, links: [
+      { url: 'https://www.newegg.com/p/1', price: 700 },
+      { url: 'https://www.amazon.de/dp/1', price: 790 },
+    ] }];
+    await generateNotifications();
+    expect(notificationInsertMany).toHaveBeenCalledWith([expect.objectContaining({ dedupeKey: 'deal:i1', body: '790|800' })]);
+  });
+});

@@ -52,6 +52,7 @@ import { renderStoragePath, TEMPLATE_TOKENS } from '@/lib/storagePath';
 import { CURRENCIES } from '@/lib/money';
 import type { SerializedCard } from '@/types';
 import { useT, useLocale } from '@/components/LocaleProvider';
+import { SHOPPING_COUNTRIES, SHOPPING_PRESETS } from '@/lib/shoppingRegion';
 import type { TKey } from '@/lib/i18n';
 import { formatDate, formatTime, formatDateTime } from '@/lib/i18n/format';
 
@@ -2154,6 +2155,16 @@ function DefaultsManager({ settings }: { settings: AppSettings }) {
   const [multiCurrency, setMultiCurrency] = useState(settings.multiCurrency);
   const [vatRate, setVatRate] = useState(String(settings.defaultVatRate));
   const [returnDays, setReturnDays] = useState(String(settings.defaultReturnWindowDays));
+  const [shoppingCountry, setShoppingCountry] = useState(settings.shoppingCountry);
+  const [extraShops, setExtraShops] = useState(settings.shoppingExtraShops.join(', '));
+  const locale = useLocale();
+  const countryName = (code: string) => {
+    try {
+      return new Intl.DisplayNames([locale], { type: 'region' }).of(code) ?? code;
+    } catch {
+      return code;
+    }
+  };
   const [msg, setMsg] = useState<string | null>(null);
 
   function save() {
@@ -2175,6 +2186,8 @@ function DefaultsManager({ settings }: { settings: AppSettings }) {
     fd.set('multiCurrency', String(multiCurrency));
     fd.set('defaultVatRate', vatRate);
     fd.set('defaultReturnWindowDays', returnDays);
+    fd.set('shoppingCountry', shoppingCountry);
+    fd.set('shoppingExtraShops', extraShops);
     setMsg(null);
     startTransition(async () => {
       await saveDefaults(fd);
@@ -2220,6 +2233,35 @@ function DefaultsManager({ settings }: { settings: AppSettings }) {
           <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.returnWindow')}</span>
           <input type="number" min="0" max="365" value={returnDays} onChange={(e) => setReturnDays(e.target.value)} className={inputClass} />
         </label>
+        <label className="block">
+          <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.shoppingCountry')}</span>
+          <select
+            value={shoppingCountry}
+            onChange={(e) => {
+              const code = e.target.value;
+              setShoppingCountry(code);
+              // Start from the country's usual cross-border shops; the user edits from there.
+              setExtraShops((SHOPPING_PRESETS[code]?.extraShops ?? []).join(', '));
+            }}
+            className={inputClass}
+          >
+            <option value="">{t('set.shoppingCountryAny')}</option>
+            {[...SHOPPING_COUNTRIES]
+              .sort((a, b) => countryName(a).localeCompare(countryName(b), locale))
+              .map((code) => (
+                <option key={code} value={code}>
+                  {countryName(code)}
+                </option>
+              ))}
+          </select>
+        </label>
+        {shoppingCountry && (
+          <label className="block">
+            <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.shoppingExtraShops')}</span>
+            <input value={extraShops} onChange={(e) => setExtraShops(e.target.value)} placeholder="amazon.de" className={inputClass} />
+            <span className="block mt-1 text-[11px] text-[color:var(--color-text-faint)]">{t('set.shoppingExtraShopsHint')}</span>
+          </label>
+        )}
         <label className="block">
           <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.trialAlert')}</span>
           <input type="number" min="0" max="60" value={trialDays} onChange={(e) => setTrialDays(e.target.value)} className={inputClass} />

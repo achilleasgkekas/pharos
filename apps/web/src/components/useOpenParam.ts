@@ -12,7 +12,9 @@ export function useOpenParam(onOpen: (id: string) => void): void {
   const router = useRouter();
   const pathname = usePathname();
   const cb = useRef(onOpen);
-  cb.current = onOpen;
+  useEffect(() => {
+    cb.current = onOpen;
+  }, [onOpen]);
   const openId = params.get('open');
 
   useEffect(() => {

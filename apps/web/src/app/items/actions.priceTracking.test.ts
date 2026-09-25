@@ -59,7 +59,7 @@ const {
     itemFind: vi.fn(async () => [] as any[]),
     fetchPageTextMock: vi.fn(),
     parseProductFromPageMock: vi.fn(),
-    searchWebMock: vi.fn(async () => [] as { title: string; url: string; content: string }[]),
+    searchWebMock: vi.fn(async (_q?: string, _max?: number, _opts?: { language?: string }) => [] as { title: string; url: string; content: string }[]),
     isFeatureEnabledMock: vi.fn(async () => true),
     revalidatePathMock: vi.fn(),
   };
@@ -96,6 +96,7 @@ vi.mock('@/lib/ssrf', () => ({ assertPublicUrl: vi.fn(async () => {}) }));
 vi.mock('@/lib/revalidate', () => ({ safeRevalidate: vi.fn() }));
 vi.mock('@/lib/appSettings', () => ({ getAppSettings: vi.fn(async () => ({ currency: 'EUR' })) }));
 vi.mock('next/cache', () => ({ revalidatePath: (p: string) => revalidatePathMock(p) }));
+import { getAppSettings } from '@/lib/appSettings';
 
 import {
   addPriceEntry,
@@ -461,5 +462,37 @@ describe('recomputeAllItemPrices', () => {
     expect(r).toEqual({ ok: true, updated: 1 });
     expect(revalidatePathMock).toHaveBeenCalledWith('/items');
     expect(revalidatePathMock).toHaveBeenCalledWith('/shopping');
+  });
+});
+
+describe('searchItemPriceCandidates: shopping country (#319)', () => {
+  const greece = () =>
+    vi.mocked(getAppSettings).mockResolvedValueOnce({ currency: 'EUR', shoppingCountry: 'GR', shoppingExtraShops: ['amazon.de'] } as any);
+  const hit = (url: string) => ({ title: '', url, content: '' });
+
+  it('reads only in-market shops (Greek first, then Amazon.de) and never spends a fetch or AI call on the rest', async () => {
+    greece();
+    itemFindById.mockReturnValue({ lean: async () => ({ title: 'RTX 5080', links: [] }) } as any);
+    searchWebMock.mockImplementation(async (q = '') =>
+      q.includes('site:amazon.de')
+        ? [hit('https://www.amazon.de/rtx')]
+        : [hit('https://www.newegg.com/rtx'), hit('https://www.skroutz.gr/rtx'), hit('https://www.amazon.com/rtx')]
+    );
+    fetchPageTextMock.mockResolvedValue({ url: '', title: '', jsonLd: '', text: '' });
+    parseProductFromPageMock.mockResolvedValue({ parsed: { title: 'RTX 5080', price: 999, currency: 'EUR', store: '' } });
+    await searchItemPriceCandidates('i1');
+    expect(fetchPageTextMock.mock.calls.map((c) => c[0])).toEqual(['https://www.skroutz.gr/rtx', 'https://www.amazon.de/rtx']);
+    expect(parseProductFromPageMock).toHaveBeenCalledTimes(2);
+    expect(searchWebMock).toHaveBeenCalledWith('RTX 5080', 8, { language: 'el-GR' });
+  });
+
+  it('says so when nothing is in the market, instead of falling back to foreign shops', async () => {
+    greece();
+    itemFindById.mockReturnValue({ lean: async () => ({ title: 'RTX 5080', links: [] }) } as any);
+    searchWebMock.mockImplementation(async () => [hit('https://www.newegg.com/rtx')]);
+    const r = await searchItemPriceCandidates('i1');
+    expect(r.ok).toBe(false);
+    expect(r.error).toMatch(/No shop found in GR/);
+    expect(fetchPageTextMock).not.toHaveBeenCalled();
   });
 });

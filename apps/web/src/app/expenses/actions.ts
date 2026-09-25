@@ -23,7 +23,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import type { SerializedExpense } from '@/types';
 import type { ParsedExpense } from '@/lib/ollama';
-import { vendorKey, serializeExpense } from './lib';
+import { vendorKey, serializeExpense, seriesKeyOf, seriesGroupKey } from './lib';
 import { csvDedupeKey } from '@/lib/csvImport';
 import { groupExpenseDupes, type ExpenseDupeGroup } from '@/lib/expenseDupes';
 import { assertCanWrite } from '@/lib/auth';
@@ -108,11 +108,14 @@ export async function scanExpenseImage(formData: FormData): Promise<ScanExpenseR
 }
 
 /** Inherit category / recurring from an existing record of the same vendor (the
- *  "continuity" the user asked for: a new ΔΕΗ bill joins the existing ΔΕΗ series). */
-async function inheritFromSeries(kind: Kind, vKey: string): Promise<{ category?: string; recurring?: boolean; recurringCycle?: string; space?: string; taxDeductible?: boolean; taxCategory?: string } | null> {
+ *  "continuity" the user asked for: a new ΔΕΗ bill joins the existing ΔΕΗ series).
+ *  #231: only from the SAME series. An entry with no series name inherits from the vendor's
+ *  unnamed series only, so one "Apple · iCloud" charge can never make a plain "Apple" entry
+ *  recurring and start a third series next to the two the user named. */
+async function inheritFromSeries(kind: Kind, vKey: string, sKey = ''): Promise<{ category?: string; recurring?: boolean; recurringCycle?: string; space?: string; taxDeductible?: boolean; taxCategory?: string } | null> {
   if (!vKey) return null;
   const Expense = await currentModel(ExpenseModel);
-  const prev = await Expense.findOne({ kind, vendorKey: vKey }).sort({ date: -1 }).lean();
+  const prev = await Expense.findOne({ kind, vendorKey: vKey, seriesKey: sKey || { $in: ['', null] } }).sort({ date: -1 }).lean();
   if (!prev) return null;
   return { category: prev.category, recurring: prev.recurring, recurringCycle: prev.recurringCycle, space: prev.space, taxDeductible: prev.taxDeductible, taxCategory: prev.taxCategory };
 }
@@ -143,11 +146,12 @@ export async function generateDueRecurring(): Promise<{ created: number }> {
     .sort({ date: -1 })
     .lean();
 
-  // Latest entry per series (kind|vendorKey); skip series with no vendorKey.
+  // Latest entry per series (kind|vendorKey|series); skip series with no vendorKey. #231: two named
+  // series under one vendor ("Apple · iCloud", "Apple · TV+") are two seeds, not one.
   const seen = new Set<string>();
   const seeds: typeof recurring = [];
   for (const e of recurring) {
-    const k = `${e.kind}|${e.vendorKey}`;
+    const k = `${e.kind}|${seriesGroupKey(e)}`;
     if (!e.vendorKey || seen.has(k)) continue;
     seen.add(k);
     seeds.push(e);
@@ -167,10 +171,12 @@ export async function generateDueRecurring(): Promise<{ created: number }> {
       const period = periodFrom(next);
       try {
         await Expense.create({
-          _id: recurringExpenseId(String(seed.kind), String(seed.vendorKey), period),
+          _id: recurringExpenseId(String(seed.kind), String(seed.vendorKey), period, seed.seriesKey || ''),
           kind: seed.kind,
           vendor: seed.vendor,
           vendorKey: seed.vendorKey,
+          series: seed.series || '',
+          seriesKey: seed.seriesKey || '',
           category: seed.category,
           space: seed.space || '',
           taxDeductible: seed.taxDeductible || false,
@@ -309,6 +315,8 @@ const UpdateSchema = z.object({
   period: z.string().default(''),
   recurring: z.boolean().default(false),
   recurringCycle: z.enum(RECURRING_CYCLE_VALUES).default(''),
+  // #231: optional name of a separate series under this vendor ("iCloud" under "Apple").
+  series: z.string().max(60).default(''),
   paymentMethod: z.string().default(''),
   notes: z.string().default(''),
   // Expense splitting (P35): people who owe you a share of this expense.
@@ -370,6 +378,8 @@ export async function updateExpense(id: string, data: z.input<typeof UpdateSchem
           period: d.period || periodFrom(date),
           recurring: d.recurring,
           recurringCycle: d.recurringCycle,
+          series: d.series.trim(),
+          seriesKey: seriesKeyOf(d.series.trim()),
           paymentMethod: d.paymentMethod,
           notes: d.notes,
           split: cleanSplit(d.split),
@@ -412,7 +422,7 @@ export async function addExpense(data: z.input<typeof AddSchema>): Promise<{ ok:
     const Expense = await currentModel(ExpenseModel);
     const date = safeDate(d.date);
     const splits = cleanPaymentSplits(d.paymentSplits);
-    const inherited = await inheritFromSeries(d.kind, vendorKey(d.vendor));
+    const inherited = await inheritFromSeries(d.kind, vendorKey(d.vendor), seriesKeyOf(d.series.trim()));
     // Apply a vendor→category auto-rule (P15) only when the user did NOT pick a category
     // (the form defaults to 'other'); an explicit choice always wins.
     const explicit = d.category && d.category !== 'other' ? d.category : '';
@@ -439,6 +449,8 @@ export async function addExpense(data: z.input<typeof AddSchema>): Promise<{ ok:
         d.recurring === false
           ? d.recurringCycle
           : d.recurringCycle || rule?.recurringCycle || (inherited?.recurringCycle as typeof d.recurringCycle) || '',
+      series: d.series.trim(),
+      seriesKey: seriesKeyOf(d.series.trim()),
       paymentMethod: d.paymentMethod,
       notes: d.notes,
       split: cleanSplit(d.split),

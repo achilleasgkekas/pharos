@@ -30,6 +30,7 @@ import { OpenInOneDriveButton } from '@/components/OpenInOneDriveButton';
 import { useLocale, useT, useMoney } from '@/components/LocaleProvider';
 import type { TKey } from '@/lib/i18n';
 import { formatDate, formatTime, formatDateTime, compareNames } from '@/lib/i18n/format';
+import { vendorKey, seriesGroupKey } from './lib';
 
 const CYCLES = RECURRING_CYCLES;
 // Filter sentinel for "records with no space assigned" (distinct from '' = no filter).
@@ -115,7 +116,18 @@ export function ExpensesClient({ kind, expenses, cards, vendors, ollamaUp, categ
   const failed = useMemo(() => expenses.filter((e) => statusOf(e) === 'failed' && e.filePath), [expenses]);
   const seriesCount = useMemo(() => {
     const m: Record<string, number> = {};
-    for (const e of expenses) if (e.vendorKey) m[e.vendorKey] = (m[e.vendorKey] || 0) + 1;
+    for (const e of expenses) if (e.vendorKey) m[seriesGroupKey(e)] = (m[seriesGroupKey(e)] || 0) + 1;
+    return m;
+  }, [expenses]);
+  // #231: the series names already used per vendor, offered as suggestions in the form so the next
+  // "Apple" charge can be filed under "iCloud" or "TV+" with one pick.
+  const seriesByVendor = useMemo(() => {
+    const m: Record<string, string[]> = {};
+    for (const e of expenses) {
+      if (!e.vendorKey || !e.series) continue;
+      const list = (m[e.vendorKey] ??= []);
+      if (!list.includes(e.series)) list.push(e.series);
+    }
     return m;
   }, [expenses]);
 
@@ -359,7 +371,7 @@ export function ExpensesClient({ kind, expenses, cards, vendors, ollamaUp, categ
                   expense={e}
                   isIncome={isIncome}
                   fx={fx}
-                  series={e.vendorKey ? seriesCount[e.vendorKey] || 1 : 1}
+                  series={e.vendorKey ? seriesCount[seriesGroupKey(e)] || 1 : 1}
                   onClick={() => setSelected(e)}
                   selectMode={selectMode}
                   selected={selectedIds.has(e._id)}
@@ -375,7 +387,7 @@ export function ExpensesClient({ kind, expenses, cards, vendors, ollamaUp, categ
                   expense={e}
                   isIncome={isIncome}
                   fx={fx}
-                  series={e.vendorKey ? seriesCount[e.vendorKey] || 1 : 1}
+                  series={e.vendorKey ? seriesCount[seriesGroupKey(e)] || 1 : 1}
                   onClick={() => setSelected(e)}
                   selectMode={selectMode}
                   selected={selectedIds.has(e._id)}
@@ -388,9 +400,9 @@ export function ExpensesClient({ kind, expenses, cards, vendors, ollamaUp, categ
       </div>
 
       {selected && (
-        <ExpenseDetail expense={selected} cards={cards} vendors={vendors} categories={categories} spaces={spaces} fx={fx} seriesCount={selected.vendorKey ? seriesCount[selected.vendorKey] || 1 : 1} onClose={() => setSelected(null)} onChanged={() => router.refresh()} confirm={confirm} />
+        <ExpenseDetail expense={selected} cards={cards} vendors={vendors} categories={categories} spaces={spaces} fx={fx} seriesCount={selected.vendorKey ? seriesCount[seriesGroupKey(selected)] || 1 : 1} seriesByVendor={seriesByVendor} onClose={() => setSelected(null)} onChanged={() => router.refresh()} confirm={confirm} />
       )}
-      {creating && <ExpenseCreate kind={kind} cards={cards} vendors={vendors} categories={categories} spaces={spaces} fx={fx} onClose={() => setCreating(false)} onCreated={() => { setCreating(false); router.refresh(); }} />}
+      {creating && <ExpenseCreate kind={kind} seriesByVendor={seriesByVendor} cards={cards} vendors={vendors} categories={categories} spaces={spaces} fx={fx} onClose={() => setCreating(false)} onCreated={() => { setCreating(false); router.refresh(); }} />}
       {importingCsv && <CsvImportModal kind={kind} fx={fx} onClose={() => setImportingCsv(false)} onImported={() => router.refresh()} />}
       {findingDupes && <ExpenseDuplicatesModal kind={kind} onClose={() => setFindingDupes(false)} />}
       {showBalances && <BalancesModal balances={balances} onClose={() => setShowBalances(false)} onChanged={() => router.refresh()} confirm={confirm} />}
@@ -524,7 +536,7 @@ function ExpenseRow({ expense, isIncome, series, fx, onClick, selectMode, select
       <button onClick={mainClick} className="flex items-center gap-3 flex-1 min-w-0 text-left">
         <Thumb expense={expense} />
         <div className="min-w-0 flex-1">
-          <span className="font-semibold text-sm truncate block" style={{ fontFamily: 'var(--font-display)' }}>{expense.vendor || t('ex.unknown')}</span>
+          <span className="font-semibold text-sm truncate block" style={{ fontFamily: 'var(--font-display)' }}>{expense.vendor || t('ex.unknown')}{expense.series ? ` · ${expense.series}` : ''}</span>
           <span className="text-[10px] text-[color:var(--color-text-faint)] block mt-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
             {fmtDate(expense.date, locale)} · {expense.category}{expense.space ? ` · ${expense.space}` : ''}{expense.recurring ? ` · ${t('ex.recurringTag')}` : ''}{series > 1 ? ` · ×${series}` : ''}
           </span>
@@ -556,7 +568,7 @@ function ExpenseCard({ expense, isIncome, series, fx, onClick, selectMode, selec
           <button onClick={mainClick} className="flex items-center gap-2.5 min-w-0 text-left flex-1">
             <Thumb expense={expense} />
             <div className="min-w-0">
-              <p className="font-semibold truncate">{expense.vendor || t('ex.unknown')}</p>
+              <p className="font-semibold truncate">{expense.vendor || t('ex.unknown')}{expense.series ? ` · ${expense.series}` : ''}</p>
               <p className="text-[11px] text-[color:var(--color-text-faint)] uppercase tracking-wider" style={{ fontFamily: 'var(--font-mono)' }}>{expense.category}</p>
             </div>
           </button>
@@ -633,7 +645,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 const selectCls = 'w-full bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[color:var(--color-accent)]';
 
-type FormState = Pick<SerializedExpense, 'kind' | 'vendor' | 'category' | 'space' | 'taxDeductible' | 'taxCategory' | 'currency' | 'date' | 'period' | 'recurring' | 'recurringCycle' | 'paymentMethod' | 'notes' | 'verified'> & { amount: string; fxRate: string; split: SplitEntry[]; paymentSplits: PaymentSplitEntry[] };
+type FormState = Pick<SerializedExpense, 'kind' | 'vendor' | 'category' | 'space' | 'taxDeductible' | 'taxCategory' | 'currency' | 'date' | 'period' | 'recurring' | 'recurringCycle' | 'series' | 'paymentMethod' | 'notes' | 'verified'> & { amount: string; fxRate: string; split: SplitEntry[]; paymentSplits: PaymentSplitEntry[] };
 
 /** The `amount` field always holds what is PRINTED on the document: the stored base-currency
  *  amount for a normal entry, `origAmount` for a foreign one. resolveFx() on the server does
@@ -645,13 +657,14 @@ function toForm(e: SerializedExpense, base: string): FormState {
     amount: String((foreign ? e.origAmount || e.amount : e.amount) ?? ''),
     currency: foreign ? normalizeCurrency(e.currency) : base,
     fxRate: foreign && e.fxRate ? String(e.fxRate) : '',
-    date: e.date ? e.date.slice(0, 10) : '', period: e.period, recurring: e.recurring, recurringCycle: e.recurringCycle,
+    date: e.date ? e.date.slice(0, 10) : '', period: e.period, recurring: e.recurring, recurringCycle: e.recurringCycle, series: e.series || '',
     paymentMethod: e.paymentMethod, notes: e.notes, verified: e.verified, split: e.split || [], paymentSplits: e.paymentSplits || [],
   };
 }
 
-function FormFields({ form, set, cards, vendors, categories, spaces, fx }: { form: FormState; set: (p: Partial<FormState>) => void; cards: SerializedCard[]; vendors: string[]; categories: string[]; spaces: string[]; fx: FxCtx }) {
+function FormFields({ form, set, cards, vendors, categories, spaces, fx, seriesByVendor }: { form: FormState; set: (p: Partial<FormState>) => void; cards: SerializedCard[]; vendors: string[]; categories: string[]; spaces: string[]; fx: FxCtx; seriesByVendor: Record<string, string[]> }) {
   const t = useT();
+  const seriesOptions = seriesByVendor[vendorKey(form.vendor)] ?? [];
   const foreign = fx.enabled && isForeignCurrency(form.currency, fx.base);
   const printedAmount = Number(form.amount) || 0;
   const rate = Number(form.fxRate) || 0;
@@ -710,6 +723,17 @@ function FormFields({ form, set, cards, vendors, categories, spaces, fx }: { for
           <Input value={form.period} onChange={(e) => set({ period: e.target.value })} placeholder="2026-06" />
         </Field>
       </div>
+      {/* #231: two subscriptions from one vendor ("Apple" → iCloud, TV+) are two series only when the
+          user says so; nothing guesses it from the amount. Empty = the vendor's one unnamed series. */}
+      {form.recurring && (
+        <Field label={t('ex.fSeries')}>
+          <Input value={form.series} onChange={(e) => set({ series: e.target.value })} list="expense-series-options" maxLength={60} placeholder={t('ex.seriesPlaceholder')} />
+          <datalist id="expense-series-options">
+            {seriesOptions.map((o) => <option key={o} value={o} />)}
+          </datalist>
+          <span className="block mt-1 text-[11px] text-[color:var(--color-text-faint)]">{t('ex.seriesHint')}</span>
+        </Field>
+      )}
       <Field label={t('v.fNotes')}>
         <textarea value={form.notes} onChange={(e) => set({ notes: e.target.value })} rows={2} className={selectCls} />
       </Field>
@@ -919,8 +943,8 @@ function PaymentSplitEditor({ splits, amount, onChange }: { splits: PaymentSplit
   );
 }
 
-function ExpenseDetail({ expense, cards, vendors, categories, spaces, fx, seriesCount, onClose, onChanged, confirm }: {
-  expense: SerializedExpense; cards: SerializedCard[]; vendors: string[]; categories: string[]; spaces: string[]; fx: FxCtx; seriesCount: number;
+function ExpenseDetail({ expense, cards, vendors, categories, spaces, fx, seriesCount, seriesByVendor, onClose, onChanged, confirm }: {
+  expense: SerializedExpense; cards: SerializedCard[]; vendors: string[]; categories: string[]; spaces: string[]; fx: FxCtx; seriesCount: number; seriesByVendor: Record<string, string[]>;
   onClose: () => void; onChanged: () => void; confirm: ReturnType<typeof useConfirm>;
 }) {
   const t = useT();
@@ -950,7 +974,7 @@ function ExpenseDetail({ expense, cards, vendors, categories, spaces, fx, series
   }
 
   return (
-    <Modal open onClose={onClose} title={expense.vendor || t('ex.recordFallback')} size="2xl">
+    <Modal open onClose={onClose} title={expense.vendor ? `${expense.vendor}${expense.series ? ` · ${expense.series}` : ''}` : t('ex.recordFallback')} size="2xl">
       {expense.filePath && (
         <div className="flex items-center gap-2 mb-3 pb-3 border-b border-[color:var(--color-border)] text-xs flex-wrap">
           <span className="text-[color:var(--color-text-faint)] uppercase tracking-wider" style={{ fontFamily: 'var(--font-mono)' }}>{t('ex.rescan')}</span>
@@ -979,7 +1003,7 @@ function ExpenseDetail({ expense, cards, vendors, categories, spaces, fx, series
             <div className="rounded-xl border border-dashed border-[color:var(--color-border)] p-8 text-center text-xs text-[color:var(--color-text-faint)] flex items-center justify-center"><Wallet size={26} className="opacity-40" /></div>
           )}
         </div>
-        <div className="order-1 md:order-2"><FormFields form={form} set={set} cards={cards} vendors={vendors} categories={categories} spaces={spaces} fx={fx} /></div>
+        <div className="order-1 md:order-2"><FormFields form={form} set={set} cards={cards} vendors={vendors} categories={categories} spaces={spaces} fx={fx} seriesByVendor={seriesByVendor} /></div>
       </div>
       <div className="flex items-center gap-2 pt-4 mt-4 border-t border-[color:var(--color-border)] flex-wrap">
         <Button onClick={() => save(true)} disabled={pending}>{pending ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />} {t('common.confirm')}</Button>
@@ -990,14 +1014,14 @@ function ExpenseDetail({ expense, cards, vendors, categories, spaces, fx, series
   );
 }
 
-function ExpenseCreate({ kind, cards, vendors, categories, spaces, fx, onClose, onCreated }: { kind: 'income' | 'expense'; cards: SerializedCard[]; vendors: string[]; categories: string[]; spaces: string[]; fx: FxCtx; onClose: () => void; onCreated: () => void }) {
+function ExpenseCreate({ kind, seriesByVendor, cards, vendors, categories, spaces, fx, onClose, onCreated }: { kind: 'income' | 'expense'; seriesByVendor: Record<string, string[]>; cards: SerializedCard[]; vendors: string[]; categories: string[]; spaces: string[]; fx: FxCtx; onClose: () => void; onCreated: () => void }) {
   const today = new Date();
   const iso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
   const [form, setForm] = useState<FormState>({
     // A new entry starts in the deployment's own currency, so nothing looks "foreign" by
     // default on a non-EUR install.
     kind, vendor: '', category: kind === 'income' ? 'salary' : 'other', space: '', taxDeductible: false, taxCategory: '', amount: '', currency: normalizeCurrency(fx.base) || 'EUR', fxRate: '', date: iso, period: '',
-    recurring: false, recurringCycle: '', paymentMethod: '', notes: '', verified: true, split: [], paymentSplits: [],
+    recurring: false, recurringCycle: '', series: '', paymentMethod: '', notes: '', verified: true, split: [], paymentSplits: [],
   });
   const t = useT();
   const [pending, startTransition] = useTransition();
@@ -1007,7 +1031,7 @@ function ExpenseCreate({ kind, cards, vendors, categories, spaces, fx, onClose, 
   }
   return (
     <Modal open onClose={onClose} title={t('ex.newRecord')} size="lg">
-      <FormFields form={form} set={set} cards={cards} vendors={vendors} categories={categories} spaces={spaces} fx={fx} />
+      <FormFields form={form} set={set} cards={cards} vendors={vendors} categories={categories} spaces={spaces} fx={fx} seriesByVendor={seriesByVendor} />
       <div className="flex items-center gap-2 pt-4 mt-4 border-t border-[color:var(--color-border)]">
         <Button onClick={save} disabled={pending || !form.amount}>{pending ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} {t('common.add')}</Button>
         <button onClick={onClose} className="text-xs px-3 py-2 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)]"><X size={13} /></button>

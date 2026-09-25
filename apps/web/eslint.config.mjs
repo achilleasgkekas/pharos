@@ -29,10 +29,10 @@ export default [
       // PRE-EXISTING, and a 35-error wall on an upgrade PR is how a gate gets switched off.
       // Warnings for now, tracked as its own piece of work (#171).
       'react-hooks/set-state-in-effect': 'warn',
-      'react-hooks/static-components': 'warn',
-      'react-hooks/globals': 'warn',
+      'react-hooks/static-components': 'error',
+      'react-hooks/globals': 'error',
       'react-hooks/immutability': 'warn',
-      'react-hooks/refs': 'warn',
+      'react-hooks/refs': 'error',
       'react-hooks/preserve-manual-memoization': 'warn',
       '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
     },

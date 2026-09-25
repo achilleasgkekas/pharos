@@ -90,7 +90,7 @@ async function getReports(monthsBack = 12, locale = 'en') {
     Item.find().select('title category status purchasedPrice currentPrice purchasedAt warrantyUntil').lean(),
     Subscription.find({ active: true }).select('amount billingCycle category space').lean(),
     Statement.find().lean(),
-    Expense.find().select('kind amount date period category space vendor vendorKey recurring').lean(),
+    Expense.find().select('kind amount date period category space vendor vendorKey series seriesKey recurring').lean(),
     Goal.find({ archived: { $ne: true } }).sort({ createdAt: -1 }).lean(),
   ]);
 
@@ -135,6 +135,8 @@ async function getReports(monthsBack = 12, locale = 'en') {
     space?: string;
     vendor?: string;
     vendorKey?: string;
+    series?: string;
+    seriesKey?: string;
     recurring?: boolean;
   }[];
   const ie = months.map((m) => ({ key: m.key, label: m.label, income: 0, expense: 0 }));

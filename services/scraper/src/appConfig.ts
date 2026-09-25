@@ -1,4 +1,5 @@
 import mongoose, { Schema } from 'mongoose';
+import { marketFor, normalizeShoppingCountry, normalizeShopList, type ShoppingMarket } from './shoppingRegion.js';
 
 // Read-only view of the web app's AppConfig singleton (collection `appconfigs`).
 // We only need the scraper-relevant fields, so the schema is loose (strict:false)
@@ -53,4 +54,18 @@ export async function getScraperAiConfig(defaults: { ollamaModel: string }): Pro
 
   cache = { v, t: Date.now() };
   return v;
+}
+
+/**
+ * The shopping market saved in Settings (#319), or null when no country is chosen. Deal and
+ * price-drop alerts only count shops inside it, like the web app's bell and push. Read fresh each
+ * pass (one small query) so a Settings change applies on the next run.
+ */
+export async function getShoppingMarket(): Promise<ShoppingMarket | null> {
+  try {
+    const doc = (await AppConfigModel.findOne({ key: 'singleton' }).select('shoppingCountry shoppingExtraShops').lean()) as Record<string, unknown> | null;
+    return marketFor(normalizeShoppingCountry(doc?.shoppingCountry), normalizeShopList(doc?.shoppingExtraShops));
+  } catch {
+    return null; // DB unreachable → no filter, the pre-#319 behaviour
+  }
 }

@@ -13,6 +13,8 @@ import { parseProductFromPage } from '@/lib/ollama';
 import { getParsedProductForUrl } from '@/lib/scrapedPriceCache';
 import { isFeatureEnabled } from '@/lib/aiFeatures.server';
 import { searchWeb, searchImages } from '@/lib/search';
+import { searchShops } from '@/lib/shopSearch';
+import { marketFor } from '@/lib/shoppingRegion';
 import { type ItemView } from '@/lib/itemStatus';
 import { saveFile, deleteFile } from '@/lib/storage';
 import { assertPublicUrl } from '@/lib/ssrf';
@@ -759,7 +761,7 @@ export async function aiFillItem(itemId: string): Promise<{
 
   if (targets.length === 0) {
     const q = `${item.title} ${item.category !== 'other' ? item.category : ''}`.trim();
-    const results = await searchWeb(q, 8);
+    const results = await searchShops(q, await shoppingMarket(), 8);
     targets = results
       .filter((r) => /^https?:\/\//i.test(r.url) && !/youtube|facebook|reddit|pinterest|instagram|tiktok/i.test(r.url))
       .slice(0, 3)
@@ -970,7 +972,7 @@ export async function aiFillInfo(
   let webDiscovered = false;
   if (targets.length === 0) {
     const q = `${item.title} ${item.category !== 'other' ? item.category : ''}`.trim();
-    const results = await searchWeb(q, 8);
+    const results = await searchShops(q, await shoppingMarket(), 8);
     targets = results
       .filter((r) => /^https?:\/\//i.test(r.url) && !/youtube|facebook|reddit|pinterest|instagram|tiktok/i.test(r.url))
       .slice(0, 3)
@@ -1788,6 +1790,12 @@ export async function bulkUpdateItems(
 
 // ─── Interactive online price search (pick a shop to track) ──────────────────
 
+/** The saved shopping market (#319), or null when no country is chosen (search everywhere). */
+async function shoppingMarket() {
+  const s = await getAppSettings();
+  return marketFor(s.shoppingCountry, s.shoppingExtraShops);
+}
+
 export type PriceCandidate = {
   store: string;
   url: string;
@@ -1819,12 +1827,17 @@ export async function searchItemPriceCandidates(
   const q = (queryOverride || item.title || '').trim();
   if (!q) return { ok: false, candidates: [], error: 'Nothing to search for' };
 
-  const results = await searchWeb(q, 8);
+  const market = await shoppingMarket();
+  const results = await searchShops(q, market, 8);
   const urls = results
     .map((r) => r.url)
     .filter((u) => /^https?:\/\//i.test(u) && !/youtube|facebook|reddit|pinterest|instagram|tiktok|wikipedia/i.test(u))
     .filter((u, i, arr) => arr.findIndex((x) => normUrl(x) === normUrl(u)) === i) // dedup
     .slice(0, 5); // cap AI cost
+  if (urls.length === 0 && market) {
+    // Say so rather than fall back to shops the user cannot buy from (#319).
+    return { ok: false, candidates: [], error: `No shop found in ${market.country} or in the shops that ship there. Add one under Settings → Defaults.` };
+  }
 
   const linked = new Set(
     (item.links ?? []).map((l: { url?: string }) => (l.url ? normUrl(l.url) : '')).filter(Boolean)

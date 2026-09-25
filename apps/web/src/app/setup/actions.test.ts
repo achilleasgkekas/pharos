@@ -147,6 +147,22 @@ describe('createFirstAdmin', () => {
 });
 
 describe('saveSetupBasics', () => {
+  it('stores the shopping country with its preset shipping shops; an unknown one is off (#319)', async () => {
+    await saveSetupBasics('EUR', 24, 'gr');
+    await saveSetupBasics('EUR', 24, 'XX');
+    await saveSetupBasics('EUR', 24, '');
+    expect(appConfigUpdateOne.mock.calls[0][1]).toEqual({
+      $set: { currency: 'EUR', defaultVatRate: 24, shoppingCountry: 'GR', shoppingExtraShops: ['amazon.de'] },
+    });
+    expect(appConfigUpdateOne.mock.calls[1][1].$set).toMatchObject({ shoppingCountry: '', shoppingExtraShops: [] });
+    expect(appConfigUpdateOne.mock.calls[2][1].$set).toMatchObject({ shoppingCountry: '', shoppingExtraShops: [] });
+  });
+
+  it('leaves the shopping country untouched when the caller does not send one', async () => {
+    await saveSetupBasics('EUR', 24);
+    expect(appConfigUpdateOne.mock.calls[0][1].$set).not.toHaveProperty('shoppingCountry');
+  });
+
   it('requires admin before writing anything', async () => {
     await saveSetupBasics('USD', 20);
     expect(requireAdminMock).toHaveBeenCalledTimes(1);
