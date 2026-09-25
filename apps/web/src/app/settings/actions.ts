@@ -68,7 +68,7 @@ import { ALERT_TYPE_KEYS, resolveNotifyTypes, type NotifyTypes } from '@/lib/ale
 import { isWithinQuietHours, normalizeQuietHours } from '@/lib/quietHours';
 import { lowestKnownPrice } from '@/lib/lowestKnownPrice';
 import { BACKUP_MODELS, BACKUP_KEYS } from '@/lib/backupModels';
-import { normalizeShoppingCountry, normalizeShopList } from '@/lib/shoppingRegion';
+import { normalizeShoppingCountry, normalizeShopList, marketFor } from '@/lib/shoppingRegion';
 import { verifyBackupJson, formatBackupCounts, type BackupVerifyResult } from '@/lib/backupVerify';
 import { encryptBackup, decryptBackup } from '@/lib/backupCrypto';
 import { detectSyncStaleness, formatSyncStaleness } from '@/lib/syncStaleness';
@@ -618,10 +618,12 @@ export async function runAlertChecks(opts: { dedupe?: boolean } = {}): Promise<{
     title: string;
     targetPrice?: number;
     currentPrice?: number;
-    links?: { price?: number | null }[];
+    links?: { price?: number | null; url?: string }[];
   }>;
+  // Same market filter as the bell (#319), so the phone and the bell name the same deals.
+  const market = marketFor(s.shoppingCountry, s.shoppingExtraShops);
   const deals = dealItems.filter((i) => {
-    const lo = lowestKnownPrice(i);
+    const lo = lowestKnownPrice(i, market);
     return lo != null && lo <= (i.targetPrice ?? 0);
   });
 

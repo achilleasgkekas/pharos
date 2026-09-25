@@ -12,7 +12,7 @@ import { useLocale, useT } from '@/components/LocaleProvider';
 import type { TKey } from '@/lib/i18n';
 import { formatDate, formatTime, formatDateTime } from '@/lib/i18n/format';
 import { useShoppingMarket } from '@/components/ShoppingMarketContext';
-import { marketRank } from '@/lib/shoppingRegion';
+import { marketRank, type ShoppingMarket } from '@/lib/shoppingRegion';
 
 const VERDICT_KEY: Record<string, TKey> = { deal: 'pp.vDeal', dropping: 'pp.vDropping', rising: 'pp.vRising', good: 'pp.vGood', high: 'pp.vHigh' };
 
@@ -35,7 +35,7 @@ type Verdict = 'deal' | 'dropping' | 'rising' | 'good' | 'high' | 'none';
 
 /** One coherent price picture, replacing the scattered currentPrice / link-price /
  *  lowest / trend / deal concepts with: best-now, lowest/highest ever, trend, stores. */
-function priceStatus(item: SerializedItem) {
+function priceStatus(item: SerializedItem, market: ShoppingMarket | null) {
   const stores = (item.links ?? [])
     .filter((l) => l.price && l.price > 0)
     .map((l) => ({ store: l.label || linkHost(l.url), url: l.url, price: l.price as number }))
@@ -44,8 +44,14 @@ function priceStatus(item: SerializedItem) {
   // Headline best price = the cheapest ACTUAL store link. A standalone currentPrice
   // (seeded or hand-entered, with no store behind it) must NOT undercut real store
   // prices — it only fills in when there are no priced links at all.
-  let bestNow: { price: number; store: string; url?: string } | null = stores[0] ? { ...stores[0] } : null;
+  // With a shopping market (#319) the headline and the deal verdict come from the cheapest shop
+  // the user can buy from. The list below still shows every link, out-of-market ones badged.
+  const inMarket = market ? stores.filter((st) => !st.url || marketRank(st.url, market) !== null) : stores;
+  const best = inMarket[0] ?? stores[0];
+  let bestNow: { price: number; store: string; url?: string } | null = best ? { ...best } : null;
   if (!bestNow && item.currentPrice > 0) bestNow = { price: item.currentPrice, store: '' };
+  // Only out-of-market shops priced: show the cheapest, but it can never make this a deal.
+  const dealEligible = inMarket.length > 0 || stores.length === 0;
 
   const hist = [...(item.priceHistory ?? [])].filter((h) => h.price > 0).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   const prices = hist.map((h) => h.price);
@@ -62,7 +68,7 @@ function priceStatus(item: SerializedItem) {
   if (bestNow && lo != null && hi != null) {
     const range = hi - lo || 1;
     const pos = (bestNow.price - lo) / range; // 0 = cheapest seen, 1 = priciest
-    if (target && bestNow.price <= target) verdict = 'deal';
+    if (target && dealEligible && bestNow.price <= target) verdict = 'deal';
     else if (trend < 0) verdict = 'dropping';
     else if (trend > 0) verdict = 'rising';
     else if (pos <= 0.15) verdict = 'good';
@@ -85,8 +91,8 @@ const money = (n: number) => `${cur()}${Math.round(n * 100) / 100}`;
 
 export function PricePanel({ item, summary = true, onChanged, onSearchOnline }: { item: SerializedItem; summary?: boolean; onChanged?: () => void; onSearchOnline?: () => void }) {
   const locale = useLocale();
-  const s = useMemo(() => priceStatus(item), [item]);
   const market = useShoppingMarket();
+  const s = useMemo(() => priceStatus(item, market), [item, market]);
   const t = useT();
   const [pending, startTransition] = useTransition();
   const [logging, setLogging] = useState(false);
@@ -212,7 +218,7 @@ export function PricePanel({ item, summary = true, onChanged, onSearchOnline }: 
                 {s.stores.slice(0, 5).map((st, i) => (
                   <a key={i} href={st.url} target="_blank" rel="noopener noreferrer"
                     className="flex items-center gap-2 text-xs rounded-lg px-2.5 py-1.5 bg-[color:var(--color-surface-2)] hover:bg-[color:var(--color-surface-3)] transition-colors group">
-                    <span className={`w-1.5 h-1.5 rounded-full ${i === 0 ? 'bg-[color:var(--color-accent)]' : 'bg-[color:var(--color-text-faint)]'}`} />
+                    <span className={`w-1.5 h-1.5 rounded-full ${st.url === s.bestNow?.url ? 'bg-[color:var(--color-accent)]' : 'bg-[color:var(--color-text-faint)]'}`} />
                     <span className="flex-1 truncate text-[color:var(--color-text-dim)]">{st.store}</span>
                     {market && st.url && marketRank(st.url, market) === null && (
                       <span
@@ -222,7 +228,8 @@ export function PricePanel({ item, summary = true, onChanged, onSearchOnline }: 
                         {t('pp.outOfMarket')}
                       </span>
                     )}
-                    {i === 0 && s.stores.length > 1 && <span className="text-[9px] font-bold text-[color:var(--color-accent)] uppercase">{t('pp.cheapest')}</span>}
+                    {/* The headline shop, which is the cheapest one in the shopping market (#319). */}
+                    {st.url === s.bestNow?.url && s.stores.length > 1 && <span className="text-[9px] font-bold text-[color:var(--color-accent)] uppercase">{t('pp.cheapest')}</span>}
                     <span className="font-bold text-[color:var(--color-text)]" style={{ fontFamily: 'var(--font-mono)' }}>{money(st.price)}</span>
                     <ExternalLink size={11} className="text-[color:var(--color-text-faint)] group-hover:text-[color:var(--color-cyan)]" />
                   </a>

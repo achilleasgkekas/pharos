@@ -1,6 +1,8 @@
+import { marketRank, type ShoppingMarket } from './shoppingRegion';
+
 export type ItemPriceInput = {
   currentPrice?: number | null;
-  links?: { price?: number | null }[] | null;
+  links?: { price?: number | null; url?: string | null }[] | null;
 };
 
 /**
@@ -22,16 +24,28 @@ export type ItemPriceInput = {
  * read the same collector so they cannot contradict each other — and this is that rule applied
  * to price (#254).
  *
+ * Pass the shopping market (#319) to leave out links to shops outside it; every deal check does,
+ * so the list badge, the bell and the push agree on it too.
+ *
  * Takes the minimal shape rather than a document, because the three callers hold three different
  * types and none of them should have to widen to share an answer.
  */
-export function lowestKnownPrice(item: ItemPriceInput): number | null {
+export function lowestKnownPrice(item: ItemPriceInput, market: ShoppingMarket | null = null): number | null {
   let lo = Infinity;
+  let pricedLinks = 0;
   for (const l of item.links ?? []) {
-    if (l.price && l.price > 0) {
-      lo = Math.min(lo, l.price);
-    }
+    if (!l.price || l.price <= 0) continue;
+    pricedLinks++;
+    // With a shopping market (#319), a shop the user cannot buy from never sets the price a deal
+    // is judged on: Newegg at 760 is no deal for someone in Greece. A link without a URL has no
+    // shop to judge, so it still counts.
+    if (market && l.url && marketRank(l.url, market) === null) continue;
+    lo = Math.min(lo, l.price);
   }
   if (lo < Infinity) return lo;
+  // Priced links exist but none is in the market: no usable price. Falling back to currentPrice
+  // would bring the out-of-market price straight back, since saving and the scraper derive
+  // currentPrice from the cheapest link.
+  if (pricedLinks > 0) return null;
   return (item.currentPrice ?? 0) > 0 ? (item.currentPrice as number) : null;
 }

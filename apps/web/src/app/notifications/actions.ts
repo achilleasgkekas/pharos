@@ -24,6 +24,7 @@ import { detectPriceHikes, type HikeEntry } from '@/lib/priceHike';
 import type { SerializedStatement } from '@/types';
 import { assertCanWrite } from '@/lib/auth';
 import { lowestKnownPrice } from '@/lib/lowestKnownPrice';
+import { marketFor } from '@/lib/shoppingRegion';
 import { collectSubscriptionReviews, type ReviewableSubscription } from '@/lib/subscriptionReview';
 import { collectExpiringDocuments, type ExpiringDocRow } from '@/lib/documentExpiry';
 import { collectUpcomingDates, type SpecialDateRow } from '@/lib/specialDates';
@@ -75,10 +76,12 @@ async function computeAlerts(): Promise<Alert[]> {
 
   // Deals — a tracked item whose best price reached its target.
   const dealItems = (await Item.find({ targetPrice: { $gt: 0 } }).select('title targetPrice currentPrice links').lean()) as Array<{
-    _id: unknown; title: string; targetPrice?: number; currentPrice?: number; links?: { price?: number | null }[];
+    _id: unknown; title: string; targetPrice?: number; currentPrice?: number; links?: { price?: number | null; url?: string }[];
   }>;
+  // Only shops in the shopping market count (#319); the push below judges deals the same way.
+  const market = marketFor(s.shoppingCountry, s.shoppingExtraShops);
   for (const i of dealItems) {
-    const lo = lowestKnownPrice(i);
+    const lo = lowestKnownPrice(i, market);
     if (lo != null && lo <= (i.targetPrice ?? 0)) {
       const id = String(i._id);
       // body = "<bestPrice>|<target>" (raw numbers; the bell formats with the symbol)

@@ -1,8 +1,8 @@
 'use client';
 import { cur } from "@/lib/money";
 import { createContext, useContext, useState, useTransition, useMemo } from 'react';
-import { ShoppingMarketProvider } from '@/components/ShoppingMarketContext';
-import type { ShoppingMarket } from '@/lib/shoppingRegion';
+import { ShoppingMarketProvider, useShoppingMarket } from '@/components/ShoppingMarketContext';
+import { marketRank, type ShoppingMarket } from '@/lib/shoppingRegion';
 import { useRouter } from 'next/navigation';
 import {
   Search,
@@ -160,8 +160,9 @@ const SORT_OPTIONS: { value: SortKey; label: string }[] = [
 
 // Quick boolean filters (chips). Each is a predicate over an item. `shoppingOnly`
 // chips are hidden in the inventory view.
-const FLAG_DEFS: { key: string; label: string; test: (i: SerializedItem) => boolean; shoppingOnly?: boolean }[] = [
-  { key: 'deal', label: '🎯 deals only', test: (i) => isDeal(i), shoppingOnly: true },
+// The shopping market (#319) is passed along for the deal chip; the other chips ignore it.
+const FLAG_DEFS: { key: string; label: string; test: (i: SerializedItem, market: ShoppingMarket | null) => boolean; shoppingOnly?: boolean }[] = [
+  { key: 'deal', label: '🎯 deals only', test: (i, market) => isDeal(i, market), shoppingOnly: true },
   { key: 'photo', label: 'has photo', test: (i) => i.photos.length > 0 },
   { key: 'ai', label: 'AI filled', test: (i) => !!i.aiFilledAt },
   { key: 'links', label: 'has links', test: (i) => i.links.length > 0 },
@@ -384,7 +385,7 @@ export function ItemsClient({
       if (storeFilter && item.purchasedFrom !== storeFilter) return false;
       if (categoryFilter && item.category !== categoryFilter) return false;
       if (locationFilter && item.location !== locationFilter) return false;
-      if (activeFlags.some((f) => !f.test(item))) return false;
+      if (activeFlags.some((f) => !f.test(item, shoppingMarket))) return false;
       if (search) {
         const q = search.toLowerCase();
         if (
@@ -558,7 +559,7 @@ export function ItemsClient({
   const shoppingBudget = items
     .filter((i) => i.status !== 'deferred')
     .reduce((s, i) => s + (i.currentPrice || 0), 0);
-  const dealsCount = view === 'shopping' ? items.filter(isDeal).length : 0;
+  const dealsCount = view === 'shopping' ? items.filter((i) => isDeal(i, shoppingMarket)).length : 0;
 
   const anyFilterActive = !!(filter || storeFilter || categoryFilter || locationFilter || flags.size > 0 || search || sortBy !== 'default');
   const resetFilters = () => {
@@ -997,10 +998,11 @@ function CompareItemsTable({
   t: TFunc;
   truncated: boolean;
 }) {
+  const market = useShoppingMarket(); // #319: deal checks count in-market shops only
   if (items.length === 0) return null;
   const money = (n: number) => `${cur()}${n}`;
   const statusLabel = (s: string) => (IT_STATUS_KEY[s] ? t(IT_STATUS_KEY[s]) : s);
-  const storeOf = (i: SerializedItem) => bestLinkPrice(i)?.store || i.purchasedFrom || '';
+  const storeOf = (i: SerializedItem) => bestLinkPrice(i, market)?.store || i.purchasedFrom || '';
   const cell = 'align-top p-2 border-b border-[color:var(--color-border)] text-xs';
   const label = 'align-top p-2 border-b border-[color:var(--color-border)] text-[10px] uppercase tracking-[0.1em] text-[color:var(--color-text-faint)] whitespace-nowrap';
 
@@ -1023,7 +1025,7 @@ function CompareItemsTable({
       key: 'lowest',
       label: t('it.cmpLowest'),
       render: (i) => {
-        const lo = lowestKnown(i);
+        const lo = lowestKnown(i, market);
         return lo != null ? money(lo) : '—';
       },
     },
@@ -1301,32 +1303,39 @@ function latestPriceForUrl(history: { url: string; price: number; date: string }
 
 // ─── Price-tracker helpers (shopping) ───────────────────────────────────────
 
-/** Cheapest store-link price (the "best price across stores" badge). */
-function bestLinkPrice(item: SerializedItem): { price: number; store: string } | null {
+/** Cheapest store-link price (the "best price across stores" badge). With a shopping market
+ *  (#319) the cheapest shop inside it wins; out-of-market shops only show when no other has a
+ *  price, the same rule as the price panel's headline. */
+function bestLinkPrice(item: SerializedItem, market: ShoppingMarket | null): { price: number; store: string } | null {
   let best: { price: number; store: string } | null = null;
+  let bestAbroad: { price: number; store: string } | null = null;
   for (const l of item.links ?? []) {
-    if (l.price && l.price > 0 && (!best || l.price < best.price)) {
-      best = { price: l.price, store: l.label || linkHost(l.url) };
+    if (!l.price || l.price <= 0) continue;
+    const entry = { price: l.price, store: l.label || linkHost(l.url) };
+    if (market && l.url && marketRank(l.url, market) === null) {
+      if (!bestAbroad || l.price < bestAbroad.price) bestAbroad = entry;
+    } else if (!best || l.price < best.price) {
+      best = entry;
     }
   }
-  return best;
+  return best ?? bestAbroad;
 }
 
-/** Lowest known price: the cheapest priced store link, else the manual current price. */
-const lowestKnown = lowestKnownPrice;
+/** Lowest known price among the shops in the shopping market (#319); see lib/lowestKnownPrice. */
+const lowestKnown = (item: SerializedItem, market: ShoppingMarket | null) => lowestKnownPrice(item, market);
 
 import { calculatePriceTrend } from '@/lib/priceTrend';
 
 /** Signed change between the two most recent price-history points for the best store link (latest − prev). */
-function priceTrend(item: SerializedItem): number | null {
-  const best = bestLinkPrice(item);
+function priceTrend(item: SerializedItem, market: ShoppingMarket | null): number | null {
+  const best = bestLinkPrice(item, market);
   return calculatePriceTrend(item.priceHistory, best);
 }
 
 /** True when a target is set and the lowest known price has reached it. */
-function isDeal(item: SerializedItem): boolean {
+function isDeal(item: SerializedItem, market: ShoppingMarket | null): boolean {
   if (!item.targetPrice || item.targetPrice <= 0) return false;
-  const lo = lowestKnown(item);
+  const lo = lowestKnown(item, market);
   return lo != null && lo <= item.targetPrice;
 }
 
@@ -1356,10 +1365,11 @@ type ItemCardProps = {
 
 // Compact horizontal row for the list layout
 function ItemRow({ item, view, base, plan, onClick, selected, onToggleSelect, selectMode }: ItemCardProps) {
+  const market = useShoppingMarket(); // #319: deal checks count in-market shops only
   const t = useT();
   const cover = item.photos[0];
-  const best = view === 'shopping' ? bestLinkPrice(item) : null;
-  const deal = view === 'shopping' && isDeal(item);
+  const best = view === 'shopping' ? bestLinkPrice(item, market) : null;
+  const deal = view === 'shopping' && isDeal(item, market);
   const w = warrantyState(item.warrantyUntil, t);
   const lend = lendBadge(item, t);
   const claim = claimBadge(item, t);
@@ -1449,13 +1459,14 @@ function ItemCard({
   onToggleSelect,
   selectMode,
 }: ItemCardProps) {
+  const market = useShoppingMarket(); // #319: deal checks count in-market shops only
   const locale = useLocale();
   const t = useT();
   const cover = item.photos[0];
   const links = (item.links ?? []).slice(0, 3);
-  const best = view === 'shopping' ? bestLinkPrice(item) : null;
-  const trend = view === 'shopping' ? priceTrend(item) : null;
-  const deal = view === 'shopping' && isDeal(item);
+  const best = view === 'shopping' ? bestLinkPrice(item, market) : null;
+  const trend = view === 'shopping' ? priceTrend(item, market) : null;
+  const deal = view === 'shopping' && isDeal(item, market);
   // In select mode, a click anywhere on the card toggles selection (the user asked
   // not to be forced to hit the tiny top-left checkbox). Otherwise it opens detail.
   const mainClick = selectMode ? onToggleSelect : onClick;
@@ -1692,6 +1703,7 @@ function ItemDetailModal({
   /** Merges onto the parent's CURRENT item; `rekey` remounts the keyed children (#245). */
   onItemPatched: (patch: Partial<Pick<SerializedItem, 'photos' | 'attachments'>>, rekey?: boolean) => void;
 }) {
+  const market = useShoppingMarket(); // #319: deal checks count in-market shops only
   const locale = useLocale();
   const t = useT();
   const router = useRouter();
@@ -1858,7 +1870,7 @@ function ItemDetailModal({
   // Headline price: what you paid (owned) or the cheapest REAL store link (shopping).
   // Falls back to currentPrice only when there are no priced links — so a stale/seeded
   // currentPrice (e.g. €475 with no store) never shows over the actual store prices.
-  const headlinePrice = item.purchasedPrice ? item.purchasedPrice : (bestLinkPrice(item)?.price ?? (item.currentPrice || 0));
+  const headlinePrice = item.purchasedPrice ? item.purchasedPrice : (bestLinkPrice(item, market)?.price ?? (item.currentPrice || 0));
   // P55 — realized gain/loss on an actual sale, against what the item cost. Null when
   // either half is missing: with no purchase price there is nothing to compare against,
   // and a bare `sold` status with no recorded price stays the plain label it always was.
@@ -2141,16 +2153,16 @@ function ItemDetailModal({
             <div
               className={cn(
                 'flex items-center gap-2 text-xs rounded-lg px-3 py-2',
-                isDeal(item)
+                isDeal(item, market)
                   ? 'bg-[#00ff881a] text-[color:var(--color-accent)] border border-[#00ff8840]'
                   : 'bg-[color:var(--color-surface-2)] text-[color:var(--color-text-dim)]'
               )}
               style={{ fontFamily: 'var(--font-mono)' }}
             >
               <Target size={13} className="shrink-0" />
-              {isDeal(item)
+              {isDeal(item, market)
                 ? t('it.dealReached', { x: `${cur()}${item.targetPrice}` })
-                : `${t('it.targetX', { x: `${cur()}${item.targetPrice}` })}${lowestKnown(item) != null ? ` · ${t('it.bestKnown', { y: `${cur()}${lowestKnown(item)}` })}` : ''}`}
+                : `${t('it.targetX', { x: `${cur()}${item.targetPrice}` })}${lowestKnown(item, market) != null ? ` · ${t('it.bestKnown', { y: `${cur()}${lowestKnown(item, market)}` })}` : ''}`}
             </div>
           ) : null}
 
