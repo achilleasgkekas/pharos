@@ -1,3 +1,4 @@
+import { needsFxRate } from "@/lib/fx";
 'use server';
 
 import { connectDB } from '@/lib/db';
@@ -182,13 +183,15 @@ async function computeAlerts(): Promise<Alert[]> {
     alerts.push({ dedupeKey: `giftcard:${id}:${iso}`, kind: 'giftcard', title: g.title, body: `${days}|${balance}`, href: '/vouchers' });
   }
 
+  const baseCurr = s.currency;
+
   // Bills / payables (P28): an unpaid bill that's overdue or due within the
   // configured lead-time window. dedupeKey carries the due date so moving it
   // re-alerts; it auto-expires once the bill is paid (leaves the query). Overdue
   // ones keep nagging (no lower bound) until paid.
   const openBills = (await Bill.find({ paidAt: null, archived: { $ne: true } })
-    .select('title vendor amount dueDate payments')
-    .lean()) as Array<{ _id: unknown; title: string; vendor?: string; amount?: number; dueDate?: string | Date | null; payments?: { amount?: number }[] }>;
+    .select('title vendor amount currency fxRate dueDate payments')
+    .lean()) as Array<{ _id: unknown; title: string; vendor?: string; amount?: number; currency?: string; fxRate?: number; dueDate?: string | Date | null; payments?: { amount?: number }[] }>;
   for (const b of openBills) {
     const days = billDaysUntilDue(b.dueDate ?? null, now);
     if (days === null || days > s.billAlertDays) continue;
@@ -201,7 +204,7 @@ async function computeAlerts(): Promise<Alert[]> {
       dedupeKey: `bill:${id}:${iso}`,
       kind: 'bill',
       title: b.title,
-      body: `${days}|${billRemaining(b.amount, b.payments, null)}`,
+      body: `${days}|${billRemaining(b.amount, b.payments, null, needsFxRate(b, baseCurr))}`,
       href: '/bills',
     });
   }

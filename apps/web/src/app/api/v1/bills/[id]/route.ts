@@ -92,7 +92,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (!Object.keys(set).length) return apiError('no valid fields');
     const doc = await Bill.findByIdAndUpdate(id, { $set: set }, { new: true }).lean();
     if (!doc) return apiError('not found', 404);
-    return NextResponse.json({ bill: trim(doc as BillLean), spawnedNext });
+    return NextResponse.json({ bill: trim(doc as BillLean, (await getAppSettings()).currency), spawnedNext });
   });
 }
 

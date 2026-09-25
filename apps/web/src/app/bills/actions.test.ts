@@ -608,7 +608,7 @@ describe('P9 multi-currency', () => {
   });
 
   it('the base currency comes from settings, so a USD deployment treats USD as ordinary and EUR as foreign', async () => {
-    getAppSettingsMock.mockResolvedValue({ currency: 'USD' });
+    getAppSettingsMock.mockResolvedValueOnce({ currency: 'USD' });
     await createBill(formData({ title: 'X', dueDate: '15/07/2026', amount: '88', currency: 'USD', fxRate: '0.92' }));
     const doc = billCreate.mock.calls[0][0];
     expect(doc.amount).toBe(88); // same currency: the rate is irrelevant, nothing is converted
@@ -817,6 +817,16 @@ describe('markBillPaid on a part-paid bill', () => {
     });
     await markBillPaid('b1', { logExpense: true });
     expect(addExpenseMock.mock.calls[0][0].amount).toBe(62);
+  });
+
+  it('skips logging a final-payment expense for a part-paid foreign bill with no rate, avoiding double booking or invalid amounts', async () => {
+    billFindById.mockResolvedValueOnce({
+      _id: 'b1', title: 'Import Tax', amount: 100, origAmount: 100, currency: 'USD', fxRate: 0,
+      paidAt: null, linkedExpenseId: '', payments: [{ amount: 50 }],
+    });
+    const res = await markBillPaid('b1', { logExpense: true });
+    expect(res.ok).toBe(true);
+    expect(addExpenseMock).not.toHaveBeenCalled(); // No safe way to know the remaining base-currency amount
   });
 });
 

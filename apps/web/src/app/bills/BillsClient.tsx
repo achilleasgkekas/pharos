@@ -358,7 +358,7 @@ function BillForm({
   // P61 — instalment state for the payment panel below the form.
   const [showPartial, setShowPartial] = useState(false);
   const paidSoFar = billPaidAmount(bill?.payments);
-  const remaining = billRemaining(bill?.amount, bill?.payments, bill?.paidAt);
+  const remaining = billRemaining(bill?.amount, bill?.payments, bill?.paidAt, bill ? needsFxRate(bill, fx.base) : false);
 
   return (
     <div className="space-y-5">

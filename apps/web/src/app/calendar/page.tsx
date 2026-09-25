@@ -1,3 +1,5 @@
+import { getAppSettings } from "@/lib/appSettings";
+import { needsFxRate } from "@/lib/fx";
 import { connectDB } from '@/lib/db';
 import { WARRANTY_ALERT_STATUSES } from '@/lib/itemStatus';
 import { addCycle, cycleRenews } from '@/lib/billingCycle';
@@ -55,7 +57,7 @@ async function getAgenda(t: TFunc, intlTag: string): Promise<{ months: MonthBloc
       .lean(),
     // P67 — the two money dates this agenda used to miss: an open payable and a goal deadline.
     Bill.find({ paidAt: null, archived: { $ne: true }, dueDate: { $gte: windowStart, $lt: windowEnd }, deletedAt: null })
-      .select('title vendor amount payments dueDate')
+      .select('title vendor amount currency fxRate payments dueDate')
       .lean(),
     Goal.find({ archived: { $ne: true }, targetDate: { $gte: windowStart, $lt: windowEnd }, deletedAt: null })
       .select('title targetAmount contributions targetDate')
@@ -138,12 +140,13 @@ async function getAgenda(t: TFunc, intlTag: string): Promise<{ months: MonthBloc
   }
 
   // Open bills (P28) — what is still OWED, so a part-paid bill counts only the balance.
-  for (const b of bills) {
+  const baseCurr = (await getAppSettings()).currency;
+  for (const b of bills as { title?: string; vendor?: string; amount?: number; currency?: string; fxRate?: number; payments?: { amount?: number }[]; dueDate?: Date }[]) {
     push(new Date(b.dueDate as unknown as string), {
       kind: 'payable',
       label: b.title || b.vendor || t('cal.lblBill'),
       sub: t('cal.subPayable'),
-      amount: billRemaining(b.amount, b.payments, null),
+      amount: billRemaining(b.amount, b.payments, null, needsFxRate(b, baseCurr)),
     });
   }
 

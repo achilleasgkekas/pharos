@@ -21,7 +21,9 @@ export type BillLean = {
  *  P61 added `payments`/`paidAmount`/`remaining`/`paymentState` as PURELY ADDITIVE fields.
  *  `status` deliberately keeps its four values: a client that reads it keeps working, and a
  *  half-paid bill that is late still reports `overdue` rather than hiding it behind progress. */
-export function trim(b: BillLean): {
+import { needsFxRate } from '@/lib/fx';
+
+export function trim(b: BillLean, baseCurr: string): {
   id: string; title: string; vendor: string; amount: number; currency: string;
   origAmount: number; fxRate: number; dueDate: string | null;
   paidAt: string | null; category: string; cycle: string; notes: string; space: string; archived: boolean;
@@ -37,8 +39,8 @@ export function trim(b: BillLean): {
     cycle: b.cycle ?? '', notes: b.notes ?? '', space: b.space ?? '', archived: !!b.archived,
     status: billStatus(b.dueDate, b.paidAt ?? null),
     paidAmount: billPaidAmount(payments),
-    remaining: billRemaining(b.amount, payments, b.paidAt ?? null),
-    paymentState: billPaymentState(b.amount, payments, b.paidAt ?? null),
+    remaining: billRemaining(b.amount, payments, b.paidAt ?? null, needsFxRate(b, baseCurr)),
+    paymentState: billPaymentState(b.amount, payments, b.paidAt ?? null, needsFxRate(b, baseCurr)),
     payments: payments.map((p) => ({
       id: String(p._id ?? ''), amount: Number(p.amount) || 0, date: iso(p.date ?? null), note: p.note ?? '',
     })),

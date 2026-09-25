@@ -161,25 +161,29 @@ export async function markBillPaid(
   // get another chance to spawn (see lib/billRecurrence.ts).
   if (!wasPaid) await spawnNextBillOnce(Bill, bill);
 
+  const baseCurr = (await getAppSettings()).currency;
+  const noRate = needsFxRate(bill, baseCurr);
   // P61: when instalments were already logged, "mark paid" settles what is LEFT, so an
   // opt-in expense books the remaining balance rather than the full amount a second time.
   // Such a bill is base-denominated by definition (see logBillPayment), hence no fx here.
   const partlyPaid = billPaidAmount(bill.payments) > 0;
-  const owed = billRemaining(bill.amount, bill.payments, null);
+  const owed = billRemaining(bill.amount, bill.payments, null, noRate);
 
   let linkedExpenseId = bill.linkedExpenseId || '';
   if (opts?.logExpense && !wasPaid && !linkedExpenseId && partlyPaid && owed > 0) {
-    const res = await addExpense({
-      kind: 'expense',
-      vendor: bill.vendor || bill.title,
-      category: bill.category || 'other',
-      space: bill.space || '', // #14: the logged spend lands in the bill's house on the per-space card
-      amount: owed,
-      date: paidAt.toISOString(),
-      notes: `Bill: ${bill.title} (final payment)`,
-      verified: true,
-    });
-    if (res.ok && res.id) linkedExpenseId = res.id;
+    if (!noRate) {
+      const res = await addExpense({
+        kind: 'expense',
+        vendor: bill.vendor || bill.title,
+        category: bill.category || 'other',
+        space: bill.space || '', // #14: the logged spend lands in the bill's house on the per-space card
+        amount: owed,
+        date: paidAt.toISOString(),
+        notes: `Bill: ${bill.title} (final payment)`,
+        verified: true,
+      });
+      if (res.ok && res.id) linkedExpenseId = res.id;
+    }
   } else if (opts?.logExpense && !wasPaid && !linkedExpenseId && (bill.amount ?? 0) > 0) {
     // addExpense opens its OWN withRequestTenant, which re-resolves to the same context we are
     // already inside (the wrapper is re-entrant and host-derived), so the logged expense lands

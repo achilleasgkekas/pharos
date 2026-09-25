@@ -1,3 +1,5 @@
+import { getAppSettings } from "@/lib/appSettings";
+import { needsFxRate } from "@/lib/fx";
 import { connectDB } from '@/lib/db';
 import { WARRANTY_ALERT_STATUSES } from '@/lib/itemStatus';
 import { addCycle, cycleRenews } from '@/lib/billingCycle';
@@ -79,7 +81,7 @@ export async function computeMoneyAgenda(now: Date = new Date(), locale = 'en'):
     // P67 — open payables (P28) and goal deadlines (P12), the two money dates the
     // agenda used to miss entirely. Both window-bounded like the expiries below.
     Bill.find({ paidAt: null, archived: { $ne: true }, dueDate: { $gte: windowStart, $lt: windowEnd }, deletedAt: null })
-      .select('title vendor amount payments dueDate')
+      .select('title vendor amount currency fxRate payments dueDate')
       .lean(),
     Goal.find({ archived: { $ne: true }, targetDate: { $gte: windowStart, $lt: windowEnd }, deletedAt: null })
       .select('title targetAmount contributions targetDate')
@@ -162,8 +164,9 @@ export async function computeMoneyAgenda(now: Date = new Date(), locale = 'en'):
   }
 
   // Open bills (P28) — what is still OWED, so a part-paid bill counts only the balance.
-  for (const b of bills as { title?: string; vendor?: string; amount?: number; payments?: { amount?: number }[]; dueDate?: Date }[]) {
-    const remaining = billRemaining(b.amount, b.payments, null);
+  const baseCurr = (await getAppSettings()).currency;
+  for (const b of bills as { title?: string; vendor?: string; amount?: number; currency?: string; fxRate?: number; payments?: { amount?: number }[]; dueDate?: Date }[]) {
+    const remaining = billRemaining(b.amount, b.payments, null, needsFxRate(b, baseCurr));
     push(new Date(b.dueDate as unknown as string), {
       kind: 'payable',
       label: b.title || b.vendor || 'Bill',

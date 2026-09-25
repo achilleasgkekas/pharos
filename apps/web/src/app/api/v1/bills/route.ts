@@ -30,7 +30,8 @@ export async function GET(req: NextRequest) {
     const count = Bill.countDocuments(filter);
     if (p.updatedSince) { find.setOptions({ withDeleted: true }); count.setOptions({ withDeleted: true }); }
     const [docs, total] = await Promise.all([find.lean() as Promise<BillLean[]>, count]);
-    return NextResponse.json(listEnvelope(docs.map(trim), total, p));
+    const baseCurr = (await getAppSettings()).currency;
+    return NextResponse.json(listEnvelope(docs.map((d) => trim(d, baseCurr)), total, p));
   });
 }
 
@@ -67,6 +68,6 @@ export async function POST(req: NextRequest) {
       paidAt: null,
       archived: false,
     });
-    return NextResponse.json({ bill: trim(doc.toObject() as BillLean) }, { status: 201 });
+    return NextResponse.json({ bill: trim(doc.toObject() as BillLean, (await getAppSettings()).currency) }, { status: 201 });
   });
 }
