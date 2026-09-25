@@ -1312,7 +1312,7 @@ function bestLinkPrice(item: SerializedItem): { price: number; store: string } |
   return best;
 }
 
-/** Lowest known price across the current price + every store-link. */
+/** Lowest known price: the cheapest priced store link, else the manual current price. */
 const lowestKnown = lowestKnownPrice;
 
 import { calculatePriceTrend } from '@/lib/priceTrend';

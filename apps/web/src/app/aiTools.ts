@@ -275,7 +275,9 @@ export async function execute(name: string, input: Record<string, unknown>): Pro
       const r = await addExpense({
         kind: 'expense', vendor: s(input, 'vendor'), amount: n(input, 'amount'),
         category: s(input, 'category') || 'other', date: s(input, 'date') || today(),
-        currency: 'EUR', period: '', recurring: !!input.recurring, recurringCycle: input.recurring ? 'monthly' : '', paymentMethod: '', notes: '', verified: true,
+        // Only a "yes" is an answer here; otherwise the flag is left out so a vendor rule or the
+        // series can still mark it recurring (#252).
+        currency: 'EUR', period: '', recurring: input.recurring ? true : undefined, recurringCycle: input.recurring ? 'monthly' : '', paymentMethod: '', notes: '', verified: true,
       });
       const sum = `expense ${s(input, 'vendor')} €${n(input, 'amount')}`;
       return { summary: sum, content: r.ok ? `Saved ${sum}` : `Failed: ${r.error}` };
@@ -283,7 +285,7 @@ export async function execute(name: string, input: Record<string, unknown>): Pro
     case 'add_income': {
       const r = await addExpense({
         kind: 'income', vendor: s(input, 'source'), amount: n(input, 'amount'),
-        category: 'salary', date: s(input, 'date') || today(), currency: 'EUR', period: '', recurring: false, recurringCycle: '', paymentMethod: '', notes: '', verified: true,
+        category: 'salary', date: s(input, 'date') || today(), currency: 'EUR', period: '', recurringCycle: '', paymentMethod: '', notes: '', verified: true,
       });
       const sum = `income ${s(input, 'source')} €${n(input, 'amount')}`;
       return { summary: sum, content: r.ok ? `Saved ${sum}` : `Failed: ${r.error}` };

@@ -112,6 +112,32 @@ describe('dismissNotification', () => {
   });
 });
 
+describe('dismissNotification — deals remember their price (#253)', () => {
+  it('stores the best price the deal carried when it was dismissed', async () => {
+    notifState.docs = [{ _id: 'n1', body: '899|900' }];
+    await dismissNotification('n1');
+    expect(notificationFind).toHaveBeenCalledWith({ _id: 'n1', kind: 'deal' });
+    const [, update] = notificationUpdateOne.mock.calls[0];
+    expect(update.$set.dismissedAtPrice).toBe(899);
+    expect(update.$set.deletedAt).toBeInstanceOf(Date);
+  });
+
+  it('leaves the price out for any other kind', async () => {
+    await dismissNotification('n1');
+    const [, update] = notificationUpdateOne.mock.calls[0];
+    expect(update.$set).not.toHaveProperty('dismissedAtPrice');
+  });
+});
+
+describe('clearAllNotifications — deals remember their price (#253)', () => {
+  it('stamps each deal with its price before soft-deleting everything', async () => {
+    notifState.docs = [{ _id: 'd1', body: '600|900' }];
+    await clearAllNotifications();
+    expect(notificationUpdateOne).toHaveBeenCalledWith({ _id: 'd1' }, { $set: { dismissedAtPrice: 600 } });
+    expect(notificationUpdateMany).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('clearAllNotifications', () => {
   it('soft-deletes every notification via a single updateMany({}, ...)', async () => {
     const res = await clearAllNotifications();
