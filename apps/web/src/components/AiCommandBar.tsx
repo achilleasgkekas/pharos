@@ -307,7 +307,7 @@ export function AiCommandBar() {
           {/* Trailing actions */}
           {pending && !isAi && <Loader2 size={14} className="shrink-0 animate-spin text-[color:var(--color-cyan)]" />}
           {!isAi && !pending && value && (
-            <button type="button" onClick={() => { setValue(''); setHits([]); }} className="shrink-0 text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)]" aria-label="Clear">
+            <button type="button" onClick={() => { setValue(''); setHits([]); }} className="shrink-0 text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)]" aria-label={t('common.clear')}>
               <X size={14} />
             </button>
           )}

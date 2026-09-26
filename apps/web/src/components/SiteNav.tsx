@@ -234,7 +234,7 @@ export function SiteNav({ aiReady = false, user }: { aiReady?: boolean; user?: S
           </span>
           {user && <NotificationBell open={notifOpen} onOpenChange={setNotifOpen} />}
           {user && <UserMenu user={user} />}
-          <button onClick={toggleMobile} className="lg:hidden p-2 rounded-lg text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface)] transition-colors" aria-label="Menu">
+          <button onClick={toggleMobile} className="lg:hidden p-2 rounded-lg text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface)] transition-colors" aria-label={t('nav.menu')}>
             {mobileOpen ? <X size={18} /> : <Menu size={18} />}
           </button>
         </div>

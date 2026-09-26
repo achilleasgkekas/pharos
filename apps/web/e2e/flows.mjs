@@ -169,6 +169,21 @@ await flow('export a backup and restore it', async () => {
   await page.locator('section', { has: page.getByRole('heading', { name: `Golf ${TAG}` }) }).getByText('History (1)').waitFor();
 });
 
+// ── Encrypted backup: the app's own passphrase prompt (#351) ─────────────
+await flow('export an encrypted backup through the passphrase dialog', async () => {
+  await open('/settings');
+  await page.getByRole('button', { name: 'Storage & backup' }).first().click();
+  await page.getByRole('button', { name: 'Encrypted export' }).first().click();
+  let dialog = page.getByRole('dialog');
+  await dialog.locator('input[type=password]').fill('ci-passphrase-1');
+  await dialog.getByRole('button', { name: 'Continue' }).click();
+  await page.getByText('Same passphrase again').waitFor(); // the second prompt, not the first one closing
+  dialog = page.getByRole('dialog');
+  await dialog.locator('input[type=password]').fill('ci-passphrase-1');
+  const [download] = await Promise.all([page.waitForEvent('download'), dialog.getByRole('button', { name: 'Encrypted export' }).click()]);
+  expect((await download.suggestedFilename()).endsWith('.enc.json'), 'the encrypted export is not an .enc.json file');
+});
+
 // ── Accessibility ─────────────────────────────────────────────────────────
 // Serious and critical axe violations only, on the pages people use most. Colour contrast is
 // left out for now: the dark theme's faint text is a known design debt, and gating on it here

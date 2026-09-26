@@ -535,7 +535,7 @@ function ExpenseCard({ expense, isIncome, series, fx, onClick, selectMode, selec
   const money = useMoney();
   const mainClick = selectMode ? onToggleSelect : onClick;
   return (
-    <div className={cn('rounded-2xl border p-4 transition-colors', selected ? 'border-[color:var(--color-accent)] ring-1 ring-[color:var(--color-accent)]' : 'border-[color:var(--color-border)] hover:border-[color:var(--color-accent)]', 'bg-[color:var(--color-surface)]')}>
+    <div className={cn('rounded-2xl border bg-[color:var(--color-surface)] p-4 transition-colors', selected ? 'border-[color:var(--color-accent)] ring-1 ring-[color:var(--color-accent)]' : 'border-[color:var(--color-border)] hover:border-[color:var(--color-accent)]', 'bg-[color:var(--color-surface)]')}>
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
           <SelectCheckbox selectMode={selectMode} selected={selected} onToggleSelect={onToggleSelect} />

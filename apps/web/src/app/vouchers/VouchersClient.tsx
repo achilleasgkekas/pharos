@@ -5,7 +5,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { DateInput } from '@/components/ui/DateInput';
 import { Field } from '@/components/ui/Field';
 import { Button } from '@/components/ui/Button';
-import { PAGE_MAIN, PageHeader, ViewToggle, PrimaryAction, FilterLayout } from '@/components/ui/PageHeader';
+import { PAGE_MAIN, PageHeader, ViewToggle, PrimaryAction, FilterLayout, FilterSection, FilterOptions } from '@/components/ui/PageHeader';
 import { Input, filterControlClass } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
@@ -73,42 +73,28 @@ export function VouchersClient({ vouchers }: { vouchers: SerializedVoucher[] }) 
   }, [vouchers, filter, search, storeFilter, sortBy]);
 
   const anyF = !!(filter !== 'all' || search || storeFilter || sortBy !== 'expiry');
-  const fLabel = 'text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-[0.12em] mb-1.5';
   const filterControls = (
     <div className="space-y-4">
       <Input icon={<Search size={14} />} placeholder={t('v.searchPlaceholder')} value={search} onChange={(e) => setSearch(e.target.value)} />
-      <div>
-        <p className={fLabel} style={{ fontFamily: 'var(--font-mono)' }}>Status</p>
-        <div className="flex flex-col gap-1">
-          {FILTERS.map((f) => (
-            <button
-              key={f.value}
-              onClick={() => setFilter(f.value)}
-              className={cn(
-                'text-left px-3 py-1.5 rounded-lg text-xs font-semibold transition-all',
-                filter === f.value ? 'bg-[color:var(--color-accent)] text-black' : 'text-[color:var(--color-text-dim)] hover:bg-[color:var(--color-surface-2)] hover:text-[color:var(--color-text)]'
-              )}
-              style={{ fontFamily: 'var(--font-mono)' }}
-            >
-              {f.value === 'all' ? t('common.all') : f.value === 'active' ? t('v.fActive') : t('v.fUsed')}
-            </button>
-          ))}
-        </div>
-      </div>
+      <FilterSection label={t('common.status')}>
+        <FilterOptions
+          value={filter}
+          onChange={setFilter}
+          options={FILTERS.map((f) => ({ value: f.value, label: f.value === 'all' ? t('common.all') : f.value === 'active' ? t('v.fActive') : t('v.fUsed') }))}
+        />
+      </FilterSection>
       {stores.length > 1 && (
-        <div>
-          <p className={fLabel} style={{ fontFamily: 'var(--font-mono)' }}>Store</p>
-          <SearchableSelect value={storeFilter} onChange={setStoreFilter} options={stores} placeholder="All stores" clearable size="sm" className="w-full" />
-        </div>
+        <FilterSection label={t('v.fStore')}>
+          <SearchableSelect value={storeFilter} onChange={setStoreFilter} options={stores} placeholder={t('it.allStores')} clearable size="sm" className="w-full" />
+        </FilterSection>
       )}
-      <div>
-        <p className={fLabel} style={{ fontFamily: 'var(--font-mono)' }}>Sort</p>
+      <FilterSection label={t('common.sort')}>
         <select value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)} className={filterControlClass} style={{ fontFamily: 'var(--font-mono)' }}>
           <option value="expiry">{t('v.sortExpiry')}</option>
           <option value="store">{t('v.sortStore')}</option>
           <option value="title">{t('v.sortTitle')}</option>
         </select>
-      </div>
+      </FilterSection>
       {anyF && (
         <button
           onClick={() => { setFilter('all'); setSearch(''); setStoreFilter(''); setSortBy('expiry'); }}
@@ -234,7 +220,7 @@ function VoucherCard({ voucher, onEdit }: { voucher: SerializedVoucher; onEdit: 
         >
           <Check size={12} /> {voucher.used ? t('v.markUnused') : t('v.markUsed')}
         </button>
-        <button onClick={onEdit} className="p-1.5 rounded-md text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface-2)]" aria-label="Edit">
+        <button onClick={onEdit} className="p-1.5 rounded-md text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface-2)]" aria-label={t('common.edit')}>
           <Pencil size={13} />
         </button>
         {voucher.url && (

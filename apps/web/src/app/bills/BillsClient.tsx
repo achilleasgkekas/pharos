@@ -3,6 +3,7 @@ import { ymd } from '@/lib/calendarDay';
 import { useState, useTransition, useMemo } from 'react';
 import { RECURRING_CYCLES, type RecurringCycle } from '@/lib/billingCycle';
 import { Trash2, Check, Undo2, Archive, ArchiveRestore, CalendarClock, RotateCw, Coins, FileText, X } from 'lucide-react';
+import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { PAGE_MAIN, PageHeader, HeaderStat, PrimaryAction, FilterLayout, FilterSection, FilterOptions } from '@/components/ui/PageHeader';
 import { Input, controlClass } from '@/components/ui/Input';
@@ -26,10 +27,9 @@ import {
   logBillPayment, removeBillPayment,
 } from './actions';
 import { formatDate } from '@/lib/i18n/format';
-import { useLocale, useT } from '@/components/LocaleProvider';
+import { useLocale, useMoney, useT } from '@/components/LocaleProvider';
 import type { TFunc, TKey } from '@/lib/i18n';
 
-const money = (n: number) => `${cur()}${n.toFixed(2)}`;
 type Filter = 'open' | 'overdue' | 'part-paid' | 'paid' | 'all';
 /** P9 context: the deployment's base currency + whether multi-currency is switched on at all. */
 type FxCtx = { base: string; enabled: boolean };
@@ -38,12 +38,6 @@ function currencyCodes(base: string): string[] {
   return [...new Set([normalizeCurrency(base) || 'EUR', ...CURRENCIES.map((c) => c.code)])];
 }
 
-const STATUS_META: Record<BillStatus, { label: TKey; cls: string }> = {
-  overdue: { label: 'bill.stOverdue', cls: 'bg-[color:var(--color-red)]/15 text-[color:var(--color-red)]' },
-  'due-soon': { label: 'bill.stDueSoon', cls: 'bg-[color:var(--color-gold)]/15 text-[color:var(--color-gold)]' },
-  upcoming: { label: 'bill.stUpcoming', cls: 'bg-[color:var(--color-surface-2)] text-[color:var(--color-text-dim)]' },
-  paid: { label: 'bill.stPaid', cls: 'bg-[color:var(--color-accent)]/15 text-[color:var(--color-accent)]' },
-};
 
 function dueLabel(bill: SerializedBill, locale: string, t: TFunc): string {
   if (bill.paidAt) return t('bill.paidOn', { date: formatDate(bill.paidAt, locale) });
@@ -81,6 +75,7 @@ export function BillsClient({
   baseCurrency?: string;
   multiCurrency?: boolean;
 }) {
+  const money = useMoney();
   const t = useT();
   const fx: FxCtx = { base: baseCurrency, enabled: multiCurrency };
   const [showCreate, setShowCreate] = useState(false);
@@ -223,16 +218,16 @@ function BillRow({
   onOpen: () => void;
   onPay: () => void;
 }) {
+  const money = useMoney();
   const t = useT();
   const locale = useLocale();
-  const meta = STATUS_META[status];
   const paidSoFar = billPaidAmount(bill.payments);
   const total = bill.amount || 0;
   const progress = partPaid && total > 0 ? Math.min(100, Math.round((paidSoFar / total) * 100)) : 0;
   return (
     <div
       className={cn(
-        'flex items-center gap-3 p-3 rounded-xl border bg-[color:var(--color-surface)]',
+        'flex items-center gap-3 px-3 py-2.5 rounded-xl border bg-[color:var(--color-surface)]',
         status === 'paid' ? 'border-[color:var(--color-border)] opacity-70' : 'border-[color:var(--color-border-light)]'
       )}
     >
@@ -279,9 +274,7 @@ function BillRow({
             <FxBadge doc={bill} base={fx.base} />
           </div>
         )}
-        <span className={cn('inline-block text-[10px] px-1.5 py-0.5 rounded font-semibold mt-1', meta.cls)} style={{ fontFamily: 'var(--font-mono)' }}>
-          {t(meta.label)}
-        </span>
+        <Badge status={status} className="mt-1" />
       </div>
       {status !== 'paid' && (
         <button
@@ -315,6 +308,7 @@ function BillForm({
   onCancel: () => void;
   onDeleted?: () => void;
 }) {
+  const money = useMoney();
   const t = useT();
   const locale = useLocale();
   const [pending, startTransition] = useTransition();
@@ -590,6 +584,7 @@ function PartialPaymentForm({
   base: string;
   onDone: () => void;
 }) {
+  const money = useMoney();
   const t = useT();
   const [pending, startTransition] = useTransition();
   const [amount, setAmount] = useState('');

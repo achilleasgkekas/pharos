@@ -62,7 +62,7 @@ import { CreditCard as CreditCardIcon, Wallet, Power, Camera, ScanLine } from 'l
 import { shrinkImage } from '@/lib/clientImage';
 import { StatementPaymentReport } from '@/components/StatementPaymentReport';
 import { buildStatementPaymentReport, cardBalanceSummary, statementPaymentSummary } from '@/lib/statementPayments';
-import { useLocale, useT } from '@/components/LocaleProvider';
+import { useLocale, useT, useMoney } from '@/components/LocaleProvider';
 import { FxBadge } from '@/components/FxBadge';
 import { FxRateButton } from '@/components/FxRateButton';
 import {
@@ -123,6 +123,7 @@ export function StatementsClient({
   baseCurrency?: string;
   multiCurrency?: boolean;
 }) {
+  const money = useMoney();
   const t = useT();
   const statements = useMemo(() => statementsWithCurrentCards(storedStatements, cards), [storedStatements, cards]);
   const fx: FxCtx = { base: baseCurrency, enabled: multiCurrency };
@@ -238,8 +239,8 @@ export function StatementsClient({
   return (
     <main className={`min-w-0 ${PAGE_MAIN}`}>
       <PageHeader title={t('nav.statements')} count={statements.length}>
-        {statements.length > 0 && <HeaderStat label={`${t('payments.due')}:`} value={`${cur()}${balances.due.toFixed(2)}`} color="var(--color-red)" />}
-        {statements.length > 0 && balances.credit > 0 && <HeaderStat label={`${t('payments.credit')}:`} value={`${cur()}${balances.credit.toFixed(2)}`} color="var(--color-accent)" />}
+        {statements.length > 0 && <HeaderStat label={`${t('payments.due')}:`} value={`${money(balances.due)}`} color="var(--color-red)" />}
+        {statements.length > 0 && balances.credit > 0 && <HeaderStat label={`${t('payments.credit')}:`} value={`${money(balances.credit)}`} color="var(--color-accent)" />}
         {statements.length > 0 && (
           <HeaderButton icon={<Link2 size={14} />} onClick={() => setShowReconcile(true)}>{t('rec.title')}</HeaderButton>
         )}
@@ -363,6 +364,7 @@ export function StatementsClient({
  * be a fabricated number, not a softer one.
  */
 function UtilizationBadge({ u, className }: { u?: CardUtilization; className?: string }) {
+  const money = useMoney();
   const t = useT();
   if (!u) return null;
   const color =
@@ -384,8 +386,8 @@ function UtilizationBadge({ u, className }: { u?: CardUtilization; className?: s
         background: u.level === 'ok' ? undefined : `color-mix(in srgb, ${color} 14%, transparent)`,
       }}
       title={t('stm.utilTitle', {
-        used: `${cur()}${u.outstanding.toFixed(2)}`,
-        limit: `${cur()}${u.creditLimit}`,
+        used: `${money(u.outstanding)}`,
+        limit: `${money(u.creditLimit)}`,
       })}
     >
       ≈ {t('stm.utilPct', { pct: u.pct })}
@@ -492,6 +494,8 @@ function PlanCardLinkable({
   allPlans: InstallmentPlan[];
   compact?: boolean;
 }) {
+  const money = useMoney();
+  const money0 = (n: number) => money(n, undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
   const t = useT();
   const confirm = useConfirm();
   const [pending, startTransition] = useTransition();
@@ -592,13 +596,13 @@ function PlanCardLinkable({
                 key={item._id}
                 onClick={() => addItem(item._id)}
                 disabled={pending}
-                title={t('stm.priceMatch', { price: `${cur()}${price}`, total: `${cur()}${plan.totalAmount.toFixed(0)}` })}
+                title={t('stm.priceMatch', { price: `${money(price)}`, total: `${money0(plan.totalAmount)}` })}
                 className="inline-flex items-center gap-1 text-[10px] text-[color:var(--color-cyan)] bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-md px-1.5 py-0.5 hover:border-[color:var(--color-accent)] hover:text-[color:var(--color-accent)] transition-colors max-w-[160px]"
                 style={{ fontFamily: 'var(--font-mono)' }}
               >
                 <Package size={9} className="shrink-0" />
                 <span className="truncate">{item.title}</span>
-                <span className="text-[color:var(--color-text-faint)] shrink-0">{cur()}{price}</span>
+                <span className="text-[color:var(--color-text-faint)] shrink-0">{money(price)}</span>
               </button>
             ))}
             <button
@@ -623,6 +627,8 @@ function PlanCardLinkable({
 /** Merge two installment plans the bank printed with different wording across
  *  statements ("QUEST ONLINE" vs "QUEST ONLINE KALLITHEA") into one payoff plan. */
 function PlanMergeControl({ plan, allPlans }: { plan: InstallmentPlan; allPlans: InstallmentPlan[] }) {
+  const money = useMoney();
+  const money0 = (n: number) => money(n, undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
   const t = useT();
   const confirm = useConfirm();
   const [pending, startTransition] = useTransition();
@@ -667,7 +673,7 @@ function PlanMergeControl({ plan, allPlans }: { plan: InstallmentPlan; allPlans:
             >
               <span className="truncate">{p.label}</span>
               <span className="text-[color:var(--color-text-faint)] shrink-0" style={{ fontFamily: 'var(--font-mono)' }}>
-                {cur()}{p.perAmount.toFixed(0)} · {p.paidInstallments}/{p.totalInstallments}
+                {money0(p.perAmount)} · {p.paidInstallments}/{p.totalInstallments}
               </span>
             </button>
           ))}
@@ -714,6 +720,7 @@ function StatementRow({
   base: string;
   onOpen: () => void;
 }) {
+  const money = useMoney();
   const t = useT();
   const credit = statementPaymentSummary(statement).credit > 0;
   const remaining = statement.totalAmount - statement.paidAmount;
@@ -743,7 +750,7 @@ function StatementRow({
           className={cn('text-sm font-bold', credit && 'text-[color:var(--color-accent)]')}
           style={{ fontFamily: 'var(--font-display)' }}
         >
-          {credit ? '+' : ''}{cur()}{Math.abs(statement.totalAmount).toFixed(2)}
+          {credit ? '+' : ''}{money(Math.abs(statement.totalAmount))}
         </div>
         {credit ? (
           <div className="text-[10px] text-[color:var(--color-accent)]" style={{ fontFamily: 'var(--font-mono)' }}>
@@ -752,7 +759,7 @@ function StatementRow({
         ) : (
           remaining > 0.001 && (
             <div className="text-[10px] text-[color:var(--color-red)]" style={{ fontFamily: 'var(--font-mono)' }}>
-              -{cur()}{remaining.toFixed(2)}
+              -{money(remaining)}
             </div>
           )
         )}
@@ -779,6 +786,7 @@ function StatementDetail({
   fx: FxCtx;
   onClose: () => void;
 }) {
+  const money = useMoney();
   const t = useT();
   const [showPdf, setShowPdf] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -828,14 +836,14 @@ function StatementDetail({
       {/* Overpaid highlight */}
       {credit && (
         <div className="flex items-center gap-2 text-xs px-3 py-2 rounded-lg bg-[color:var(--color-accent)]/8 text-[color:var(--color-accent)] border border-[color:var(--color-accent)]/20" style={{ fontFamily: 'var(--font-mono)' }}>
-          {t('stm.creditBalance', { amount: `${cur()}${paymentSummary.credit.toFixed(2)}` })}
+          {t('stm.creditBalance', { amount: `${money(paymentSummary.credit)}` })}
         </div>
       )}
 
       <dl className="grid min-w-0 gap-4 rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] p-4 sm:grid-cols-3">
-        <div><dt style={{ fontFamily: 'var(--font-mono)' }} className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)]">{t('payments.included')}</dt><dd className="mt-1.5 text-lg font-semibold tabular-nums text-[color:var(--color-accent)]" style={{ fontFamily: 'var(--font-display)' }}>{cur()}{paymentSummary.paymentsIncluded.toFixed(2)}</dd></div>
-        <div><dt style={{ fontFamily: 'var(--font-mono)' }} className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)]">{t('payments.additional')}</dt><dd className="mt-1.5 text-lg font-semibold tabular-nums text-[color:var(--color-accent)]" style={{ fontFamily: 'var(--font-display)' }}>{cur()}{paymentSummary.additionalPaid.toFixed(2)}</dd></div>
-        <div><dt style={{ fontFamily: 'var(--font-mono)' }} className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)]">{t('payments.due')}</dt><dd className="mt-1.5 text-lg font-semibold tabular-nums" style={{ fontFamily: 'var(--font-display)', color: paymentSummary.due > 0 ? 'var(--color-red)' : 'var(--color-accent)' }}>{cur()}{paymentSummary.due.toFixed(2)}</dd></div>
+        <div><dt style={{ fontFamily: 'var(--font-mono)' }} className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)]">{t('payments.included')}</dt><dd className="mt-1.5 text-lg font-semibold tabular-nums text-[color:var(--color-accent)]" style={{ fontFamily: 'var(--font-display)' }}>{money(paymentSummary.paymentsIncluded)}</dd></div>
+        <div><dt style={{ fontFamily: 'var(--font-mono)' }} className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)]">{t('payments.additional')}</dt><dd className="mt-1.5 text-lg font-semibold tabular-nums text-[color:var(--color-accent)]" style={{ fontFamily: 'var(--font-display)' }}>{money(paymentSummary.additionalPaid)}</dd></div>
+        <div><dt style={{ fontFamily: 'var(--font-mono)' }} className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)]">{t('payments.due')}</dt><dd className="mt-1.5 text-lg font-semibold tabular-nums" style={{ fontFamily: 'var(--font-display)', color: paymentSummary.due > 0 ? 'var(--color-red)' : 'var(--color-accent)' }}>{money(paymentSummary.due)}</dd></div>
       </dl>
       {/* Editable statement fields — same form for reading and writing */}
       <StatementForm
@@ -1033,6 +1041,7 @@ function TransactionRow({
   onDelete: () => void;
   pending: boolean;
 }) {
+  const money = useMoney();
   const locale = useLocale();
   const t = useT();
   const credit = tx.amount < 0;
@@ -1065,7 +1074,7 @@ function TransactionRow({
           )}
           style={{ fontFamily: 'var(--font-mono)' }}
         >
-          {credit ? '+' : ''}{cur()}{Math.abs(tx.amount).toFixed(2)}
+          {credit ? '+' : ''}{money(Math.abs(tx.amount))}
         </span>
         <button
           onClick={onDelete}
@@ -1474,6 +1483,7 @@ function CardsManager({
   statements: SerializedStatement[];
   utilization: CardUtilizationIndex;
 }) {
+  const money = useMoney();
   const t = useT();
   const [editing, setEditing] = useState<SerializedCard | null>(null);
   const [adding, setAdding] = useState(false);
@@ -1530,8 +1540,8 @@ function CardsManager({
               </div>
               <div className="text-[10px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
                 {c.bank || c.type}
-                {spend && ` · ${t('stm.charged', { amount: `${cur()}${spend.total.toFixed(2)}`, count: spend.count })}`}
-                {c.creditLimit > 0 && ` · ${t('stm.limit', { amount: `${cur()}${c.creditLimit}` })}`}
+                {spend && ` · ${t('stm.charged', { amount: `${money(spend.total)}`, count: spend.count })}`}
+                {c.creditLimit > 0 && ` · ${t('stm.limit', { amount: `${money(c.creditLimit)}` })}`}
               </div>
             </div>
             <button

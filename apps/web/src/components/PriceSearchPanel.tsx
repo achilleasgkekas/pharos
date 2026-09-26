@@ -10,6 +10,8 @@ import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { getBulkAiGuard } from '@/app/jobActions';
 import { searchItemPriceCandidates, addPriceLinks, type PriceCandidate } from '@/app/items/actions';
 import type { SerializedItem } from '@/types';
+import { useT } from '@/components/LocaleProvider';
+import { EmptyState } from '@/components/ui/EmptyState';
 
 function linkHost(url: string): string {
   try {
@@ -35,6 +37,7 @@ export function PriceSearchPanel({
   onClose: () => void;
   onAdded: (item: SerializedItem) => void;
 }) {
+  const t = useT();
   const router = useRouter();
   const confirm = useConfirm();
   const [query, setQuery] = useState(item.title);
@@ -106,7 +109,7 @@ export function PriceSearchPanel({
   const pickableCount = candidates ? candidates.filter((c) => picked.has(c.url) && c.price > 0).length : 0;
 
   return (
-    <Modal open={open} onClose={onClose} title="Search prices online" size="lg">
+    <Modal open={open} onClose={onClose} title={t('ps.title')} size="lg">
       <div className="space-y-4">
         <div className="flex items-center gap-2">
           <input
@@ -141,10 +144,7 @@ export function PriceSearchPanel({
 
         {candidates && !searching && (
           candidates.length === 0 ? (
-            <div className="py-10 text-center text-[color:var(--color-text-faint)]">
-              <p className="text-3xl mb-2">🔍</p>
-              <p className="text-sm">No shops found for this search.</p>
-            </div>
+            <EmptyState className="py-10" icon={<Search />} title={t('ps.noShops')} />
           ) : (
             <div className="space-y-1.5">
               {candidates.map((c) => {

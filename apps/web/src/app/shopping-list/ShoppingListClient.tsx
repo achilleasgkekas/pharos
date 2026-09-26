@@ -6,7 +6,7 @@ import { Field } from '@/components/ui/Field';
 import { cn } from '@/components/ui/cn';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
-import { PAGE_MAIN, PageHeader, HeaderButton, ViewToggle, PrimaryAction, FilterLayout } from '@/components/ui/PageHeader';
+import { PAGE_MAIN, PageHeader, HeaderButton, ViewToggle, PrimaryAction, FilterLayout, FilterSection, FilterOptions } from '@/components/ui/PageHeader';
 import { Input, controlClass, filterControlClass } from '@/components/ui/Input';
 import { useT } from '@/components/LocaleProvider';
 import { shrinkImage } from '@/lib/clientImage';
@@ -219,50 +219,36 @@ export function ShoppingListClient({ initialItems }: { initialItems: SerializedL
     addItem(d, true); // optimistic + persist + rollback-on-failure, marked AI-scanned
   }
 
-  const fLabel = 'text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-[0.12em] mb-1.5';
   const statusLabel = (v: StatusFilter) => (v === 'all' ? t('common.all') : v === 'todo' ? t('sl.fToBuy') : t('sl.fBought'));
   const anyF = statusFilter !== 'all' || !!catFilter || !!search || sortBy !== 'recent';
 
   const filterControls = (
     <div className="space-y-4">
       <Input icon={<Search size={14} />} placeholder={t('common.search')} value={search} onChange={(e) => setSearch(e.target.value)} />
-      <div>
-        <p className={fLabel} style={mono}>{t('common.status')}</p>
-        <div className="flex flex-col gap-1">
-          {(['all', 'todo', 'bought'] as const).map((v) => (
-            <button
-              key={v}
-              onClick={() => setStatusFilter(v)}
-              className={cn(
-                'text-left px-3 py-1.5 rounded-lg text-xs font-semibold transition-all',
-                statusFilter === v ? 'bg-[color:var(--color-accent)] text-black' : 'text-[color:var(--color-text-dim)] hover:bg-[color:var(--color-surface-2)] hover:text-[color:var(--color-text)]'
-              )}
-              style={mono}
-            >
-              {statusLabel(v)}
-            </button>
-          ))}
-        </div>
-      </div>
+      <FilterSection label={t('common.status')}>
+        <FilterOptions
+          value={statusFilter}
+          onChange={setStatusFilter}
+          options={(['all', 'todo', 'bought'] as const).map((v) => ({ value: v, label: statusLabel(v) }))}
+        />
+      </FilterSection>
       {cats.length > 0 && (
-        <div>
-          <p className={fLabel} style={mono}>{t('common.category')}</p>
+        <FilterSection label={t('common.category')}>
           <select value={catFilter} onChange={(e) => setCatFilter(e.target.value)} className={filterControlClass} style={mono}>
             <option value="">{t('common.all')}</option>
             {cats.map((c) => (
               <option key={c} value={c}>{c}</option>
             ))}
           </select>
-        </div>
+        </FilterSection>
       )}
-      <div>
-        <p className={fLabel} style={mono}>{t('common.sort')}</p>
+      <FilterSection label={t('common.sort')}>
         <select value={sortBy} onChange={(e) => setSortBy(e.target.value as SortKey)} className={filterControlClass} style={mono}>
           <option value="recent">{t('sl.sortRecent')}</option>
           <option value="name">{t('sl.sortName')}</option>
           <option value="category">{t('common.category')}</option>
         </select>
-      </div>
+      </FilterSection>
       {anyF && (
         <button
           onClick={() => { setStatusFilter('all'); setCatFilter(''); setSearch(''); setSortBy('recent'); }}

@@ -108,7 +108,7 @@ export function DocumentsClient({ documents, leadDays }: { documents: Serialized
               <div
                 key={d._id}
                 className={cn(
-                  'flex items-center gap-3 rounded-xl border bg-[color:var(--color-surface)] p-3 transition-colors',
+                  'flex items-center gap-3 rounded-xl border bg-[color:var(--color-surface)] px-3 py-2.5 transition-colors',
                   d.archived ? 'border-[color:var(--color-border)] opacity-60' : 'border-[color:var(--color-border)] hover:border-[color:var(--color-border-light)]'
                 )}
               >

@@ -16,7 +16,7 @@ import { SavedViews } from '@/components/ui/SavedViews';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { NO_SPACE, matchesSpace, spaceFilterOptions } from '@/lib/spaceFilter';
 import { Button } from '@/components/ui/Button';
-import { PAGE_MAIN, PageHeader, HeaderButton, HeaderStat, ViewToggle, PrimaryAction, FilterLayout } from '@/components/ui/PageHeader';
+import { PAGE_MAIN, PageHeader, HeaderButton, HeaderStat, ViewToggle, PrimaryAction, FilterLayout, FilterSection, FilterOptions } from '@/components/ui/PageHeader';
 import { Input, controlClass } from '@/components/ui/Input';
 import { DateInput } from '@/components/ui/DateInput';
 import { Modal } from '@/components/ui/Modal';
@@ -183,7 +183,6 @@ export function SubscriptionsClient({
   }, [subscriptions, search, categoryFilter, spaceFilter, statusFilter, sortBy, locale]);
 
   const anyF = !!(search || categoryFilter || spaceFilter || statusFilter !== 'all' || sortBy !== 'name');
-  const fLabel = 'text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-[0.12em] mb-1.5';
 
   // P87: saved filter presets for Subscriptions (same reusable primitive as Items).
   const currentView = { search, categoryFilter, spaceFilter, statusFilter, sortBy };
@@ -198,44 +197,34 @@ export function SubscriptionsClient({
   const filterControls = (
     <div className="space-y-4">
       <Input icon={<Search size={14} />} placeholder={t('sub.searchPlaceholder')} value={search} onChange={(e) => setSearch(e.target.value)} />
-      <div>
-        <p className={fLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('common.status')}</p>
-        <div className="flex flex-col gap-1">
-          {([['all', 'All'], ['active', 'Active'], ['cancelled', 'Cancelled']] as const).map(([v]) => (
-            <button
-              key={v}
-              onClick={() => setStatusFilter(v)}
-              className={cn(
-                'text-left px-3 py-1.5 rounded-lg text-xs font-semibold transition-all',
-                statusFilter === v ? 'bg-[color:var(--color-accent)] text-black' : 'text-[color:var(--color-text-dim)] hover:bg-[color:var(--color-surface-2)] hover:text-[color:var(--color-text)]'
-              )}
-              style={{ fontFamily: 'var(--font-mono)' }}
-            >
-              {v === 'all' ? t('common.all') : v === 'active' ? t('v.fActive') : t('sub.fCancelled')}
-            </button>
-          ))}
-        </div>
-      </div>
+      <FilterSection label={t('common.status')}>
+        <FilterOptions
+          value={statusFilter}
+          onChange={setStatusFilter}
+          options={[
+            { value: 'all', label: t('common.all') },
+            { value: 'active', label: t('v.fActive') },
+            { value: 'cancelled', label: t('sub.fCancelled') },
+          ]}
+        />
+      </FilterSection>
       {categories.length > 1 && (
-        <div>
-          <p className={fLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('common.category')}</p>
+        <FilterSection label={t('common.category')}>
           <SearchableSelect value={categoryFilter} onChange={setCategoryFilter} options={categories} placeholder={t('sub.allCategories')} clearable size="sm" className="w-full" />
-        </div>
+        </FilterSection>
       )}
       {spaces.length > 0 && (
-        <div>
-          <p className={fLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('ex.space')}</p>
+        <FilterSection label={t('ex.space')}>
           <SearchableSelect value={spaceFilter} onChange={setSpaceFilter} options={spaceFilterOptions(spaces)} labels={{ [NO_SPACE]: t('ex.spaceNone') }} placeholder={t('ex.allSpaces')} clearable size="sm" className="w-full" />
-        </div>
+        </FilterSection>
       )}
-      <div>
-        <p className={fLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('common.sort')}</p>
+      <FilterSection label={t('common.sort')}>
         <select value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)} className={controlClass} style={{ fontFamily: 'var(--font-mono)' }}>
           <option value="name">{t('sub.sortName')}</option>
           <option value="amount">{t('sub.sortCost')}</option>
           <option value="renewal">{t('sub.sortRenewal')}</option>
         </select>
-      </div>
+      </FilterSection>
       <div className="flex items-center gap-3 flex-wrap">
         <SavedViews<SubsView> moduleKey="subscriptions" current={currentView} canSave={anyF} onApply={applyView} />
         {anyF && (

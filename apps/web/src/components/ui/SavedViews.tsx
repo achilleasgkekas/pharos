@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Bookmark, ChevronDown, Trash2, Plus, Check } from 'lucide-react';
 import { useT } from '@/components/LocaleProvider';
+import { usePrompt } from './ConfirmDialog';
 
 /**
  * Saved filter presets / "smart views" (P87).
@@ -64,6 +65,7 @@ export function SavedViews<S>({
   onApply: (state: S) => void;
 }) {
   const t = useT();
+  const prompt = usePrompt();
   const [views, setViews] = useState<SavedView<S>[]>([]);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -88,8 +90,8 @@ export function SavedViews<S>({
     saveViews(moduleKey, next);
   }
 
-  function handleSave() {
-    const name = window.prompt(t('views.namePrompt'))?.trim();
+  async function handleSave() {
+    const name = (await prompt({ title: t('views.saveCurrent'), label: t('views.namePrompt'), confirmLabel: t('common.save') }))?.trim();
     if (!name) return;
     const id = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `v${Date.now()}`;
     // Replace a same-named view rather than piling up duplicates.
