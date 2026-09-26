@@ -1,5 +1,6 @@
 import { Schema, model, models, type Model, type InferSchemaType } from 'mongoose';
 import { softDeletePlugin } from '@/lib/softDelete';
+import { createdByPlugin } from '@/lib/createdBy';
 
 // Single source of truth for item status. Used by the schema enum AND by the
 // /api/v1/items POST + PATCH routes (whitelist validation) so they never drift.
@@ -191,6 +192,7 @@ ItemSchema.index({ title: 'text', specs: 'text', notes: 'text' });
 ItemSchema.index({ updatedAt: -1 });
 
 ItemSchema.plugin(softDeletePlugin);
+ItemSchema.plugin(createdByPlugin); // P75: who added it (display only)
 
 export type ItemDoc = InferSchemaType<typeof ItemSchema> & { _id: string };
 

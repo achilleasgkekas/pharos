@@ -53,6 +53,12 @@ adds people in **Settings → Users** with one of three roles:
 Each person can change their own password and turn on two-factor authentication
 (TOTP) in Settings → General.
 
+Once there is more than one account, records show who added them ("Added by
+Maria") on items, expenses, receipts and tasks. It is recorded for anything added
+in the app, through the REST API or over MCP; records from before this existed,
+and ones created by background jobs, show nothing. A single-user install sees no
+change at all.
+
 ## Inventory & Shopping (Items)
 
 One data model, two views. An **Item** is anything you own or plan to buy, with a

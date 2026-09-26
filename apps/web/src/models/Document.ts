@@ -1,5 +1,6 @@
 import { Schema, model, models, type Model, type InferSchemaType } from 'mongoose';
 import { softDeletePlugin } from '@/lib/softDelete';
+import { createdByPlugin } from '@/lib/createdBy';
 
 // P42 — personal document expiry tracker (passport, ID card, driving licence, residence
 // permit, vehicle registration/MOT). PHAROS is a "Personal Hub", but nothing tracked the
@@ -29,6 +30,7 @@ const DocumentSchema = new Schema(
 DocumentSchema.index({ updatedAt: -1 });
 
 DocumentSchema.plugin(softDeletePlugin);
+DocumentSchema.plugin(createdByPlugin); // P75: who added it (display only)
 
 export type DocumentDoc = InferSchemaType<typeof DocumentSchema> & { _id: string };
 

@@ -6,6 +6,7 @@ import { canWrite, isReadMethod, READ_ONLY_MESSAGE, type Role } from '@/lib/role
 import { DEFAULT_TENANT, type TenantContext } from '@/lib/tenancy/context';
 import { currentModel } from '@/lib/tenancy/connection';
 import { withTenant } from '@/lib/tenancy/current';
+import { runAsActor } from '@/lib/actor';
 
 export type ApiUser = { id: string; name: string; username: string; role: Role };
 
@@ -94,7 +95,8 @@ export async function withAuth(
     const limited = rateLimit(`u:${user.id}`);
     if (limited) return limited;
     try {
-      return await fn(user);
+      // P75: records created through the API are attributed to the token's owner.
+      return await runAsActor(user.id, () => fn(user));
     } catch (e) {
       return apiError((e as Error).message?.slice(0, 200) || 'Server error', 500);
     }

@@ -757,6 +757,7 @@ export const fr: Partial<Dict> = {
   'date.invalid': 'Saisissez une date valide',
   'date.openCalendar': 'Ouvrir le calendrier',
   'common.delete': 'Supprimer',
+  'common.addedBy': 'Ajouté par {name}', // P75
   'common.deleteForever': 'Supprimer définitivement',
   'common.edit': 'Modifier',
   'common.new': 'Nouveau',
