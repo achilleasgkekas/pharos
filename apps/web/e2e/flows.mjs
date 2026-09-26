@@ -145,6 +145,16 @@ await flow('export a backup and restore it', async () => {
   const file = await download.path();
   expect(file, 'the export produced no file');
 
+  // Delete something the backup holds, so the restore has to bring it back. Without this the
+  // flow passes even if restore cannot revive a deleted record, the case a backup exists for.
+  // Deleting the vehicle also soft-deletes its fuel log, so the children are covered too.
+  await open('/vehicles');
+  page.once('dialog', (d) => d.accept()); // the delete button asks with a native confirm()
+  await page.locator('section', { has: page.getByRole('heading', { name: `Golf ${TAG}` }) }).getByRole('button', { name: 'Delete' }).click();
+  await page.getByRole('heading', { name: `Golf ${TAG}` }).waitFor({ state: 'detached' });
+
+  await open('/settings');
+  await page.getByRole('button', { name: 'Storage & backup' }).first().click();
   await page.locator('input[type=file][accept="application/json,.json"]').first().setInputFiles(file);
   await page.getByRole('dialog').getByRole('button', { name: 'Confirm' }).click();
   const done = page.getByText(/✓ Restored \d+ records/);
@@ -155,6 +165,8 @@ await flow('export a backup and restore it', async () => {
 
   await open('/items');
   await page.getByText(`Drill ${TAG}`).first().waitFor();
+  await open('/vehicles');
+  await page.locator('section', { has: page.getByRole('heading', { name: `Golf ${TAG}` }) }).getByText('History (1)').waitFor();
 });
 
 // ── Accessibility ─────────────────────────────────────────────────────────
