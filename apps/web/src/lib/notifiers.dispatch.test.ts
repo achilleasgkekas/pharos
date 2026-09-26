@@ -23,6 +23,10 @@ vi.mock('./notify', () => ({ sendNtfyTo: (...a: unknown[]) => sendNtfyTo(...a) }
 // user-supplied, so that branch is not guarded and needs no mock here.)
 vi.mock('node:dns/promises', () => ({ lookup: vi.fn() }));
 
+// email goes through lib/mailer.ts (nodemailer); mock it so no SMTP connection is opened.
+const sendPlainMail = vi.fn(async (..._args: unknown[]) => {});
+vi.mock('./mailer', () => ({ sendPlainMail: (...a: unknown[]) => sendPlainMail(...a) }));
+
 import { lookup } from 'node:dns/promises';
 import { testNotifier } from './notifiers';
 
@@ -47,6 +51,7 @@ const cfg = (over: Partial<NotifierConfig> & { type: NotifierType }): NotifierCo
 beforeEach(() => {
   sendNtfyTo.mockClear();
   sendNtfyTo.mockResolvedValue(true);
+  sendPlainMail.mockReset();
   mockLookup.mockReset();
   mockLookup.mockResolvedValue([{ address: '203.0.113.10', family: 4 }] as never);
   vi.stubGlobal(
@@ -168,6 +173,48 @@ describe('testNotifier — webhook', () => {
   it('returns false and does not fetch when url is missing', async () => {
     expect(await testNotifier(cfg({ type: 'webhook', url: '' }))).toBe(false);
     expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+});
+
+describe('testNotifier — email', () => {
+  const smtp = { host: 'smtp.example.com', port: 465, secure: true, user: 'me', pass: 'app-pw', from: 'Pharos <a@example.com>' };
+
+  it('sends the title as subject and the message as plain text to the target', async () => {
+    const ok = await testNotifier(cfg({ type: 'email', ...smtp, target: 'me@example.com' }));
+    expect(ok).toBe(true);
+    expect(sendPlainMail).toHaveBeenCalledTimes(1);
+    const [conn, mail] = sendPlainMail.mock.calls[0] as unknown as [Record<string, unknown>, Record<string, string>];
+    expect(conn).toEqual(smtp);
+    expect(mail.to).toBe('me@example.com');
+    expect(mail.subject).toBe('Pharos test');
+    expect(mail.text).toMatch(/alerts will arrive/i);
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  it('falls back to port 587 without implicit TLS when those are unset', async () => {
+    await testNotifier(cfg({ type: 'email', host: 'smtp.example.com', from: 'a@example.com', target: 'b@example.com' }));
+    const [conn] = sendPlainMail.mock.calls[0] as unknown as [Record<string, unknown>];
+    expect(conn).toMatchObject({ port: 587, secure: false });
+  });
+
+  it.each([
+    ['host', { host: '' }],
+    ['from', { from: '' }],
+    ['target', { target: '' }],
+  ])('returns false and never connects when %s is missing', async (_field, over) => {
+    expect(await testNotifier(cfg({ type: 'email', ...smtp, target: 'me@example.com', ...over }))).toBe(false);
+    expect(sendPlainMail).not.toHaveBeenCalled();
+  });
+
+  it('swallows an SMTP error and returns false', async () => {
+    sendPlainMail.mockRejectedValueOnce(Object.assign(new Error('Invalid login'), { code: 'EAUTH' }));
+    await expect(testNotifier(cfg({ type: 'email', ...smtp, target: 'me@example.com' }))).resolves.toBe(false);
+  });
+
+  it('does not run the SSRF guard: a relay on the LAN is a valid SMTP host', async () => {
+    mockLookup.mockResolvedValue([{ address: '10.0.0.5', family: 4 }] as never);
+    expect(await testNotifier(cfg({ type: 'email', ...smtp, host: 'mail.lan', target: 'me@example.com' }))).toBe(true);
+    expect(mockLookup).not.toHaveBeenCalled();
   });
 });
 
