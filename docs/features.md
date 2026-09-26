@@ -634,6 +634,15 @@ The command bar has a **Search / AI toggle**: in Search mode it is the global
 search below; in AI mode it is the assistant. The AI command bar requires an
 Anthropic-capable provider (see [Configuration → AI providers](configuration.md#ai-providers)).
 
+In AI mode a **microphone button** lets you dictate instead of typing. It uses the
+browser's own speech recognition (Chrome, Edge, Safari) in the interface language;
+the words appear in the box as you speak, and nothing is sent until you review
+them and press send. Pharos never receives the audio, but note that Chrome and
+Edge run recognition on their vendor's servers, not on the device. The button is hidden in browsers
+without speech recognition (Firefox) and when Pharos is opened over plain `http`
+on a non-localhost address, because browsers only grant the microphone to secure
+origins.
+
 ## Search
 
 Global search across items, receipts, statements, tasks, subscriptions,
