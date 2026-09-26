@@ -1,7 +1,7 @@
 'use client';
 import { useState, useTransition, useRef, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Activity, Sun, Moon, Sparkles, Database, CreditCard, ExternalLink, Server, Cloud, Download, Upload, Loader2, Check, Store as StoreIcon, Pencil, Trash2, Plus, X, Copy, ShieldCheck, SlidersHorizontal, Bell, MessageSquareCode, RotateCcw, ChevronDown, Globe, HardDrive, FolderTree, RefreshCw, Plug, Users, UserPlus, KeyRound, Star, Landmark, TrendingUp, TrendingDown, CalendarPlus, Tags, MapPin, FlaskConical, Webhook, Mail, Bookmark, LogOut } from 'lucide-react';
+import { Activity, Sun, Moon, Sparkles, Database, CreditCard, ExternalLink, Server, Cloud, Download, Upload, Loader2, Check, Store as StoreIcon, Pencil, Trash2, Plus, X, Copy, ShieldCheck, SlidersHorizontal, Bell, MessageSquareCode, RotateCcw, ChevronDown, Globe, HardDrive, FolderTree, RefreshCw, Plug, Users, UserPlus, KeyRound, Star, Landmark, TrendingUp, TrendingDown, CalendarPlus, Tags, MapPin, FlaskConical, Webhook, Mail, Bookmark, LogOut, History } from 'lucide-react';
 import { useTheme, type Theme } from '@/components/ThemeProvider';
 import { cur } from '@/lib/money';
 import { cn } from '@/components/ui/cn';
@@ -42,6 +42,8 @@ import { mfaCodeReady, mfaPasswordReady, describeMfaError } from '@/lib/mfaSetti
 import { QrCode } from '@/components/QrCode';
 import { McpManager } from './McpManager';
 import { CalendarFeedManager } from './CalendarFeedManager';
+import { ActivityFeed } from './ActivityFeed';
+import { useAttributionNames } from '@/components/CreatedBy';
 import { UpdateChecker } from './UpdateChecker';
 import { WebPushToggle } from './WebPushToggle';
 import { BookmarkletManager } from './BookmarkletManager';
@@ -118,13 +120,13 @@ const OPENROUTER_SUGGESTIONS = ['openai/gpt-4o-mini', 'anthropic/claude-3.5-sonn
 // Mirror of the server-side vision detection (lib/aiConfig.ts) for inline warnings.
 const isVisionName = (name: string) => /vl|vision|llava|minicpm-v|moondream|bakllava|llama3\.2-vision/i.test(name);
 
-type TabId = 'general' | 'money' | 'ai' | 'storage' | 'data' | 'notifications' | 'users' | 'system';
+type TabId = 'general' | 'money' | 'ai' | 'storage' | 'data' | 'notifications' | 'users' | 'activity' | 'system';
 
 import type { Role } from '@/lib/roles';
 
 type CurrentUser = { id: string; name: string; role: Role };
 
-const TABS: { id: TabId; label: string; icon: React.ReactNode; adminOnly?: boolean; selfHostOnly?: boolean }[] = [
+const TABS: { id: TabId; label: string; icon: React.ReactNode; adminOnly?: boolean; selfHostOnly?: boolean; multiUserOnly?: boolean }[] = [
   { id: 'general', label: 'General', icon: <SlidersHorizontal size={15} /> },
   { id: 'money', label: 'Money', icon: <CreditCard size={15} /> },
   // Hosted: AI moves to Workspace → AI (key + toggles in one control-plane place), so hide the
@@ -134,6 +136,9 @@ const TABS: { id: TabId; label: string; icon: React.ReactNode; adminOnly?: boole
   { id: 'data', label: 'Stores & lists', icon: <StoreIcon size={15} /> },
   { id: 'notifications', label: 'Notifications', icon: <Bell size={15} />, adminOnly: true },
   { id: 'users', label: 'Users', icon: <Users size={15} />, adminOnly: true, selfHostOnly: true },
+  // P89 (#23): who added or trashed what. Every role may read it, but only once there is a
+  // second account: on a single-user install there is nobody else's activity to show.
+  { id: 'activity', label: 'Activity', icon: <History size={15} />, multiUserOnly: true },
   // P77 — host-level numbers (Mongo latency, volume free space, job queue). Shared
   // infrastructure on the managed SaaS, so self-host + admin only.
   { id: 'system', label: 'System status', icon: <Activity size={15} />, adminOnly: true, selfHostOnly: true },
@@ -147,6 +152,7 @@ const TAB_KEY: Record<TabId, TKey> = {
   data: 'set.tabData',
   notifications: 'set.tabNotifications',
   users: 'set.tabUsers',
+  activity: 'set.tabActivity',
   system: 'set.tabSystem',
 };
 
@@ -155,7 +161,8 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
   const t = useT();
   const [tab, setTab] = useState<TabId>('general');
   const isAdmin = currentUser.role === 'admin';
-  const visibleTabs = TABS.filter((t) => (!t.adminOnly || isAdmin));
+  const multiUser = useAttributionNames() !== null;
+  const visibleTabs = TABS.filter((t) => (!t.adminOnly || isAdmin) && (!t.multiUserOnly || multiUser));
   const searchParams = useSearchParams();
 
   // A ?tab= deep-link (e.g. from the "Set up AI" banner) wins; otherwise restore the
@@ -334,6 +341,7 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
 
 
           {tab === 'users' && isAdmin && <UsersManager currentUserId={currentUser.id} />}
+          {tab === 'activity' && multiUser && <ActivityFeed />}
 
           {tab === 'system' && isAdmin && (
             <Section title={t('sys.title')} icon={<Activity size={15} />}>

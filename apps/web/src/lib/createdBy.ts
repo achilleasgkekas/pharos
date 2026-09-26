@@ -1,4 +1,4 @@
-import { Schema } from 'mongoose';
+import { Schema, type Query } from 'mongoose';
 import { currentActorId } from './actor';
 
 /**
@@ -16,13 +16,22 @@ import { currentActorId } from './actor';
  * instead of being re-attributed to whoever pressed Restore.
  */
 export function createdByPlugin(schema: Schema): void {
-  schema.add({ createdBy: { type: Schema.Types.ObjectId, ref: 'User', default: null } });
+  schema.add({
+    createdBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+    // P89 (#23): who moved it to Trash. Set and cleared by the query hook below, so none of the
+    // ~30 delete paths (each one an update that sets deletedAt) has to know about it.
+    deletedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+  });
 
   schema.pre('save', async function () {
     if (!this.isNew || this.get('createdBy')) return;
     const actor = await currentActorId();
     if (actor) this.set('createdBy', actor);
   });
+
+  for (const hook of ['updateOne', 'updateMany', 'findOneAndUpdate'] as const) {
+    schema.pre(hook, stampDeletedBy);
+  }
 
   schema.pre('insertMany', async function (docs: unknown) {
     const list = (Array.isArray(docs) ? docs : [docs]) as Array<Record<string, unknown> | null>;
@@ -31,4 +40,19 @@ export function createdByPlugin(schema: Schema): void {
     if (!actor) return;
     for (const d of list) if (d && d.createdBy == null) d.createdBy = actor;
   });
+}
+
+/**
+ * P89 (#23) — record who trashed a record. Every soft delete in the app is an update that sets
+ * `deletedAt` (see lib/softDelete.ts), so this watches for exactly that: a date means "trashed
+ * now, by the current actor"; null means "restored", which clears the name as well. Updates
+ * that do not touch deletedAt pass through untouched. Exported for tests.
+ */
+export async function stampDeletedBy(this: Query<unknown, unknown>): Promise<void> {
+  const update = this.getUpdate() as Record<string, unknown> | null;
+  if (!update || Array.isArray(update)) return; // pipeline updates are never soft deletes
+  const $set = (update.$set ?? {}) as Record<string, unknown>;
+  const touched = 'deletedAt' in $set ? $set.deletedAt : 'deletedAt' in update ? update.deletedAt : undefined;
+  if (touched === undefined) return;
+  this.set('deletedBy', touched == null ? null : await currentActorId());
 }

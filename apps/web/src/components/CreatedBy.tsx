@@ -11,6 +11,11 @@ export function AttributionProvider({ names, children }: { names: Record<string,
   return <AttributionContext.Provider value={names}>{children}</AttributionContext.Provider>;
 }
 
+/** The id -> name map, or null on a single-user instance (attribution stays invisible). */
+export function useAttributionNames(): Record<string, string> | null {
+  return useContext(AttributionContext);
+}
+
 /** The name of whoever created a record, or null when it should not be shown. */
 export function useCreatedByName(id: string | null | undefined): string | null {
   const names = useContext(AttributionContext);

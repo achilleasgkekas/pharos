@@ -10,10 +10,12 @@ import { Expense } from '@/models/Expense';
 setupTestDatabase();
 
 // The plugin adds the field at runtime, so the inferred schema types do not list it.
-const by = (doc: unknown): string | null => {
-  const v = (doc as { createdBy?: unknown } | null)?.createdBy;
+const field = (name: 'createdBy' | 'deletedBy') => (doc: unknown): string | null => {
+  const v = (doc as Record<string, unknown> | null)?.[name];
   return v == null ? null : String(v);
 };
+const by = field('createdBy');
+const trashedBy = field('deletedBy');
 
 const ALICE = new mongoose.Types.ObjectId().toString();
 const BOB = new mongoose.Types.ObjectId().toString();
@@ -58,3 +60,31 @@ describe('createdByPlugin', () => {
     expect(by(await Item.findById(doc._id).lean())).toBe(ALICE);
   });
 });
+
+// P89 (#23): the delete side. Every soft delete is an update that sets deletedAt.
+describe('deletedBy stamping', () => {
+  it('records who trashed a record, through updateOne and findOneAndUpdate', async () => {
+    const a = await Item.create({ title: 'Lamp' });
+    const b = await Item.create({ title: 'Desk' });
+    await runAsActor(BOB, () => Item.updateOne({ _id: a._id }, { $set: { deletedAt: new Date() } }));
+    await runAsActor(ALICE, () => Item.findOneAndUpdate({ _id: b._id }, { deletedAt: new Date() }));
+    const [la, lb] = await Promise.all([
+      Item.findById(a._id).setOptions({ withDeleted: true }).lean(),
+      Item.findById(b._id).setOptions({ withDeleted: true }).lean(),
+    ]);
+    expect(trashedBy(la)).toBe(BOB);
+    expect(trashedBy(lb)).toBe(ALICE);
+  });
+
+  it('clears it on restore, and leaves other updates alone', async () => {
+    const doc = await Item.create({ title: 'Chair' });
+    await runAsActor(BOB, () => Item.updateOne({ _id: doc._id }, { $set: { deletedAt: new Date() } }));
+    await runAsActor(ALICE, () => Item.updateOne({ _id: doc._id }, { $set: { deletedAt: null } }).setOptions({ withDeleted: true }));
+    expect(trashedBy(await Item.findById(doc._id).lean())).toBeNull();
+
+    await runAsActor(BOB, () => Item.updateOne({ _id: doc._id }, { $set: { deletedAt: new Date() } }));
+    await runAsActor(ALICE, () => Item.updateOne({ _id: doc._id }, { $set: { notes: 'note' } }).setOptions({ withDeleted: true }));
+    expect(trashedBy(await Item.findById(doc._id).setOptions({ withDeleted: true }).lean())).toBe(BOB);
+  });
+});
+
