@@ -1,5 +1,6 @@
 import { Schema, model, models, type Model, type InferSchemaType } from 'mongoose';
 import { softDeletePlugin } from '@/lib/softDelete';
+import { createdByPlugin } from '@/lib/createdBy';
 
 const StepSchema = new Schema(
   {
@@ -39,6 +40,7 @@ const TaskSchema = new Schema(
 TaskSchema.index({ updatedAt: -1 });
 
 TaskSchema.plugin(softDeletePlugin);
+TaskSchema.plugin(createdByPlugin); // P75: who added it (display only)
 
 export type TaskDoc = InferSchemaType<typeof TaskSchema> & { _id: string };
 

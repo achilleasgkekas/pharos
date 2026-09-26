@@ -1,5 +1,6 @@
 import { Schema, model, models, type Model, type InferSchemaType } from 'mongoose';
 import { softDeletePlugin } from '@/lib/softDelete';
+import { createdByPlugin } from '@/lib/createdBy';
 
 // P49 — a manual cumulative utility-meter observation. Utility type and unit stay
 // free-form because providers and meters vary by country; consumption is derived from
@@ -20,6 +21,7 @@ const MeterReadingSchema = new Schema(
 MeterReadingSchema.index({ meter: 1, space: 1, unit: 1, readingAt: 1 });
 MeterReadingSchema.index({ updatedAt: -1 });
 MeterReadingSchema.plugin(softDeletePlugin);
+MeterReadingSchema.plugin(createdByPlugin); // P75: who added it (display only)
 
 export type MeterReadingDoc = InferSchemaType<typeof MeterReadingSchema> & { _id: string };
 export const MeterReading: Model<MeterReadingDoc> =

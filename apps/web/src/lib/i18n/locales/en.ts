@@ -87,6 +87,7 @@ export const en = {
   'date.invalid': 'Enter a valid date',
   'date.openCalendar': 'Open calendar',
   'common.delete': 'Delete',
+  'common.addedBy': 'Added by {name}', // P75
   'common.deleteForever': 'Delete forever',
   'common.saving': 'Saving…',
   'common.savedOk': 'Saved ✓',

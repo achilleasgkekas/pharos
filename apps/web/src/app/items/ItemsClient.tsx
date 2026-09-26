@@ -56,6 +56,7 @@ import { ItemPhotoGallery } from './ItemPhotoGallery';
 import { ItemDocuments } from './ItemDocuments';
 import { applyItemPatch } from './itemPatch';
 import { ItemAssetTag } from './ItemAssetTag';
+import { CreatedBy } from '@/components/CreatedBy';
 import { formatDate, compareNames } from '@/lib/i18n/format';
 import { assetLabelSubtitle } from '@/lib/assetLabel';
 import { printAssetTags } from './printAssetTags';
@@ -1930,6 +1931,7 @@ function ItemDetailModal({
                 #{item.num}
               </span>
             )}
+            <CreatedBy id={item.createdBy} className="ml-auto" />
           </div>
 
           {/* Price — top-right of the product (paid for owned, current for wishlist) */}

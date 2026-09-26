@@ -1,5 +1,6 @@
 'use client';
 import { PAGE_MAIN, PageHeader, ViewToggle, PrimaryAction, FilterLayout, FilterSection, FilterOptions } from '@/components/ui/PageHeader';
+import { CreatedBy } from '@/components/CreatedBy';
 import { useState, useTransition, useMemo, useEffect } from 'react';
 import {
   Plus,
@@ -612,6 +613,7 @@ function TaskDetailModal({ task, onClose }: { task: SerializedTask; onClose: () 
             {PRIORITIES.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
           </select>
           <Input value={form.tags} onChange={set('tags')} placeholder="tags, comma separated" className="flex-1 min-w-[160px]" />
+          <CreatedBy id={task.createdBy} />
         </div>
 
         {/* Steps */}

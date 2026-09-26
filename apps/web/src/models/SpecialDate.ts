@@ -1,5 +1,6 @@
 import { Schema, model, models, type Model, type InferSchemaType } from 'mongoose';
 import { softDeletePlugin } from '@/lib/softDelete';
+import { createdByPlugin } from '@/lib/createdBy';
 
 // P50 — recurring personal dates: birthdays, anniversaries, namedays. PHAROS is a
 // "Personal Hub" but tracked no recurring personal dates at all. Distinct from Documents
@@ -24,6 +25,7 @@ const SpecialDateSchema = new Schema(
 SpecialDateSchema.index({ updatedAt: -1 });
 
 SpecialDateSchema.plugin(softDeletePlugin);
+SpecialDateSchema.plugin(createdByPlugin); // P75: who added it (display only)
 
 export type SpecialDateDoc = InferSchemaType<typeof SpecialDateSchema> & { _id: string };
 

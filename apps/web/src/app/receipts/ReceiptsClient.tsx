@@ -1,5 +1,6 @@
 'use client';
 import { PAGE_MAIN, PageHeader, HeaderButton, ViewToggle, PrimaryAction, FilterLayout } from '@/components/ui/PageHeader';
+import { CreatedBy } from '@/components/CreatedBy';
 import { cur, currencySymbol, CURRENCIES } from "@/lib/money";
 import { matchesQuery, haystack, fold, sameLabel } from '@/lib/searchText';
 import { isForeignCurrency, normalizeCurrency, convertToBase, deriveFxRate, formatMoney, toPrinted } from '@/lib/fx';
@@ -1096,6 +1097,7 @@ function ReceiptDetailModal({
           {rescanMsg && <span className="text-[10px] text-[color:var(--color-text-dim)] truncate max-w-[200px]">{rescanMsg}</span>}
         </div>
         <div className="flex items-center gap-3 shrink-0">
+          <CreatedBy id={receipt.createdBy} />
           <OpenInOneDriveButton filePath={receipt.filePath} />
           {receipt.aiModel && (
             <span className="text-[10px] text-[color:var(--color-text-faint)] flex items-center gap-1">

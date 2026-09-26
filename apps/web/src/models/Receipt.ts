@@ -1,5 +1,6 @@
 import { Schema, model, models, type Model, type InferSchemaType } from 'mongoose';
 import { softDeletePlugin } from '@/lib/softDelete';
+import { createdByPlugin } from '@/lib/createdBy';
 
 const LineItemSchema = new Schema(
   {
@@ -71,6 +72,7 @@ const ReceiptSchema = new Schema(
 ReceiptSchema.index({ updatedAt: -1 });
 
 ReceiptSchema.plugin(softDeletePlugin);
+ReceiptSchema.plugin(createdByPlugin); // P75: who added it (display only)
 
 export type ReceiptDoc = InferSchemaType<typeof ReceiptSchema> & { _id: string };
 

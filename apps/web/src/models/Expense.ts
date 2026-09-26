@@ -1,5 +1,6 @@
 import { Schema, model, models, type Model, type InferSchemaType } from 'mongoose';
 import { softDeletePlugin } from '@/lib/softDelete';
+import { createdByPlugin } from '@/lib/createdBy';
 
 /**
  * An income or expense document — rent, electricity, fuel, a payslip, etc.
@@ -103,6 +104,7 @@ ExpenseSchema.index({ kind: 1, vendorKey: 1, date: -1 }); // series timeline per
 ExpenseSchema.index({ updatedAt: -1 });
 
 ExpenseSchema.plugin(softDeletePlugin);
+ExpenseSchema.plugin(createdByPlugin); // P75: who added it (display only)
 
 export type ExpenseDoc = InferSchemaType<typeof ExpenseSchema> & { _id: string };
 

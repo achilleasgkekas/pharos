@@ -83,6 +83,7 @@ export const el: Partial<Dict> = {
   'date.invalid': 'Συμπληρώστε έγκυρη ημερομηνία',
   'date.openCalendar': 'Άνοιγμα ημερολογίου',
   'common.delete': 'Διαγραφή',
+  'common.addedBy': 'Προστέθηκε από {name}', // P75
   'common.deleteForever': 'Οριστική διαγραφή',
   'common.edit': 'Επεξεργασία',
   'common.new': 'Νέο',

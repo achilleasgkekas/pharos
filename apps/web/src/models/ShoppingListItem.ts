@@ -1,5 +1,6 @@
 import { Schema, model, models, type Model, type InferSchemaType } from 'mongoose';
 import { softDeletePlugin } from '@/lib/softDelete';
+import { createdByPlugin } from '@/lib/createdBy';
 
 /** A lightweight, shared "to-buy" list entry — separate from the product-tracking
  *  Items (no prices/specs/links). Added by hand or by photographing a product. */
@@ -19,6 +20,7 @@ const ShoppingListItemSchema = new Schema(
 );
 
 ShoppingListItemSchema.plugin(softDeletePlugin);
+ShoppingListItemSchema.plugin(createdByPlugin); // P75: who added it (display only)
 
 export type ShoppingListItemDoc = InferSchemaType<typeof ShoppingListItemSchema> & { _id: string };
 

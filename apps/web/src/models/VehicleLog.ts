@@ -1,5 +1,6 @@
 import { Schema, model, models, type Model, type InferSchemaType } from 'mongoose';
 import { softDeletePlugin } from '@/lib/softDelete';
+import { createdByPlugin } from '@/lib/createdBy';
 
 // P110 (#126): one fuel fill or one service on a vehicle. `cost` is base currency, like every
 // other money amount. When the user logs it as an expense too, `expenseId` points at it.
@@ -22,6 +23,7 @@ const VehicleLogSchema = new Schema(
 VehicleLogSchema.index({ vehicleId: 1, kind: 1, date: -1 });
 VehicleLogSchema.index({ updatedAt: -1 });
 VehicleLogSchema.plugin(softDeletePlugin);
+VehicleLogSchema.plugin(createdByPlugin); // P75: who added it (display only)
 
 export type VehicleLogDoc = InferSchemaType<typeof VehicleLogSchema> & { _id: string };
 export const VehicleLog: Model<VehicleLogDoc> =

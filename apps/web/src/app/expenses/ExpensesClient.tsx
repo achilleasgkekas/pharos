@@ -1,5 +1,6 @@
 'use client';
 import { cur, currencySymbol, CURRENCIES } from '@/lib/money';
+import { CreatedBy } from '@/components/CreatedBy';
 import { isForeignCurrency, normalizeCurrency, convertToBase, deriveFxRate } from '@/lib/fx';
 import { FxBadge } from '@/components/FxBadge';
 import { FxRateButton } from '@/components/FxRateButton';
@@ -984,6 +985,7 @@ function ExpenseDetail({ expense, cards, vendors, categories, spaces, fx, series
       <div className="flex items-center gap-2 pt-4 mt-4 border-t border-[color:var(--color-border)] flex-wrap">
         <Button onClick={() => save(true)} disabled={pending}>{pending ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />} {t('common.confirm')}</Button>
         <button onClick={() => save(form.verified)} disabled={pending} className="text-xs px-3 py-2 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] hover:border-[color:var(--color-accent)]">{t('common.save')}</button>
+        <CreatedBy id={expense.createdBy} />
         <button onClick={doDelete} disabled={pending} className="ml-auto flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-red)] hover:border-[color:var(--color-red)]"><Trash2 size={13} /> {t('common.delete')}</button>
       </div>
     </Modal>
