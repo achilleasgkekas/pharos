@@ -59,6 +59,11 @@ in the app, through the REST API or over MCP; records from before this existed,
 and ones created by background jobs, show nothing. A single-user install sees no
 change at all.
 
+**Settings → Activity** lists the last 100 things household members added or
+moved to Trash, newest first, with who did it and a link to the record. Every
+role can read it; it appears only once there is a second account. Edits are not
+listed.
+
 ## Inventory & Shopping (Items)
 
 One data model, two views. An **Item** is anything you own or plan to buy, with a

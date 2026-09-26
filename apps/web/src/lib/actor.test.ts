@@ -29,6 +29,12 @@ describe('currentActorId', () => {
     expect(await currentActorId()).toBeNull();
   });
 
+  it('runs a lazy thenable (a Mongoose query) inside the scope', async () => {
+    // A query only executes when awaited; this one records the actor at that moment.
+    const lazy = { then: (ok: (v: string | null) => void) => void currentActorId().then(ok) } as unknown as PromiseLike<string | null>;
+    expect(await runAsActor(ID, () => lazy)).toBe(ID);
+  });
+
   it('ignores an actor that is not an ObjectId, and a missing one', async () => {
     expect(await runAsActor('not-an-id', () => currentActorId())).toBeNull();
     expect(await runAsActor(null, () => currentActorId())).toBeNull();

@@ -19,9 +19,15 @@ import { isValidObjectId } from 'mongoose';
 const globalActor = globalThis as typeof globalThis & { __pharosActorStore?: AsyncLocalStorage<string> };
 const actorStore = (globalActor.__pharosActorStore ??= new AsyncLocalStorage<string>());
 
-/** Run `fn` with `userId` as the actor for every record it creates. */
-export function runAsActor<T>(userId: string | null | undefined, fn: () => T): T {
-  return userId ? actorStore.run(userId, fn) : fn();
+/**
+ * Run `fn` with `userId` as the actor for every record it creates or trashes.
+ *
+ * Awaits inside the scope on purpose: a Mongoose query is lazy and only runs when awaited, so
+ * `runAsActor(id, () => Model.updateOne(...))` handing the query back unawaited would execute
+ * it after the scope had closed, with nobody as the actor.
+ */
+export async function runAsActor<T>(userId: string | null | undefined, fn: () => T | PromiseLike<T>): Promise<T> {
+  return userId ? actorStore.run(userId, async () => await fn()) : await fn();
 }
 
 /** The user id to stamp on a new record, or null when nobody can be named. */
