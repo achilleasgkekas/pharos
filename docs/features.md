@@ -68,6 +68,11 @@ links and prices rather than duplicating the product.
 
 Highlights:
 
+- **Builds.** Give related items the same **build / project** name (a PC build, a
+  rack, a network upgrade) and filter either list by it: a card shows how many parts
+  the build has, how many are planned, ordered, received or installed, what the
+  bought parts cost and what the wishlisted ones still add up to, across both views.
+  Each part's detail links back to the whole build.
 - **Price tracking.** Set a **target price** and the item shows the best current
   store price, the lowest price ever seen, a price-position bar (where the current
   best sits between the cheapest and most expensive), a trend arrow, and a "good
