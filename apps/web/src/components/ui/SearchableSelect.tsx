@@ -14,7 +14,7 @@ export function SearchableSelect({
   value,
   onChange,
   options,
-  placeholder = 'Select…',
+  placeholder,
   allowCustom = false,
   clearable = false,
   size = 'md',
@@ -70,7 +70,7 @@ export function SearchableSelect({
         )}
       >
         <span className={cn('truncate', !value && 'text-[color:var(--color-text-faint)]')}>
-          {value ? labelFor(value) : placeholder}
+          {value ? labelFor(value) : placeholder ?? t('common.select')}
         </span>
         <span className="flex items-center gap-1 shrink-0">
           {clearable && value && (

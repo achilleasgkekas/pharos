@@ -2,6 +2,7 @@
 import { createContext, useCallback, useContext, useState } from 'react';
 import { Modal } from './Modal';
 import { Button } from './Button';
+import { useT } from '@/components/LocaleProvider';
 
 type ConfirmOptions = {
   title?: string;
@@ -18,6 +19,7 @@ const ConfirmContext = createContext<ConfirmFn>(async () => false);
 export const useConfirm = () => useContext(ConfirmContext);
 
 export function ConfirmProvider({ children }: { children: React.ReactNode }) {
+  const t = useT();
   const [state, setState] = useState<{ opts: ConfirmOptions; resolve: (v: boolean) => void } | null>(
     null
   );
@@ -36,20 +38,20 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
     <ConfirmContext.Provider value={confirm}>
       {children}
       {state && (
-        <Modal open onClose={() => close(false)} title={state.opts.title ?? 'Confirm'} size="sm">
+        <Modal open onClose={() => close(false)} title={state.opts.title ?? t('common.confirm')} size="sm">
           {state.opts.message && (
             <p className="text-sm text-[color:var(--color-text-dim)] mb-5">{state.opts.message}</p>
           )}
           <div className="flex gap-2 justify-end">
             <Button variant="ghost" onClick={() => close(false)}>
-              {state.opts.cancelLabel ?? 'Cancel'}
+              {state.opts.cancelLabel ?? t('common.cancel')}
             </Button>
             <Button
               variant={state.opts.danger ? 'danger' : 'primary'}
               onClick={() => close(true)}
               autoFocus
             >
-              {state.opts.confirmLabel ?? 'Confirm'}
+              {state.opts.confirmLabel ?? t('common.confirm')}
             </Button>
           </div>
         </Modal>

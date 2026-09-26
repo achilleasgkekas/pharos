@@ -1,5 +1,6 @@
 'use client';
 import { PAGE_MAIN, PageHeader, HeaderButton, HeaderStat, PrimaryAction } from '@/components/ui/PageHeader';
+import { Field } from '@/components/ui/Field';
 import { cur, currencySymbol, CURRENCIES } from "@/lib/money";
 import { todayLocal } from "@/lib/dates";
 import { useState, useTransition, useMemo, useRef } from 'react';
@@ -18,9 +19,10 @@ import {
   Package,
   GitMerge,
 } from 'lucide-react';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { Button } from '@/components/ui/Button';
 import { DateInput } from '@/components/ui/DateInput';
-import { Input } from '@/components/ui/Input';
+import { Input, controlClass, compactControlClass } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { cn } from '@/components/ui/cn';
@@ -83,8 +85,6 @@ export type ItemOption = {
   purchasedPrice: number | null;
 };
 
-const inputClass =
-  'w-full min-w-0 max-w-full bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-md px-2.5 py-1.5 text-xs text-[color:var(--color-text)] focus:outline-none focus:border-[color:var(--color-accent)]';
 
 function fileUrl(filePath: string) {
   return `/api/files/${filePath.split('/').map(encodeURIComponent).join('/')}`;
@@ -255,7 +255,7 @@ export function StatementsClient({
         onClick={() => !uploading && fileInputRef.current?.click()}
         className={cn(
           'border-2 border-dashed rounded-2xl p-6 mb-3 text-center cursor-pointer transition-all',
-          dragOver ? 'border-[color:var(--color-accent)] bg-[#00ff8808]' : 'border-[color:var(--color-border)] hover:border-[color:var(--color-border-light)]',
+          dragOver ? 'border-[color:var(--color-accent)] bg-[color:var(--color-accent)]/3' : 'border-[color:var(--color-border)] hover:border-[color:var(--color-border-light)]',
           uploading && 'pointer-events-none opacity-70'
         )}
       >
@@ -299,10 +299,7 @@ export function StatementsClient({
 
       {/* Empty */}
       {statements.length === 0 ? (
-        <div className="text-center py-16 text-[color:var(--color-text-faint)]">
-          <p className="text-5xl mb-4">💳</p>
-          <p className="text-sm">{t('st.empty')}</p>
-        </div>
+        <EmptyState icon={<CreditCardIcon />} title={t('st.empty')} />
       ) : (
         <div className="space-y-8">
           {byCard.map(([card, list]) => (
@@ -569,7 +566,7 @@ function PlanCardLinkable({
 
         {picking ? (
           <div className="bg-[color:var(--color-surface-3)] rounded-lg p-2 space-y-1">
-            <input autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t('stm.searchInventory')} className={inputClass} />
+            <input autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t('stm.searchInventory')} className={compactControlClass} />
             <div className="max-h-32 overflow-y-auto space-y-0.5">
               {searchMatches.map((i) => (
                 <button
@@ -659,7 +656,7 @@ function PlanMergeControl({ plan, allPlans }: { plan: InstallmentPlan; allPlans:
         <p className="text-[10px] text-[color:var(--color-text-faint)] px-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
           {t('stm.mergeInto')}
         </p>
-        <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('stm.searchPlans')} className={inputClass} />
+        <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('stm.searchPlans')} className={compactControlClass} />
         <div className="max-h-32 overflow-y-auto space-y-0.5">
           {targets.map((p) => (
             <button
@@ -830,7 +827,7 @@ function StatementDetail({
     <div className="min-w-0 space-y-5 [&_input]:min-w-0 [&_input]:max-w-full [&_select]:min-w-0 [&_select]:max-w-full">
       {/* Overpaid highlight */}
       {credit && (
-        <div className="flex items-center gap-2 text-xs px-3 py-2 rounded-lg bg-[#00ff8814] text-[color:var(--color-accent)] border border-[#00ff8833]" style={{ fontFamily: 'var(--font-mono)' }}>
+        <div className="flex items-center gap-2 text-xs px-3 py-2 rounded-lg bg-[color:var(--color-accent)]/8 text-[color:var(--color-accent)] border border-[color:var(--color-accent)]/20" style={{ fontFamily: 'var(--font-mono)' }}>
           {t('stm.creditBalance', { amount: `${cur()}${paymentSummary.credit.toFixed(2)}` })}
         </div>
       )}
@@ -860,7 +857,7 @@ function StatementDetail({
         )}
         {current.transactions.length > 0 && (
           <button
-            onClick={() => startTransition(async () => { const r = await categorizeStatement(current._id); if (!r.ok && r.error) alert(r.error); })}
+            onClick={() => startTransition(async () => { setRescanMsg(null); const r = await categorizeStatement(current._id); if (!r.ok && r.error) setRescanMsg(r.error); })}
             disabled={pending}
             className="flex items-center gap-1 text-[color:var(--color-purple)] hover:opacity-80 disabled:opacity-50"
           >
@@ -1170,7 +1167,7 @@ function InstallmentLink({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={t('stm.searchProduct')}
-            className={inputClass}
+            className={compactControlClass}
           />
           <div className="max-h-40 overflow-y-auto space-y-0.5">
             {matches.map((i) => (
@@ -1216,13 +1213,13 @@ function AddTransactionForm({ statementId, onDone }: { statementId: string; onDo
     <form onSubmit={handleSubmit} className="bg-[color:var(--color-surface-2)] rounded-lg p-3 mb-2 space-y-2">
       <div className="flex flex-wrap gap-2">
         <div className="w-32 shrink-0">
-          <DateInput name="date" required value={date} onValueChange={setDate} className={cn(inputClass, 'pr-8')} />
+          <DateInput name="date" required value={date} onValueChange={setDate} className={cn(compactControlClass, 'pr-8')} />
         </div>
-        <input name="description" placeholder={t('stm.description')} required className={cn(inputClass, 'min-w-0 flex-1')} />
-        <input name="amount" type="number" step="0.01" placeholder={cur()} required className={cn(inputClass, 'w-20 text-right')} />
+        <input name="description" placeholder={t('stm.description')} required className={cn(compactControlClass, 'min-w-0 flex-1')} />
+        <input name="amount" type="number" step="0.01" placeholder={cur()} required className={cn(compactControlClass, 'w-20 text-right')} />
       </div>
       <div className="flex items-center gap-2">
-        <input name="category" placeholder={t('stm.category')} className={cn(inputClass, 'min-w-0 flex-1')} />
+        <input name="category" placeholder={t('stm.category')} className={cn(compactControlClass, 'min-w-0 flex-1')} />
         <label className="flex items-center gap-1.5 text-[10px] text-[color:var(--color-text-dim)] cursor-pointer" style={{ fontFamily: 'var(--font-mono)' }}>
           <input type="checkbox" checked={installment} onChange={(e) => setInstallment(e.target.checked)} className="accent-[color:var(--color-purple)]" />
           {t('stm.installment')}
@@ -1230,9 +1227,9 @@ function AddTransactionForm({ statementId, onDone }: { statementId: string; onDo
       </div>
       {installment && (
         <div className="flex gap-2 items-center">
-          <input name="currentInstallment" type="number" min="1" placeholder={t('stm.current')} className={cn(inputClass, 'w-24')} />
+          <input name="currentInstallment" type="number" min="1" placeholder={t('stm.current')} className={cn(compactControlClass, 'w-24')} />
           <span className="text-[color:var(--color-text-faint)] text-xs">/</span>
-          <input name="totalInstallments" type="number" min="1" placeholder={t('stm.total')} className={cn(inputClass, 'w-24')} />
+          <input name="totalInstallments" type="number" min="1" placeholder={t('stm.total')} className={cn(compactControlClass, 'w-24')} />
         </div>
       )}
       <div className="flex flex-wrap gap-2">
@@ -1253,8 +1250,6 @@ function cardLabel(c: SerializedCard) {
   return buildCardLabel(c.name, c.last4);
 }
 
-const selectClass =
-  'w-full min-w-0 max-w-full bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-4 py-2 text-sm text-[color:var(--color-text)] focus:outline-none focus:border-[color:var(--color-accent)] transition-colors';
 
 function StatementForm({
   cards,
@@ -1325,7 +1320,7 @@ function StatementForm({
           <select value={form.cardId || form.card} onChange={(e) => {
             const card = cards.find((c) => c._id === e.target.value);
             setForm((p) => ({ ...p, cardId: card?._id ?? '', card: card ? cardLabel(card) : e.target.value }));
-          }} className={selectClass} required>
+          }} className={controlClass} required>
             <option value="">{t('stm.selectCard')}</option>
             {cards.map((c) => (
               <option key={c._id} value={c._id}>
@@ -1345,19 +1340,19 @@ function StatementForm({
           <Input value={form.period} onChange={set('period')} required placeholder="2026-06" />
         </Field>
         <Field label={t('stm.statementDate')}>
-          <Input type="date" value={form.statementDate} onChange={set('statementDate')} />
+          <DateInput value={form.statementDate} onValueChange={(v) => setForm((p) => ({ ...p, statementDate: v }))} />
         </Field>
       </div>
       <div className={cn('grid grid-cols-1 sm:grid-cols-2 gap-3', fx.enabled && 'lg:grid-cols-3')}>
         <Field label={t('stm.paymentDue')}>
-          <Input type="date" value={form.dueDate} onChange={set('dueDate')} />
+          <DateInput value={form.dueDate} onValueChange={(v) => setForm((p) => ({ ...p, dueDate: v }))} />
         </Field>
         <Field label={t('stm.totalAmount', { cur: fx.enabled ? currencySymbol(form.currency).trim() : cur() })}>
           <Input type="number" step="0.01" value={form.totalAmount} onChange={set('totalAmount')} required />
         </Field>
         {fx.enabled && (
           <Field label={t('ex.fCurrency')}>
-            <select value={form.currency} onChange={set('currency')} className={selectClass}>
+            <select value={form.currency} onChange={set('currency')} className={controlClass}>
               {currencyCodes(fx.base).map((c) => (
                 <option key={c} value={c}>{c}</option>
               ))}
@@ -1459,19 +1454,6 @@ function StatementFxFields({
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="min-w-0">
-      <label
-        className="block text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider mb-1.5"
-        style={{ fontFamily: 'var(--font-mono)' }}
-      >
-        {label}
-      </label>
-      {children}
-    </div>
-  );
-}
 
 // ─── Cards Manager ─────────────────────────────────────────────────────────
 
@@ -1692,7 +1674,7 @@ function CardForm({ card, onDone }: { card?: SerializedCard; onDone: () => void 
           <Input value={form.bank} onChange={set('bank')} placeholder={t('stm.bankEg')} />
         </Field>
       </div>
-      <Field label={t('stm.kind')}>
+      <Field as="div" label={t('stm.kind')}>
         <div className="flex gap-1.5">
           {(['credit', 'debit'] as const).map((k) => (
             <button
@@ -1713,7 +1695,7 @@ function CardForm({ card, onDone }: { card?: SerializedCard; onDone: () => void 
       </Field>
       <div className="grid grid-cols-2 gap-3">
         <Field label={t('stm.type')}>
-          <select value={form.type} onChange={set('type')} className={selectClass}>
+          <select value={form.type} onChange={set('type')} className={controlClass}>
             {CARD_TYPES.map((ct) => (
               <option key={ct.value} value={ct.value}>{ct.label}</option>
             ))}

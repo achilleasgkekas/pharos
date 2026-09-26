@@ -3,10 +3,10 @@ import { useEffect, useState } from 'react';
 import { Copy, Check, Loader2, CalendarPlus, RefreshCw, Trash2 } from 'lucide-react';
 import { getCalendarFeed, generateCalendarFeed, revokeCalendarFeed } from './calendarFeedActions';
 import { useT } from '@/components/LocaleProvider';
+import { FIELD_LABEL } from '@/components/ui/Field';
 
 const codeCls = 'flex-1 min-w-0 text-xs bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-3 py-2 truncate';
 const iconBtn = 'shrink-0 p-2 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:border-[color:var(--color-accent)] transition-colors';
-const labelCls = 'block text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)] mb-1';
 
 /** Settings card: a per-user read-only iCal subscription URL for the money agenda. */
 export function CalendarFeedManager() {
@@ -52,7 +52,7 @@ export function CalendarFeedManager() {
 
       {url && (
         <div>
-          <span className={labelCls} style={{ fontFamily: 'var(--font-mono)' }}>{t('ics.feedUrl')}</span>
+          <span className={FIELD_LABEL} style={{ fontFamily: 'var(--font-mono)' }}>{t('ics.feedUrl')}</span>
           <div className="flex items-center gap-2">
             <code className={`${codeCls} text-[color:var(--color-accent)]`} style={{ fontFamily: 'var(--font-mono)' }}>{url}</code>
             <button type="button" onClick={() => copy(url)} className={iconBtn} title={t('ics.copyUrl')}>

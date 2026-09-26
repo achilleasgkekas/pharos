@@ -1,9 +1,12 @@
 'use client';
 import { useState, useTransition, useMemo, useRef } from 'react';
-import { Pencil, Trash2, ExternalLink, Copy, Check, Search, Sparkles, Upload, Loader2 } from 'lucide-react';
+import { Pencil, Trash2, ExternalLink, Copy, Check, Search, Sparkles, Upload, Loader2, Ticket } from 'lucide-react';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { DateInput } from '@/components/ui/DateInput';
+import { Field } from '@/components/ui/Field';
 import { Button } from '@/components/ui/Button';
 import { PAGE_MAIN, PageHeader, ViewToggle, PrimaryAction, FilterLayout } from '@/components/ui/PageHeader';
-import { Input } from '@/components/ui/Input';
+import { Input, filterControlClass } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
@@ -71,8 +74,6 @@ export function VouchersClient({ vouchers }: { vouchers: SerializedVoucher[] }) 
 
   const anyF = !!(filter !== 'all' || search || storeFilter || sortBy !== 'expiry');
   const fLabel = 'text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-[0.12em] mb-1.5';
-  const selCls =
-    'w-full bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-3 py-1.5 text-xs text-[color:var(--color-text-dim)] focus:outline-none focus:border-[color:var(--color-accent)]';
   const filterControls = (
     <div className="space-y-4">
       <Input icon={<Search size={14} />} placeholder={t('v.searchPlaceholder')} value={search} onChange={(e) => setSearch(e.target.value)} />
@@ -102,7 +103,7 @@ export function VouchersClient({ vouchers }: { vouchers: SerializedVoucher[] }) 
       )}
       <div>
         <p className={fLabel} style={{ fontFamily: 'var(--font-mono)' }}>Sort</p>
-        <select value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)} className={selCls} style={{ fontFamily: 'var(--font-mono)' }}>
+        <select value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)} className={filterControlClass} style={{ fontFamily: 'var(--font-mono)' }}>
           <option value="expiry">{t('v.sortExpiry')}</option>
           <option value="store">{t('v.sortStore')}</option>
           <option value="title">{t('v.sortTitle')}</option>
@@ -129,10 +130,7 @@ export function VouchersClient({ vouchers }: { vouchers: SerializedVoucher[] }) 
 
       <FilterLayout filters={filterControls} active={anyF}>
           {visible.length === 0 ? (
-            <div className="text-center py-20 text-[color:var(--color-text-faint)]">
-              <p className="text-5xl mb-4">🎟️</p>
-              <p className="text-sm">{vouchers.length === 0 ? 'No vouchers here. Hit + to save a coupon or promo code.' : 'No vouchers match these filters.'}</p>
-            </div>
+            <EmptyState icon={<Ticket />} title={vouchers.length === 0 ? t('v.empty') : t('ex.emptyFiltered')} />
           ) : (
             <div className={cn(layout === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3' : 'flex flex-col gap-2')}>
               {visible.map((v) =>
@@ -199,7 +197,7 @@ function VoucherCard({ voucher, onEdit }: { voucher: SerializedVoucher; onEdit: 
           {voucher.store && <p className="text-xs text-[color:var(--color-text-faint)] truncate">{voucher.store}</p>}
         </div>
         {voucher.discount && (
-          <span className="shrink-0 text-xs font-bold px-2 py-0.5 rounded-md bg-[#00ff8820] text-[color:var(--color-accent)] border border-[#00ff8840]" style={{ fontFamily: 'var(--font-mono)' }}>
+          <span className="shrink-0 text-xs font-bold px-2 py-0.5 rounded-md bg-[color:var(--color-accent)]/13 text-[color:var(--color-accent)] border border-[color:var(--color-accent)]/25" style={{ fontFamily: 'var(--font-mono)' }}>
             {voucher.discount}
           </span>
         )}
@@ -434,7 +432,7 @@ function VoucherForm({ voucher, onSuccess, onDeleted }: { voucher?: SerializedVo
           <Input value={form.store} onChange={set('store')} placeholder={t('v.fStorePlaceholder')} />
         </Field>
         <Field label={t('v.fExpires')}>
-          <Input type="date" value={form.expiresAt} onChange={set('expiresAt')} />
+          <DateInput value={form.expiresAt} onValueChange={(v) => setForm((p) => ({ ...p, expiresAt: v }))} />
         </Field>
       </div>
       <Field label="URL">
@@ -463,13 +461,3 @@ function VoucherForm({ voucher, onSuccess, onDeleted }: { voucher?: SerializedVo
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="min-w-0">
-      <label className="block text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider mb-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
-        {label}
-      </label>
-      {children}
-    </div>
-  );
-}

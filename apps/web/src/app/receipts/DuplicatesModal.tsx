@@ -1,7 +1,8 @@
 'use client';
 import { cur } from "@/lib/money";
 import { useEffect, useState, useTransition } from 'react';
-import { Loader2, Copy, Check, Merge } from 'lucide-react';
+import { Loader2, Copy, Check, Merge, CheckCircle2 } from 'lucide-react';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/components/ui/cn';
@@ -67,10 +68,7 @@ export function DuplicatesModal({ open, onClose }: { open: boolean; onClose: () 
           <p className="text-sm">{t('dup.scanning')}</p>
         </div>
       ) : groups.length === 0 ? (
-        <div className="py-16 text-center text-[color:var(--color-text-faint)]">
-          <p className="text-5xl mb-3">✨</p>
-          <p className="text-sm">{t('dup.none')}</p>
-        </div>
+        <EmptyState className="py-16" icon={<CheckCircle2 />} title={t('dup.none')} />
       ) : (
         <div className="space-y-4">
           <p className="text-xs text-[color:var(--color-text-dim)]" style={{ fontFamily: 'var(--font-mono)' }}>
@@ -86,7 +84,7 @@ export function DuplicatesModal({ open, onClose }: { open: boolean; onClose: () 
                 key={grp.key}
                 className={cn(
                   'border rounded-xl p-3 transition-colors',
-                  merged ? 'border-[color:var(--color-accent)] bg-[#00ff8808]' : 'border-[color:var(--color-border)]'
+                  merged ? 'border-[color:var(--color-accent)] bg-[color:var(--color-accent)]/3' : 'border-[color:var(--color-border)]'
                 )}
               >
                 <div className="flex items-center justify-between gap-2 mb-2">

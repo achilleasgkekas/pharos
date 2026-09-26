@@ -1,5 +1,7 @@
 'use client';
-import { PAGE_MAIN, PageHeader, ViewToggle, PrimaryAction, FilterLayout } from '@/components/ui/PageHeader';
+import { PAGE_MAIN, PageHeader, ViewToggle, PrimaryAction, FilterLayout, FilterSection, FilterOptions } from '@/components/ui/PageHeader';
+import { DateInput } from '@/components/ui/DateInput';
+import { Field } from '@/components/ui/Field';
 import { cur } from "@/lib/money";
 import { createContext, useContext, useState, useTransition, useMemo } from 'react';
 import { ShoppingMarketProvider, useShoppingMarket } from '@/components/ShoppingMarketContext';
@@ -8,12 +10,13 @@ import { useRouter } from 'next/navigation';
 import { Search, Plus, Trash2, X, Loader2, Sparkles, Link2, ExternalLink, Wand2, ListPlus, Check, FileText, TrendingDown, TrendingUp, Target, Merge, Columns3, ImagePlus, Pencil, Truck, Printer, Wrench, HandHelping, ShieldAlert, Boxes } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
+import { Input, controlClass, filterControlClass } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { PricePanel } from '@/components/PricePanel';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { cn } from '@/components/ui/cn';
-import { Layers, Receipt as ReceiptIcon, CreditCard } from 'lucide-react';
+import { Layers, Receipt as ReceiptIcon, CreditCard, Package, ShoppingCart } from 'lucide-react';
 import { CURRENCIES, currencySymbol } from '@/lib/money';
 import { FxBadge } from '@/components/FxBadge';
 import { FxRateButton } from '@/components/FxRateButton';
@@ -158,8 +161,6 @@ const FLAG_DEFS: { key: string; label: string; test: (i: SerializedItem, market:
  *  600px QR rendered in this tab, and a whole inventory at once is a freeze and a ream. */
 const BULK_TAG_CONFIRM_AT = 40;
 
-const selectClass =
-  'w-full bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-4 py-2 text-sm text-[color:var(--color-text)] focus:outline-none focus:border-[color:var(--color-accent)] transition-colors';
 
 const textareaClass =
   'w-full bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-4 py-2 text-sm text-[color:var(--color-text)] placeholder:text-[color:var(--color-text-faint)] focus:outline-none focus:border-[color:var(--color-accent)] transition-colors resize-none';
@@ -581,55 +582,46 @@ export function ItemsClient({
   const filterControls = (
     <div className="space-y-4">
       <Input icon={<Search size={14} />} placeholder={t('it.searchPlaceholder')} value={search} onChange={(e) => setSearch(e.target.value)} />
-      <FilterGroup label={t('common.status')}>
-        <div className="flex flex-col gap-1">
-          {cfg.statusFilters.map((f) => (
-            <button
-              key={f.value}
-              onClick={() => setFilter(f.value)}
-              className={cn(
-                'text-left px-3 py-1.5 rounded-lg text-xs font-semibold uppercase tracking-[0.06em] transition-all',
-                filter === f.value
-                  ? 'bg-[color:var(--color-accent)] text-black'
-                  : 'text-[color:var(--color-text-dim)] hover:bg-[color:var(--color-surface-2)] hover:text-[color:var(--color-text)]'
-              )}
-              style={{ fontFamily: 'var(--font-mono)' }}
-            >
-              {f.value === '' ? t('common.all') : IT_STATUS_KEY[f.value] ? t(IT_STATUS_KEY[f.value]) : f.label}
-            </button>
-          ))}
-        </div>
-      </FilterGroup>
+      <FilterSection label={t('common.status')}>
+        <FilterOptions
+          value={filter}
+          onChange={setFilter}
+          options={cfg.statusFilters.map((f) => ({
+            value: f.value,
+            label: f.value === '' ? t('common.all') : IT_STATUS_KEY[f.value] ? t(IT_STATUS_KEY[f.value]) : f.label,
+          }))}
+        />
+      </FilterSection>
       {stores.length > 0 && (
-        <FilterGroup label={t('v.fStore')}>
+        <FilterSection label={t('v.fStore')}>
           <SearchableSelect value={storeFilter} onChange={setStoreFilter} options={stores} placeholder={t('it.allStores')} clearable size="sm" className="w-full" />
-        </FilterGroup>
+        </FilterSection>
       )}
       {categories.length > 1 && (
-        <FilterGroup label={t('common.category')}>
+        <FilterSection label={t('common.category')}>
           <SearchableSelect value={categoryFilter} onChange={setCategoryFilter} options={categories} placeholder={t('sub.allCategories')} clearable size="sm" className="w-full" />
-        </FilterGroup>
+        </FilterSection>
       )}
       {/* P92 — browse by physical location (room / rack / shelf). Only shown once items
           actually carry more than one distinct location. */}
       {locations.length > 1 && (
-        <FilterGroup label={t('it.fLocation')}>
+        <FilterSection label={t('it.fLocation')}>
           <SearchableSelect value={locationFilter} onChange={setLocationFilter} options={locations} placeholder={t('it.allLocations')} clearable size="sm" className="w-full" />
-        </FilterGroup>
+        </FilterSection>
       )}
       {/* P39 — browse one build. Shown as soon as a single item in this view names one: a
           build with parts in only this view is still worth jumping to. */}
       {viewBundles.length > 0 && (
-        <FilterGroup label={t('it.fBundle')}>
+        <FilterSection label={t('it.fBundle')}>
           <SearchableSelect value={bundleFilter} onChange={setBundleFilter} options={viewBundles} placeholder={t('it.allBundles')} clearable size="sm" className="w-full" />
-        </FilterGroup>
+        </FilterSection>
       )}
-      <FilterGroup label={t('common.sort')}>
+      <FilterSection label={t('common.sort')}>
         <select
           aria-label={t('common.sort')}
           value={sortBy}
           onChange={(e) => setSortBy(e.target.value as SortKey)}
-          className="w-full bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-3 py-1.5 text-xs text-[color:var(--color-text-dim)] focus:outline-none focus:border-[color:var(--color-accent)]"
+          className={filterControlClass}
           style={{ fontFamily: 'var(--font-mono)' }}
         >
           {SORT_OPTIONS.map((s) => (
@@ -638,8 +630,8 @@ export function ItemsClient({
             </option>
           ))}
         </select>
-      </FilterGroup>
-      <FilterGroup label={t('it.showOnly')}>
+      </FilterSection>
+      <FilterSection label={t('it.showOnly')}>
         <div className="flex flex-wrap gap-1.5">
           {FLAG_DEFS.filter((f) => !f.shoppingOnly || view === 'shopping').map((f) => {
             const on = flags.has(f.key);
@@ -660,7 +652,7 @@ export function ItemsClient({
             );
           })}
         </div>
-      </FilterGroup>
+      </FilterSection>
       <div className="flex items-center gap-3 flex-wrap">
         <SavedViews<ItemsView> moduleKey="items" current={currentView} canSave={anyFilterActive} onApply={applyView} />
         {anyFilterActive && (
@@ -789,10 +781,7 @@ export function ItemsClient({
             <BundleSummaryCard bundle={bundleByName.get(bundleFilter) as BundleSummary} />
           )}
           {filtered.length === 0 ? (
-            <div className="text-center py-24 text-[color:var(--color-text-faint)]">
-              <p className="text-5xl mb-4">{cfg.emptyEmoji}</p>
-              <p className="text-sm">{items.length === 0 ? cfg.emptyText : t('it.noResults')}</p>
-            </div>
+            <EmptyState icon={view === 'shopping' ? <ShoppingCart /> : <Package />} title={items.length === 0 ? t(cfg.emptyKey) : t('it.noResults')} />
           ) : layout === 'grid' ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
               {filtered.map((item) => (
@@ -889,7 +878,7 @@ export function ItemsClient({
             {t('it.bulkEditHint')}
           </p>
           <Field label={t('common.category')}>
-            <select value={bulkCategory} onChange={(e) => setBulkCategory(e.target.value)} className={selectClass}>
+            <select value={bulkCategory} onChange={(e) => setBulkCategory(e.target.value)} className={controlClass}>
               <option value="">{t('common.noChange')}</option>
               {bulkCategoryOptions.map((c) => (
                 <option key={c.value} value={c.value}>
@@ -899,7 +888,7 @@ export function ItemsClient({
             </select>
           </Field>
           <Field label={t('common.status')}>
-            <select value={bulkStatus} onChange={(e) => setBulkStatus(e.target.value)} className={selectClass}>
+            <select value={bulkStatus} onChange={(e) => setBulkStatus(e.target.value)} className={controlClass}>
               <option value="">{t('common.noChange')}</option>
               {STATUSES.map((s) => (
                 <option key={s.value} value={s.value}>
@@ -1336,16 +1325,6 @@ function BundleSummaryCard({ bundle }: { bundle: BundleSummary }) {
 }
 
 // Labelled group for the filter sidebar
-function FilterGroup({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <p className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-[0.12em] mb-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
-        {label}
-      </p>
-      {children}
-    </div>
-  );
-}
 
 type ItemCardProps = {
   item: SerializedItem;
@@ -1572,7 +1551,7 @@ function ItemCard({
               )}
               {item.targetPrice ? (
                 deal ? (
-                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-[#00ff881a] text-[color:var(--color-accent)] border border-[#00ff8840] font-semibold uppercase tracking-wide">
+                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-[color:var(--color-accent)]/10 text-[color:var(--color-accent)] border border-[color:var(--color-accent)]/25 font-semibold uppercase tracking-wide">
                     <Target size={9} /> {t('it.deal')} ≤{cur()}{item.targetPrice}
                   </span>
                 ) : (
@@ -1631,8 +1610,8 @@ function ItemCard({
                 className={cn(
                   'inline-flex items-center gap-1 text-[9px] font-semibold px-1.5 py-0.5 rounded uppercase tracking-wider border',
                   plan.done
-                    ? 'bg-[#00ff881a] text-[color:var(--color-accent)] border-[#00ff8840]'
-                    : 'bg-[#a55eea1a] text-[color:var(--color-purple)] border-[#a55eea40]'
+                    ? 'bg-[color:var(--color-accent)]/10 text-[color:var(--color-accent)] border-[color:var(--color-accent)]/25'
+                    : 'bg-[color:var(--color-purple)]/10 text-[color:var(--color-purple)] border-[color:var(--color-purple)]/25'
                 )}
                 style={{ fontFamily: 'var(--font-mono)' }}
               >
@@ -2177,7 +2156,7 @@ function ItemDetailModal({
               className={cn(
                 'flex items-center gap-2 text-xs rounded-lg px-3 py-2',
                 isDeal(item, market)
-                  ? 'bg-[#00ff881a] text-[color:var(--color-accent)] border border-[#00ff8840]'
+                  ? 'bg-[color:var(--color-accent)]/10 text-[color:var(--color-accent)] border border-[color:var(--color-accent)]/25'
                   : 'bg-[color:var(--color-surface-2)] text-[color:var(--color-text-dim)]'
               )}
               style={{ fontFamily: 'var(--font-mono)' }}
@@ -2693,7 +2672,7 @@ function ItemForm({
 
       {/* Category + Status */}
       <Field label={t('common.category')}>
-        <select value={form.category} onChange={set('category')} className={selectClass}>
+        <select value={form.category} onChange={set('category')} className={controlClass}>
           {categoryOptions.map((c) => (
             <option key={c.value} value={c.value}>
               {c.label}
@@ -2702,7 +2681,7 @@ function ItemForm({
         </select>
       </Field>
       <Field label={t('common.status')}>
-        <select value={form.status} onChange={set('status')} className={selectClass}>
+        <select value={form.status} onChange={set('status')} className={controlClass}>
           {STATUSES.map((s) => (
             <option key={s.value} value={s.value}>
               {IT_STATUS_KEY[s.value] ? t(IT_STATUS_KEY[s.value]) : s.label}
@@ -2724,7 +2703,7 @@ function ItemForm({
           </Field>
         </>
       ) : cheapestLink != null ? (
-        <Field label={t('it.fPrice', { cur: priceCur })}>
+        <Field as="div" label={t('it.fPrice', { cur: priceCur })}>
           <div className="text-sm px-3 py-2 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-text-dim)] flex items-center justify-between gap-2">
             <span className="font-semibold text-[color:var(--color-text)]">{cur()}{cheapestLink}</span>
             <span className="text-[11px] text-[color:var(--color-text-faint)]">{t('it.autoCheapest')}</span>
@@ -2740,7 +2719,7 @@ function ItemForm({
           single-currency deployment, so nothing about that flow changes. */}
       {fx.enabled && (
         <Field label={t('ex.fCurrency')}>
-          <select value={form.currency} onChange={set('currency')} className={selectClass}>
+          <select value={form.currency} onChange={set('currency')} className={controlClass}>
             {currencyCodes(fx.base).map((c) => (
               <option key={c} value={c}>{c}</option>
             ))}
@@ -2783,7 +2762,7 @@ function ItemForm({
             />
           </Field>
           <Field label={t('it.fSoldAt')}>
-            <Input type="date" value={form.soldAt} onChange={set('soldAt')} />
+            <DateInput value={form.soldAt} onValueChange={(v) => setForm((p) => ({ ...p, soldAt: v }))} />
           </Field>
           <Field label={t('it.fSoldTo')} className="md:col-span-2">
             <Input value={form.soldTo} onChange={set('soldTo')} placeholder={t('it.fSoldToPlaceholder')} />
@@ -2906,7 +2885,7 @@ function ItemForm({
             />
           </Field>
           <Field label={t('it.fMaintLast')}>
-            <Input type="date" value={form.lastMaintenanceAt} onChange={set('lastMaintenanceAt')} />
+            <DateInput value={form.lastMaintenanceAt} onValueChange={(v) => setForm((p) => ({ ...p, lastMaintenanceAt: v }))} />
           </Field>
         </>
       )}
@@ -2922,10 +2901,10 @@ function ItemForm({
           {form.lentTo.trim() ? (
             <>
               <Field label={t('it.fLentAt')}>
-                <Input type="date" value={form.lentAt} onChange={set('lentAt')} />
+                <DateInput value={form.lentAt} onValueChange={(v) => setForm((p) => ({ ...p, lentAt: v }))} />
               </Field>
               <Field label={t('it.fExpectedReturn')}>
-                <Input type="date" value={form.expectedReturnAt} onChange={set('expectedReturnAt')} />
+                <DateInput value={form.expectedReturnAt} onValueChange={(v) => setForm((p) => ({ ...p, expectedReturnAt: v }))} />
               </Field>
             </>
           ) : null}
@@ -3102,23 +3081,15 @@ function ItemForm({
                   <label className="text-[9px] text-[color:var(--color-text-faint)] uppercase tracking-wider" style={{ fontFamily: 'var(--font-mono)' }}>
                     {t('it.fClaimReportedAt')}
                   </label>
-                  <input
-                    type="date"
-                    value={c.reportedAt ?? ''}
-                    onChange={(e) => updateClaim(i, 'reportedAt', e.target.value)}
-                    className="bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-md px-2 py-1.5 text-xs focus:outline-none focus:border-[color:var(--color-accent)]"
-                    style={{ fontFamily: 'var(--font-mono)' }}
-                  />
+                  <div className="w-36">
+                    <DateInput value={c.reportedAt ?? ''} onValueChange={(v) => updateClaim(i, 'reportedAt', v)} aria-label={t('it.fClaimReportedAt')} className="py-1.5 text-xs" />
+                  </div>
                   <label className="text-[9px] text-[color:var(--color-text-faint)] uppercase tracking-wider" style={{ fontFamily: 'var(--font-mono)' }}>
                     {t('it.fClaimLastUpdateAt')}
                   </label>
-                  <input
-                    type="date"
-                    value={c.lastUpdateAt ?? ''}
-                    onChange={(e) => updateClaim(i, 'lastUpdateAt', e.target.value)}
-                    className="bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-md px-2 py-1.5 text-xs focus:outline-none focus:border-[color:var(--color-accent)]"
-                    style={{ fontFamily: 'var(--font-mono)' }}
-                  />
+                  <div className="w-36">
+                    <DateInput value={c.lastUpdateAt ?? ''} onValueChange={(v) => updateClaim(i, 'lastUpdateAt', v)} aria-label={t('it.fClaimLastUpdateAt')} className="py-1.5 text-xs" />
+                  </div>
                   <input
                     value={c.trackingNumber}
                     onChange={(e) => updateClaim(i, 'trackingNumber', e.target.value)}
@@ -3230,16 +3201,3 @@ function ItemFxFields({
   );
 }
 
-function Field({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) {
-  return (
-    <div className={`min-w-0 ${className ?? ''}`}>
-      <label
-        className="block text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider mb-1.5"
-        style={{ fontFamily: 'var(--font-mono)' }}
-      >
-        {label}
-      </label>
-      {children}
-    </div>
-  );
-}

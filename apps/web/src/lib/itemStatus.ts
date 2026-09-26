@@ -15,6 +15,8 @@ export const SHOPPING_STATUSES = ['researching', 'decided', 'ordered', 'deferred
  */
 export const WARRANTY_ALERT_STATUSES = ['received', 'installed'] as const;
 
+import type { TKey } from '@/lib/i18n';
+
 export type ItemView = 'inventory' | 'shopping';
 
 export function statusesFor(view: ItemView): readonly string[] {
@@ -28,8 +30,8 @@ export const VIEW_CONFIG: Record<
     eyebrow: string;
     defaultStatus: string;
     statusFilters: { label: string; value: string }[];
-    emptyEmoji: string;
-    emptyText: string;
+    /** The empty-list line, as an i18n key: the page shows the view's nav icon above it. */
+    emptyKey: TKey;
   }
 > = {
   inventory: {
@@ -43,8 +45,7 @@ export const VIEW_CONFIG: Record<
       { label: 'Sold', value: 'sold' },
       { label: 'Broken', value: 'broken' },
     ],
-    emptyEmoji: '📦',
-    emptyText: 'Inventory is empty. Whatever you buy (or add from a receipt) shows up here.',
+    emptyKey: 'it.emptyInventory',
   },
   shopping: {
     title: 'Shopping',
@@ -57,7 +58,6 @@ export const VIEW_CONFIG: Record<
       { label: 'Ordered', value: 'ordered' },
       { label: 'Deferred', value: 'deferred' },
     ],
-    emptyEmoji: '🛒',
-    emptyText: 'Nothing to buy yet. Hit + to add something.',
+    emptyKey: 'it.emptyShopping',
   },
 };

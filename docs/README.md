@@ -45,6 +45,7 @@ These guides are plain Markdown, so they read the same on GitHub and in any edit
 | 🧭 | **[Architecture](architecture.md)** | How the pieces fit: Docker services and profiles, auth, the data layer, and the optional AI, scraper and SearXNG companions. |
 | 🔌 | **[API reference](api.md)** | The REST API under `/api/v1`: bearer-token auth, the list envelope, incremental sync and every endpoint. The **[OpenAPI 3.1 spec](openapi.yaml)** covers the same 85 operations for Swagger UI, Postman and code generation. |
 | 🧩 | **[Browser extension](../apps/extension/README.md)** | The Chrome extension that sends any product page to your inventory or shopping list. |
+| 🎨 | **[UI conventions](ui-conventions.md)** | How every page is built: the shared header, filters, fields, dialogs, empty states, wording and colours, and the test that keeps them in line. |
 
 ## Look it up
 

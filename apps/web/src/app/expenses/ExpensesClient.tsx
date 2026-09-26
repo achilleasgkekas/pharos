@@ -5,10 +5,13 @@ import { isForeignCurrency, normalizeCurrency, convertToBase, deriveFxRate } fro
 import { FxBadge } from '@/components/FxBadge';
 import { FxRateButton } from '@/components/FxRateButton';
 import { useState, useTransition, useRef, useMemo } from 'react';
-import { Upload, Loader2, Trash2, CheckCircle2, AlertTriangle, FileText, FileSpreadsheet, Repeat, Wallet, Search, Plus, X, Camera, Sparkles, MapPin, Users, Split as SplitIcon, Landmark, Copy, Check, Pencil, CreditCard } from 'lucide-react';
-import { PAGE_MAIN, PageHeader, HeaderButton, ViewToggle, PrimaryAction, FilterLayout } from '@/components/ui/PageHeader';
+import { Upload, Loader2, Trash2, CheckCircle2, AlertTriangle, FileText, FileSpreadsheet, Repeat, Wallet, Search, Plus, X, Camera, Sparkles, MapPin, Users, Split as SplitIcon, Landmark, Copy, Check, Pencil, CreditCard, Banknote } from 'lucide-react';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { DateInput } from '@/components/ui/DateInput';
+import { Field } from '@/components/ui/Field';
+import { PAGE_MAIN, PageHeader, HeaderButton, ViewToggle, PrimaryAction, FilterLayout, FilterSection, FilterOptions } from '@/components/ui/PageHeader';
 import { Modal } from '@/components/ui/Modal';
-import { Input } from '@/components/ui/Input';
+import { Input, controlClass, filterControlClass } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { CardSelect } from '@/components/CardSelect';
@@ -45,8 +48,6 @@ function statusOf(e: SerializedExpense): Status {
   return (e.amount || 0) === 0 ? 'failed' : 'parsed';
 }
 
-const labelCls = 'text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider mb-1.5';
-const selCls = 'w-full bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-[color:var(--color-accent)]';
 
 /** Multi-currency context (P9): the deployment's base currency code + whether the
  *  per-entry currency/FX controls are switched on at all. Passed as one object so the
@@ -211,23 +212,25 @@ export function ExpensesClient({ kind, expenses, cards, vendors, ollamaUp, categ
   const filterControls = (
     <div className="space-y-4">
       <Input icon={<Search size={14} />} placeholder={t('ex.searchPlaceholder')} value={search} onChange={(e) => setSearch(e.target.value)} />
-      <div>
-        <p className={labelCls} style={{ fontFamily: 'var(--font-mono)' }}>{t('common.status')}</p>
-        <div className="flex flex-col gap-1">
-          {(['all', 'verified', 'parsed', 'failed'] as const).map((v) => (
-            <button key={v} onClick={() => setStatusFilter(v)} className={cn('text-left px-3 py-1.5 rounded-lg text-xs font-semibold transition-all', statusFilter === v ? 'bg-[color:var(--color-accent)] text-black' : 'text-[color:var(--color-text-dim)] hover:bg-[color:var(--color-surface-2)] hover:text-[color:var(--color-text)]')} style={{ fontFamily: 'var(--font-mono)' }}>{v === 'all' ? t('common.all') : v === 'verified' ? t('ex.stVerified') : v === 'parsed' ? t('ex.stParsed') : t('ex.stNeedsScan')}</button>
-          ))}
-        </div>
-      </div>
-      <div>
-        <p className={labelCls} style={{ fontFamily: 'var(--font-mono)' }}>{t('common.category')}</p>
+      <FilterSection label={t('common.status')}>
+        <FilterOptions
+          value={statusFilter}
+          onChange={setStatusFilter}
+          options={[
+            { value: 'all', label: t('common.all') },
+            { value: 'verified', label: t('ex.stVerified') },
+            { value: 'parsed', label: t('ex.stParsed') },
+            { value: 'failed', label: t('ex.stNeedsScan') },
+          ]}
+        />
+      </FilterSection>
+      <FilterSection label={t('common.category')}>
         <SearchableSelect value={catFilter} onChange={setCatFilter} options={categories} placeholder={t('sub.allCategories')} clearable size="sm" className="w-full" />
-      </div>
+      </FilterSection>
       {hasSpaces && (
-        <div>
-          <p className={labelCls} style={{ fontFamily: 'var(--font-mono)' }}>{t('ex.space')}</p>
+        <FilterSection label={t('ex.space')}>
           <SearchableSelect value={spaceFilter} onChange={setSpaceFilter} options={spaceFilterOptions(spaces)} labels={{ [NO_SPACE]: t('ex.spaceNone') }} placeholder={t('ex.allSpaces')} clearable size="sm" className="w-full" />
-        </div>
+        </FilterSection>
       )}
       {!isIncome && (
         <label className="flex items-center gap-2 text-xs text-[color:var(--color-text-dim)] cursor-pointer">
@@ -236,21 +239,19 @@ export function ExpensesClient({ kind, expenses, cards, vendors, ollamaUp, categ
         </label>
       )}
       {vendorOptions.length > 0 && (
-        <div>
-          <p className={labelCls} style={{ fontFamily: 'var(--font-mono)' }}>{t('ex.vendor')}</p>
+        <FilterSection label={t('ex.vendor')}>
           <SearchableSelect value={search && vendorOptions.includes(search) ? search : ''} onChange={setSearch} options={vendorOptions} placeholder={t('ex.allVendors')} clearable size="sm" className="w-full" />
-        </div>
+        </FilterSection>
       )}
-      <div>
-        <p className={labelCls} style={{ fontFamily: 'var(--font-mono)' }}>{t('common.sort')}</p>
-        <select aria-label={t('common.sort')} value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)} className={selCls} style={{ fontFamily: 'var(--font-mono)' }}>
+      <FilterSection label={t('common.sort')}>
+        <select aria-label={t('common.sort')} value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)} className={filterControlClass} style={{ fontFamily: 'var(--font-mono)' }}>
           <option value="recent">{t('ex.sortRecent')}</option>
           <option value="oldest">{t('ex.sortOldest')}</option>
           <option value="amount-desc">{t('ex.sortAmountDesc')}</option>
           <option value="amount-asc">{t('ex.sortAmountAsc')}</option>
           <option value="vendor">{t('ex.sortVendor')}</option>
         </select>
-      </div>
+      </FilterSection>
       {anyFilter && <button onClick={resetFilters} className="text-[0.65rem] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] underline" style={{ fontFamily: 'var(--font-mono)' }}>{t('common.resetFilters')}</button>}
     </div>
   );
@@ -264,7 +265,7 @@ export function ExpensesClient({ kind, expenses, cards, vendors, ollamaUp, categ
           </HeaderButton>
         )}
         {failed.length > 0 && (
-          <HeaderButton tone="cyan" onClick={rescanAllFailed} disabled={rescanning} title="Re-scan empty records (amount 0) with OCR">
+          <HeaderButton tone="cyan" onClick={rescanAllFailed} disabled={rescanning} title={t('ex.rescanAllTitle')}>
             {rescanning ? t('ex.rescanning') : t('ex.failedRescan', { n: failed.length })}
           </HeaderButton>
         )}
@@ -316,7 +317,7 @@ export function ExpensesClient({ kind, expenses, cards, vendors, ollamaUp, categ
             onDragLeave={() => setDragOver(false)}
             onDrop={(e) => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }}
             onClick={() => !uploading && fileRef.current?.click()}
-            className={cn('border-2 border-dashed rounded-2xl p-8 mb-6 text-center cursor-pointer transition-all', dragOver ? 'border-[color:var(--color-accent)] bg-[#00ff8808]' : 'border-[color:var(--color-border)] hover:border-[color:var(--color-border-light)]', uploading && 'pointer-events-none opacity-70')}
+            className={cn('border-2 border-dashed rounded-2xl p-8 mb-6 text-center cursor-pointer transition-all', dragOver ? 'border-[color:var(--color-accent)] bg-[color:var(--color-accent)]/3' : 'border-[color:var(--color-border)] hover:border-[color:var(--color-border-light)]', uploading && 'pointer-events-none opacity-70')}
           >
             <input ref={fileRef} type="file" accept="image/*,application/pdf,.pdf" multiple className="hidden" onChange={(e) => handleFiles(e.target.files)} />
             {uploading ? (
@@ -333,14 +334,11 @@ export function ExpensesClient({ kind, expenses, cards, vendors, ollamaUp, categ
           </div>
           <div className="flex items-center justify-between mb-3">
             <span className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
-              {visible.length} {visible.length === 1 ? 'record' : 'records'}{visible.length !== expenses.length ? ` / ${expenses.length}` : ''}
+              {visible.length} {visible.length === 1 ? t('ex.recordOne') : t('ex.recordMany')}{visible.length !== expenses.length ? ` / ${expenses.length}` : ''}
             </span>
           </div>
           {visible.length === 0 ? (
-            <div className="text-center py-20 text-[color:var(--color-text-faint)]">
-              <p className="text-5xl mb-4">{isIncome ? '💶' : '🧾'}</p>
-              <p className="text-sm">{expenses.length === 0 ? t('ex.emptyNone', { label: label.toLowerCase() }) : t('ex.emptyFiltered')}</p>
-            </div>
+            <EmptyState icon={isIncome ? <Banknote /> : <Wallet />} title={expenses.length === 0 ? t('ex.emptyNone', { label: label.toLowerCase() }) : t('ex.emptyFiltered')} />
           ) : layout === 'grid' ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
               {visible.map((e) => (
@@ -388,15 +386,14 @@ export function ExpensesClient({ kind, expenses, cards, vendors, ollamaUp, categ
       <Modal open={showBulkEdit} onClose={() => setShowBulkEdit(false)} title={t('ex.editN', { n: selectedIds.size })} size="sm">
         <div className="space-y-4">
           <p className="text-xs text-[color:var(--color-text-dim)]" style={{ fontFamily: 'var(--font-mono)' }}>{t('ex.bulkEditHint')}</p>
-          <div>
-            <p className={labelCls} style={{ fontFamily: 'var(--font-mono)' }}>{t('common.category')}</p>
-            <select value={bulkCategory} onChange={(e) => setBulkCategory(e.target.value)} className={selCls}>
+          <Field label={t('common.category')}>
+            <select value={bulkCategory} onChange={(e) => setBulkCategory(e.target.value)} className={controlClass}>
               <option value="">{t('common.noChange')}</option>
               {categories.map((c) => (
                 <option key={c} value={c}>{c}</option>
               ))}
             </select>
-          </div>
+          </Field>
           <div className="flex justify-end gap-2 pt-1">
             <Button variant="ghost" onClick={() => setShowBulkEdit(false)}>{t('common.cancel')}</Button>
             <Button variant="primary" onClick={handleBulkEditApply} disabled={applyingBulk || !bulkCategory}>
@@ -611,16 +608,7 @@ function AnomalyBadge({ anomaly }: { anomaly?: number }) {
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="block min-w-0">
-      <span className="block text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider mb-1.5" style={{ fontFamily: 'var(--font-mono)' }}>{label}</span>
-      {children}
-    </label>
-  );
-}
 
-const selectCls = 'w-full bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[color:var(--color-accent)]';
 
 type FormState = Pick<SerializedExpense, 'kind' | 'vendor' | 'category' | 'space' | 'taxDeductible' | 'taxCategory' | 'currency' | 'date' | 'period' | 'recurring' | 'recurringCycle' | 'series' | 'paymentMethod' | 'notes' | 'verified'> & { amount: string; fxRate: string; split: SplitEntry[]; paymentSplits: PaymentSplitEntry[] };
 
@@ -655,7 +643,7 @@ function FormFields({ form, set, cards, vendors, categories, spaces, fx, seriesB
           <SearchableSelect value={form.vendor} onChange={(v) => set({ vendor: v })} options={vendors} placeholder={t('ex.fVendorPlaceholder')} allowCustom />
         </Field>
         <Field label={t('common.category')}>
-          <select value={form.category} onChange={(e) => set({ category: e.target.value })} className={selectCls}>
+          <select value={form.category} onChange={(e) => set({ category: e.target.value })} className={controlClass}>
             {categories.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
         </Field>
@@ -671,13 +659,13 @@ function FormFields({ form, set, cards, vendors, categories, spaces, fx, seriesB
         </Field>
         {fx.enabled && (
           <Field label={t('ex.fCurrency')}>
-            <select value={form.currency} onChange={(e) => set({ currency: e.target.value })} className={selectCls}>
+            <select value={form.currency} onChange={(e) => set({ currency: e.target.value })} className={controlClass}>
               {codes.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           </Field>
         )}
         <Field label={t('ex.fDate')}>
-          <Input type="date" value={form.date} onChange={(e) => set({ date: e.target.value })} />
+          <DateInput value={form.date} onValueChange={(v) => set({ date: v })} />
         </Field>
         <Field label={t('sub.fPayment')}>
           <CardSelect cards={cards} value={form.paymentMethod} onChange={(v) => set({ paymentMethod: v })} />
@@ -692,7 +680,7 @@ function FormFields({ form, set, cards, vendors, categories, spaces, fx, seriesB
           </button>
         </div>
         <Field label={t('ex.fCycle')}>
-          <select value={form.recurringCycle} onChange={(e) => set({ recurringCycle: e.target.value as FormState['recurringCycle'] })} className={selectCls} disabled={!form.recurring}>
+          <select value={form.recurringCycle} onChange={(e) => set({ recurringCycle: e.target.value as FormState['recurringCycle'] })} className={controlClass} disabled={!form.recurring}>
             {CYCLES.map((c) => <option key={c} value={c}>{c ? t(`cyc.${c}` as TKey) : '—'}</option>)}
           </select>
         </Field>
@@ -712,7 +700,7 @@ function FormFields({ form, set, cards, vendors, categories, spaces, fx, seriesB
         </Field>
       )}
       <Field label={t('v.fNotes')}>
-        <textarea value={form.notes} onChange={(e) => set({ notes: e.target.value })} rows={2} className={selectCls} />
+        <textarea value={form.notes} onChange={(e) => set({ notes: e.target.value })} rows={2} className={controlClass} />
       </Field>
       {form.kind !== 'income' && (
         <div className="grid grid-cols-2 gap-3 items-end">

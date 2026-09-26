@@ -6,6 +6,9 @@ import {
   Wallet, CalendarClock, Ticket, CheckSquare, FileText, Loader2, Target, Bot,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { Input } from '@/components/ui/Input';
+import { PAGE_MAIN, PageHeader } from '@/components/ui/PageHeader';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { cn } from '@/components/ui/cn';
 import { restoreFromTrash, purgeFromTrash, emptyTrash, type TrashRow, type TrashType } from '@/app/settings/actions';
@@ -134,44 +137,23 @@ export function TrashClient({ rows }: { rows: TrashRow[] }) {
   }
 
   return (
-    <main className="max-w-[1400px] mx-auto px-4 py-6 pb-24">
-      {/* Header */}
-      <div className="flex items-end justify-between gap-4 flex-wrap mb-1">
-        <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2.5" style={{ fontFamily: 'var(--font-display)' }}>
-          <Trash2 size={26} className="text-[color:var(--color-text-dim)]" />
-          {t('nav.trash')}
-          <span className="text-sm font-normal text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
-            {rows.length}
-          </span>
-        </h1>
+    <main className={PAGE_MAIN}>
+      <PageHeader title={t('nav.trash')} count={rows.length} subtitle={t('trash.intro')}>
         {rows.length > 0 && (
-          <Button variant="danger" size="sm" onClick={empty} disabled={pending}>
+          <Button variant="danger" onClick={empty} disabled={pending}>
             <Trash2 size={14} /> {t('trash.empty')}
           </Button>
         )}
-      </div>
-      <p className="text-xs text-[color:var(--color-text-faint)] mb-5">
-        {t('trash.intro')}
-      </p>
+      </PageHeader>
 
       {rows.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-[color:var(--color-border)] py-20 text-center">
-          <Trash2 size={32} className="mx-auto text-[color:var(--color-text-faint)] opacity-40" />
-          <p className="mt-3 text-sm text-[color:var(--color-text-dim)]">{t('trash.isEmpty')}</p>
-          <p className="text-xs text-[color:var(--color-text-faint)]">{t('trash.emptyHint')}</p>
-        </div>
+        <EmptyState icon={<Trash2 />} title={t('trash.isEmpty')} hint={t('trash.emptyHint')} />
       ) : (
         <>
           {/* Filters */}
           <div className="flex items-center gap-2 flex-wrap mb-4">
-            <div className="relative flex-1 min-w-[180px]">
-              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[color:var(--color-text-faint)]" />
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder={t('trash.searchPlaceholder')}
-                className="w-full bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg pl-8 pr-3 py-1.5 text-sm outline-none focus:border-[color:var(--color-accent)]"
-              />
+            <div className="flex-1 min-w-[180px]">
+              <Input icon={<Search size={14} />} value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t('trash.searchPlaceholder')} aria-label={t('common.search')} />
             </div>
           </div>
           <div className="flex items-center gap-1.5 flex-wrap mb-4" style={{ fontFamily: 'var(--font-mono)' }}>
