@@ -1,12 +1,20 @@
 'use client';
 import { cur } from '@/lib/money';
 import { useEffect, useState, useTransition } from 'react';
-import { Loader2, Copy, Check, Merge } from 'lucide-react';
+import { Loader2, Copy, Check, Merge, CheckCircle2 } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { useT } from '@/components/LocaleProvider';
+import type { TKey } from '@/lib/i18n';
 import { cn } from '@/components/ui/cn';
 import { useRouter } from 'next/navigation';
 import { findDuplicateItems, mergeItems, type DupItem, type ItemDupGroup } from './actions';
+
+const STATUS_KEY: Record<string, TKey> = {
+  researching: 'it.stResearching', decided: 'it.stDecided', ordered: 'it.stOrdered', received: 'it.stReceived',
+  installed: 'it.stInstalled', deferred: 'it.stDeferred', sold: 'it.stSold', broken: 'it.stBroken',
+};
 
 function fileUrl(p: string) {
   return `/api/files/${p.split('/').map(encodeURIComponent).join('/')}`;
@@ -25,6 +33,7 @@ export function MergeItemsPicker({
   keepId: string;
   onKeep: (id: string) => void;
 }) {
+  const t = useT();
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
       {items.map((it) => {
@@ -59,18 +68,18 @@ export function MergeItemsPicker({
             )}
             <span className="min-w-0 flex-1">
               <span className="flex items-center gap-1.5 text-[11px]">
-                <span className="text-[color:var(--color-text-dim)] capitalize">{it.status}</span>
+                <span className="text-[color:var(--color-text-dim)]">{STATUS_KEY[it.status] ? t(STATUS_KEY[it.status]) : it.status}</span>
                 {it.currentPrice > 0 && (
                   <span className="text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
                     {cur()}
                     {it.currentPrice}
                   </span>
                 )}
-                {isKeep && <span className="text-[9px] uppercase tracking-wider text-[color:var(--color-accent)]">keep</span>}
+                {isKeep && <span className="text-[9px] uppercase tracking-wider text-[color:var(--color-accent)]">{t('dup.keep')}</span>}
               </span>
               <span className="block text-xs text-[color:var(--color-text)] truncate">{it.title}</span>
               <span className="block text-[10px] text-[color:var(--color-text-faint)] truncate" style={{ fontFamily: 'var(--font-mono)' }}>
-                {it.links} links · {it.photos} photos · {it.receipts} receipts
+                {t('itdup.stats', { links: it.links, photos: it.photos, receipts: it.receipts })}
               </span>
             </span>
           </button>
@@ -82,6 +91,7 @@ export function MergeItemsPicker({
 
 /** "Find duplicate products" — auto-grouped by title; pick the keeper, merge the rest. */
 export function ItemDuplicatesModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const t = useT();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [groups, setGroups] = useState<ItemDupGroup[]>([]);
@@ -122,23 +132,19 @@ export function ItemDuplicatesModal({ open, onClose }: { open: boolean; onClose:
   const totalDupes = groups.reduce((s, g) => s + (g.items.length - 1), 0);
 
   return (
-    <Modal open={open} onClose={onClose} title="Find duplicate products" size="xl">
+    <Modal open={open} onClose={onClose} title={t('itdup.title')} size="xl">
       {loading ? (
         <div className="py-16 flex flex-col items-center gap-3 text-[color:var(--color-text-dim)]">
           <Loader2 size={26} className="animate-spin" />
-          <p className="text-sm">Scanning for duplicates…</p>
+          <p className="text-sm">{t('dup.scanning')}</p>
         </div>
       ) : groups.length === 0 ? (
-        <div className="py-16 text-center text-[color:var(--color-text-faint)]">
-          <p className="text-5xl mb-3">✨</p>
-          <p className="text-sm">No duplicate products found. Clean library!</p>
-        </div>
+        <EmptyState className="py-16" icon={<CheckCircle2 />} title={t('dup.none')} />
       ) : (
         <div className="space-y-4">
           <p className="text-xs text-[color:var(--color-text-dim)]" style={{ fontFamily: 'var(--font-mono)' }}>
             <Copy size={12} className="inline mr-1" />
-            {groups.length} group{groups.length === 1 ? '' : 's'} · {totalDupes} duplicate{totalDupes === 1 ? '' : 's'} to merge. Pick the one to{' '}
-            <b>keep</b> in each (defaults to the most complete); the rest merge into it.
+            {t('dup.intro', { groups: groups.length, dupes: totalDupes })}
           </p>
 
           {groups.map((grp) => {
@@ -149,7 +155,7 @@ export function ItemDuplicatesModal({ open, onClose }: { open: boolean; onClose:
                 key={grp.key}
                 className={cn(
                   'border rounded-xl p-3 transition-colors',
-                  merged ? 'border-[color:var(--color-accent)] bg-[#00ff8808]' : 'border-[color:var(--color-border)]'
+                  merged ? 'border-[color:var(--color-accent)] bg-[color:var(--color-accent)]/3' : 'border-[color:var(--color-border)]'
                 )}
               >
                 <div className="flex items-center justify-between gap-2 mb-2">
@@ -158,12 +164,12 @@ export function ItemDuplicatesModal({ open, onClose }: { open: boolean; onClose:
                   </span>
                   {merged ? (
                     <span className="text-[11px] text-[color:var(--color-accent)] flex items-center gap-1 shrink-0" style={{ fontFamily: 'var(--font-mono)' }}>
-                      <Check size={13} /> merged {merged}
+                      <Check size={13} /> {t('dup.merged', { n: merged })}
                     </span>
                   ) : (
                     <Button variant="primary" size="sm" onClick={() => handleMerge(grp)} disabled={busyKey === grp.key}>
                       {busyKey === grp.key ? <Loader2 size={13} className="animate-spin" /> : <Merge size={13} />}
-                      Merge {grp.items.length} → 1
+                      {t('dup.merge', { n: grp.items.length })}
                     </Button>
                   )}
                 </div>
@@ -178,7 +184,7 @@ export function ItemDuplicatesModal({ open, onClose }: { open: boolean; onClose:
           {pending.length === 0 && (
             <div className="text-center pt-2">
               <Button variant="ghost" onClick={onClose}>
-                Done
+                {t('common.done')}
               </Button>
             </div>
           )}

@@ -5,6 +5,8 @@ import {
   Activity, UploadCloud, ScanLine, Sparkles, Loader2, CheckCircle2, XCircle, X, RefreshCw, Settings,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { PAGE_MAIN, PageHeader, HeaderButton } from '@/components/ui/PageHeader';
 import { Modal } from '@/components/ui/Modal';
 import { cn } from '@/components/ui/cn';
 import { getJobs, enqueueOnedriveSync, dismissJob, getJobDetail, type JobRow, type JobDetail, type JobItemResult } from '@/app/jobActions';
@@ -78,22 +80,12 @@ export function JobsPageClient({
   }
 
   return (
-    <main className="max-w-[1400px] mx-auto px-4 py-6 pb-24">
-      <div className="flex items-end justify-between gap-4 flex-wrap mb-1">
-        <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2.5" style={{ fontFamily: 'var(--font-display)' }}>
-          <Activity size={24} className="text-[color:var(--color-accent)]" />
-          {t('nav.jobs')}
-          <span className="text-sm font-normal text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
-            {jobs.length}
-          </span>
-        </h1>
-        <button onClick={refresh} disabled={pending} className="flex items-center gap-1.5 text-xs text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]" style={{ fontFamily: 'var(--font-mono)' }}>
-          <RefreshCw size={13} className={cn(pending && 'animate-spin')} /> {t('common.refresh')}
-        </button>
-      </div>
-      <p className="text-xs text-[color:var(--color-text-faint)] mb-5">
-        {t('jobs.intro')}
-      </p>
+    <main className={PAGE_MAIN}>
+      <PageHeader title={t('nav.jobs')} count={jobs.length} subtitle={t('jobs.intro')}>
+        <HeaderButton icon={<RefreshCw size={14} className={cn(pending && 'animate-spin')} />} onClick={refresh} disabled={pending}>
+          {t('common.refresh')}
+        </HeaderButton>
+      </PageHeader>
 
       {/* Start a job */}
       <div className="rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-4 mb-6">
@@ -125,11 +117,7 @@ export function JobsPageClient({
 
       {/* Job list */}
       {jobs.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-[color:var(--color-border)] py-16 text-center">
-          <Activity size={30} className="mx-auto text-[color:var(--color-text-faint)] opacity-40" />
-          <p className="mt-3 text-sm text-[color:var(--color-text-dim)]">{t('jobs.empty')}</p>
-          <p className="text-xs text-[color:var(--color-text-faint)]">{t('jobs.emptyHint')}</p>
-        </div>
+        <EmptyState icon={<Activity />} title={t('jobs.empty')} hint={t('jobs.emptyHint')} />
       ) : (
         <div className="space-y-2">
           {jobs.map((j) => {

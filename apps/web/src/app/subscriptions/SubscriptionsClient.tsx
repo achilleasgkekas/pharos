@@ -8,14 +8,16 @@ import { isForeignCurrency, normalizeCurrency, convertToBase, deriveFxRate, toPr
 import { FxBadge } from '@/components/FxBadge';
 import { FxRateButton } from '@/components/FxRateButton';
 import { useState, useTransition, useMemo, useEffect } from 'react';
-import { Plus, Pencil, Trash2, ExternalLink, Power, Sparkles, Loader2, Search, Radar, X, Split as SplitIcon, CheckCircle2, Copy } from 'lucide-react';
+import { Plus, Pencil, Trash2, ExternalLink, Power, Sparkles, Loader2, Search, Radar, X, Split as SplitIcon, CheckCircle2, Copy, CalendarClock } from 'lucide-react';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { Field } from '@/components/ui/Field';
 import { SubscriptionDuplicatesModal } from './SubscriptionDuplicatesModal';
 import { SavedViews } from '@/components/ui/SavedViews';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { NO_SPACE, matchesSpace, spaceFilterOptions } from '@/lib/spaceFilter';
 import { Button } from '@/components/ui/Button';
 import { PAGE_MAIN, PageHeader, HeaderButton, HeaderStat, ViewToggle, PrimaryAction, FilterLayout } from '@/components/ui/PageHeader';
-import { Input } from '@/components/ui/Input';
+import { Input, controlClass } from '@/components/ui/Input';
 import { DateInput } from '@/components/ui/DateInput';
 import { Modal } from '@/components/ui/Modal';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
@@ -61,8 +63,6 @@ function subCategoryOptions(current?: string): { value: string; label: string }[
 }
 
 
-const selectClass =
-  'w-full bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-4 py-2 text-sm text-[color:var(--color-text)] focus:outline-none focus:border-[color:var(--color-accent)] transition-colors';
 
 function categoryMeta(cat: string) {
   return CATEGORIES.find((c) => c.value === cat) ?? CATEGORIES[CATEGORIES.length - 1];
@@ -230,7 +230,7 @@ export function SubscriptionsClient({
       )}
       <div>
         <p className={fLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('common.sort')}</p>
-        <select value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)} className={selectClass} style={{ fontFamily: 'var(--font-mono)' }}>
+        <select value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)} className={controlClass} style={{ fontFamily: 'var(--font-mono)' }}>
           <option value="name">{t('sub.sortName')}</option>
           <option value="amount">{t('sub.sortCost')}</option>
           <option value="renewal">{t('sub.sortRenewal')}</option>
@@ -345,10 +345,7 @@ export function SubscriptionsClient({
           )}
 
           {visible.length === 0 ? (
-            <div className="text-center py-20 text-[color:var(--color-text-faint)]">
-              <p className="text-5xl mb-4">🔄</p>
-              <p className="text-sm">{subscriptions.length === 0 ? 'No subscriptions yet. Hit + to add one.' : 'No subscriptions match these filters.'}</p>
-            </div>
+            <EmptyState icon={<CalendarClock />} title={subscriptions.length === 0 ? t('sub.empty') : t('ex.emptyFiltered')} />
           ) : (
             <div className={cn(layout === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3' : 'flex flex-col gap-2')}>
               {visible.map((s) => (
@@ -732,7 +729,7 @@ function SubForm({ sub, cards, spaces = [], fx, onSuccess, onDeleted }: { sub?: 
           <Input value={form.provider} onChange={set('provider')} placeholder={t('sub.fProviderPlaceholder')} />
         </Field>
         <Field label={t('sub.fCategory')}>
-          <select value={form.category} onChange={set('category')} className={selectClass}>
+          <select value={form.category} onChange={set('category')} className={controlClass}>
             {subCategoryOptions(form.category).map((c) => (
               <option key={c.value} value={c.value}>{c.label}</option>
             ))}
@@ -745,7 +742,7 @@ function SubForm({ sub, cards, spaces = [], fx, onSuccess, onDeleted }: { sub?: 
         </Field>
         {fx.enabled && (
           <Field label={t('ex.fCurrency')}>
-            <select value={form.currency} onChange={set('currency')} className={selectClass}>
+            <select value={form.currency} onChange={set('currency')} className={controlClass}>
               {currencyCodes(fx.base).map((c) => (
                 <option key={c} value={c}>{c}</option>
               ))}
@@ -753,7 +750,7 @@ function SubForm({ sub, cards, spaces = [], fx, onSuccess, onDeleted }: { sub?: 
           </Field>
         )}
         <Field label={t('sub.fBillingCycle')}>
-          <select value={form.billingCycle} onChange={set('billingCycle')} className={selectClass}>
+          <select value={form.billingCycle} onChange={set('billingCycle')} className={controlClass}>
             {BILLING_CYCLES.map((c) => (
               <option key={c} value={c}>{t(`cyc.${c}` as TKey)}</option>
             ))}
@@ -949,16 +946,3 @@ function SplitEditor({ split, amount, baseCurrency, onChange }: { split: SplitEn
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="min-w-0">
-      <label
-        className="block text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider mb-1.5"
-        style={{ fontFamily: 'var(--font-mono)' }}
-      >
-        {label}
-      </label>
-      {children}
-    </div>
-  );
-}

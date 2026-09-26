@@ -64,6 +64,7 @@ If the two ever disagree, `npm run type-check:ts5` runs the old check. See issue
 - **Comments in English**; user-facing copy can be localized.
 - Match the surrounding code's naming and density. Avoid em-dashes in UI copy.
 - Tailwind classes inline; extract a component when a pattern repeats.
+- **One UI on every page**: build pages from `components/ui` (PageHeader, Field, Modal, EmptyState…). See [UI conventions](docs/ui-conventions.md); a unit test enforces the main rules.
 
 ## Project layout
 

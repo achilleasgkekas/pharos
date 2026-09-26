@@ -2,6 +2,7 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import { X, ArrowLeft } from 'lucide-react';
 import { cn } from './cn';
+import { useT } from '@/components/LocaleProvider';
 
 interface ModalProps {
   open: boolean;
@@ -21,6 +22,7 @@ const sizes = {
 };
 
 export function Modal({ open, onClose, title, children, size = 'md' }: ModalProps) {
+  const t = useT();
   const isFull = size === 'full';
 
   return (
@@ -60,7 +62,7 @@ export function Modal({ open, onClose, title, children, size = 'md' }: ModalProp
                     onClick={onClose}
                     className="flex items-center gap-1.5 text-sm text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] transition-colors"
                   >
-                    <ArrowLeft size={18} /> Back
+                    <ArrowLeft size={18} /> {t('common.back')}
                   </button>
                   {title && (
                     <>
@@ -83,6 +85,7 @@ export function Modal({ open, onClose, title, children, size = 'md' }: ModalProp
                   </Dialog.Title>
                   <button
                     onClick={onClose}
+                    aria-label={t('common.close')}
                     className="shrink-0 p-1.5 rounded-lg text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface-2)] transition-colors"
                   >
                     <X size={16} />

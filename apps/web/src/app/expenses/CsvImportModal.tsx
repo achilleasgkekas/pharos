@@ -11,9 +11,9 @@ import {
 } from '@/lib/csvImport';
 import { isForeignCurrency, normalizeCurrency, convertToBase } from '@/lib/fx';
 import { importExpensesCsv } from './actions';
+import { FIELD_LABEL } from '@/components/ui/Field';
+import { controlClass } from '@/components/ui/Input';
 
-const labelCls = 'text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider mb-1.5';
-const selCls = 'w-full bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-[color:var(--color-accent)]';
 
 const MAPPED_FIELDS: Array<{ field: CsvField; required: boolean }> = [
   { field: 'date', required: true },
@@ -174,7 +174,7 @@ export function CsvImportModal({ kind, fx, onClose, onImported }: Props) {
           <>
             {/* Column mapping */}
             <div>
-              <p className={labelCls} style={{ fontFamily: 'var(--font-mono)' }}>{t('csv.mapColumns')}</p>
+              <p className={FIELD_LABEL} style={{ fontFamily: 'var(--font-mono)' }}>{t('csv.mapColumns')}</p>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 {mappedFields.map(({ field, required }) => (
                   <div key={field}>
@@ -184,7 +184,7 @@ export function CsvImportModal({ kind, fx, onClose, onImported }: Props) {
                     <select
                       value={mapping[field] ?? -1}
                       onChange={(e) => setMapping((m) => ({ ...m, [field]: e.target.value === '-1' ? undefined : Number(e.target.value) }))}
-                      className={selCls}
+                      className={controlClass}
                       style={{ fontFamily: 'var(--font-mono)' }}
                     >
                       <option value={-1}>—</option>
@@ -215,7 +215,7 @@ export function CsvImportModal({ kind, fx, onClose, onImported }: Props) {
             {/* Multi-currency (P9): one rate per foreign code found in the file. */}
             {foreignCodes.length > 0 && (
               <div>
-                <p className={labelCls} style={{ fontFamily: 'var(--font-mono)' }}>{t('csv.fxRates')}</p>
+                <p className={FIELD_LABEL} style={{ fontFamily: 'var(--font-mono)' }}>{t('csv.fxRates')}</p>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                   {foreignCodes.map((code) => (
                     <div key={code}>
@@ -230,7 +230,7 @@ export function CsvImportModal({ kind, fx, onClose, onImported }: Props) {
                         placeholder="0.00"
                         value={rateInput[code] ?? ''}
                         onChange={(e) => setRateInput((m) => ({ ...m, [code]: e.target.value }))}
-                        className={selCls}
+                        className={controlClass}
                         style={{ fontFamily: 'var(--font-mono)' }}
                       />
                     </div>
@@ -243,7 +243,7 @@ export function CsvImportModal({ kind, fx, onClose, onImported }: Props) {
             {/* Preview */}
             {preview.length > 0 && (
               <div>
-                <p className={labelCls} style={{ fontFamily: 'var(--font-mono)' }}>
+                <p className={FIELD_LABEL} style={{ fontFamily: 'var(--font-mono)' }}>
                   {t('csv.previewValid', { valid: mapped.good.length, invalid: mapped.invalid })}
                 </p>
                 <div className="overflow-x-auto rounded-xl border border-[color:var(--color-border)]">

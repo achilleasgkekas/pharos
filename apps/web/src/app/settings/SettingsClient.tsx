@@ -5,6 +5,8 @@ import { Activity, Sun, Moon, Sparkles, Database, CreditCard, ExternalLink, Serv
 import { useTheme, type Theme } from '@/components/ThemeProvider';
 import { cur } from '@/lib/money';
 import { cn } from '@/components/ui/cn';
+import { controlClass } from '@/components/ui/Input';
+import { Field } from '@/components/ui/Field';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { saveAiConfig, pullOllamaModel, testAnthropic, saveStore, deleteStore, setAiConfirmBulk, exportData, exportDataEncrypted, importData, importDataEncrypted, verifyBackup, exportCSV, exportInsuranceBundle, exportTaxBundle, saveBudgets, saveBudgetRollover, suggestBudgets, saveAssetAccounts, saveDepreciation, saveCategoryRules, setAiEnabled, setAiFeature, fetchProviderModels } from './actions';
 import { applyCategoryRulesToExisting } from '@/app/expenses/actions';
@@ -488,7 +490,7 @@ function ModelPicker({
 
   return (
     <Field label={t('set.modelField')}>
-      <input value={model} onChange={(e) => onModel(e.target.value)} className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} />
+      <input value={model} onChange={(e) => onModel(e.target.value)} className={controlClass} style={{ fontFamily: 'var(--font-mono)' }} />
       <div className="flex items-center gap-2 mt-2 flex-wrap">
         <button
           type="button"
@@ -581,7 +583,7 @@ function CloudKeyModel({
           onChange={(e) => onKey(e.target.value)}
           placeholder={hasKey ? '••••••••••••  (saved)' : keyPlaceholder}
           autoComplete="new-password" data-1p-ignore data-lpignore="true"
-          className={inputClass}
+          className={controlClass}
           style={{ fontFamily: 'var(--font-mono)' }}
         />
       </Field>
@@ -745,7 +747,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
               value={ollamaHost}
               onChange={(e) => setOllamaHost(e.target.value)}
               placeholder="http://localhost:11434"
-              className={inputClass}
+              className={controlClass}
               style={{ fontFamily: 'var(--font-mono)' }}
             />
             <p className="text-[10px] text-[color:var(--color-text-faint)] mt-1" style={{ fontFamily: 'var(--font-mono)' }}>
@@ -755,7 +757,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
 
           <Field label={t('set.textModel')}>
             {installedNames.length > 0 ? (
-              <select value={ollamaModel} onChange={(e) => setOllamaModel(e.target.value)} className={selectClass}>
+              <select value={ollamaModel} onChange={(e) => setOllamaModel(e.target.value)} className={controlClass}>
                 {!installedNames.includes(ollamaModel) && <option value={ollamaModel}>{ollamaModel} {t('set.notInstalled')}</option>}
                 {ai.installed.map((m) => (
                   <option key={m.name} value={m.name}>
@@ -764,13 +766,13 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
                 ))}
               </select>
             ) : (
-              <input value={ollamaModel} onChange={(e) => setOllamaModel(e.target.value)} className={inputClass} />
+              <input value={ollamaModel} onChange={(e) => setOllamaModel(e.target.value)} className={controlClass} />
             )}
           </Field>
 
           <Field label={t('set.visionModel')}>
             {installedNames.length > 0 ? (
-              <select value={visionModel} onChange={(e) => setVisionModel(e.target.value)} className={selectClass}>
+              <select value={visionModel} onChange={(e) => setVisionModel(e.target.value)} className={controlClass}>
                 {!installedNames.includes(visionModel) && <option value={visionModel}>{visionModel} {t('set.notInstalled')}</option>}
                 {ai.installed.map((m) => (
                   <option key={m.name} value={m.name}>
@@ -779,7 +781,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
                 ))}
               </select>
             ) : (
-              <input value={visionModel} onChange={(e) => setVisionModel(e.target.value)} className={inputClass} />
+              <input value={visionModel} onChange={(e) => setVisionModel(e.target.value)} className={controlClass} />
             )}
             {visionModel && !isVisionName(visionModel) && (
               <p className="text-[10px] text-[color:var(--color-red)] mt-1" style={{ fontFamily: 'var(--font-mono)' }}>
@@ -794,7 +796,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
                 value={pullName}
                 onChange={(e) => setPullName(e.target.value)}
                 placeholder={t('set.modelPlaceholder')}
-                className={inputClass}
+                className={controlClass}
                 style={{ fontFamily: 'var(--font-mono)' }}
               />
               <button
@@ -843,7 +845,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
               onChange={(e) => setApiKey(e.target.value)}
               placeholder={ai.hasKey ? '••••••••••••  (saved)' : 'sk-ant-...'}
               autoComplete="new-password" data-1p-ignore data-lpignore="true"
-              className={inputClass}
+              className={controlClass}
               style={{ fontFamily: 'var(--font-mono)' }}
             />
           </Field>
@@ -865,7 +867,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
               autoComplete="off"
               data-1p-ignore
               data-lpignore="true"
-              className={inputClass}
+              className={controlClass}
               style={{ fontFamily: 'var(--font-mono)' }}
             />
             <p className="mt-1 text-[10px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
@@ -949,7 +951,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
               value={customBaseUrl}
               onChange={(e) => setCustomBaseUrl(e.target.value)}
               placeholder="http://localhost:1234/v1"
-              className={inputClass}
+              className={controlClass}
               style={{ fontFamily: 'var(--font-mono)' }}
             />
             <p className="text-[10px] text-[color:var(--color-text-faint)] mt-1" style={{ fontFamily: 'var(--font-mono)' }}>
@@ -1015,7 +1017,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
             value={monthlyBudget}
             onChange={(e) => setMonthlyBudget(e.target.value)}
             placeholder="0"
-            className={inputClass}
+            className={controlClass}
             style={{ fontFamily: 'var(--font-mono)' }}
           />
         </Field>
@@ -1115,7 +1117,7 @@ function ScraperAiSettings({ scraperAi, installed, hasAnthropicKey }: { scraperA
       {provider === 'ollama' ? (
         <Field label={t('set.scraperModel')}>
           {installedNames.length > 0 ? (
-            <select value={model} onChange={(e) => setModel(e.target.value)} className={selectClass}>
+            <select value={model} onChange={(e) => setModel(e.target.value)} className={controlClass}>
               <option value="">{t('set.defaultOllamaEnv')}</option>
               {!installedNames.includes(model) && model && <option value={model}>{model} {t('set.notInstalled')}</option>}
               {installed.map((m) => (
@@ -1125,7 +1127,7 @@ function ScraperAiSettings({ scraperAi, installed, hasAnthropicKey }: { scraperA
               ))}
             </select>
           ) : (
-            <input value={model} onChange={(e) => setModel(e.target.value)} placeholder="qwen2.5:14b" className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} />
+            <input value={model} onChange={(e) => setModel(e.target.value)} placeholder="qwen2.5:14b" className={controlClass} style={{ fontFamily: 'var(--font-mono)' }} />
           )}
           <p className="text-[10px] text-[color:var(--color-text-faint)] mt-1" style={{ fontFamily: 'var(--font-mono)' }}>
             {t('set.scraperModelHint')}
@@ -1176,14 +1178,14 @@ function ScraperAiSettings({ scraperAi, installed, hasAnthropicKey }: { scraperA
           value={maxLinks}
           onChange={(e) => setMaxLinks(e.target.value)}
           placeholder="0"
-          className={inputClass}
+          className={controlClass}
           style={{ fontFamily: 'var(--font-mono)' }}
         />
         <p className="text-[10px] text-[color:var(--color-text-faint)] mt-1">{t('set.scraperMaxLinksHint')}</p>
       </Field>
       {/* #330: what a scheduled scrape covers. Shopping always goes first. */}
       <Field label={t('set.scraperScope')}>
-        <select value={scope} onChange={(e) => setScope(e.target.value as typeof scope)} className={selectClass}>
+        <select value={scope} onChange={(e) => setScope(e.target.value as typeof scope)} className={controlClass}>
           <option value="both">{t('set.scraperScopeBoth')}</option>
           <option value="shopping">{t('set.scraperScopeShopping')}</option>
           <option value="inventory">{t('set.scraperScopeInventory')}</option>
@@ -1200,7 +1202,7 @@ function ScraperAiSettings({ scraperAi, installed, hasAnthropicKey }: { scraperA
             inputMode="numeric"
             value={ownedDays}
             onChange={(e) => setOwnedDays(e.target.value)}
-            className={inputClass}
+            className={controlClass}
             style={{ fontFamily: 'var(--font-mono)' }}
           />
         </Field>
@@ -1410,7 +1412,7 @@ function OnedriveWizard({ connected: initialConnected, account }: { connected: b
                   <li>Authentication → Allow public client flows → Yes → Save. Copy the client id.</li>
                 </ol>
                 <Field label={t('set.appClientId')}>
-                  <input value={clientId} onChange={(e) => setClientId(e.target.value)} placeholder="00000000-0000-0000-0000-000000000000" className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} />
+                  <input value={clientId} onChange={(e) => setClientId(e.target.value)} placeholder="00000000-0000-0000-0000-000000000000" className={controlClass} style={{ fontFamily: 'var(--font-mono)' }} />
                 </Field>
               </div>
             )}
@@ -1590,24 +1592,24 @@ function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Inf
       {(backend === 'smb' || backend === 'ftp') && (
         <div className="grid sm:grid-cols-2 gap-3 pt-1">
           <Field label={t('set.hostIp')}>
-            <input value={host} onChange={(e) => setHost(e.target.value)} placeholder="192.168.10.20" className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} />
+            <input value={host} onChange={(e) => setHost(e.target.value)} placeholder="192.168.10.20" className={controlClass} style={{ fontFamily: 'var(--font-mono)' }} />
           </Field>
           <Field label={t('set.portBlank', { default: backend === 'smb' ? '445' : '21' })}>
-            <input value={port} onChange={(e) => setPort(e.target.value)} placeholder={backend === 'smb' ? '445' : '21'} className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} />
+            <input value={port} onChange={(e) => setPort(e.target.value)} placeholder={backend === 'smb' ? '445' : '21'} className={controlClass} style={{ fontFamily: 'var(--font-mono)' }} />
           </Field>
           {backend === 'smb' && (
             <Field label={t('set.shareName')}>
-              <input value={share} onChange={(e) => setShare(e.target.value)} placeholder="home" className={inputClass} />
+              <input value={share} onChange={(e) => setShare(e.target.value)} placeholder="home" className={controlClass} />
             </Field>
           )}
           <Field label={t('set.username')}>
-            <input value={user} onChange={(e) => setUser(e.target.value)} className={inputClass} autoComplete="new-password" data-1p-ignore data-lpignore="true" />
+            <input value={user} onChange={(e) => setUser(e.target.value)} className={controlClass} autoComplete="new-password" data-1p-ignore data-lpignore="true" />
           </Field>
           <Field label={storage.hasPass ? t('set.passwordSaved') : t('set.password')}>
-            <input type="password" value={pass} onChange={(e) => setPass(e.target.value)} placeholder={storage.hasPass ? '••••••••' : ''} className={inputClass} autoComplete="new-password" data-1p-ignore data-lpignore="true" />
+            <input type="password" value={pass} onChange={(e) => setPass(e.target.value)} placeholder={storage.hasPass ? '••••••••' : ''} className={controlClass} autoComplete="new-password" data-1p-ignore data-lpignore="true" />
           </Field>
           <Field label={t('set.baseFolder')}>
-            <input value={basePath} onChange={(e) => setBasePath(e.target.value)} placeholder="Pharos" className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} />
+            <input value={basePath} onChange={(e) => setBasePath(e.target.value)} placeholder="Pharos" className={controlClass} style={{ fontFamily: 'var(--font-mono)' }} />
           </Field>
           {backend === 'ftp' && (
             <div className="flex items-center justify-between sm:col-span-2">
@@ -1624,10 +1626,10 @@ function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Inf
         </div>
         <div className="grid sm:grid-cols-2 gap-3">
           <Field label={t('set.folderTemplate')}>
-            <input value={folderTpl} onChange={(e) => setFolderTpl(e.target.value)} className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} />
+            <input value={folderTpl} onChange={(e) => setFolderTpl(e.target.value)} className={controlClass} style={{ fontFamily: 'var(--font-mono)' }} />
           </Field>
           <Field label={t('set.filenameTemplate')}>
-            <input value={nameTpl} onChange={(e) => setNameTpl(e.target.value)} className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} />
+            <input value={nameTpl} onChange={(e) => setNameTpl(e.target.value)} className={controlClass} style={{ fontFamily: 'var(--font-mono)' }} />
           </Field>
         </div>
         <div className="text-[10px] text-[color:var(--color-text-faint)] leading-relaxed" style={{ fontFamily: 'var(--font-mono)' }}>
@@ -1684,24 +1686,24 @@ function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Inf
           {(m2Backend === 'smb' || m2Backend === 'ftp') && (
             <div className="grid sm:grid-cols-2 gap-3">
               <Field label={t('set.hostIp')}>
-                <input value={m2Host} onChange={(e) => setM2Host(e.target.value)} placeholder="192.168.10.30" className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} />
+                <input value={m2Host} onChange={(e) => setM2Host(e.target.value)} placeholder="192.168.10.30" className={controlClass} style={{ fontFamily: 'var(--font-mono)' }} />
               </Field>
               <Field label={t('set.portBlank', { default: m2Backend === 'smb' ? '445' : '21' })}>
-                <input value={m2Port} onChange={(e) => setM2Port(e.target.value)} placeholder={m2Backend === 'smb' ? '445' : '21'} className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} />
+                <input value={m2Port} onChange={(e) => setM2Port(e.target.value)} placeholder={m2Backend === 'smb' ? '445' : '21'} className={controlClass} style={{ fontFamily: 'var(--font-mono)' }} />
               </Field>
               {m2Backend === 'smb' && (
                 <Field label={t('set.shareName')}>
-                  <input value={m2Share} onChange={(e) => setM2Share(e.target.value)} placeholder="backup" className={inputClass} />
+                  <input value={m2Share} onChange={(e) => setM2Share(e.target.value)} placeholder="backup" className={controlClass} />
                 </Field>
               )}
               <Field label={t('set.username')}>
-                <input value={m2User} onChange={(e) => setM2User(e.target.value)} className={inputClass} autoComplete="new-password" data-1p-ignore data-lpignore="true" />
+                <input value={m2User} onChange={(e) => setM2User(e.target.value)} className={controlClass} autoComplete="new-password" data-1p-ignore data-lpignore="true" />
               </Field>
               <Field label={storage.hasPass2 ? t('set.passwordSaved') : t('set.password')}>
-                <input type="password" value={m2Pass} onChange={(e) => setM2Pass(e.target.value)} placeholder={storage.hasPass2 ? '••••••••' : ''} className={inputClass} autoComplete="new-password" data-1p-ignore data-lpignore="true" />
+                <input type="password" value={m2Pass} onChange={(e) => setM2Pass(e.target.value)} placeholder={storage.hasPass2 ? '••••••••' : ''} className={controlClass} autoComplete="new-password" data-1p-ignore data-lpignore="true" />
               </Field>
               <Field label={t('set.baseFolder')}>
-                <input value={m2BasePath} onChange={(e) => setM2BasePath(e.target.value)} placeholder="Pharos" className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} />
+                <input value={m2BasePath} onChange={(e) => setM2BasePath(e.target.value)} placeholder="Pharos" className={controlClass} style={{ fontFamily: 'var(--font-mono)' }} />
               </Field>
               {m2Backend === 'ftp' && (
                 <div className="flex items-center justify-between sm:col-span-2">
@@ -2252,7 +2254,7 @@ function DefaultsManager({ settings }: { settings: AppSettings }) {
       <div className="grid sm:grid-cols-2 gap-4">
         <label className="block">
           <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.currency')}</span>
-          <select value={currency} onChange={(e) => setCurrency(e.target.value)} className={inputClass}>
+          <select value={currency} onChange={(e) => setCurrency(e.target.value)} className={controlClass}>
             {CURRENCIES.map((c) => (
               <option key={c.code} value={c.code}>
                 {c.label}
@@ -2262,26 +2264,26 @@ function DefaultsManager({ settings }: { settings: AppSettings }) {
         </label>
         <label className="block">
           <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.defaultVat')}</span>
-          <input type="number" min="0" max="100" step="0.5" value={vatRate} onChange={(e) => setVatRate(e.target.value)} className={inputClass} />
+          <input type="number" min="0" max="100" step="0.5" value={vatRate} onChange={(e) => setVatRate(e.target.value)} className={controlClass} />
         </label>
         <label className="block">
           <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.defaultView')}</span>
-          <select value={view} onChange={(e) => setView(e.target.value as 'grid' | 'list')} className={inputClass}>
+          <select value={view} onChange={(e) => setView(e.target.value as 'grid' | 'list')} className={controlClass}>
             <option value="grid">{t('v.grid')}</option>
             <option value="list">{t('v.list')}</option>
           </select>
         </label>
         <label className="block">
           <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.defaultWarranty')}</span>
-          <input type="number" min="0" max="120" value={warrantyMonths} onChange={(e) => setWarrantyMonths(e.target.value)} className={inputClass} />
+          <input type="number" min="0" max="120" value={warrantyMonths} onChange={(e) => setWarrantyMonths(e.target.value)} className={controlClass} />
         </label>
         <label className="block">
           <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.warrantyAlert')}</span>
-          <input type="number" min="0" max="730" value={alertDays} onChange={(e) => setAlertDays(e.target.value)} className={inputClass} />
+          <input type="number" min="0" max="730" value={alertDays} onChange={(e) => setAlertDays(e.target.value)} className={controlClass} />
         </label>
         <label className="block">
           <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.returnWindow')}</span>
-          <input type="number" min="0" max="365" value={returnDays} onChange={(e) => setReturnDays(e.target.value)} className={inputClass} />
+          <input type="number" min="0" max="365" value={returnDays} onChange={(e) => setReturnDays(e.target.value)} className={controlClass} />
         </label>
         <label className="block">
           <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.shoppingCountry')}</span>
@@ -2293,7 +2295,7 @@ function DefaultsManager({ settings }: { settings: AppSettings }) {
               // Start from the country's usual cross-border shops; the user edits from there.
               setExtraShops((SHOPPING_PRESETS[code]?.extraShops ?? []).join(', '));
             }}
-            className={inputClass}
+            className={controlClass}
           >
             <option value="">{t('set.shoppingCountryAny')}</option>
             {[...SHOPPING_COUNTRIES]
@@ -2308,45 +2310,45 @@ function DefaultsManager({ settings }: { settings: AppSettings }) {
         {shoppingCountry && (
           <label className="block">
             <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.shoppingExtraShops')}</span>
-            <input value={extraShops} onChange={(e) => setExtraShops(e.target.value)} placeholder="amazon.de" className={inputClass} />
+            <input value={extraShops} onChange={(e) => setExtraShops(e.target.value)} placeholder="amazon.de" className={controlClass} />
             <span className="block mt-1 text-[11px] text-[color:var(--color-text-faint)]">{t('set.shoppingExtraShopsHint')}</span>
           </label>
         )}
         <label className="block">
           <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.trialAlert')}</span>
-          <input type="number" min="0" max="60" value={trialDays} onChange={(e) => setTrialDays(e.target.value)} className={inputClass} />
+          <input type="number" min="0" max="60" value={trialDays} onChange={(e) => setTrialDays(e.target.value)} className={controlClass} />
         </label>
         <label className="block">
           <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.billAlert')}</span>
-          <input type="number" min="0" max="90" value={billDays} onChange={(e) => setBillDays(e.target.value)} className={inputClass} />
+          <input type="number" min="0" max="90" value={billDays} onChange={(e) => setBillDays(e.target.value)} className={controlClass} />
         </label>
         <label className="block">
           <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.documentAlert')}</span>
-          <input type="number" min="0" max="180" value={docDays} onChange={(e) => setDocDays(e.target.value)} className={inputClass} />
+          <input type="number" min="0" max="180" value={docDays} onChange={(e) => setDocDays(e.target.value)} className={controlClass} />
         </label>
         <label className="block">
           <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.specialDateAlert')}</span>
-          <input type="number" min="0" max="180" value={specialDays} onChange={(e) => setSpecialDays(e.target.value)} className={inputClass} />
+          <input type="number" min="0" max="180" value={specialDays} onChange={(e) => setSpecialDays(e.target.value)} className={controlClass} />
         </label>
         <label className="block">
           <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.maintenanceAlert')}</span>
-          <input type="number" min="0" max="180" value={maintDays} onChange={(e) => setMaintDays(e.target.value)} className={inputClass} />
+          <input type="number" min="0" max="180" value={maintDays} onChange={(e) => setMaintDays(e.target.value)} className={controlClass} />
         </label>
         <label className="block">
           <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.lendingAlert')}</span>
-          <input type="number" min="0" max="180" value={lendDays} onChange={(e) => setLendDays(e.target.value)} className={inputClass} />
+          <input type="number" min="0" max="180" value={lendDays} onChange={(e) => setLendDays(e.target.value)} className={controlClass} />
         </label>
         <label className="block">
           <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.claimStaleAlert')}</span>
-          <input type="number" min="0" max="180" value={claimStaleDays} onChange={(e) => setClaimStaleDays(e.target.value)} className={inputClass} />
+          <input type="number" min="0" max="180" value={claimStaleDays} onChange={(e) => setClaimStaleDays(e.target.value)} className={controlClass} />
         </label>
         <label className="block">
           <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.syncStaleAlert')}</span>
-          <input type="number" min="0" max="365" value={syncStaleDays} onChange={(e) => setSyncStaleDays(e.target.value)} className={inputClass} />
+          <input type="number" min="0" max="365" value={syncStaleDays} onChange={(e) => setSyncStaleDays(e.target.value)} className={controlClass} />
         </label>
         <label className="block">
           <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.subscriptionReviewAlert')}</span>
-          <input type="number" min="0" max="730" value={subscriptionReviewDays} onChange={(e) => setSubscriptionReviewDays(e.target.value)} className={inputClass} />
+          <input type="number" min="0" max="730" value={subscriptionReviewDays} onChange={(e) => setSubscriptionReviewDays(e.target.value)} className={controlClass} />
         </label>
         <div className="flex items-center justify-between gap-3 self-end pb-1">
           <span className="min-w-0">
@@ -2439,7 +2441,7 @@ function ChannelCard({
         <select
           value={ch.type}
           onChange={(e) => set({ type: e.target.value as NotifierType })}
-          className={cn(inputClass, 'w-auto')}
+          className={cn(controlClass, 'w-auto')}
           style={{ fontFamily: 'var(--font-mono)' }}
         >
           {NOTIFIER_TYPES.map((nt) => (
@@ -2450,7 +2452,7 @@ function ChannelCard({
           value={ch.label || ''}
           onChange={(e) => set({ label: e.target.value })}
           placeholder={t('set.chLabelOptional')}
-          className={cn(inputClass, 'flex-1')}
+          className={cn(controlClass, 'flex-1')}
         />
         <Switch label={ch.label || ch.type} checked={ch.enabled} onChange={(v) => set({ enabled: v })} />
         <button type="button" onClick={onRemove} className="p-1.5 rounded-lg text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)]" aria-label="Remove channel">
@@ -2463,7 +2465,7 @@ function ChannelCard({
           value={ch.url || ''}
           onChange={(e) => set({ url: e.target.value })}
           placeholder={ch.type === 'ntfy' ? 'https://ntfy.sh/your-topic' : 'Webhook URL'}
-          className={inputClass}
+          className={controlClass}
           style={{ fontFamily: 'var(--font-mono)' }}
         />
       )}
@@ -2472,7 +2474,7 @@ function ChannelCard({
           value={ch.token || ''}
           onChange={(e) => set({ token: e.target.value })}
           placeholder="Bot token (123456:ABC-…)"
-          className={inputClass}
+          className={controlClass}
           style={{ fontFamily: 'var(--font-mono)' }}
         />
       )}
@@ -2484,7 +2486,7 @@ function ChannelCard({
               onChange={(e) => set({ host: e.target.value })}
               placeholder="SMTP host (smtp.gmail.com)"
               aria-label="SMTP host"
-              className={cn(inputClass, 'flex-1 min-w-0')}
+              className={cn(controlClass, 'flex-1 min-w-0')}
               style={{ fontFamily: 'var(--font-mono)' }}
             />
             <input
@@ -2495,7 +2497,7 @@ function ChannelCard({
               // 465 is implicit TLS; the usual 587/25 start plain and upgrade with STARTTLS.
               onChange={(e) => set({ port: Number(e.target.value), secure: Number(e.target.value) === 465 })}
               aria-label="SMTP port"
-              className={cn(inputClass, 'w-20')}
+              className={cn(controlClass, 'w-20')}
               style={{ fontFamily: 'var(--font-mono)' }}
             />
           </div>
@@ -2510,7 +2512,7 @@ function ChannelCard({
               placeholder="Username (blank for an open relay)"
               aria-label="SMTP username"
               autoComplete="off"
-              className={cn(inputClass, 'flex-1 min-w-0')}
+              className={cn(controlClass, 'flex-1 min-w-0')}
             />
             <input
               type="password"
@@ -2519,7 +2521,7 @@ function ChannelCard({
               placeholder="Password / app password"
               aria-label="SMTP password"
               autoComplete="new-password"
-              className={cn(inputClass, 'flex-1 min-w-0')}
+              className={cn(controlClass, 'flex-1 min-w-0')}
             />
           </div>
           <input
@@ -2527,7 +2529,7 @@ function ChannelCard({
             onChange={(e) => set({ from: e.target.value })}
             placeholder="From (Pharos <alerts@example.com>)"
             aria-label="From address"
-            className={inputClass}
+            className={controlClass}
           />
         </div>
       )}
@@ -2536,7 +2538,7 @@ function ChannelCard({
           value={ch.target || ''}
           onChange={(e) => set({ target: e.target.value })}
           placeholder={ch.type === 'email' ? 'Send to (you@example.com, comma-separated for several)' : 'Chat id (e.g. 123456789)'}
-          className={inputClass}
+          className={controlClass}
           style={{ fontFamily: 'var(--font-mono)' }}
         />
       )}
@@ -2691,7 +2693,7 @@ function NotificationsManager() {
               type="time"
               value={quiet?.start ?? ''}
               onChange={(e) => setQuiet((p) => ({ start: e.target.value, end: p?.end ?? '' }))}
-              className={cn(inputClass, 'w-auto')}
+              className={cn(controlClass, 'w-auto')}
             />
           </label>
           <label className="flex items-center gap-1.5">
@@ -2700,7 +2702,7 @@ function NotificationsManager() {
               type="time"
               value={quiet?.end ?? ''}
               onChange={(e) => setQuiet((p) => ({ start: p?.start ?? '', end: e.target.value }))}
-              className={cn(inputClass, 'w-auto')}
+              className={cn(controlClass, 'w-auto')}
             />
           </label>
           {quiet?.start && quiet?.end && quiet.start !== quiet.end && (
@@ -2770,7 +2772,7 @@ function WebhookCard({
           value={sub.label || ''}
           onChange={(e) => set({ label: e.target.value })}
           placeholder="Label (optional)"
-          className={cn(inputClass, 'flex-1')}
+          className={cn(controlClass, 'flex-1')}
         />
         <Switch label={sub.label || 'Webhook'} checked={sub.enabled} onChange={(v) => set({ enabled: v })} />
         <button type="button" onClick={onRemove} className="p-1.5 rounded-lg text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)]" aria-label="Remove webhook">
@@ -2782,7 +2784,7 @@ function WebhookCard({
         value={sub.url}
         onChange={(e) => set({ url: e.target.value })}
         placeholder="https://your-automation.example/hook"
-        className={inputClass}
+        className={controlClass}
         style={{ fontFamily: 'var(--font-mono)' }}
       />
 
@@ -3134,19 +3136,19 @@ function ImapImportManager({ imap }: { imap: ImapInfo }) {
 
       <div className="grid sm:grid-cols-2 gap-3 pt-1">
         <Field label={t('set.imapHost')}>
-          <input value={host} onChange={(e) => setHost(e.target.value)} placeholder="imap.gmail.com" className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} autoComplete="new-password" data-1p-ignore data-lpignore="true" />
+          <input value={host} onChange={(e) => setHost(e.target.value)} placeholder="imap.gmail.com" className={controlClass} style={{ fontFamily: 'var(--font-mono)' }} autoComplete="new-password" data-1p-ignore data-lpignore="true" />
         </Field>
         <Field label={t('set.imapPort')}>
-          <input value={port} onChange={(e) => setPort(e.target.value)} placeholder="993" className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} />
+          <input value={port} onChange={(e) => setPort(e.target.value)} placeholder="993" className={controlClass} style={{ fontFamily: 'var(--font-mono)' }} />
         </Field>
         <Field label={t('set.imapUsername')}>
-          <input value={user} onChange={(e) => setUser(e.target.value)} className={inputClass} autoComplete="new-password" data-1p-ignore data-lpignore="true" />
+          <input value={user} onChange={(e) => setUser(e.target.value)} className={controlClass} autoComplete="new-password" data-1p-ignore data-lpignore="true" />
         </Field>
         <Field label={imap.hasPass ? t('set.imapPasswordSaved') : t('set.imapPassword')}>
-          <input type="password" value={pass} onChange={(e) => setPass(e.target.value)} placeholder={imap.hasPass ? '••••••••' : ''} className={inputClass} autoComplete="new-password" data-1p-ignore data-lpignore="true" />
+          <input type="password" value={pass} onChange={(e) => setPass(e.target.value)} placeholder={imap.hasPass ? '••••••••' : ''} className={controlClass} autoComplete="new-password" data-1p-ignore data-lpignore="true" />
         </Field>
         <Field label={t('set.imapFolder')}>
-          <input value={folder} onChange={(e) => setFolder(e.target.value)} placeholder="INBOX" className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} />
+          <input value={folder} onChange={(e) => setFolder(e.target.value)} placeholder="INBOX" className={controlClass} style={{ fontFamily: 'var(--font-mono)' }} />
         </Field>
         <div className="flex items-center justify-between">
           <span className="text-xs text-[color:var(--color-text-dim)]">{t('set.imapSecure')}</span>
@@ -3658,15 +3660,15 @@ function StoreForm({ store, onDone }: { store?: StoreLite; onDone: () => void })
 
   return (
     <div className="bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg p-2.5 space-y-2">
-      <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t('set.storeNamePlaceholder')} className={inputClass} />
+      <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t('set.storeNamePlaceholder')} className={controlClass} />
       <input
         value={aliases}
         onChange={(e) => setAliases(e.target.value)}
         placeholder={t('set.aliasesPlaceholder')}
-        className={inputClass}
+        className={controlClass}
         style={{ fontFamily: 'var(--font-mono)' }}
       />
-      <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder={t('set.urlPlaceholder')} className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} />
+      <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder={t('set.urlPlaceholder')} className={controlClass} style={{ fontFamily: 'var(--font-mono)' }} />
       <input
         type="number"
         min="0"
@@ -3674,7 +3676,7 @@ function StoreForm({ store, onDone }: { store?: StoreLite; onDone: () => void })
         value={returnDays}
         onChange={(e) => setReturnDays(e.target.value)}
         placeholder={t('set.storeReturnWindowPlaceholder')}
-        className={inputClass}
+        className={controlClass}
         style={{ fontFamily: 'var(--font-mono)' }}
       />
       <div className="flex items-center gap-2">
@@ -3760,15 +3762,15 @@ function CardsManager({ cards }: { cards: SerializedCard[] }) {
       {editing ? (
         <div className="mt-3 p-3 rounded-xl border border-[color:var(--color-border)] space-y-2.5">
           <div className="grid grid-cols-2 gap-2">
-            <input value={form.name} onChange={(e) => set({ name: e.target.value })} placeholder={t('set.cardNamePlaceholder')} className={inputClass} />
-            <input value={form.last4} onChange={(e) => set({ last4: e.target.value.slice(0, 4) })} placeholder={t('set.last4Placeholder')} className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} />
-            <input value={form.bank} onChange={(e) => set({ bank: e.target.value })} placeholder={t('set.bankPlaceholder')} className={inputClass} />
-            <input type="number" value={form.creditLimit} onChange={(e) => set({ creditLimit: e.target.value })} placeholder={t('set.creditLimitPlaceholder')} className={inputClass} />
-            <select value={form.kind} onChange={(e) => set({ kind: e.target.value })} className={selectClass}>
+            <input value={form.name} onChange={(e) => set({ name: e.target.value })} placeholder={t('set.cardNamePlaceholder')} className={controlClass} />
+            <input value={form.last4} onChange={(e) => set({ last4: e.target.value.slice(0, 4) })} placeholder={t('set.last4Placeholder')} className={controlClass} style={{ fontFamily: 'var(--font-mono)' }} />
+            <input value={form.bank} onChange={(e) => set({ bank: e.target.value })} placeholder={t('set.bankPlaceholder')} className={controlClass} />
+            <input type="number" value={form.creditLimit} onChange={(e) => set({ creditLimit: e.target.value })} placeholder={t('set.creditLimitPlaceholder')} className={controlClass} />
+            <select value={form.kind} onChange={(e) => set({ kind: e.target.value })} className={controlClass}>
               <option value="credit">{t('set.credit')}</option>
               <option value="debit">{t('set.debit')}</option>
             </select>
-            <select value={form.type} onChange={(e) => set({ type: e.target.value })} className={selectClass}>
+            <select value={form.type} onChange={(e) => set({ type: e.target.value })} className={controlClass}>
               {CARD_TYPES.map((ct) => <option key={ct} value={ct}>{ct}</option>)}
             </select>
           </div>
@@ -3872,10 +3874,10 @@ function UsersManager({ currentUserId }: { currentUserId: string }) {
       {adding ? (
         <div className="mt-3 p-3 rounded-xl border border-[color:var(--color-border)] space-y-2.5">
           <div className="grid grid-cols-2 gap-2">
-            <input value={form.username} onChange={(e) => setForm((f) => ({ ...f, username: e.target.value }))} placeholder={t('set.usernamePlaceholder')} className={inputClass} />
-            <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder={t('set.displayNamePlaceholder')} className={inputClass} />
-            <input value={form.password} onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))} type="password" placeholder={t('set.passwordPlaceholder')} className={inputClass} />
-            <select value={form.role} onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))} className={selectClass}>
+            <input value={form.username} onChange={(e) => setForm((f) => ({ ...f, username: e.target.value }))} placeholder={t('set.usernamePlaceholder')} className={controlClass} />
+            <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder={t('set.displayNamePlaceholder')} className={controlClass} />
+            <input value={form.password} onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))} type="password" placeholder={t('set.passwordPlaceholder')} className={controlClass} />
+            <select value={form.role} onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))} className={controlClass}>
               <option value="viewer">{t('set.viewer')}</option>
               <option value="member">{t('set.member')}</option>
               <option value="admin">{t('set.admin')}</option>
@@ -3927,8 +3929,8 @@ function SelfPasswordCard() {
     <Section title={t('set.yourPassword')} icon={<KeyRound size={15} />}>
       {open ? (
         <div className="space-y-2.5">
-          <input value={oldPwd} onChange={(e) => setOldPwd(e.target.value)} type="password" placeholder={t('set.currentPwdPlaceholder')} className={inputClass} />
-          <input value={newPwd} onChange={(e) => setNewPwd(e.target.value)} type="password" placeholder={t('set.newPwdPlaceholder')} className={inputClass} />
+          <input value={oldPwd} onChange={(e) => setOldPwd(e.target.value)} type="password" placeholder={t('set.currentPwdPlaceholder')} className={controlClass} />
+          <input value={newPwd} onChange={(e) => setNewPwd(e.target.value)} type="password" placeholder={t('set.newPwdPlaceholder')} className={controlClass} />
           <div className="flex items-center gap-2">
             <button onClick={submit} disabled={pending} className={saveBtn}>{pending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} {t('set.update')}</button>
             <button onClick={() => { setOpen(false); setMsg(null); }} className={ghostBtn}><X size={13} /> {t('common.cancel')}</button>
@@ -4086,7 +4088,7 @@ function SelfMfaCard() {
       {stage === 'need-password-to-start' && (
         <div className="space-y-2.5">
           <p className="text-xs text-[color:var(--color-text-dim)]">{t('set.twoFactorPasswordToStart')}</p>
-          <input value={reauthPassword} onChange={(e) => setReauthPassword(e.target.value)} type="password" autoComplete="current-password" placeholder={t('set.currentPwdPlaceholder')} className={inputClass} />
+          <input value={reauthPassword} onChange={(e) => setReauthPassword(e.target.value)} type="password" autoComplete="current-password" placeholder={t('set.currentPwdPlaceholder')} className={controlClass} />
           <div className="flex items-center gap-2">
             <button onClick={() => beginEnrollment(reauthPassword)} disabled={pending || !mfaPasswordReady(reauthPassword)} className={saveBtn}>
               {pending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} {pending ? t('set.twoFactorContinuing') : t('set.twoFactorContinue')}
@@ -4112,7 +4114,7 @@ function SelfMfaCard() {
               inputMode="numeric"
               autoComplete="one-time-code"
               placeholder="000000"
-              className={cn(inputClass, 'mt-1 max-w-[10rem] text-center tracking-[0.3em]')}
+              className={cn(controlClass, 'mt-1 max-w-[10rem] text-center tracking-[0.3em]')}
               style={{ fontFamily: 'var(--font-mono)' }}
             />
           </label>
@@ -4128,7 +4130,7 @@ function SelfMfaCard() {
       {stage === 'need-password-to-disable' && (
         <div className="space-y-2.5">
           <p className="text-xs text-[color:var(--color-text-dim)]">{t('set.twoFactorPasswordToDisable')}</p>
-          <input value={disablePassword} onChange={(e) => setDisablePassword(e.target.value)} type="password" autoComplete="current-password" placeholder={t('set.currentPwdPlaceholder')} className={inputClass} />
+          <input value={disablePassword} onChange={(e) => setDisablePassword(e.target.value)} type="password" autoComplete="current-password" placeholder={t('set.currentPwdPlaceholder')} className={controlClass} />
           <div className="flex items-center gap-2">
             <button
               onClick={confirmDisable}
@@ -4207,7 +4209,7 @@ function ListEditor({ entry }: { entry: ListEditorEntry }) {
         ))}
       </div>
       <div className="flex items-center gap-1.5">
-        <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') add(); }} placeholder={t('set.addCategoryPlaceholder')} className={cn(inputClass, 'text-xs py-1.5')} />
+        <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') add(); }} placeholder={t('set.addCategoryPlaceholder')} className={cn(controlClass, 'text-xs py-1.5')} />
         <button onClick={add} className={ghostBtn}><Plus size={13} /></button>
         <button onClick={() => save(values)} disabled={pending} className={saveBtn}>{pending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} {t('common.save')}</button>
         <button onClick={() => { setValues(entry.default); save(entry.default); }} disabled={pending} title={t('set.resetDefault')} className={ghostBtn}><RotateCcw size={13} /></button>
@@ -4252,7 +4254,7 @@ function SpacesManager({ spaces }: { spaces: string[] }) {
           ))}
         </div>
         <div className="flex items-center gap-1.5">
-          <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') add(); }} placeholder={t('set.spacesPlaceholder')} className={cn(inputClass, 'text-xs py-1.5')} />
+          <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') add(); }} placeholder={t('set.spacesPlaceholder')} className={cn(controlClass, 'text-xs py-1.5')} />
           <button onClick={add} className={ghostBtn}><Plus size={13} /></button>
           <button onClick={() => save(values)} disabled={pending} className={saveBtn}>{pending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} {t('common.save')}</button>
           {msg && <span className="text-[11px] text-[color:var(--color-accent)]" style={{ fontFamily: 'var(--font-mono)' }}>{msg}</span>}
@@ -4262,23 +4264,7 @@ function SpacesManager({ spaces }: { spaces: string[] }) {
   );
 }
 
-const selectClass =
-  'w-full bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[color:var(--color-accent)]';
-const inputClass =
-  'w-full bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[color:var(--color-accent)]';
 
-/** The label WRAPS the control so it names it (a sibling <label> without htmlFor names nothing,
- *  and every settings input read as unlabeled to a screen reader). */
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="block min-w-0">
-      <span className="block text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider mb-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
-        {label}
-      </span>
-      {children}
-    </label>
-  );
-}
 
 function Section({ title, icon, children }: { title: string; icon?: React.ReactNode; children: React.ReactNode }) {
   return (

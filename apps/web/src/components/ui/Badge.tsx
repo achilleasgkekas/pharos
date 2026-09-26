@@ -3,10 +3,11 @@ import { cn } from './cn';
 import { useT } from '@/components/LocaleProvider';
 import type { TKey } from '@/lib/i18n';
 
-// status value → i18n key (item + task statuses; priorities fall back to English)
+// status value → i18n key (item + task statuses and task priorities)
 const BADGE_KEY: Record<string, TKey> = {
   researching: 'it.stResearching', decided: 'it.stDecided', ordered: 'it.stOrdered', received: 'it.stReceived', installed: 'it.stInstalled', deferred: 'it.stDeferred', sold: 'it.stSold', broken: 'it.stBroken',
   todo: 'tk.todo', 'in-progress': 'tk.inProgress', done: 'tk.done', blocked: 'tk.blocked',
+  high: 'tk.prHigh', normal: 'tk.prNormal', low: 'tk.prLow',
 };
 
 const STATUS_CONFIG: Record<string, { label: string; hex: string }> = {

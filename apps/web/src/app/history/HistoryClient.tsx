@@ -1,8 +1,11 @@
 'use client';
 import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { MessageSquare, Search, Trash2, Check, ChevronDown, Sparkles } from 'lucide-react';
+import { MessageSquare, Search, Trash2, Check, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { Input } from '@/components/ui/Input';
+import { PAGE_MAIN, PageHeader } from '@/components/ui/PageHeader';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { cn } from '@/components/ui/cn';
 import { deleteConversation, clearConversations, type ConversationRow } from './actions';
@@ -57,39 +60,21 @@ export function HistoryClient({ conversations }: { conversations: ConversationRo
   }
 
   return (
-    <main className="max-w-[1400px] mx-auto px-4 py-6 pb-24">
-      <div className="flex items-end justify-between gap-4 flex-wrap mb-1">
-        <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2.5" style={{ fontFamily: 'var(--font-display)' }}>
-          <MessageSquare size={24} className="text-[color:var(--color-cyan)]" />
-          {t('nav.history')}
-          <span className="text-sm font-normal text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
-            {conversations.length}
-          </span>
-        </h1>
+    <main className={PAGE_MAIN}>
+      <PageHeader title={t('nav.history')} count={conversations.length} subtitle={t('history.intro')}>
         {conversations.length > 0 && (
-          <Button variant="danger" size="sm" onClick={clearAll} disabled={pending}>
+          <Button variant="danger" onClick={clearAll} disabled={pending}>
             <Trash2 size={14} /> {t('history.clearAll')}
           </Button>
         )}
-      </div>
-      <p className="text-xs text-[color:var(--color-text-faint)] mb-5">{t('history.intro')}</p>
+      </PageHeader>
 
       {conversations.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-[color:var(--color-border)] py-20 text-center">
-          <Sparkles size={32} className="mx-auto text-[color:var(--color-cyan)] opacity-40" />
-          <p className="mt-3 text-sm text-[color:var(--color-text-dim)]">{t('history.empty')}</p>
-          <p className="text-xs text-[color:var(--color-text-faint)]">{t('history.emptyHint')}</p>
-        </div>
+        <EmptyState icon={<MessageSquare />} title={t('history.empty')} hint={t('history.emptyHint')} />
       ) : (
         <>
-          <div className="relative mb-4">
-            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[color:var(--color-text-faint)]" />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder={t('history.searchPlaceholder')}
-              className="w-full bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg pl-8 pr-3 py-1.5 text-sm outline-none focus:border-[color:var(--color-accent)]"
-            />
+          <div className="mb-4">
+            <Input icon={<Search size={14} />} value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t('history.searchPlaceholder')} aria-label={t('common.search')} />
           </div>
 
           <div className="space-y-2">
@@ -142,7 +127,7 @@ export function HistoryClient({ conversations }: { conversations: ConversationRo
                 </div>
               );
             })}
-            {visible.length === 0 && <p className="text-center text-sm text-[color:var(--color-text-faint)] py-10">{t('history.noMatch')}</p>}
+            {visible.length === 0 && <EmptyState className="py-10" title={t('history.noMatch')} />}
           </div>
         </>
       )}

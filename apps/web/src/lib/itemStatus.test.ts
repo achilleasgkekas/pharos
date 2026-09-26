@@ -45,16 +45,14 @@ describe('VIEW_CONFIG', () => {
     const c = VIEW_CONFIG.inventory;
     expect(c.title).toBe('Inventory');
     expect(c.defaultStatus).toBe('received');
-    expect(c.emptyEmoji).toBe('📦');
-    expect(c.emptyText.length).toBeGreaterThan(0);
+    expect(c.emptyKey).toBe('it.emptyInventory');
   });
 
   it('shopping config wires the expected copy and default', () => {
     const c = VIEW_CONFIG.shopping;
     expect(c.title).toBe('Shopping');
     expect(c.defaultStatus).toBe('researching');
-    expect(c.emptyEmoji).toBe('🛒');
-    expect(c.emptyText.length).toBeGreaterThan(0);
+    expect(c.emptyKey).toBe('it.emptyShopping');
   });
 
   it('every statusFilters list leads with an "All" (empty-value) option', () => {

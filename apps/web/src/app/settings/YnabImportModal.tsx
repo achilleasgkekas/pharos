@@ -8,8 +8,8 @@ import { cn } from '@/components/ui/cn';
 import { useT } from '@/components/LocaleProvider';
 import { parseYnabCsv, type YnabMapResult } from '@/lib/ynabImport';
 import { importExpensesCsv } from '@/app/expenses/actions';
+import { FIELD_LABEL } from '@/components/ui/Field';
 
-const labelCls = 'text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider mb-1.5';
 const CHUNK = 300;
 
 type Props = { onClose: () => void; onImported: () => void };
@@ -98,7 +98,7 @@ export function YnabImportModal({ onClose, onImported }: Props) {
 
         {parsed && !result && (
           <>
-            <p className={labelCls} style={{ fontFamily: 'var(--font-mono)' }}>
+            <p className={FIELD_LABEL} style={{ fontFamily: 'var(--font-mono)' }}>
               {t('ynab.summary', { valid: parsed.rows.length, excluded: parsed.excluded, invalid: parsed.invalid })}
             </p>
 

@@ -117,8 +117,8 @@ await flow('mark a bill paid and log it as an expense', async () => {
 await flow('log a fuel fill on a vehicle (and its expense)', async () => {
   await open('/vehicles');
   await newButton().click();
-  // The vehicle forms are plain overlays, not role=dialog: wait for their heading to go away
-  // (the Save button itself turns into "Saving…" at once, so it is no signal of completion).
+  // Wait for the form's heading to go away: the Save button itself turns into "Saving…" at
+  // once, so it is no signal of completion.
   await page.getByLabel('Name').fill(`Golf ${TAG}`);
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   await page.getByRole('heading', { name: 'Add vehicle' }).waitFor({ state: 'hidden' });
@@ -149,8 +149,8 @@ await flow('export a backup and restore it', async () => {
   // flow passes even if restore cannot revive a deleted record, the case a backup exists for.
   // Deleting the vehicle also soft-deletes its fuel log, so the children are covered too.
   await open('/vehicles');
-  page.once('dialog', (d) => d.accept()); // the delete button asks with a native confirm()
   await page.locator('section', { has: page.getByRole('heading', { name: `Golf ${TAG}` }) }).getByRole('button', { name: 'Delete' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Delete', exact: true }).click(); // the app's confirm dialog
   await page.getByRole('heading', { name: `Golf ${TAG}` }).waitFor({ state: 'detached' });
 
   await open('/settings');

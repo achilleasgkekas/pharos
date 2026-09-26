@@ -115,7 +115,7 @@ export function ReconcilePanel({ statements }: { statements: StmtOption[] }) {
                     className={cn(
                       'rounded-xl border p-3',
                       matched
-                        ? 'border-[color:var(--color-accent)]/40 bg-[#00ff8806]'
+                        ? 'border-[color:var(--color-accent)]/40 bg-[color:var(--color-accent)]/2'
                         : tx.candidates.length === 0
                           ? 'border-[color:var(--color-border)] opacity-70'
                           : 'border-[color:var(--color-cyan)]/40'
