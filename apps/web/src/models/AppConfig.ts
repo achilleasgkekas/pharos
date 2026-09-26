@@ -116,8 +116,9 @@ const AppConfigSchema = new Schema(
     // Legacy single ntfy channel (migrated into `notifiers` on first save).
     ntfyUrl: { type: String, default: '' }, // e.g. https://ntfy.sh/your-topic (or self-hosted)
     ntfyEnabled: { type: Boolean, default: false },
-    // Pluggable outbound channels: array of { id, type, enabled, label, url?, token?, target? }.
-    // type ∈ ntfy | discord | slack | telegram | webhook. See lib/notifiers.ts.
+    // Pluggable outbound channels: array of { id, type, enabled, label, url?, token?, target? },
+    // plus host/port/secure/user/pass/from for email. type ∈ ntfy | discord | slack | telegram |
+    // webhook | email. See lib/notifiers.ts.
     notifiers: { type: [Schema.Types.Mixed], default: [] },
 
     // Outbound event webhooks (P24) — automation hooks for Home Assistant/n8n/Node-RED.

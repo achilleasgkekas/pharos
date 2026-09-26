@@ -165,12 +165,13 @@ vehicle dates, special dates, maintenance and more) fan out to **every enabled
 channel**. Each alert category has its own switch under **Settings →
 Notifications**, so you can, say, keep bills on your phone but leave price hikes
 to the in-app bell. Lead times (how many days ahead a bill, trial, document or
-birthday warns you) are set in **Settings → General**. All channels are plain HTTP POSTs, so no extra
-dependency is required. Email is reachable through a generic webhook
-(Zapier/Make/n8n) or a self-hosted relay.
+birthday warns you) are set in **Settings → General**. Every channel is a plain HTTP
+POST except `email`, which sends plain-text mail through any SMTP server you
+point it at (a Gmail app password, Resend, Postmark, or your own relay).
 
 Configure channels under **Settings → Notifications**. Each channel is an entry
-in `notifiers` with `{ id, type, enabled, label, url?, token?, target? }`.
+in `notifiers` with `{ id, type, enabled, label, url?, token?, target? }`. Email
+channels also carry `host`, `port`, `secure`, `user`, `pass` and `from`.
 
 ### Channel types
 
@@ -181,6 +182,7 @@ in `notifiers` with `{ id, type, enabled, label, url?, token?, target? }`.
 | `slack`    | `url`                    | Slack incoming-webhook URL.                       |
 | `telegram` | `token` + `target`       | Bot token + chat id.                              |
 | `webhook`  | `url`                    | POSTs JSON `{ title, message, ts }`.              |
+| `email`    | SMTP fields + `target`   | Alert title as subject. `target` = recipient(s).  |
 
 **Web push** needs no third-party service. Open Settings → Notifications on each
 phone or browser that should get alerts and press **Enable browser push**.
@@ -191,6 +193,12 @@ web apps).
 Use **Test** on a channel to send a one-off "Notifications are working" message
 before relying on it. ntfy titles are ASCII-only; message bodies keep unicode
 (e.g. Greek).
+
+For email, port 587 (or 25) connects plain and upgrades with STARTTLS when the
+server offers it; switch on **TLS from the start** for port 465. Leave the
+username blank for an open relay. The SMTP host may be a private address, so a
+relay on your LAN works. A refused login or a 5xx reply is not retried, since it
+would fail the same way again.
 
 > The legacy single-channel fields (`ntfyUrl`, `ntfyEnabled`) still work and are
 > migrated into `notifiers` the first time you save from Settings.

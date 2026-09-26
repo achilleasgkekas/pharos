@@ -18,7 +18,7 @@ import type { AppSettings } from '@/lib/appSettings';
 import { rateForCategory } from '@/lib/depreciation';
 import { saveDefaults, runAlertChecks, getNotifierChannels, saveNotifierChannels, getNotifyTypes, saveNotifyTypes, getQuietHours, saveQuietHours, testNotifierChannel, getDeliveryLogs, getWebhookSubscriptions, saveWebhookSubscriptions, testWebhookSubscription, savePrompt, resetPrompt, saveScraperAi, saveStorageConfig, testRemoteConnection, testSecondaryRemote, syncToRemote, saveList, saveSpaces, getTrash, restoreFromTrash, purgeFromTrash, emptyTrash, startOnedriveAuth, pollOnedriveAuth, disconnectOnedriveAccount, testOnedriveConnection, saveImapConfigAction, testImapConnectionAction, checkImapInboxNow, type PromptEditorEntry, type ScraperAiConfig, type StorageInfo, type ListEditorEntry, type TrashRow, type ImapInfo } from './actions';
 import { enqueueOnedriveSync } from '@/app/jobActions';
-import { NOTIFIER_TYPES, type NotifierConfig, type NotifierType } from '@/lib/notifiers.shared';
+import { DEFAULT_SMTP_PORT, NOTIFIER_TYPES, type NotifierConfig, type NotifierType } from '@/lib/notifiers.shared';
 import { ALERT_TYPES, type AlertType, type NotifyTypes } from '@/lib/alertTypes';
 import { notifierLogKey, webhookLogKey, type DeliveryLogEntry } from '@/lib/deliveryLog.shared';
 import { WEBHOOK_EVENTS, type WebhookSubscription, type WebhookEvent } from '@/lib/webhooks.shared';
@@ -2468,11 +2468,66 @@ function ChannelCard({
           style={{ fontFamily: 'var(--font-mono)' }}
         />
       )}
+      {meta.needs.includes('smtp') && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <input
+              value={ch.host || ''}
+              onChange={(e) => set({ host: e.target.value })}
+              placeholder="SMTP host (smtp.gmail.com)"
+              aria-label="SMTP host"
+              className={cn(inputClass, 'flex-1 min-w-0')}
+              style={{ fontFamily: 'var(--font-mono)' }}
+            />
+            <input
+              type="number"
+              min={1}
+              max={65535}
+              value={ch.port ?? DEFAULT_SMTP_PORT}
+              // 465 is implicit TLS; the usual 587/25 start plain and upgrade with STARTTLS.
+              onChange={(e) => set({ port: Number(e.target.value), secure: Number(e.target.value) === 465 })}
+              aria-label="SMTP port"
+              className={cn(inputClass, 'w-20')}
+              style={{ fontFamily: 'var(--font-mono)' }}
+            />
+          </div>
+          <label className="flex items-center gap-2 text-[11px] text-[color:var(--color-text-dim)]">
+            <Switch label="Use TLS from the start (port 465)" checked={!!ch.secure} onChange={(v) => set({ secure: v })} />
+            TLS from the start (port 465). Off uses STARTTLS when the server offers it.
+          </label>
+          <div className="flex items-center gap-2">
+            <input
+              value={ch.user || ''}
+              onChange={(e) => set({ user: e.target.value })}
+              placeholder="Username (blank for an open relay)"
+              aria-label="SMTP username"
+              autoComplete="off"
+              className={cn(inputClass, 'flex-1 min-w-0')}
+            />
+            <input
+              type="password"
+              value={ch.pass || ''}
+              onChange={(e) => set({ pass: e.target.value })}
+              placeholder="Password / app password"
+              aria-label="SMTP password"
+              autoComplete="new-password"
+              className={cn(inputClass, 'flex-1 min-w-0')}
+            />
+          </div>
+          <input
+            value={ch.from || ''}
+            onChange={(e) => set({ from: e.target.value })}
+            placeholder="From (Pharos <alerts@example.com>)"
+            aria-label="From address"
+            className={inputClass}
+          />
+        </div>
+      )}
       {meta.needs.includes('target') && (
         <input
           value={ch.target || ''}
           onChange={(e) => set({ target: e.target.value })}
-          placeholder="Chat id (e.g. 123456789)"
+          placeholder={ch.type === 'email' ? 'Send to (you@example.com, comma-separated for several)' : 'Chat id (e.g. 123456789)'}
           className={inputClass}
           style={{ fontFamily: 'var(--font-mono)' }}
         />
@@ -2562,7 +2617,7 @@ function NotificationsManager() {
       <p className="text-xs text-[color:var(--color-text-dim)] -mt-1">
         Alerts for deals, installments due this month, and warranties expiring soon always show in the in-app{' '}
         <span className="text-[color:var(--color-accent)]">bell</span>. Add channels below to also push them out — ntfy, Discord, Slack,
-        Telegram, or any webhook (route to email via Zapier/n8n).
+        Telegram, email over your own SMTP server, or any webhook.
       </p>
 
       <div className="space-y-2.5">
