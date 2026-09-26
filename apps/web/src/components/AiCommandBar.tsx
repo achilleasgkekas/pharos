@@ -3,13 +3,14 @@ import { useState, useRef, useTransition, useEffect } from 'react';
 import {
   Sparkles, ArrowUp, Loader2, Check, X, RotateCcw, Search,
   Package, Receipt as ReceiptIcon, CreditCard, CheckSquare, CalendarClock, Wallet, Ticket,
-  FileText, Target, ShoppingCart,
+  FileText, Target, ShoppingCart, Mic, Square,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { runAiCommand, type ChatTurn } from '@/app/aiCommandActions';
 import { searchAll, type SearchHit } from '@/app/search-actions';
 import { cn } from '@/components/ui/cn';
-import { useT } from './LocaleProvider';
+import { useLocale, useT } from './LocaleProvider';
+import { useSpeechInput } from './useSpeechInput';
 
 type Msg = ChatTurn & { actions?: { name: string; summary: string }[]; error?: boolean };
 type Mode = 'search' | 'ai';
@@ -64,6 +65,8 @@ export function AiCommandBar() {
   const wrapRef = useRef<HTMLDivElement>(null);
   const threadRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  // Dictation fills the same input; the user still reviews and presses send (never auto-sent).
+  const speech = useSpeechInput(useLocale(), setValue);
 
   // Restore the last-used mode.
   useEffect(() => {
@@ -110,6 +113,8 @@ export function AiCommandBar() {
   }, [value, mode]);
 
   function switchMode(m: Mode) {
+    speech.cancel();
+    speech.clearError();
     setMode(m);
     setValue('');
     setHits([]);
@@ -131,6 +136,8 @@ export function AiCommandBar() {
   function send(text?: string) {
     const cmd = (text ?? value).trim();
     if (!cmd || aiPending) return;
+    speech.cancel(); // a late result must not refill the box after sending
+    speech.clearError();
     const next: Msg[] = [...messages, { role: 'user', content: cmd }];
     setMessages(next);
     setValue('');
@@ -148,10 +155,21 @@ export function AiCommandBar() {
   }
 
   function resetAi() {
+    speech.cancel();
+    speech.clearError();
     setMessages([]);
     setValue('');
     setOpen(false);
     setConvId(undefined); // next message starts a fresh conversation
+  }
+
+  function toggleDictation() {
+    setOpen(true);
+    if (speech.listening) speech.stop();
+    else {
+      speech.start(value);
+      inputRef.current?.focus();
+    }
   }
 
   function onEnter() {
@@ -166,7 +184,7 @@ export function AiCommandBar() {
   // Beacon = AI mode + open: lightly light the page, float the bar to centre, and
   // sweep a lighthouse beam behind it (see the beacon backdrop + pulse rings below).
   const spotlight = isAi && open;
-  const ph = isAi ? t('bar.aiPlaceholder') : t('bar.searchPlaceholder');
+  const ph = isAi ? (speech.listening ? t('bar.micListening') : t('bar.aiPlaceholder')) : t('bar.searchPlaceholder');
   const pending = isAi ? aiPending : searchPending;
 
   return (
@@ -256,6 +274,9 @@ export function AiCommandBar() {
             ref={inputRef}
             value={value}
             onChange={(e) => {
+              // Typing takes over from dictation, which would otherwise overwrite the edit.
+              if (speech.listening) speech.cancel();
+              speech.clearError();
               setValue(e.target.value);
               setOpen(true);
             }}
@@ -295,6 +316,25 @@ export function AiCommandBar() {
               <RotateCcw size={14} />
             </button>
           )}
+          {isAi && speech.supported && (
+            <button
+              type="button"
+              onClick={toggleDictation}
+              disabled={aiPending}
+              aria-pressed={speech.listening}
+              aria-label={speech.listening ? t('bar.micStop') : t('bar.micStart')}
+              title={speech.listening ? t('bar.micStop') : t('bar.micStart')}
+              className={cn(
+                'shrink-0 grid place-items-center w-8 h-8 rounded-xl transition-colors disabled:opacity-40',
+                speech.listening
+                  ? 'bg-[color:var(--color-red)]/15 text-[color:var(--color-red)]'
+                  : 'text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface-2)]'
+              )}
+              style={speech.listening ? { animation: 'pharos-beacon-pulse 1.8s ease-out infinite' } : undefined}
+            >
+              {speech.listening ? <Square size={13} fill="currentColor" /> : <Mic size={15} />}
+            </button>
+          )}
           {isAi && (
             <button
               type="button"
@@ -312,6 +352,9 @@ export function AiCommandBar() {
       {/* Panel — AI conversation */}
       {open && isAi && (
         <div className="absolute left-0 right-0 top-full mt-2 z-50 rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] shadow-2xl shadow-black/40 overflow-hidden">
+          {speech.error && (
+            <p role="alert" className="px-4 pt-3 text-xs text-[color:var(--color-gold)]">{t(speech.error)}</p>
+          )}
           {messages.length === 0 && !aiPending && (
             <div className="p-2.5">
               <p className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)] px-1.5 mb-1.5" style={{ fontFamily: 'var(--font-mono)' }}>{t('bar.try')}</p>
