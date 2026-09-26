@@ -68,6 +68,11 @@ links and prices rather than duplicating the product.
 
 Highlights:
 
+- **Builds.** Give related items the same **build / project** name (a PC build, a
+  rack, a network upgrade) and filter either list by it: a card shows how many parts
+  the build has, how many are planned, ordered, received or installed, what the
+  bought parts cost and what the wishlisted ones still add up to, across both views.
+  Each part's detail links back to the whole build.
 - **Price tracking.** Set a **target price** and the item shows the best current
   store price, the lowest price ever seen, a price-position bar (where the current
   best sits between the cheapest and most expensive), a trend arrow, and a "good
@@ -652,7 +657,7 @@ overdue or due soon, price hikes, trials ending, subscriptions due a usage revie
 documents expiring, vehicle dates due, special dates coming up, maintenance due,
 lent items due back, warranty claims with no movement, and a remote backup that
 has fallen behind. The in-app **bell** shows all of them. The same checks send a
-human-readable summary through your configured channel (ntfy, Discord, Slack, Telegram,
+human-readable summary through your configured channel (ntfy, Discord, Slack, Telegram, email,
 web push, or a generic webhook), and each category can be switched off on its own; see
 [Configuration → Notifications](configuration.md#notifications)). You can trigger
 a check on demand or send a test message from Settings.
@@ -724,7 +729,7 @@ Configuration is grouped into tabs:
   printable receipts report, **migration import** (YNAB and other tools), and Trash.
 - **Stores & lists** — known stores (with duplicate detection / merge) and the
   editable dropdown taxonomies (item / expense / subscription categories).
-- **Notifications** (admin) — alert channels (ntfy, Discord, Slack, Telegram,
+- **Notifications** (admin) — alert channels (ntfy, Discord, Slack, Telegram, email,
   web push, webhook), per-category switches, lead times, test and check-now
   buttons; outbound event webhooks for automation platforms.
 - **Users** (admin) — add household members and viewers, change roles.

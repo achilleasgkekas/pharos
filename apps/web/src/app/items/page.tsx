@@ -10,6 +10,8 @@ import { computeInstallmentPlans, type InstallmentPlan } from '@/lib/installment
 import { getAppSettings } from '@/lib/appSettings';
 import { marketFor } from '@/lib/shoppingRegion';
 import type { SerializedItem, SerializedStatement } from '@/types';
+import { loadBundleSummaries } from './bundleData';
+import type { BundleSummary } from '@/lib/bundles';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,16 +20,18 @@ async function getData(): Promise<{
   plans: InstallmentPlan[];
   unlinkedPlans: InstallmentPlan[];
   receipts: ReceiptRef[];
+  bundles: BundleSummary[];
 }> {
   return withRequestTenant(async () => {
   await connectDB();
   const Item = await currentModel(ItemModel);
   const Statement = await currentModel(StatementModel);
   const Receipt = await currentModel(ReceiptModel);
-  const [items, statements, receipts] = await Promise.all([
+  const [items, statements, receipts, bundles] = await Promise.all([
     Item.find({ status: { $in: OWNED_STATUSES } }).sort({ purchasedAt: -1, createdAt: -1 }).lean(),
     Statement.find().lean(),
     Receipt.find().select('store date total filePath fileType').lean(),
+    loadBundleSummaries(),
   ]);
   const serialized: SerializedStatement[] = JSON.parse(JSON.stringify(statements));
   const all = computeInstallmentPlans(serialized);
@@ -37,12 +41,13 @@ async function getData(): Promise<{
     plans: all.filter((p) => p.itemIds.length > 0),
     unlinkedPlans: all.filter((p) => p.itemIds.length === 0 && !p.done),
     receipts: JSON.parse(JSON.stringify(receipts)),
+    bundles,
   };
   });
 }
 
 export default async function ItemsPage() {
-  const [{ items, plans, unlinkedPlans, receipts }, settings] = await Promise.all([getData(), getAppSettings()]);
+  const [{ items, plans, unlinkedPlans, receipts, bundles }, settings] = await Promise.all([getData(), getAppSettings()]);
   return (
     <ItemsClient
       items={items}
@@ -50,6 +55,7 @@ export default async function ItemsPage() {
       plans={plans}
       unlinkedPlans={unlinkedPlans}
       receipts={receipts}
+      bundles={bundles}
       defaultView={settings.defaultItemView}
       categoryList={settings.itemCategories}
       baseCurrency={settings.currency}

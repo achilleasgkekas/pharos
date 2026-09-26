@@ -172,6 +172,10 @@ const ItemSchema = new Schema(
     warrantyUntil: { type: Date, default: null },
     serialNumber: { type: String, default: '' },
     location: { type: String, default: '' }, // where it physically lives (room / rack / shelf)
+    // P39: the build / project this item is a part of ("Battle Station", "10G upgrade").
+    // Free string, '' = not part of one, which is every pre-P39 record. The roll-up (what
+    // the parts cost, how many are installed) is derived in lib/bundles.ts, never stored.
+    bundle: { type: String, default: '', index: true },
 
     aiFilledAt: { type: Date, default: null }, // last time AI fill-from-web enriched it (status badge → don't re-do)
 
