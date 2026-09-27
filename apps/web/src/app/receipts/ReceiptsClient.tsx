@@ -1,14 +1,18 @@
 'use client';
-import { PAGE_MAIN, PageHeader, HeaderButton, ViewToggle, PrimaryAction, FilterLayout } from '@/components/ui/PageHeader';
+import { PAGE_MAIN, PageHeader, HeaderButton, ViewToggle, PrimaryAction, FilterLayout, FilterSection, FilterOptions } from '@/components/ui/PageHeader';
+import { DateInput } from '@/components/ui/DateInput';
+import { Field } from '@/components/ui/Field';
+import { CreatedBy } from '@/components/CreatedBy';
 import { cur, currencySymbol, CURRENCIES } from "@/lib/money";
 import { matchesQuery, haystack, fold, sameLabel } from '@/lib/searchText';
 import { isForeignCurrency, normalizeCurrency, convertToBase, deriveFxRate, formatMoney, toPrinted } from '@/lib/fx';
 import { FxBadge } from '@/components/FxBadge';
 import { FxRateButton } from '@/components/FxRateButton';
 import { useState, useTransition, useRef, useMemo } from 'react';
-import { Upload, Sparkles, Trash2, CheckCircle2, AlertTriangle, Plus, X, FileText, Loader2, PackagePlus, Mail, Search, Archive, Zap, Undo2, Copy } from 'lucide-react';
+import { Upload, Sparkles, Trash2, CheckCircle2, AlertTriangle, Plus, X, FileText, Loader2, PackagePlus, Mail, Search, Archive, Zap, Undo2, Copy, Receipt as ReceiptIcon } from 'lucide-react';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
+import { Input, filterControlClass } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { cn } from '@/components/ui/cn';
@@ -336,43 +340,33 @@ export function ReceiptsClient({
     setCategoryFilter('');
     setPaymentFilter('');
   };
-  const labelCls = 'text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-[0.12em] mb-1.5';
-  const selCls =
-    'w-full bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-3 py-1.5 text-xs text-[color:var(--color-text-dim)] focus:outline-none focus:border-[color:var(--color-accent)]';
 
   // Shared filter controls — left sidebar (desktop) + drawer (mobile)
   const filterControls = (
     <div className="space-y-4">
       <Input icon={<Search size={14} />} placeholder={t('rc.searchPlaceholder')} value={search} onChange={(e) => setSearch(e.target.value)} />
-      <div>
-        <p className={labelCls} style={{ fontFamily: 'var(--font-mono)' }}>{t('common.status')}</p>
-        <div className="flex flex-col gap-1">
-          {(['all', 'verified', 'parsed', 'failed', 'archived'] as const).map((v) => (
-            <button
-              key={v}
-              onClick={() => setStatusFilter(v)}
-              className={cn(
-                'text-left px-3 py-1.5 rounded-lg text-xs font-semibold transition-all',
-                statusFilter === v ? 'bg-[color:var(--color-accent)] text-black' : 'text-[color:var(--color-text-dim)] hover:bg-[color:var(--color-surface-2)] hover:text-[color:var(--color-text)]'
-              )}
-              style={{ fontFamily: 'var(--font-mono)' }}
-            >
-              {v === 'all' ? t('common.all') : v === 'verified' ? t('rc.stVerified') : v === 'parsed' ? t('rc.stParsed') : v === 'failed' ? t('rc.stNeedsScan') : t('rc.stArchived')}
-            </button>
-          ))}
-        </div>
-      </div>
+      <FilterSection label={t('common.status')}>
+        <FilterOptions
+          value={statusFilter}
+          onChange={setStatusFilter}
+          options={[
+            { value: 'all', label: t('common.all') },
+            { value: 'verified', label: t('rc.stVerified') },
+            { value: 'parsed', label: t('rc.stParsed') },
+            { value: 'failed', label: t('rc.stNeedsScan') },
+            { value: 'archived', label: t('rc.stArchived') },
+          ]}
+        />
+      </FilterSection>
       {stores.length > 0 && (
-        <div>
-          <p className={labelCls} style={{ fontFamily: 'var(--font-mono)' }}>{t('v.fStore')}</p>
+        <FilterSection label={t('v.fStore')}>
           <SearchableSelect value={storeFilter} onChange={setStoreFilter} options={stores} placeholder={t('it.allStores')} clearable size="sm" className="w-full" />
-        </div>
+        </FilterSection>
       )}
-      <div>
-        <p className={labelCls} style={{ fontFamily: 'var(--font-mono)' }}>{t('rc.fltPeriod')}</p>
+      <FilterSection label={t('rc.fltPeriod')}>
         <div className="flex flex-col gap-1.5 min-w-0">
-          <Input type="date" value={dateFrom} max={dateTo || undefined} onChange={(e) => setDateFrom(e.target.value)} aria-label={t('rc.fltFrom')} className="min-w-0" />
-          <Input type="date" value={dateTo} min={dateFrom || undefined} onChange={(e) => setDateTo(e.target.value)} aria-label={t('rc.fltTo')} className="min-w-0" />
+          <DateInput value={dateFrom} max={dateTo || undefined} onValueChange={setDateFrom} aria-label={t('rc.fltFrom')} className="py-1.5 text-xs" />
+          <DateInput value={dateTo} min={dateFrom || undefined} onValueChange={setDateTo} aria-label={t('rc.fltTo')} className="py-1.5 text-xs" />
         </div>
         <div className="flex flex-wrap gap-1 mt-1.5">
           {([
@@ -391,35 +385,31 @@ export function ReceiptsClient({
             </button>
           ))}
         </div>
-      </div>
+      </FilterSection>
       {usedCategories.length > 0 && (
-        <div>
-          <p className={labelCls} style={{ fontFamily: 'var(--font-mono)' }}>{t('rc.fltCategory')}</p>
+        <FilterSection label={t('rc.fltCategory')}>
           <SearchableSelect value={categoryFilter} onChange={setCategoryFilter} options={usedCategories} placeholder={t('rc.fltAllCategories')} clearable size="sm" className="w-full" />
-        </div>
+        </FilterSection>
       )}
       {spaces.length > 0 && (
-        <div>
-          <p className={labelCls} style={{ fontFamily: 'var(--font-mono)' }}>{t('ex.space')}</p>
+        <FilterSection label={t('ex.space')}>
           <SearchableSelect value={spaceFilter} onChange={setSpaceFilter} options={spaceFilterOptions(spaces)} labels={{ [NO_SPACE]: t('ex.spaceNone') }} placeholder={t('ex.allSpaces')} clearable size="sm" className="w-full" />
-        </div>
+        </FilterSection>
       )}
       {payments.length > 0 && (
-        <div>
-          <p className={labelCls} style={{ fontFamily: 'var(--font-mono)' }}>{t('sub.fPayment')}</p>
+        <FilterSection label={t('sub.fPayment')}>
           <SearchableSelect value={paymentFilter} onChange={setPaymentFilter} options={payments} placeholder={t('rc.fltAllPayments')} clearable size="sm" className="w-full" />
-        </div>
+        </FilterSection>
       )}
-      <div>
-        <p className={labelCls} style={{ fontFamily: 'var(--font-mono)' }}>{t('common.sort')}</p>
-        <select value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)} className={selCls} style={{ fontFamily: 'var(--font-mono)' }}>
+      <FilterSection label={t('common.sort')}>
+        <select value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)} className={filterControlClass} style={{ fontFamily: 'var(--font-mono)' }}>
           <option value="recent">{t('rc.sortRecent')}</option>
           <option value="oldest">{t('rc.sortOldest')}</option>
           <option value="total-desc">{t('rc.sortTotalDesc')}</option>
           <option value="total-asc">{t('rc.sortTotalAsc')}</option>
           <option value="store">{t('rc.sortStore')}</option>
         </select>
-      </div>
+      </FilterSection>
       {anyRFilter && (
         <button onClick={resetRFilters} className="text-[0.65rem] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] underline" style={{ fontFamily: 'var(--font-mono)' }}>
           {t('common.resetFilters')}
@@ -473,7 +463,7 @@ export function ReceiptsClient({
             className={cn(
               'border-2 border-dashed rounded-2xl p-8 mb-6 text-center cursor-pointer transition-all',
               dragOver
-                ? 'border-[color:var(--color-accent)] bg-[#00ff8808]'
+                ? 'border-[color:var(--color-accent)] bg-[color:var(--color-accent)]/3'
                 : 'border-[color:var(--color-border)] hover:border-[color:var(--color-border-light)]',
               uploading && 'pointer-events-none opacity-70'
             )}
@@ -540,10 +530,7 @@ export function ReceiptsClient({
           </div>
 
           {visible.length === 0 ? (
-            <div className="text-center py-20 text-[color:var(--color-text-faint)]">
-              <p className="text-5xl mb-4">🧾</p>
-              <p className="text-sm">{receipts.length === 0 ? t('rc.emptyNone') : t('rc.emptyFiltered')}</p>
-            </div>
+            <EmptyState icon={<ReceiptIcon />} title={receipts.length === 0 ? t('rc.emptyNone') : t('rc.emptyFiltered')} />
           ) : layout === 'grid' ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
               {visible.map((r) => (
@@ -703,15 +690,15 @@ function ReceiptCard({
               <Archive size={12} className="text-[color:var(--color-text-faint)]" />
             </span>
           ) : receipt.verified ? (
-            <span title={t('rc.tipVerified')} className="flex items-center justify-center w-6 h-6 rounded-full bg-[#00ff8820] border border-[#00ff8840]">
+            <span title={t('rc.tipVerified')} className="flex items-center justify-center w-6 h-6 rounded-full bg-[color:var(--color-accent)]/13 border border-[color:var(--color-accent)]/25">
               <CheckCircle2 size={13} className="text-[color:var(--color-accent)]" />
             </span>
           ) : receipt.total > 0 || (receipt.lineItems?.length ?? 0) > 0 ? (
-            <span title={t('rc.tipParsed')} className="flex items-center justify-center w-6 h-6 rounded-full bg-[#00d4ff20] border border-[#00d4ff40]">
+            <span title={t('rc.tipParsed')} className="flex items-center justify-center w-6 h-6 rounded-full bg-[color:var(--color-cyan)]/13 border border-[color:var(--color-cyan)]/25">
               <Sparkles size={12} className="text-[color:var(--color-cyan)]" />
             </span>
           ) : (
-            <span title={t('rc.tipFailed')} className="flex items-center justify-center w-6 h-6 rounded-full bg-[#ffd93d20] border border-[#ffd93d40]">
+            <span title={t('rc.tipFailed')} className="flex items-center justify-center w-6 h-6 rounded-full bg-[color:var(--color-gold)]/13 border border-[color:var(--color-gold)]/25">
               <AlertTriangle size={12} className="text-[color:var(--color-gold)]" />
             </span>
           )}
@@ -758,8 +745,8 @@ function ReturnBadge({ days }: { days?: number | null }) {
       className={cn(
         'inline-flex items-center gap-0.5 px-1.5 py-px rounded border text-[9px] font-bold shrink-0',
         closing
-          ? 'text-[color:var(--color-gold)] border-[#ffd93d40] bg-[#ffd93d14]'
-          : 'text-[color:var(--color-cyan)] border-[#00d4ff33] bg-[#00d4ff10]'
+          ? 'text-[color:var(--color-gold)] border-[color:var(--color-gold)]/25 bg-[color:var(--color-gold)]/8'
+          : 'text-[color:var(--color-cyan)] border-[color:var(--color-cyan)]/20 bg-[color:var(--color-cyan)]/6'
       )}
       style={{ fontFamily: 'var(--font-mono)' }}
     >
@@ -1096,6 +1083,7 @@ function ReceiptDetailModal({
           {rescanMsg && <span className="text-[10px] text-[color:var(--color-text-dim)] truncate max-w-[200px]">{rescanMsg}</span>}
         </div>
         <div className="flex items-center gap-3 shrink-0">
+          <CreatedBy id={receipt.createdBy} />
           <OpenInOneDriveButton filePath={receipt.filePath} />
           {receipt.aiModel && (
             <span className="text-[10px] text-[color:var(--color-text-faint)] flex items-center gap-1">
@@ -1111,8 +1099,8 @@ function ReceiptDetailModal({
             <div className="w-full h-[55vh] md:aspect-[3/4] md:h-auto rounded-xl border border-dashed border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] grid place-items-center text-center px-6">
               <div>
                 <FileText size={34} strokeWidth={1.5} className="mx-auto mb-3 text-[color:var(--color-text-faint)]" />
-                <p className="text-sm font-medium text-[color:var(--color-text-dim)]">No scan file</p>
-                <p className="text-[11px] text-[color:var(--color-text-faint)] mt-1">The original was lost (2026-06 reset). The parsed data is kept — re-upload a scan to attach one.</p>
+                <p className="text-sm font-medium text-[color:var(--color-text-dim)]">{t('rc.noScanFile')}</p>
+                <p className="text-[11px] text-[color:var(--color-text-faint)] mt-1">{t('rc.noScanFileHint')}</p>
               </div>
             </div>
           ) : isImage ? (
@@ -1168,7 +1156,7 @@ function ReceiptDetailModal({
               />
             </Field>
             <Field label={t('ex.fDate')}>
-              <Input type="date" value={form.date} onChange={(e) => setForm((p) => ({ ...p, date: e.target.value }))} />
+              <DateInput value={form.date} onValueChange={(v) => setForm((p) => ({ ...p, date: v }))} />
             </Field>
           </div>
           {/* Total — the key number, on its own wide row so it's never cramped */}
@@ -1401,16 +1389,3 @@ function ReceiptDetailModal({
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="min-w-0">
-      <label
-        className="block text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider mb-1.5"
-        style={{ fontFamily: 'var(--font-mono)' }}
-      >
-        {label}
-      </label>
-      {children}
-    </div>
-  );
-}

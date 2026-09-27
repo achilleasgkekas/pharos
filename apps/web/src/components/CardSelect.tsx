@@ -1,13 +1,11 @@
 'use client';
 import type { SerializedCard } from '@/types';
+import { controlClass } from '@/components/ui/Input';
 
 /** Stable display label for a card: "Mastercard 1234". */
 export function cardLabel(c: Pick<SerializedCard, 'name' | 'last4'>): string {
   return `${c.name}${c.last4 ? ' ' + c.last4 : ''}`;
 }
-
-const selectClass =
-  'w-full bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-4 py-2 text-sm text-[color:var(--color-text)] focus:outline-none focus:border-[color:var(--color-accent)] transition-colors';
 
 /**
  * Payment-method picker backed by the globally managed cards. Keeps any legacy
@@ -34,13 +32,13 @@ export function CardSelect({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder="e.g. Mastercard 1234"
-        className={selectClass}
+        className={controlClass}
       />
     );
   }
 
   return (
-    <select value={value} onChange={(e) => onChange(e.target.value)} className={selectClass}>
+    <select value={value} onChange={(e) => onChange(e.target.value)} className={controlClass}>
       <option value="">{placeholder}</option>
       {cards.map((c) => (
         <option key={c._id} value={cardLabel(c)}>

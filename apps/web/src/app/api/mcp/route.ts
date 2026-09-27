@@ -6,6 +6,7 @@ import { apiTenant } from '@/lib/apiAuth';
 import { canWrite, parseRole, READ_ONLY_MESSAGE, type Role } from '@/lib/roles';
 import { currentModel } from '@/lib/tenancy/connection';
 import { withTenant } from '@/lib/tenancy/current';
+import { runAsActor } from '@/lib/actor';
 
 // Remote MCP server (Streamable-HTTP, JSON-RPC 2.0) so an external Claude (mobile
 // app / Claude Code / MCP Inspector) can drive Pharos. Tools-only, so plain JSON
@@ -36,17 +37,18 @@ const PROTOCOL_VERSION = '2025-06-18';
  *  guard downstream saw "no session" and waved the call through, and a read-only account's token
  *  could add, edit and delete records (#192). The role the token belongs to is the only thing
  *  that can answer that here, so it is read together with the token. */
-async function authed(req: NextRequest): Promise<Role | null> {
+async function authed(req: NextRequest): Promise<{ role: Role; userId: string | null } | null> {
   const m = (req.headers.get('authorization') || '').match(/^Bearer\s+(.+)$/i);
   const token = m?.[1]?.trim();
   if (!token) return null;
   await connectDB();
   const User = await currentModel(UserModel);
-  const u = (await User.findOne({ apiToken: token }).select('role').lean()) as { role?: string } | null;
+  const u = (await User.findOne({ apiToken: token }).select('_id role').lean()) as { _id?: unknown; role?: string } | null;
   if (!u) return null;
   // An unknown/missing stored role reads as `viewer`, the least privileged — same rule as
   // `verifySession`: a value we cannot interpret may only ever lose privileges.
-  return parseRole(u.role) ?? 'viewer';
+  // The id is only for P75 attribution (who added a record), never for permissions.
+  return { role: parseRole(u.role) ?? 'viewer', userId: u._id ? String(u._id) : null };
 }
 
 function rpc(id: unknown, result: unknown) {
@@ -71,10 +73,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 }
 
 async function handle(req: NextRequest): Promise<NextResponse> {
-  const role = await authed(req);
-  if (!role) {
+  const auth = await authed(req);
+  if (!auth) {
     return NextResponse.json({ jsonrpc: '2.0', id: null, error: { code: -32001, message: 'Unauthorized' } }, { status: 401 });
   }
+  // P75: whatever the tools create is attributed to the token's owner.
+  return runAsActor(auth.userId, () => dispatch(req, auth.role));
+}
+
+async function dispatch(req: NextRequest, role: Role): Promise<NextResponse> {
 
   let body: { id?: unknown; method?: string; params?: Record<string, unknown> };
   try {

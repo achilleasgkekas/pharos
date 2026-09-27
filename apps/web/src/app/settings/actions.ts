@@ -80,6 +80,7 @@ import { collectSubscriptionReviews, type ReviewableSubscription } from '@/lib/s
 import { markRemoteSync, getLastRemoteSync } from '@/lib/syncState';
 import { splitFreshAlerts } from '@/lib/alertDedup';
 import { dispatchAlert, getNotifiers, testNotifier, type NotifierConfig } from '@/lib/notifiers';
+import { smtpFields } from '@/lib/notifiers.shared';
 import { getDeliveryLog } from '@/lib/deliveryLog';
 import type { DeliveryLogEntry } from '@/lib/deliveryLog.shared';
 import { formatDate } from '@/lib/i18n/format';
@@ -467,7 +468,7 @@ export async function sendTestNtfy(): Promise<{ ok: boolean; error?: string }> {
 
 // ─── Pluggable notification channels ─────────────────────────────────────────
 
-/** Channels for the Settings editor (ntfy/Discord/Slack/Telegram/webhook). */
+/** Channels for the Settings editor (ntfy/Discord/Slack/Telegram/webhook/email). */
 export async function getNotifierChannels(): Promise<NotifierConfig[]> {
   await requireAdmin();
   return getNotifiers();
@@ -487,6 +488,7 @@ export async function saveNotifierChannels(channels: NotifierConfig[]): Promise<
     url: (c.url || '').trim(),
     token: (c.token || '').trim(),
     target: (c.target || '').trim(),
+    ...(c.type === 'email' ? smtpFields(c as unknown as Record<string, unknown>) : {}),
   }));
   const firstNtfy = clean.find((c) => c.type === 'ntfy');
   await (await scoped(AppConfig)).updateOne(
@@ -547,7 +549,8 @@ export async function saveQuietHours(quietHours: { start: string; end: string })
 export async function testNotifierChannel(channel: NotifierConfig): Promise<{ ok: boolean; error?: string }> {
   await requireAdmin();
   const ok = await testNotifier(channel);
-  return ok ? { ok: true } : { ok: false, error: 'Delivery failed — check the URL/token' };
+  if (ok) return { ok: true };
+  return { ok: false, error: channel?.type === 'email' ? 'Delivery failed — check the SMTP server, login and addresses' : 'Delivery failed — check the URL/token' };
 }
 
 /** Recent outbound delivery attempts per channel (P80), keyed `notifier:<id>` /

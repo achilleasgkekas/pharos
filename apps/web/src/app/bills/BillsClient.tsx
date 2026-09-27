@@ -2,10 +2,14 @@
 import { ymd } from '@/lib/calendarDay';
 import { useState, useTransition, useMemo } from 'react';
 import { RECURRING_CYCLES, type RecurringCycle } from '@/lib/billingCycle';
-import { Trash2, Check, Undo2, Archive, ArchiveRestore, CalendarClock, RotateCw, Coins } from 'lucide-react';
+import { Trash2, Check, Undo2, Archive, ArchiveRestore, CalendarClock, RotateCw, Coins, FileText, X } from 'lucide-react';
+import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { PAGE_MAIN, PageHeader, HeaderStat, PrimaryAction, FilterLayout, FilterSection, FilterOptions } from '@/components/ui/PageHeader';
-import { Input } from '@/components/ui/Input';
+import { Input, controlClass } from '@/components/ui/Input';
+import { DateInput } from '@/components/ui/DateInput';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { Field } from '@/components/ui/Field';
 import { Modal } from '@/components/ui/Modal';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { useOpenParam } from '@/components/useOpenParam';
@@ -23,9 +27,9 @@ import {
   logBillPayment, removeBillPayment,
 } from './actions';
 import { formatDate } from '@/lib/i18n/format';
-import { useLocale } from '@/components/LocaleProvider';
+import { useLocale, useMoney, useT } from '@/components/LocaleProvider';
+import type { TFunc, TKey } from '@/lib/i18n';
 
-const money = (n: number) => `${cur()}${n.toFixed(2)}`;
 type Filter = 'open' | 'overdue' | 'part-paid' | 'paid' | 'all';
 /** P9 context: the deployment's base currency + whether multi-currency is switched on at all. */
 type FxCtx = { base: string; enabled: boolean };
@@ -34,34 +38,28 @@ function currencyCodes(base: string): string[] {
   return [...new Set([normalizeCurrency(base) || 'EUR', ...CURRENCIES.map((c) => c.code)])];
 }
 
-const STATUS_META: Record<BillStatus, { label: string; cls: string }> = {
-  overdue: { label: 'overdue', cls: 'bg-[color:var(--color-red)]/15 text-[color:var(--color-red)]' },
-  'due-soon': { label: 'due soon', cls: 'bg-[color:var(--color-gold)]/15 text-[color:var(--color-gold)]' },
-  upcoming: { label: 'upcoming', cls: 'bg-[color:var(--color-surface-2)] text-[color:var(--color-text-dim)]' },
-  paid: { label: 'paid', cls: 'bg-[color:var(--color-accent)]/15 text-[color:var(--color-accent)]' },
-};
 
-function dueLabel(bill: SerializedBill, locale: string): string {
-  if (bill.paidAt) return `paid ${formatDate(bill.paidAt, locale)}`;
+function dueLabel(bill: SerializedBill, locale: string, t: TFunc): string {
+  if (bill.paidAt) return t('bill.paidOn', { date: formatDate(bill.paidAt, locale) });
   const days = billDaysUntilDue(bill.dueDate);
   const date = formatDate(bill.dueDate, locale, undefined, '—');
   if (days === null) return date;
-  if (days < 0) return `${date} · ${-days}d overdue`;
-  if (days === 0) return `${date} · today`;
-  return `${date} · in ${days}d`;
+  if (days < 0) return `${date} · ${t('bill.daysOverdue', { n: -days })}`;
+  if (days === 0) return `${date} · ${t('bill.dueToday')}`;
+  return `${date} · ${t('common.inDays', { n: days })}`;
 }
 
-// This page is still the untranslated one (no useT yet), so the wording stays inline
-// English like the rest of it — only the VALUES come from lib/billingCycle, so the
-// repeat options cannot drift out of step with the model enum again.
-const CYCLE_LABELS: Record<RecurringCycle, string> = {
-  '': 'One-off',
-  weekly: 'Weekly',
-  monthly: 'Monthly',
-  quarterly: 'Quarterly',
-  yearly: 'Yearly',
-  biennial: 'Every 2 years',
+// The VALUES come from lib/billingCycle, so the repeat options cannot drift out of step with
+// the model enum again; the labels are the shared billing-cycle strings.
+const CYCLE_LABELS: Record<RecurringCycle, TKey> = {
+  '': 'bill.oneOff',
+  weekly: 'cyc.weekly',
+  monthly: 'cyc.monthly',
+  quarterly: 'cyc.quarterly',
+  yearly: 'cyc.yearly',
+  biennial: 'cyc.biennial',
 };
+const cycleLabel = (c: string | undefined | null, t: TFunc) => (c && c in CYCLE_LABELS ? t(CYCLE_LABELS[c as RecurringCycle]) : c || '');
 
 export function BillsClient({
   bills,
@@ -77,6 +75,8 @@ export function BillsClient({
   baseCurrency?: string;
   multiCurrency?: boolean;
 }) {
+  const money = useMoney();
+  const t = useT();
   const fx: FxCtx = { base: baseCurrency, enabled: multiCurrency };
   const [showCreate, setShowCreate] = useState(false);
   const [editing, setEditing] = useState<SerializedBill | null>(null);
@@ -138,20 +138,26 @@ export function BillsClient({
     });
 
   const FILTERS: { key: Filter; label: string }[] = [
-    { key: 'open', label: 'Open' },
-    { key: 'overdue', label: 'Overdue' },
+    { key: 'open', label: t('bill.fOpen') },
+    { key: 'overdue', label: t('bill.fOverdue') },
     // Only worth a chip once something is actually part-paid; otherwise it is noise.
-    ...(partPaidCount > 0 ? [{ key: 'part-paid' as Filter, label: `Part-paid (${partPaidCount})` }] : []),
-    { key: 'paid', label: 'Paid' },
-    { key: 'all', label: 'All' },
+    ...(partPaidCount > 0 ? [{ key: 'part-paid' as Filter, label: t('bill.fPartPaid', { n: partPaidCount }) }] : []),
+    { key: 'paid', label: t('bill.fPaid') },
+    { key: 'all', label: t('common.all') },
   ];
 
   return (
     <main className={PAGE_MAIN}>
+<<<<<<< HEAD
       <PageHeader title="Bills" count={`${openBills.length} open`}>
         {totalDue > 0 && <HeaderStat label="to pay" value={money(totalDue)} color="var(--color-text)" />}
         {noRateCount > 0 && <HeaderStat label="need a rate" value={noRateCount} color="var(--color-gold)" />}
         {overdueCount > 0 && <HeaderStat label="overdue" value={overdueCount} color="var(--color-red)" />}
+=======
+      <PageHeader title={t('nav.bills')} count={t('bill.openCount', { n: openBills.length })}>
+        {totalDue > 0 && <HeaderStat label={t('bill.toPay')} value={money(totalDue)} color="var(--color-text)" />}
+        {overdueCount > 0 && <HeaderStat label={t('bill.stOverdue')} value={overdueCount} color="var(--color-red)" />}
+>>>>>>> origin/main
         <PrimaryAction onClick={() => setShowCreate(true)} />
       </PageHeader>
 
@@ -159,28 +165,20 @@ export function BillsClient({
         active={filter !== 'open' || !!spaceFilter}
         filters={
           <div className="space-y-4">
-            <FilterSection label="Status">
+            <FilterSection label={t('common.status')}>
               <FilterOptions value={filter} onChange={setFilter} options={FILTERS.map((f) => ({ value: f.key, label: f.label }))} />
             </FilterSection>
-            {/* #146: hidden until a space is named, like the space field on the form. Inline English,
-                as the rest of this page (see CYCLE_LABELS). */}
+            {/* #146: hidden until a space is named, like the space field on the form. */}
             {spaces.length > 0 && (
-              <FilterSection label="Space">
-                <SearchableSelect value={spaceFilter} onChange={setSpaceFilter} options={spaceFilterOptions(spaces)} labels={{ [NO_SPACE]: 'Unassigned' }} placeholder="All spaces" clearable size="sm" className="w-full" />
+              <FilterSection label={t('ex.space')}>
+                <SearchableSelect value={spaceFilter} onChange={setSpaceFilter} options={spaceFilterOptions(spaces)} labels={{ [NO_SPACE]: t('ex.spaceNone') }} placeholder={t('ex.allSpaces')} clearable size="sm" className="w-full" />
               </FilterSection>
             )}
           </div>
         }
       >
       {visible.length === 0 ? (
-        <div className="text-center py-20 text-[color:var(--color-text-faint)]">
-          <p className="text-5xl mb-4">🧾</p>
-          <p className="text-sm">
-            {bills.length === 0
-              ? 'No bills yet. Hit + to track a bill you pay by hand (ΔΕΗ, ΟΤΕ, κοινόχρηστα), so nothing slips into overdue.'
-              : 'Nothing here. Try another filter.'}
-          </p>
-        </div>
+        <EmptyState icon={<FileText />} title={bills.length === 0 ? t('bill.empty') : t('ex.emptyFiltered')} />
       ) : (
         <div className="space-y-2">
           {visible.map(({ b, status, partPaid, remaining }) => (
@@ -200,12 +198,12 @@ export function BillsClient({
       )}
       </FilterLayout>
 
-      <Modal open={showCreate} onClose={() => setShowCreate(false)} title="New bill" size="lg">
-        <BillForm categories={categories} spaces={spaces} fx={fx} onSuccess={() => setShowCreate(false)} />
+      <Modal open={showCreate} onClose={() => setShowCreate(false)} title={t('bill.new')} size="lg">
+        <BillForm categories={categories} spaces={spaces} fx={fx} onSuccess={() => setShowCreate(false)} onCancel={() => setShowCreate(false)} />
       </Modal>
       {editing && (
         <Modal open onClose={() => setEditing(null)} title={editing.title} size="lg">
-          <BillForm bill={editing} categories={categories} spaces={spaces} fx={fx} onSuccess={() => setEditing(null)} onDeleted={() => setEditing(null)} />
+          <BillForm bill={editing} categories={categories} spaces={spaces} fx={fx} onSuccess={() => setEditing(null)} onCancel={() => setEditing(null)} onDeleted={() => setEditing(null)} />
         </Modal>
       )}
     </main>
@@ -232,8 +230,9 @@ function BillRow({
   onOpen: () => void;
   onPay: () => void;
 }) {
+  const money = useMoney();
+  const t = useT();
   const locale = useLocale();
-  const meta = STATUS_META[status];
   const paidSoFar = billPaidAmount(bill.payments);
   const total = bill.amount || 0;
   // #297: no rate, no base-currency total, so neither a progress bar nor "x of y" can be drawn:
@@ -244,24 +243,24 @@ function BillRow({
   return (
     <div
       className={cn(
-        'flex items-center gap-3 p-3 rounded-xl border bg-[color:var(--color-surface)]',
+        'flex items-center gap-3 px-3 py-2.5 rounded-xl border bg-[color:var(--color-surface)]',
         status === 'paid' ? 'border-[color:var(--color-border)] opacity-70' : 'border-[color:var(--color-border-light)]'
       )}
     >
       <button onClick={onOpen} className="flex-1 min-w-0 text-left">
         <div className="flex items-center gap-2">
           <p className="text-[10px] uppercase tracking-[0.14em] text-[color:var(--color-text-faint)] flex items-center gap-1" style={{ fontFamily: 'var(--font-mono)' }}>
-            <CalendarClock size={11} /> {bill.vendor || bill.category || 'bill'}
+            <CalendarClock size={11} /> {bill.vendor || bill.category || t('bill.fallback')}
           </p>
           {bill.cycle && (
             <span className="inline-flex items-center gap-0.5 text-[9px] px-1 py-0.5 rounded text-[color:var(--color-text-faint)] bg-[color:var(--color-surface-2)]" style={{ fontFamily: 'var(--font-mono)' }}>
-              <RotateCw size={9} /> {bill.cycle}
+              <RotateCw size={9} /> {cycleLabel(bill.cycle, t)}
             </span>
           )}
         </div>
         <p className="font-semibold text-[color:var(--color-text)] truncate mt-0.5">{bill.title}</p>
         <p className="text-[11px] text-[color:var(--color-text-dim)]" style={{ fontFamily: 'var(--font-mono)' }}>
-          {dueLabel(bill, locale)}
+          {dueLabel(bill, locale, t)}
         </p>
         {/* P61: how far along a part-paid bill is, without stealing the urgency chip. */}
         {partPaid && noRate && (
@@ -275,7 +274,7 @@ function BillRow({
               <div className="h-full rounded-full bg-[color:var(--color-cyan)]" style={{ width: `${progress}%` }} />
             </div>
             <span className="text-[10px] text-[color:var(--color-cyan)]" style={{ fontFamily: 'var(--font-mono)' }}>
-              {money(paidSoFar)} of {money(total)} paid
+              {t('bill.partProgress', { paid: money(paidSoFar), total: money(total) })}
             </span>
           </div>
         )}
@@ -292,7 +291,7 @@ function BillRow({
         )}
         {partPaid && !noRate && (
           <p className="text-[10px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
-            left of {money(total)}
+            {t('bill.leftOf', { total: money(total) })}
           </p>
         )}
         {/* P9: what the paper actually says, when it is not the base currency. */}
@@ -301,15 +300,14 @@ function BillRow({
             <FxBadge doc={bill} base={fx.base} />
           </div>
         )}
-        <span className={cn('inline-block text-[10px] px-1.5 py-0.5 rounded font-semibold mt-1', meta.cls)} style={{ fontFamily: 'var(--font-mono)' }}>
-          {meta.label}
-        </span>
+        <Badge status={status} className="mt-1" />
       </div>
       {status !== 'paid' && (
         <button
           onClick={onPay}
           disabled={pending}
-          title="Mark paid"
+          title={t('bill.markPaid')}
+          aria-label={t('bill.markPaid')}
           className="shrink-0 h-9 w-9 flex items-center justify-center rounded-lg border border-[color:var(--color-border)] text-[color:var(--color-accent)] hover:bg-[color:var(--color-accent)]/10 disabled:opacity-50"
         >
           <Check size={16} strokeWidth={2.5} />
@@ -325,6 +323,7 @@ function BillForm({
   spaces = [],
   fx,
   onSuccess,
+  onCancel,
   onDeleted,
 }: {
   bill?: SerializedBill;
@@ -332,8 +331,11 @@ function BillForm({
   spaces?: string[];
   fx: FxCtx;
   onSuccess: () => void;
+  onCancel: () => void;
   onDeleted?: () => void;
 }) {
+  const money = useMoney();
+  const t = useT();
   const locale = useLocale();
   const [pending, startTransition] = useTransition();
   const confirm = useConfirm();
@@ -346,6 +348,7 @@ function BillForm({
   const [currency, setCurrency] = useState(normalizeCurrency(bill?.currency) || normalizeCurrency(fx.base) || 'EUR');
   const [fxRate, setFxRate] = useState(String(bill?.fxRate || ''));
   const [amount, setAmount] = useState(String((wasForeign ? bill?.origAmount || bill?.amount : bill?.amount) || ''));
+  const [dueDate, setDueDate] = useState(bill?.dueDate ? bill.dueDate.slice(0, 10) : '');
   const foreign = fx.enabled && isForeignCurrency(currency, fx.base);
 
   const submit = (formData: FormData) => {
@@ -353,11 +356,10 @@ function BillForm({
     startTransition(async () => {
       const r = bill ? await updateBill(bill._id, formData) : await createBill(formData);
       if (r.ok) onSuccess();
-      else setError(r.error || 'Save failed');
+      else setError(r.error || t('common.saveFailed'));
     });
   };
 
-  const label = 'block text-[11px] uppercase tracking-[0.1em] text-[color:var(--color-text-faint)] mb-1';
   const isPaid = !!bill?.paidAt;
   // P61 — instalment state for the payment panel below the form.
   const [showPartial, setShowPartial] = useState(false);
@@ -371,18 +373,13 @@ function BillForm({
   return (
     <div className="space-y-5">
       <form action={submit} className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <div className="md:col-span-2">
-          <label className={label} style={{ fontFamily: 'var(--font-mono)' }}>Title</label>
-          <Input name="title" defaultValue={bill?.title} placeholder="ΔΕΗ electricity" required />
-        </div>
-        <div>
-          <label className={label} style={{ fontFamily: 'var(--font-mono)' }}>Payee</label>
-          <Input name="vendor" defaultValue={bill?.vendor} placeholder="ΔΕΗ" />
-        </div>
-        <div>
-          <label className={label} style={{ fontFamily: 'var(--font-mono)' }}>
-            Amount ({fx.enabled ? currencySymbol(currency).trim() : cur()})
-          </label>
+        <Field label={t('bill.fTitle')} className="md:col-span-2">
+          <Input name="title" defaultValue={bill?.title} placeholder={t('bill.titleHint')} required />
+        </Field>
+        <Field label={t('bill.fPayee')}>
+          <Input name="vendor" defaultValue={bill?.vendor} placeholder={t('bill.payeeHint')} />
+        </Field>
+        <Field label={t('ex.fAmount', { cur: fx.enabled ? currencySymbol(currency).trim() : cur() })}>
           <Input
             name="amount"
             type="number"
@@ -392,21 +389,20 @@ function BillForm({
             onChange={(e) => setAmount(e.target.value)}
             placeholder="0.00"
           />
-        </div>
+        </Field>
         {fx.enabled && (
-          <div>
-            <label className={label} style={{ fontFamily: 'var(--font-mono)' }}>Currency</label>
+          <Field label={t('ex.fCurrency')}>
             <select
               name="currency"
               value={currency}
               onChange={(e) => setCurrency(e.target.value)}
-              className="w-full rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] px-3 py-2 text-sm"
+              className={controlClass}
             >
               {currencyCodes(fx.base).map((c) => (
                 <option key={c} value={c}>{c}</option>
               ))}
             </select>
-          </div>
+          </Field>
         )}
         {foreign && (
           <div className="md:col-span-2">
@@ -415,51 +411,45 @@ function BillForm({
         )}
         {/* Always submitted so the server can clear a rate that no longer applies. */}
         {fx.enabled && <input type="hidden" name="fxRate" value={foreign ? fxRate : ''} />}
-        <div>
-          <label className={label} style={{ fontFamily: 'var(--font-mono)' }}>Due date</label>
-          <Input name="dueDate" type="date" defaultValue={bill?.dueDate ? bill.dueDate.slice(0, 10) : ''} required />
-        </div>
-        <div>
-          <label className={label} style={{ fontFamily: 'var(--font-mono)' }}>Repeat</label>
-          <select name="cycle" defaultValue={bill?.cycle || ''} className="w-full rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] px-3 py-2 text-sm">
+        <Field label={t('bill.fDue')}>
+          <DateInput name="dueDate" value={dueDate} onValueChange={setDueDate} required />
+        </Field>
+        <Field label={t('bill.fRepeat')}>
+          <select name="cycle" defaultValue={bill?.cycle || ''} className={controlClass}>
             {RECURRING_CYCLES.map((c) => (
-              <option key={c} value={c}>{CYCLE_LABELS[c]}</option>
+              <option key={c} value={c}>{t(CYCLE_LABELS[c])}</option>
             ))}
           </select>
-        </div>
-        <div>
-          <label className={label} style={{ fontFamily: 'var(--font-mono)' }}>Category</label>
-          <Input name="category" defaultValue={bill?.category || 'other'} list="bill-categories" placeholder="utilities" />
+        </Field>
+        <Field label={t('common.category')}>
+          <Input name="category" defaultValue={bill?.category || 'other'} list="bill-categories" placeholder={t('bill.categoryHint')} />
           <datalist id="bill-categories">
             {categories.map((c) => (
               <option key={c} value={c} />
             ))}
           </datalist>
-        </div>
+        </Field>
         {/* #14 (P68): which property this bill belongs to. Hidden until a space is named in
             Settings, like the Expenses/Receipts/Subscriptions forms; while hidden nothing is
             submitted, so an existing tag is never wiped. */}
         {spaces.length > 0 && (
-          <div>
-            <label className={label} style={{ fontFamily: 'var(--font-mono)' }}>Space</label>
+          <Field label={t('ex.space')}>
             <Input name="space" defaultValue={bill?.space || ''} list="bill-spaces" placeholder="—" maxLength={40} />
             <datalist id="bill-spaces">
               {spaces.map((s) => (
                 <option key={s} value={s} />
               ))}
             </datalist>
-          </div>
+          </Field>
         )}
-        <div className="md:col-span-2">
-          <label className={label} style={{ fontFamily: 'var(--font-mono)' }}>Notes</label>
-          <Input name="notes" defaultValue={bill?.notes} placeholder="optional" />
-        </div>
+        <Field label={t('v.fNotes')} className="md:col-span-2">
+          <Input name="notes" defaultValue={bill?.notes} placeholder={t('common.optional')} />
+        </Field>
         {error && <p className="md:col-span-2 text-xs text-[color:var(--color-red)]">{error}</p>}
-        <div className="md:col-span-2 flex items-center justify-between gap-2">
-          <Button type="submit" variant="primary" disabled={pending}>
-            {bill ? 'Save' : 'Add bill'}
-          </Button>
-          {bill && onDeleted && (
+        {/* Footer like every other form (#351): record actions on the left, Cancel and the
+            primary action on the right. */}
+        <div className="md:col-span-2 flex items-center justify-between gap-2 flex-wrap pt-1">
+          {bill && onDeleted ? (
             <div className="flex items-center gap-2">
               <button
                 type="button"
@@ -472,37 +462,47 @@ function BillForm({
                 className="text-xs px-2 py-1.5 rounded-lg text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] flex items-center gap-1"
                 style={{ fontFamily: 'var(--font-mono)' }}
               >
-                {bill.archived ? <ArchiveRestore size={13} /> : <Archive size={13} />} {bill.archived ? 'Reopen' : 'Archive'}
+                {bill.archived ? <ArchiveRestore size={13} /> : <Archive size={13} />} {bill.archived ? t('bill.reopen') : t('common.archive')}
               </button>
               <button
                 type="button"
                 onClick={async () => {
-                  const ok = await confirm({ title: 'Delete bill', message: `Delete "${bill.title}"? It moves to Trash.`, confirmLabel: 'Delete', danger: true });
+                  const ok = await confirm({ title: t('bill.deleteTitle'), message: t('bill.deleteBody', { title: bill.title }), confirmLabel: t('common.delete'), danger: true });
                   if (ok) startTransition(async () => { await deleteBill(bill._id); onDeleted(); });
                 }}
                 className="text-xs px-2 py-1.5 rounded-lg text-[color:var(--color-red)] hover:bg-[color:var(--color-red)]/10 flex items-center gap-1"
                 style={{ fontFamily: 'var(--font-mono)' }}
               >
-                <Trash2 size={13} /> Delete
+                <Trash2 size={13} /> {t('common.delete')}
               </button>
             </div>
+          ) : (
+            <span />
           )}
+          <div className="flex items-center gap-2 ml-auto">
+            <Button type="button" variant="ghost" onClick={onCancel}>
+              <X size={14} /> {t('common.cancel')}
+            </Button>
+            <Button type="submit" variant="primary" disabled={pending}>
+              <Check size={14} /> {bill ? t('common.save') : t('bill.add')}
+            </Button>
+          </div>
         </div>
       </form>
 
       {bill && (
         <div className="pt-4 border-t border-[color:var(--color-border)] space-y-3">
-          <p className="text-[11px] uppercase tracking-[0.1em] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
-            Payment
+          <p className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
+            {t('bill.payment')}
           </p>
           {isPaid ? (
             <div className="flex items-center justify-between gap-2">
               <span className="text-sm text-[color:var(--color-accent)]">
-                Paid {formatDate(bill.paidAt, locale)}
-                {bill.linkedExpenseId && ' · logged as expense'}
+                {t('bill.paidDate', { date: formatDate(bill.paidAt, locale) })}
+                {bill.linkedExpenseId && ` · ${t('bill.loggedAsExpense')}`}
               </span>
               <Button type="button" variant="ghost" disabled={pending} onClick={() => startTransition(async () => { await markBillUnpaid(bill._id); onDeleted?.(); })}>
-                <Undo2 size={14} /> Undo
+                <Undo2 size={14} /> {t('common.undo')}
               </Button>
             </div>
           ) : (
@@ -516,8 +516,8 @@ function BillForm({
                       <span className="text-[color:var(--color-text-dim)]"> paid toward {printedTotal}</span>
                     ) : (
                       <>
-                        <span className="text-[color:var(--color-text-dim)]"> paid of {money(bill.amount || 0)} · </span>
-                        <span className="text-[color:var(--color-text)] font-semibold">{money(remaining)} left</span>
+                        <span className="text-[color:var(--color-text-dim)]"> {t('bill.paidOf', { total: money(bill.amount || 0) })} · </span>
+                        <span className="text-[color:var(--color-text)] font-semibold">{t('bill.left', { amount: money(remaining) })}</span>
                       </>
                     )}
                   </p>
@@ -529,16 +529,17 @@ function BillForm({
                           {formatDate(p.date, locale)}
                         </span>
                         {p.note && <span className="text-[color:var(--color-text-faint)] truncate">· {p.note}</span>}
-                        {p.expenseId && <span className="text-[color:var(--color-text-faint)]">· expensed</span>}
+                        {p.expenseId && <span className="text-[color:var(--color-text-faint)]">· {t('bill.expensed')}</span>}
                         <button
                           type="button"
-                          title="Remove this payment"
+                          title={t('bill.removePayment')}
+                          aria-label={t('bill.removePayment')}
                           disabled={pending}
                           onClick={async () => {
                             const ok = await confirm({
-                              title: 'Remove payment',
-                              message: `Remove the ${money(p.amount || 0)} payment? Any expense it logged stays.`,
-                              confirmLabel: 'Remove',
+                              title: t('bill.removePaymentTitle'),
+                              message: t('bill.removePaymentBody', { amount: money(p.amount || 0) }),
+                              confirmLabel: t('common.remove'),
                               danger: true,
                             });
                             if (ok) startTransition(async () => { await removeBillPayment(bill._id, p._id); onDeleted?.(); });
@@ -563,7 +564,7 @@ function BillForm({
 
               <label className="flex items-center gap-2 text-sm text-[color:var(--color-text-dim)] cursor-pointer">
                 <input type="checkbox" checked={logExpense} onChange={(e) => setLogExpense(e.target.checked)} />
-                Also log this as an expense
+                {t('bill.alsoLog')}
               </label>
 
               <div className="flex items-center gap-2 flex-wrap">
@@ -573,10 +574,10 @@ function BillForm({
                   disabled={pending}
                   onClick={() => startTransition(async () => { await markBillPaid(bill._id, { logExpense }); onDeleted?.(); })}
                 >
-                  <Check size={14} /> {paidSoFar > 0 ? (remaining === null ? 'Pay the rest' : `Pay the rest (${money(remaining)})`) : 'Mark paid'}
+                  <Check size={14} /> {paidSoFar > 0 ? (remaining === null ? 'Pay the rest' : t('bill.payRest', { amount: money(remaining) })) : t('bill.markPaid')}
                 </Button>
                 <Button type="button" variant="ghost" disabled={pending} onClick={() => setShowPartial((v) => !v)}>
-                  <Coins size={14} /> {showPartial ? 'Cancel' : 'Log a partial payment'}
+                  <Coins size={14} /> {showPartial ? t('common.cancel') : t('bill.logPartial')}
                 </Button>
               </div>
 
@@ -593,7 +594,7 @@ function BillForm({
 
               {bill.cycle && (
                 <p className="text-[11px] text-[color:var(--color-text-faint)]">
-                  Paying it off spawns the next {bill.cycle} instance automatically.
+                  {t('bill.nextInstance', { cycle: cycleLabel(bill.cycle, t).toLowerCase() })}
                 </p>
               )}
             </div>
@@ -628,6 +629,8 @@ function PartialPaymentForm({
   base: string;
   onDone: () => void;
 }) {
+  const money = useMoney();
+  const t = useT();
   const [pending, startTransition] = useTransition();
   const [amount, setAmount] = useState('');
   // `ymd`, not `toISOString().slice(0, 10)`: the latter is UTC, so in Athens every payment
@@ -641,47 +644,42 @@ function PartialPaymentForm({
   const [paymentKey] = useState(() =>
     typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `p${Date.now()}${Math.random().toString(36).slice(2)}`
   );
-  const label = 'block text-[11px] uppercase tracking-[0.1em] text-[color:var(--color-text-faint)] mb-1';
-
   const submit = () => {
     setError('');
     startTransition(async () => {
       const r = await logBillPayment(billId, { amount: Number(amount) || 0, date, note, logExpense, key: paymentKey });
       if (r.ok) onDone();
-      else setError(r.error || 'Could not log the payment');
+      else setError(r.error || t('bill.logFailed'));
     });
   };
 
   return (
     <div className="rounded-lg border border-[color:var(--color-border-light)] bg-[color:var(--color-surface-2)] p-3 space-y-3">
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        <div>
-          <label className={label} style={{ fontFamily: 'var(--font-mono)' }}>Amount ({cur()})</label>
+        <Field label={t('ex.fAmount', { cur: cur() })}>
           <Input type="number" step="0.01" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder={remaining === null ? '0.00' : remaining.toFixed(2)} />
-        </div>
-        <div>
-          <label className={label} style={{ fontFamily: 'var(--font-mono)' }}>Paid on</label>
-          <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-        </div>
-        <div className="col-span-2 sm:col-span-1">
-          <label className={label} style={{ fontFamily: 'var(--font-mono)' }}>Note</label>
-          <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="1st instalment" />
-        </div>
+        </Field>
+        <Field label={t('bill.fPaidOn')}>
+          <DateInput value={date} onValueChange={setDate} />
+        </Field>
+        <Field label={t('bill.fNote')} className="col-span-2 sm:col-span-1">
+          <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder={t('bill.noteHint')} />
+        </Field>
       </div>
       {foreignBill && (
         <p className="text-[11px] text-[color:var(--color-gold)]">
-          ⚠ This bill is billed in another currency. Enter what you actually paid in {base}.
+          ⚠ {t('bill.foreignHint', { base })}
         </p>
       )}
       {error && <p className="text-xs text-[color:var(--color-red)]">{error}</p>}
       <div className="flex items-center gap-2">
         <Button type="button" variant="primary" disabled={pending || !(Number(amount) > 0)} onClick={submit}>
-          <Coins size={14} /> Log payment
+          <Coins size={14} /> {t('bill.logPayment')}
         </Button>
         <p className="text-[11px] text-[color:var(--color-text-faint)]">
           {remaining === null
             ? 'Needs an exchange rate before payments can settle it.'
-            : `${money(remaining)} left · reaching the total marks the bill paid on its own.`}
+            : t('bill.leftHint', { amount: money(remaining) })}
         </p>
       </div>
     </div>
@@ -709,13 +707,10 @@ function BillFxFields({
   const [charged, setCharged] = useState('');
   const printed = Number(amount) || 0;
   const rate = Number(fxRate) || 0;
-  const label = 'block text-[11px] uppercase tracking-[0.1em] text-[color:var(--color-text-faint)] mb-1';
+  const t = useT();
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 items-end rounded-lg border border-[color:var(--color-purple)]/30 bg-[color:var(--color-surface-2)] p-3">
-      <div>
-        <label className={label} style={{ fontFamily: 'var(--font-mono)' }}>
-          Rate ({normalizeCurrency(currency)}→{base})
-        </label>
+      <Field as="div" label={t('ex.fFxRate', { base, code: normalizeCurrency(currency) })}>
         <Input
           type="number"
           step="0.000001"
@@ -731,11 +726,8 @@ function BillFxFields({
         <div className="mt-1">
           <FxRateButton currency={currency} onRate={(r) => { setCharged(''); setRate(String(r)); }} />
         </div>
-      </div>
-      <div>
-        <label className={label} style={{ fontFamily: 'var(--font-mono)' }}>
-          or charged ({currencySymbol(base).trim()})
-        </label>
+      </Field>
+      <Field label={t('ex.fFxCharged', { cur: currencySymbol(base).trim() })}>
         <Input
           type="number"
           step="0.01"
@@ -747,12 +739,12 @@ function BillFxFields({
             setRate(derived ? String(derived) : '');
           }}
         />
-      </div>
+      </Field>
       <p className="text-[11px] pb-2" style={{ fontFamily: 'var(--font-mono)' }}>
         {rate > 0 ? (
           <span className="text-[color:var(--color-purple)]">= {formatMoney(convertToBase(printed, rate), base)}</span>
         ) : (
-          <span className="text-[color:var(--color-gold)]">⚠ no rate yet — stored as-is, not in {base}</span>
+          <span className="text-[color:var(--color-gold)]">⚠ {t('ex.fxNoRate', { base })}</span>
         )}
       </p>
     </div>

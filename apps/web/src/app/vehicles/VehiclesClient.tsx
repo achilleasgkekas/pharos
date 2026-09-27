@@ -1,10 +1,17 @@
 'use client';
 import { PAGE_MAIN, PageHeader, HeaderButton, PrimaryAction } from '@/components/ui/PageHeader';
 import { useMemo, useState, useTransition } from 'react';
-import { Archive, ArchiveRestore, Fuel, Pencil, Trash2, Wrench, X } from 'lucide-react';
+import { Archive, ArchiveRestore, Car, Check, Fuel, Pencil, Trash2, Wrench, X } from 'lucide-react';
 import { useLocale, useT } from '@/components/LocaleProvider';
+import { Button } from '@/components/ui/Button';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { DateInput } from '@/components/ui/DateInput';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { Field } from '@/components/ui/Field';
+import { Input, controlClass } from '@/components/ui/Input';
+import { Modal } from '@/components/ui/Modal';
 import { formatMoney } from '@/lib/fx';
+import { formatDate } from '@/lib/i18n/format';
 import { todayLocal } from '@/lib/dates';
 import { documentDaysUntilExpiry } from '@/lib/documentExpiry';
 import { VEHICLE_DUE_KINDS, vehicleStats, withFuelConsumption, type VehicleDueKind } from '@/lib/vehicles';
@@ -37,7 +44,6 @@ export type LogRow = {
   expenseId?: string;
 };
 
-const input = 'w-full bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[color:var(--color-accent)]';
 const card = 'bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-2xl';
 
 const DUE_LABEL: Record<VehicleDueKind, TKey> = {
@@ -53,6 +59,7 @@ export function VehiclesClient({ vehicles, logs, spaces, currency, leadDays }: {
   const t = useT();
   const locale = useLocale();
   const money = (n: number) => formatMoney(n, currency, locale);
+  const confirm = useConfirm();
   const [showArchived, setShowArchived] = useState(false);
   const [editing, setEditing] = useState<VehicleRow | 'new' | null>(null);
   const [logFor, setLogFor] = useState<{ vehicle: VehicleRow; kind: 'fuel' | 'service' } | null>(null);
@@ -67,19 +74,28 @@ export function VehiclesClient({ vehicles, logs, spaces, currency, leadDays }: {
   const archivedCount = vehicles.filter((v) => v.archived).length;
   const shown = vehicles.filter((v) => showArchived || !v.archived);
 
+  async function removeVehicle(v: VehicleRow) {
+    if (!(await confirm({ title: t('veh.deleteTitle'), message: t('veh.confirmDelete'), confirmLabel: t('common.delete'), danger: true }))) return;
+    startTransition(async () => { await deleteVehicle(v._id); });
+  }
+  async function removeLog(id: string) {
+    if (!(await confirm({ title: t('veh.deleteLogTitle'), message: t('common.movesToTrash'), confirmLabel: t('common.delete'), danger: true }))) return;
+    startTransition(async () => { await deleteVehicleLog(id); });
+  }
+
   return (
     <main className={PAGE_MAIN}>
       <PageHeader title={t('veh.title')} count={shown.length} subtitle={t('veh.subtitle')}>
         {archivedCount > 0 && (
           <HeaderButton icon={<Archive size={14} />} aria-pressed={showArchived} onClick={() => setShowArchived((v) => !v)}>
-            {t('veh.showArchived')} ({archivedCount})
+            {showArchived ? t('common.hideArchived') : t('common.showArchived', { n: archivedCount })}
           </HeaderButton>
         )}
         <PrimaryAction onClick={() => setEditing('new')} />
       </PageHeader>
 
       {shown.length === 0 ? (
-        <p className={`${card} p-10 text-center text-sm text-[color:var(--color-text-dim)]`}>{t('veh.empty')}</p>
+        <EmptyState icon={<Car />} title={t('veh.empty')} />
       ) : (
         <div className="space-y-4">
           {shown.map((v) => {
@@ -98,19 +114,19 @@ export function VehiclesClient({ vehicles, logs, spaces, currency, leadDays }: {
                       {v.plate && <span className="ml-2 rounded border border-[color:var(--color-border)] px-1.5 py-0.5 font-mono text-xs">{v.plate}</span>}
                     </h2>
                     <p className="text-xs text-[color:var(--color-text-dim)]">
-                      {[v.make, v.model, v.year].filter(Boolean).join(' ')}
-                      {v.space ? ` · ${v.space}` : ''}
-                      {odometer >= 0 ? ` · ${odometer.toLocaleString(locale)} km` : ''}
+                      {[[v.make, v.model, v.year].filter(Boolean).join(' '), v.space, odometer >= 0 ? `${odometer.toLocaleString(locale)} km` : '']
+                        .filter(Boolean)
+                        .join(' · ')}
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-1.5">
-                    <button onClick={() => setLogFor({ vehicle: v, kind: 'fuel' })} className="flex items-center gap-1 rounded-lg border border-[color:var(--color-border)] px-2.5 py-1.5 text-xs"><Fuel size={14} /> {t('veh.addFuel')}</button>
-                    <button onClick={() => setLogFor({ vehicle: v, kind: 'service' })} className="flex items-center gap-1 rounded-lg border border-[color:var(--color-border)] px-2.5 py-1.5 text-xs"><Wrench size={14} /> {t('veh.addService')}</button>
-                    <button aria-label={t('common.edit')} onClick={() => setEditing(v)} className="p-1.5 text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)]"><Pencil size={15} /></button>
-                    <button aria-label={v.archived ? t('veh.unarchive') : t('veh.archive')} title={v.archived ? t('veh.unarchive') : t('veh.archive')} onClick={() => startTransition(async () => { await setVehicleArchived(v._id, !v.archived); })} className="p-1.5 text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)]">
+                    <Button size="sm" onClick={() => setLogFor({ vehicle: v, kind: 'fuel' })}><Fuel size={14} /> {t('veh.addFuel')}</Button>
+                    <Button size="sm" onClick={() => setLogFor({ vehicle: v, kind: 'service' })}><Wrench size={14} /> {t('veh.addService')}</Button>
+                    <button aria-label={t('common.edit')} title={t('common.edit')} onClick={() => setEditing(v)} className="p-1.5 rounded-lg text-[color:var(--color-text-faint)] hover:text-[color:var(--color-accent)]"><Pencil size={15} /></button>
+                    <button aria-label={v.archived ? t('veh.unarchive') : t('veh.archive')} title={v.archived ? t('veh.unarchive') : t('veh.archive')} onClick={() => startTransition(async () => { await setVehicleArchived(v._id, !v.archived); })} className="p-1.5 rounded-lg text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)]">
                       {v.archived ? <ArchiveRestore size={15} /> : <Archive size={15} />}
                     </button>
-                    <button aria-label={t('common.delete')} onClick={() => { if (confirm(t('veh.confirmDelete'))) startTransition(async () => { await deleteVehicle(v._id); }); }} className="p-1.5 text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)]"><Trash2 size={15} /></button>
+                    <button aria-label={t('common.delete')} title={t('common.delete')} onClick={() => removeVehicle(v)} className="p-1.5 rounded-lg text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)]"><Trash2 size={15} /></button>
                   </div>
                 </div>
 
@@ -123,7 +139,7 @@ export function VehiclesClient({ vehicles, logs, spaces, currency, leadDays }: {
                     const when = days === null ? '' : days < 0 ? t('veh.overdue', { n: -days }) : days === 0 ? t('veh.today') : t('veh.inDays', { n: days });
                     return (
                       <span key={k} className={`rounded-full border px-2.5 py-1 text-xs ${tone}`}>
-                        {t(DUE_LABEL[k])}: {new Date(at).toLocaleDateString(locale)} · {when}
+                        {t(DUE_LABEL[k])}: {formatDate(at, locale)} · {when}
                       </span>
                     );
                   })}
@@ -151,14 +167,14 @@ export function VehiclesClient({ vehicles, logs, spaces, currency, leadDays }: {
                                 {l.shop ? <span className="text-[color:var(--color-text-dim)]"> · {l.shop}</span> : null}
                               </p>
                               <p className="text-[11px] text-[color:var(--color-text-faint)]">
-                                {new Date(l.date).toLocaleDateString(locale)}
+                                {formatDate(l.date, locale)}
                                 {l.odometer !== null ? ` · ${l.odometer.toLocaleString(locale)} km` : ''}
                                 {c != null ? ` · ${c.toLocaleString(locale)} L/100km` : ''}
                                 {l.expenseId ? ` · ${t('veh.loggedExpense')}` : ''}
                               </p>
                             </div>
                             <span className="font-mono text-sm">{money(l.cost)}</span>
-                            <button aria-label={t('common.delete')} className="p-1.5 text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)]" onClick={() => startTransition(async () => { await deleteVehicleLog(l._id); })}><Trash2 size={14} /></button>
+                            <button aria-label={t('common.delete')} title={t('common.delete')} className="p-1.5 rounded-lg text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)]" onClick={() => removeLog(l._id)}><Trash2 size={14} /></button>
                           </div>
                         );
                       })}
@@ -187,25 +203,14 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
-  return (
-    <div className="fixed inset-0 z-50 bg-black/60 grid place-items-center p-4 overflow-y-auto" onMouseDown={onClose}>
-      <div onMouseDown={(e) => e.stopPropagation()} className={`w-full max-w-lg ${card} p-5`}>
-        <div className="flex justify-between mb-3"><h2 className="font-semibold">{title}</h2><button type="button" onClick={onClose}><X size={18} /></button></div>
-        {children}
-      </div>
-    </div>
-  );
-}
-
 function FormFooter({ error, pending, onClose }: { error: string; pending: boolean; onClose: () => void }) {
   const t = useT();
   return (
     <>
-      {error && <p className="text-xs text-[color:var(--color-red)]">{error}</p>}
-      <div className="flex justify-end gap-2">
-        <button type="button" onClick={onClose} className="px-3 py-2 text-sm">{t('common.cancel')}</button>
-        <button disabled={pending} className="rounded-lg bg-[color:var(--color-accent)] text-black px-4 py-2 text-sm font-semibold">{pending ? t('common.saving') : t('common.save')}</button>
+      {error && <p className="text-xs text-[color:var(--color-red)]" style={{ fontFamily: 'var(--font-mono)' }}>{error}</p>}
+      <div className="flex justify-end gap-2 pt-1">
+        <Button type="button" variant="ghost" onClick={onClose}><X size={14} /> {t('common.cancel')}</Button>
+        <Button type="submit" variant="primary" disabled={pending}><Check size={14} /> {pending ? t('common.saving') : t('common.save')}</Button>
       </div>
     </>
   );
@@ -232,24 +237,27 @@ function VehicleForm({ vehicle, spaces, onClose }: { vehicle: VehicleRow | null;
   }
 
   return (
-    <Modal title={vehicle ? t('veh.edit') : t('veh.add')} onClose={onClose}>
+    <Modal open onClose={onClose} title={vehicle ? t('veh.edit') : t('veh.add')} size="md">
       <form action={submit} className="space-y-3">
         {vehicle && <input type="hidden" name="id" value={vehicle._id} />}
         <div className="grid grid-cols-2 gap-3">
-          <label className="block text-xs">{t('veh.name')}<input name="name" required defaultValue={vehicle?.name} className={input} placeholder={t('veh.nameHint')} /></label>
-          <label className="block text-xs">{t('veh.plate')}<input name="plate" defaultValue={vehicle?.plate} className={input} /></label>
-          <label className="block text-xs">{t('veh.make')}<input name="make" defaultValue={vehicle?.make} className={input} /></label>
-          <label className="block text-xs">{t('veh.model')}<input name="model" defaultValue={vehicle?.model} className={input} /></label>
-          <label className="block text-xs">{t('veh.year')}<input name="year" type="number" min="1900" max="2100" defaultValue={vehicle?.year ?? ''} className={input} /></label>
-          <label className="block text-xs">{t('veh.space')}<input name="space" list="vehicle-spaces" defaultValue={vehicle?.space} className={input} /><datalist id="vehicle-spaces">{spaces.map((s) => <option key={s} value={s} />)}</datalist></label>
+          <Field label={t('veh.name')}><Input name="name" required defaultValue={vehicle?.name} placeholder={t('veh.nameHint')} /></Field>
+          <Field label={t('veh.plate')}><Input name="plate" defaultValue={vehicle?.plate} /></Field>
+          <Field label={t('veh.make')}><Input name="make" defaultValue={vehicle?.make} /></Field>
+          <Field label={t('veh.model')}><Input name="model" defaultValue={vehicle?.model} /></Field>
+          <Field label={t('veh.year')}><Input name="year" type="number" min="1900" max="2100" defaultValue={vehicle?.year ?? ''} /></Field>
+          <Field label={t('veh.space')}>
+            <Input name="space" list="vehicle-spaces" defaultValue={vehicle?.space} />
+            <datalist id="vehicle-spaces">{spaces.map((s) => <option key={s} value={s} />)}</datalist>
+          </Field>
         </div>
-        <p className="text-xs font-semibold pt-1">{t('veh.dates')}</p>
+        <p className="text-sm font-semibold pt-1">{t('veh.dates')}</p>
         <div className="grid grid-cols-2 gap-3">
           {VEHICLE_DUE_KINDS.map((k) => (
-            <label key={k} className="block text-xs">{t(DUE_LABEL[k])}<DateInput name={k} value={dates[k]} onValueChange={(v) => setDates((d) => ({ ...d, [k]: v }))} className={input} /></label>
+            <Field key={k} label={t(DUE_LABEL[k])}><DateInput name={k} value={dates[k]} onValueChange={(v) => setDates((d) => ({ ...d, [k]: v }))} /></Field>
           ))}
         </div>
-        <label className="block text-xs">{t('veh.notes')}<textarea name="notes" defaultValue={vehicle?.notes} className={input} rows={2} /></label>
+        <Field label={t('veh.notes')}><textarea name="notes" defaultValue={vehicle?.notes} className={controlClass} rows={2} /></Field>
         <FormFooter error={error} pending={pending} onClose={onClose} />
       </form>
     </Modal>
@@ -272,20 +280,20 @@ function LogForm({ vehicle, kind, onClose }: { vehicle: VehicleRow; kind: 'fuel'
   }
 
   return (
-    <Modal title={`${kind === 'fuel' ? t('veh.addFuel') : t('veh.addService')} · ${vehicle.name}`} onClose={onClose}>
+    <Modal open onClose={onClose} title={`${kind === 'fuel' ? t('veh.addFuel') : t('veh.addService')} · ${vehicle.name}`} size="md">
       <form action={submit} className="space-y-3">
         <input type="hidden" name="vehicleId" value={vehicle._id} />
         <input type="hidden" name="kind" value={kind} />
         <div className="grid grid-cols-2 gap-3">
-          <label className="block text-xs">{t('veh.date')}<DateInput name="date" required value={date} onValueChange={setDate} className={input} /></label>
-          <label className="block text-xs">{t('veh.odometer')}<input name="odometer" type="number" min="0" step="1" required={kind === 'fuel'} className={input} /></label>
-          {kind === 'fuel' && <label className="block text-xs">{t('veh.liters')}<input name="liters" type="number" min="0" step="any" required className={input} /></label>}
-          <label className="block text-xs">{t('veh.cost')}<input name="cost" type="number" min="0" step="any" className={input} /></label>
-          <label className={`block text-xs ${kind === 'fuel' ? '' : 'col-span-2'}`}>{kind === 'fuel' ? t('veh.station') : t('veh.garage')}<input name="shop" className={input} /></label>
+          <Field label={t('veh.date')}><DateInput name="date" required value={date} onValueChange={setDate} /></Field>
+          <Field label={t('veh.odometer')}><Input name="odometer" type="number" min="0" step="1" required={kind === 'fuel'} /></Field>
+          {kind === 'fuel' && <Field label={t('veh.liters')}><Input name="liters" type="number" min="0" step="any" required /></Field>}
+          <Field label={t('veh.cost')}><Input name="cost" type="number" min="0" step="any" /></Field>
+          <Field label={kind === 'fuel' ? t('veh.station') : t('veh.garage')} className={kind === 'fuel' ? '' : 'col-span-2'}><Input name="shop" /></Field>
         </div>
-        {kind === 'service' && <label className="block text-xs">{t('veh.serviceWhat')}<input name="description" required className={input} placeholder={t('veh.serviceHint')} /></label>}
-        {kind === 'fuel' && <label className="flex items-center gap-2 text-xs"><input type="checkbox" name="fullTank" defaultChecked /> {t('veh.fullTank')}</label>}
-        <label className="flex items-center gap-2 text-xs"><input type="checkbox" name="logExpense" defaultChecked /> {t('veh.logExpense')}</label>
+        {kind === 'service' && <Field label={t('veh.serviceWhat')}><Input name="description" required placeholder={t('veh.serviceHint')} /></Field>}
+        {kind === 'fuel' && <label className="flex items-center gap-2 text-sm text-[color:var(--color-text-dim)] cursor-pointer"><input type="checkbox" name="fullTank" defaultChecked /> {t('veh.fullTank')}</label>}
+        <label className="flex items-center gap-2 text-sm text-[color:var(--color-text-dim)] cursor-pointer"><input type="checkbox" name="logExpense" defaultChecked /> {t('veh.logExpense')}</label>
         <FormFooter error={error} pending={pending} onClose={onClose} />
       </form>
     </Modal>

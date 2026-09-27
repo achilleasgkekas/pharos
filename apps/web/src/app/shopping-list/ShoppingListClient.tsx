@@ -1,11 +1,13 @@
 'use client';
 import { useState, useRef, useTransition, useMemo } from 'react';
 import { Camera, Plus, Check, Loader2, Trash2, Sparkles, ShoppingBasket, Search, CheckSquare, Repeat2 } from 'lucide-react';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { Field } from '@/components/ui/Field';
 import { cn } from '@/components/ui/cn';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
-import { PAGE_MAIN, PageHeader, HeaderButton, ViewToggle, PrimaryAction, FilterLayout } from '@/components/ui/PageHeader';
-import { Input } from '@/components/ui/Input';
+import { PAGE_MAIN, PageHeader, HeaderButton, ViewToggle, PrimaryAction, FilterLayout, FilterSection, FilterOptions } from '@/components/ui/PageHeader';
+import { Input, controlClass, filterControlClass } from '@/components/ui/Input';
 import { useT } from '@/components/LocaleProvider';
 import { shrinkImage } from '@/lib/clientImage';
 import { compareNames } from '@/lib/i18n/format';
@@ -217,52 +219,36 @@ export function ShoppingListClient({ initialItems }: { initialItems: SerializedL
     addItem(d, true); // optimistic + persist + rollback-on-failure, marked AI-scanned
   }
 
-  const fLabel = 'text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-[0.12em] mb-1.5';
-  const selCls =
-    'w-full bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-3 py-1.5 text-xs text-[color:var(--color-text-dim)] focus:outline-none focus:border-[color:var(--color-accent)]';
   const statusLabel = (v: StatusFilter) => (v === 'all' ? t('common.all') : v === 'todo' ? t('sl.fToBuy') : t('sl.fBought'));
   const anyF = statusFilter !== 'all' || !!catFilter || !!search || sortBy !== 'recent';
 
   const filterControls = (
     <div className="space-y-4">
       <Input icon={<Search size={14} />} placeholder={t('common.search')} value={search} onChange={(e) => setSearch(e.target.value)} />
-      <div>
-        <p className={fLabel} style={mono}>{t('common.status')}</p>
-        <div className="flex flex-col gap-1">
-          {(['all', 'todo', 'bought'] as const).map((v) => (
-            <button
-              key={v}
-              onClick={() => setStatusFilter(v)}
-              className={cn(
-                'text-left px-3 py-1.5 rounded-lg text-xs font-semibold transition-all',
-                statusFilter === v ? 'bg-[color:var(--color-accent)] text-black' : 'text-[color:var(--color-text-dim)] hover:bg-[color:var(--color-surface-2)] hover:text-[color:var(--color-text)]'
-              )}
-              style={mono}
-            >
-              {statusLabel(v)}
-            </button>
-          ))}
-        </div>
-      </div>
+      <FilterSection label={t('common.status')}>
+        <FilterOptions
+          value={statusFilter}
+          onChange={setStatusFilter}
+          options={(['all', 'todo', 'bought'] as const).map((v) => ({ value: v, label: statusLabel(v) }))}
+        />
+      </FilterSection>
       {cats.length > 0 && (
-        <div>
-          <p className={fLabel} style={mono}>{t('common.category')}</p>
-          <select value={catFilter} onChange={(e) => setCatFilter(e.target.value)} className={selCls} style={mono}>
+        <FilterSection label={t('common.category')}>
+          <select value={catFilter} onChange={(e) => setCatFilter(e.target.value)} className={filterControlClass} style={mono}>
             <option value="">{t('common.all')}</option>
             {cats.map((c) => (
               <option key={c} value={c}>{c}</option>
             ))}
           </select>
-        </div>
+        </FilterSection>
       )}
-      <div>
-        <p className={fLabel} style={mono}>{t('common.sort')}</p>
-        <select value={sortBy} onChange={(e) => setSortBy(e.target.value as SortKey)} className={selCls} style={mono}>
+      <FilterSection label={t('common.sort')}>
+        <select value={sortBy} onChange={(e) => setSortBy(e.target.value as SortKey)} className={filterControlClass} style={mono}>
           <option value="recent">{t('sl.sortRecent')}</option>
           <option value="name">{t('sl.sortName')}</option>
           <option value="category">{t('common.category')}</option>
         </select>
-      </div>
+      </FilterSection>
       {anyF && (
         <button
           onClick={() => { setStatusFilter('all'); setCatFilter(''); setSearch(''); setSortBy('recent'); }}
@@ -311,10 +297,7 @@ export function ShoppingListClient({ initialItems }: { initialItems: SerializedL
 
           {/* Items */}
           {visible.length === 0 ? (
-            <div className="text-center py-20 text-[color:var(--color-text-faint)]">
-              <ShoppingBasket size={40} className="mx-auto mb-3 opacity-40" />
-              <p className="text-sm">{items.length === 0 ? t('sl.empty') : t('sl.noMatch')}</p>
-            </div>
+            <EmptyState icon={<ShoppingBasket />} title={items.length === 0 ? t('sl.empty') : t('sl.noMatch')} />
           ) : (
             <div className={cn(layout === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3' : 'flex flex-col gap-2')}>
               {visible.map((it) =>
@@ -341,21 +324,21 @@ export function ShoppingListClient({ initialItems }: { initialItems: SerializedL
         <Modal open onClose={() => setShowAdd(false)} title={t('sl.addTitle')} size="sm">
           <div className="space-y-3">
             <Field label={t('sl.name')}>
-              <input autoFocus value={addForm.name} onChange={(e) => setAddForm({ ...addForm, name: e.target.value })} onKeyDown={(e) => { if (e.key === 'Enter') submitAdd(); }} className={inputCls} />
+              <input autoFocus value={addForm.name} onChange={(e) => setAddForm({ ...addForm, name: e.target.value })} onKeyDown={(e) => { if (e.key === 'Enter') submitAdd(); }} className={controlClass} />
             </Field>
             <div className="grid grid-cols-2 gap-3">
               <Field label={t('sl.qty')}>
-                <input value={addForm.quantity} onChange={(e) => setAddForm({ ...addForm, quantity: e.target.value })} onKeyDown={(e) => { if (e.key === 'Enter') submitAdd(); }} className={inputCls} />
+                <input value={addForm.quantity} onChange={(e) => setAddForm({ ...addForm, quantity: e.target.value })} onKeyDown={(e) => { if (e.key === 'Enter') submitAdd(); }} className={controlClass} />
               </Field>
               <Field label={t('sl.category')}>
-                <input value={addForm.category} onChange={(e) => setAddForm({ ...addForm, category: e.target.value })} onKeyDown={(e) => { if (e.key === 'Enter') submitAdd(); }} className={inputCls} />
+                <input value={addForm.category} onChange={(e) => setAddForm({ ...addForm, category: e.target.value })} onKeyDown={(e) => { if (e.key === 'Enter') submitAdd(); }} className={controlClass} />
               </Field>
             </div>
             <Field label={t('sl.brand')}>
-              <input value={addForm.brand} onChange={(e) => setAddForm({ ...addForm, brand: e.target.value })} onKeyDown={(e) => { if (e.key === 'Enter') submitAdd(); }} className={inputCls} />
+              <input value={addForm.brand} onChange={(e) => setAddForm({ ...addForm, brand: e.target.value })} onKeyDown={(e) => { if (e.key === 'Enter') submitAdd(); }} className={controlClass} />
             </Field>
             <Field label={t('sl.restockDays')}>
-              <input type="number" min="1" max="3650" step="1" placeholder={t('sl.restockPlaceholder')} value={addForm.restockIntervalDays} onChange={(e) => setAddForm({ ...addForm, restockIntervalDays: e.target.value })} className={inputCls} />
+              <input type="number" min="1" max="3650" step="1" placeholder={t('sl.restockPlaceholder')} value={addForm.restockIntervalDays} onChange={(e) => setAddForm({ ...addForm, restockIntervalDays: e.target.value })} className={controlClass} />
             </Field>
             <div className="flex items-center gap-2 pt-1">
               <Button variant="primary" onClick={submitAdd} disabled={!addForm.name.trim()}>
@@ -372,7 +355,7 @@ export function ShoppingListClient({ initialItems }: { initialItems: SerializedL
           <div className="space-y-3">
             <p className="text-xs text-[color:var(--color-text-dim)]">{t('sl.restockHint')}</p>
             <Field label={t('sl.restockDays')}>
-              <input autoFocus type="number" min="1" max="3650" step="1" placeholder={t('sl.restockPlaceholder')} value={restockDays} onChange={(e) => setRestockDays(e.target.value)} className={inputCls} />
+              <input autoFocus type="number" min="1" max="3650" step="1" placeholder={t('sl.restockPlaceholder')} value={restockDays} onChange={(e) => setRestockDays(e.target.value)} className={controlClass} />
             </Field>
             <div className="flex gap-2"><Button variant="primary" onClick={saveRestock}>{t('common.save')}</Button><Button variant="ghost" onClick={() => setRestockItem(null)}>{t('common.cancel')}</Button></div>
           </div>
@@ -387,18 +370,18 @@ export function ShoppingListClient({ initialItems }: { initialItems: SerializedL
               <Sparkles size={13} className="text-[color:var(--color-accent)]" /> {t('sl.verifyHint')}
             </p>
             <Field label={t('sl.name')}>
-              <input autoFocus value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} className={inputCls} />
+              <input autoFocus value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} className={controlClass} />
             </Field>
             <div className="grid grid-cols-2 gap-3">
               <Field label={t('sl.qty')}>
-                <input value={draft.quantity} onChange={(e) => setDraft({ ...draft, quantity: e.target.value })} className={inputCls} />
+                <input value={draft.quantity} onChange={(e) => setDraft({ ...draft, quantity: e.target.value })} className={controlClass} />
               </Field>
               <Field label={t('sl.category')}>
-                <input value={draft.category} onChange={(e) => setDraft({ ...draft, category: e.target.value })} className={inputCls} />
+                <input value={draft.category} onChange={(e) => setDraft({ ...draft, category: e.target.value })} className={controlClass} />
               </Field>
             </div>
             <Field label={t('sl.brand')}>
-              <input value={draft.brand} onChange={(e) => setDraft({ ...draft, brand: e.target.value })} className={inputCls} />
+              <input value={draft.brand} onChange={(e) => setDraft({ ...draft, brand: e.target.value })} className={controlClass} />
             </Field>
             <div className="flex items-center gap-2 pt-1">
               <Button variant="primary" onClick={addDraft} disabled={!draft.name.trim()}>
@@ -413,17 +396,7 @@ export function ShoppingListClient({ initialItems }: { initialItems: SerializedL
   );
 }
 
-const inputCls =
-  'w-full bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-3 py-2 text-sm outline-none focus:border-[color:var(--color-accent)]';
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="block">
-      <span className="block text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)] mb-1" style={mono}>{label}</span>
-      {children}
-    </label>
-  );
-}
 
 function Box({ checked, accent, onClick }: { checked: boolean; accent: boolean; onClick?: (e: React.MouseEvent) => void }) {
   return (

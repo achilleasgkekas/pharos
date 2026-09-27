@@ -3,10 +3,10 @@ import { useEffect, useState } from 'react';
 import { Copy, Check, Loader2, KeyRound, RefreshCw, Trash2 } from 'lucide-react';
 import { getMcpStatus, generateApiToken, revokeApiToken } from './mcpActions';
 import { useT } from '@/components/LocaleProvider';
+import { FIELD_LABEL } from '@/components/ui/Field';
 
 const codeCls = 'flex-1 min-w-0 text-xs bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-3 py-2 truncate';
 const iconBtn = 'shrink-0 p-2 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:border-[color:var(--color-accent)] transition-colors';
-const labelCls = 'block text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)] mb-1';
 
 /** Settings card: a per-user bearer token + connector URL for the remote MCP server. */
 export function McpManager() {
@@ -54,7 +54,7 @@ export function McpManager() {
 
       {/* Connector URL */}
       <div>
-        <span className={labelCls} style={{ fontFamily: 'var(--font-mono)' }}>{t('mcp.connectorUrl')}</span>
+        <span className={FIELD_LABEL} style={{ fontFamily: 'var(--font-mono)' }}>{t('mcp.connectorUrl')}</span>
         <div className="flex items-center gap-2">
           <code className={codeCls} style={{ fontFamily: 'var(--font-mono)' }}>{url}</code>
           <button type="button" onClick={() => copy(url, 'url')} className={iconBtn} title={t('mcp.copyUrl')}>
@@ -68,7 +68,7 @@ export function McpManager() {
 
       {/* Token */}
       <div>
-        <span className={labelCls} style={{ fontFamily: 'var(--font-mono)' }}>{t('mcp.apiToken')}</span>
+        <span className={FIELD_LABEL} style={{ fontFamily: 'var(--font-mono)' }}>{t('mcp.apiToken')}</span>
         {token ? (
           <div className="space-y-1.5">
             <div className="flex items-center gap-2">

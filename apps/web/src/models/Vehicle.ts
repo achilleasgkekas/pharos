@@ -1,5 +1,6 @@
 import { Schema, model, models, type Model, type InferSchemaType } from 'mongoose';
 import { softDeletePlugin } from '@/lib/softDelete';
+import { createdByPlugin } from '@/lib/createdBy';
 
 // P110 (#126): a car or motorbike, with the dates that expire on it. Fuel fills and services
 // live in VehicleLog; consumption, cost per km and the current odometer are derived from the
@@ -25,6 +26,7 @@ const VehicleSchema = new Schema(
 
 VehicleSchema.index({ updatedAt: -1 });
 VehicleSchema.plugin(softDeletePlugin);
+VehicleSchema.plugin(createdByPlugin); // P75: who added it (display only)
 
 export type VehicleDoc = InferSchemaType<typeof VehicleSchema> & { _id: string };
 export const Vehicle: Model<VehicleDoc> = (models.Vehicle as Model<VehicleDoc>) || model<VehicleDoc>('Vehicle', VehicleSchema);

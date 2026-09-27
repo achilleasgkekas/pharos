@@ -1,5 +1,6 @@
 import { Schema, model, models, type Model, type InferSchemaType } from 'mongoose';
 import { softDeletePlugin } from '@/lib/softDelete';
+import { createdByPlugin } from '@/lib/createdBy';
 
 const VoucherSchema = new Schema(
   {
@@ -19,6 +20,7 @@ const VoucherSchema = new Schema(
 VoucherSchema.index({ updatedAt: -1 });
 
 VoucherSchema.plugin(softDeletePlugin);
+VoucherSchema.plugin(createdByPlugin); // P75: who added it (display only)
 
 export type VoucherDoc = InferSchemaType<typeof VoucherSchema> & { _id: string };
 

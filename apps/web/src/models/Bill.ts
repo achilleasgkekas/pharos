@@ -1,5 +1,6 @@
 import { Schema, model, models, type Model, type InferSchemaType } from 'mongoose';
 import { softDeletePlugin } from '@/lib/softDelete';
+import { createdByPlugin } from '@/lib/createdBy';
 
 // P28 — bill / payable status tracker (due → paid → overdue). Distinct from
 // Subscription (an AUTOMATIC recurring charge) and from /calendar (which only
@@ -65,6 +66,7 @@ const BillSchema = new Schema(
 BillSchema.index({ updatedAt: -1 });
 
 BillSchema.plugin(softDeletePlugin);
+BillSchema.plugin(createdByPlugin); // P75: who added it (display only)
 
 export type BillDoc = InferSchemaType<typeof BillSchema> & { _id: string };
 

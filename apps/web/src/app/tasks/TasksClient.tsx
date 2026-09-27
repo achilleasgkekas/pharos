@@ -1,5 +1,6 @@
 'use client';
 import { PAGE_MAIN, PageHeader, ViewToggle, PrimaryAction, FilterLayout, FilterSection, FilterOptions } from '@/components/ui/PageHeader';
+import { CreatedBy } from '@/components/CreatedBy';
 import { useState, useTransition, useMemo, useEffect } from 'react';
 import {
   Plus,
@@ -15,10 +16,12 @@ import {
   List as ListIcon,
   ChevronLeft,
   ChevronRight,
+  CheckSquare,
 } from 'lucide-react';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
+import { Input, controlClass } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { cn } from '@/components/ui/cn';
@@ -271,10 +274,7 @@ export function TasksClient({ tasks }: { tasks: SerializedTask[] }) {
                 {t('tk.tasksCount', { n: listFiltered.length, total: localTasks.length })}
               </div>
               {listFiltered.length === 0 ? (
-                <div className="text-center py-20 text-[color:var(--color-text-faint)]">
-                  <p className="text-5xl mb-4">✅</p>
-                  <p className="text-sm">{localTasks.length === 0 ? 'No tasks yet.' : 'No tasks match these filters.'}</p>
-                </div>
+                <EmptyState icon={<CheckSquare />} title={localTasks.length === 0 ? t('tk.empty') : t('ex.emptyFiltered')} />
               ) : (
                 <div className="space-y-1.5">
                   {listFiltered.map((task) => (
@@ -435,13 +435,13 @@ function TaskCreateForm({ onClose }: { onClose: () => void }) {
         style={{ fontFamily: 'var(--font-display)' }}
       />
       <div className="flex flex-wrap gap-3 items-center">
-        <select value={form.status} onChange={set('status')} className={selectClass}>
-          {TASK_STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+        <select value={form.status} onChange={set('status')} className={cn(controlClass, 'w-auto')}>
+          {TASK_STATUSES.map((s) => <option key={s} value={s}>{t(STATUS_KEY[s] ?? 'tk.todo')}</option>)}
         </select>
-        <select value={form.priority} onChange={set('priority')} className={selectClass}>
-          {PRIORITIES.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+        <select value={form.priority} onChange={set('priority')} className={cn(controlClass, 'w-auto')}>
+          {PRIORITIES.map((p) => <option key={p.value} value={p.value}>{t(p.key)}</option>)}
         </select>
-        <Input value={form.tags} onChange={set('tags')} placeholder="tags, comma separated" className="flex-1 min-w-[160px]" />
+        <Input value={form.tags} onChange={set('tags')} placeholder={t('tk.tagsPlaceholder')} className="flex-1 min-w-[160px]" />
       </div>
       <div>
         <h3 className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider mb-2" style={{ fontFamily: 'var(--font-mono)' }}>Details</h3>
@@ -541,19 +541,12 @@ function TaskRow({ task, onOpen }: { task: SerializedTask; onOpen: () => void })
 
 // ─── Task Detail (full-screen) ─────────────────────────────────────────────
 
-const TASK_STATUSES = [
-  { value: 'todo', label: 'Todo' },
-  { value: 'in-progress', label: 'In Progress' },
-  { value: 'blocked', label: 'Blocked' },
-  { value: 'done', label: 'Done' },
+const TASK_STATUSES = ['todo', 'in-progress', 'blocked', 'done'] as const;
+const PRIORITIES: { value: string; key: TKey }[] = [
+  { value: 'low', key: 'tk.prLow' },
+  { value: 'normal', key: 'tk.prNormal' },
+  { value: 'high', key: 'tk.prHigh' },
 ];
-const PRIORITIES = [
-  { value: 'low', label: 'Low' },
-  { value: 'normal', label: 'Normal' },
-  { value: 'high', label: 'High' },
-];
-const selectClass =
-  'bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-[color:var(--color-accent)]';
 
 function TaskDetailModal({ task, onClose }: { task: SerializedTask; onClose: () => void }) {
   const t = useT();
@@ -605,13 +598,14 @@ function TaskDetailModal({ task, onClose }: { task: SerializedTask; onClose: () 
           style={{ fontFamily: 'var(--font-display)' }}
         />
         <div className="flex flex-wrap gap-3 items-center">
-          <select value={form.status} onChange={set('status')} className={selectClass}>
-            {TASK_STATUSES.map((s) => <option key={s.value} value={s.value}>{t(STATUS_KEY[s.value] ?? 'tk.todo')}</option>)}
+          <select value={form.status} onChange={set('status')} className={cn(controlClass, 'w-auto')}>
+            {TASK_STATUSES.map((s) => <option key={s} value={s}>{t(STATUS_KEY[s] ?? 'tk.todo')}</option>)}
           </select>
-          <select value={form.priority} onChange={set('priority')} className={selectClass}>
-            {PRIORITIES.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+          <select value={form.priority} onChange={set('priority')} className={cn(controlClass, 'w-auto')}>
+            {PRIORITIES.map((p) => <option key={p.value} value={p.value}>{t(p.key)}</option>)}
           </select>
-          <Input value={form.tags} onChange={set('tags')} placeholder="tags, comma separated" className="flex-1 min-w-[160px]" />
+          <Input value={form.tags} onChange={set('tags')} placeholder={t('tk.tagsPlaceholder')} className="flex-1 min-w-[160px]" />
+          <CreatedBy id={task.createdBy} />
         </div>
 
         {/* Steps */}

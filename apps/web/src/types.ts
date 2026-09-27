@@ -18,6 +18,8 @@ export type SerializedAttachment = {
 
 export type SerializedItem = {
   _id: string;
+  /** P75: the User who created it. Absent/null = unknown (pre-P75, or a background job). */
+  createdBy?: string | null;
   num: string;
   title: string;
   category: string;
@@ -83,6 +85,9 @@ export type SerializedItem = {
   warrantyUntil: string | null;
   serialNumber: string;
   location: string;
+  /** P39: the build this item is a part of. Absent on documents written before P39: read
+   *  it as `item.bundle ?? ''`. See lib/bundles.ts for the roll-up. */
+  bundle?: string;
   aiFilledAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -96,6 +101,8 @@ export type SerializedStep = {
 
 export type SerializedTask = {
   _id: string;
+  /** P75: the User who created it. Absent/null = unknown (pre-P75, or a background job). */
+  createdBy?: string | null;
   title: string;
   description: string;
   content: string;
@@ -123,6 +130,8 @@ export type SerializedLineItem = {
 
 export type SerializedReceipt = {
   _id: string;
+  /** P75: the User who created it. Absent/null = unknown (pre-P75, or a background job). */
+  createdBy?: string | null;
   store: string;
   date: string;
   total: number;
@@ -158,6 +167,8 @@ export type SerializedReceipt = {
 
 export type SerializedExpense = {
   _id: string;
+  /** P75: the User who created it. Absent/null = unknown (pre-P75, or a background job). */
+  createdBy?: string | null;
   kind: 'income' | 'expense';
   vendor: string;
   vendorKey: string;
@@ -202,6 +213,8 @@ export type SerializedExpense = {
 
 export type SerializedVoucher = {
   _id: string;
+  /** P75: the User who created it. Absent/null = unknown (pre-P75, or a background job). */
+  createdBy?: string | null;
   title: string;
   code: string;
   store: string;
@@ -217,6 +230,8 @@ export type SerializedVoucher = {
 // P28 — a manually-paid bill/payable whose status (paid/overdue/due-soon) is derived.
 export type SerializedBill = {
   _id: string;
+  /** P75: the User who created it. Absent/null = unknown (pre-P75, or a background job). */
+  createdBy?: string | null;
   title: string;
   vendor: string;
   amount: number;
@@ -242,6 +257,8 @@ export type SerializedBill = {
 // P50: recurring personal dates (birthdays / anniversaries).
 export type SerializedSpecialDate = {
   _id: string;
+  /** P75: the User who created it. Absent/null = unknown (pre-P75, or a background job). */
+  createdBy?: string | null;
   name: string;
   type: string;
   month: number;
@@ -256,6 +273,8 @@ export type SerializedSpecialDate = {
 // P42: personal document expiry tracker.
 export type SerializedDocument = {
   _id: string;
+  /** P75: the User who created it. Absent/null = unknown (pre-P75, or a background job). */
+  createdBy?: string | null;
   title: string;
   type: string;
   holder: string;
@@ -285,6 +304,8 @@ export type SerializedCard = {
 
 export type SerializedSubscription = {
   _id: string;
+  /** P75: the User who created it. Absent/null = unknown (pre-P75, or a background job). */
+  createdBy?: string | null;
   name: string;
   provider: string;
   category: string;

@@ -1,0 +1,6 @@
+# CI only (ci.yml "Docker image builds"): run the real docker-compose.yml stack, but with the
+# web image the job just built instead of building it again.
+services:
+  web:
+    image: pharos-web:ci
+    pull_policy: never

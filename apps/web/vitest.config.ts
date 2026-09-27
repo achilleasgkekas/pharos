@@ -23,6 +23,8 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['src/**/*.test.ts'],
+    // Integration tests need a real MongoDB: `npm run test:integration` (vitest.integration.config.ts).
+    exclude: ['src/**/*.int.test.ts', '**/node_modules/**'],
     globals: false,
     // Only collected with `npm run test:coverage` (CI uploads the HTML report as an artifact).
     coverage: {

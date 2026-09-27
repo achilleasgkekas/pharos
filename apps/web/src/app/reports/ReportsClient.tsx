@@ -739,7 +739,7 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
         {/* Expenses by category (bills) */}
         <Card title={inWindow(t('reports.cExpByCat'))}>
           {data.expenseByCategory.length === 0 ? (
-            <Empty text="No expenses logged yet" />
+            <Empty text={t('reports.noExpenses')} />
           ) : (
             <ResponsiveContainer width="100%" height={Math.max(200, data.expenseByCategory.length * 34)}>
               <BarChart data={data.expenseByCategory} layout="vertical" margin={{ left: 8, right: 16 }}>
@@ -777,7 +777,7 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
         {/* Subscriptions monthly by category */}
         <Card title={t('reports.cSubsByCat', { cur: cur() })}>
           {data.subsByCategory.length === 0 ? (
-            <Empty text="No active subscriptions" />
+            <Empty text={t('reports.noSubscriptions')} />
           ) : (
             <ResponsiveContainer width="100%" height={240}>
               <BarChart data={data.subsByCategory} margin={{ left: 0, right: 8 }}>

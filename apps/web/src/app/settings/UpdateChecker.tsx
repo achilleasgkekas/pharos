@@ -72,7 +72,7 @@ export function UpdateChecker({ canEdit }: { canEdit: boolean }) {
           rel="noopener noreferrer"
           className={cn(
             'flex items-center gap-2 rounded-lg border px-3 py-2 text-xs transition-colors',
-            'border-[color:var(--color-gold)] bg-[#ffd93d10] text-[color:var(--color-gold)] hover:bg-[#ffd93d1a]'
+            'border-[color:var(--color-gold)] bg-[color:var(--color-gold)]/6 text-[color:var(--color-gold)] hover:bg-[color:var(--color-gold)]/10'
           )}
           style={{ fontFamily: 'var(--font-mono)' }}
         >
@@ -118,6 +118,7 @@ export function UpdateChecker({ canEdit }: { canEdit: boolean }) {
           <button
             type="button"
             role="switch"
+            aria-label={t('upd.toggle')}
             aria-checked={!!status.enabled}
             onClick={() => toggle(!status.enabled)}
             className={cn(

@@ -1,11 +1,14 @@
 'use client';
 import { useState, useTransition, useRef, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Activity, Sun, Moon, Sparkles, Database, CreditCard, ExternalLink, Server, Cloud, Download, Upload, Loader2, Check, Store as StoreIcon, Pencil, Trash2, Plus, X, Copy, ShieldCheck, SlidersHorizontal, Bell, MessageSquareCode, RotateCcw, ChevronDown, Globe, HardDrive, FolderTree, RefreshCw, Plug, Users, UserPlus, KeyRound, Star, Landmark, TrendingUp, TrendingDown, CalendarPlus, Tags, MapPin, FlaskConical, Webhook, Mail, Bookmark, LogOut } from 'lucide-react';
+import { Activity, Sun, Moon, Sparkles, Database, CreditCard, ExternalLink, Server, Cloud, Download, Upload, Loader2, Check, Store as StoreIcon, Pencil, Trash2, Plus, X, Copy, ShieldCheck, SlidersHorizontal, Bell, MessageSquareCode, RotateCcw, ChevronDown, Globe, HardDrive, FolderTree, RefreshCw, Plug, Users, UserPlus, KeyRound, Star, Landmark, TrendingUp, TrendingDown, CalendarPlus, Tags, MapPin, FlaskConical, Webhook, Mail, Bookmark, LogOut, History } from 'lucide-react';
 import { useTheme, type Theme } from '@/components/ThemeProvider';
 import { cur } from '@/lib/money';
 import { cn } from '@/components/ui/cn';
-import { useConfirm } from '@/components/ui/ConfirmDialog';
+import { PAGE_MAIN, PageHeader } from '@/components/ui/PageHeader';
+import { controlClass } from '@/components/ui/Input';
+import { Field } from '@/components/ui/Field';
+import { useConfirm, usePrompt } from '@/components/ui/ConfirmDialog';
 import { saveAiConfig, pullOllamaModel, testAnthropic, saveStore, deleteStore, setAiConfirmBulk, exportData, exportDataEncrypted, importData, importDataEncrypted, verifyBackup, exportCSV, exportInsuranceBundle, exportTaxBundle, saveBudgets, saveBudgetRollover, suggestBudgets, saveAssetAccounts, saveDepreciation, saveCategoryRules, setAiEnabled, setAiFeature, fetchProviderModels } from './actions';
 import { applyCategoryRulesToExisting } from '@/app/expenses/actions';
 import type { CategoryRule } from '@/lib/categoryRules';
@@ -18,7 +21,7 @@ import type { AppSettings } from '@/lib/appSettings';
 import { rateForCategory } from '@/lib/depreciation';
 import { saveDefaults, runAlertChecks, getNotifierChannels, saveNotifierChannels, getNotifyTypes, saveNotifyTypes, getQuietHours, saveQuietHours, testNotifierChannel, getDeliveryLogs, getWebhookSubscriptions, saveWebhookSubscriptions, testWebhookSubscription, savePrompt, resetPrompt, saveScraperAi, saveStorageConfig, testRemoteConnection, testSecondaryRemote, syncToRemote, saveList, saveSpaces, getTrash, restoreFromTrash, purgeFromTrash, emptyTrash, startOnedriveAuth, pollOnedriveAuth, disconnectOnedriveAccount, testOnedriveConnection, saveImapConfigAction, testImapConnectionAction, checkImapInboxNow, type PromptEditorEntry, type ScraperAiConfig, type StorageInfo, type ListEditorEntry, type TrashRow, type ImapInfo } from './actions';
 import { enqueueOnedriveSync } from '@/app/jobActions';
-import { NOTIFIER_TYPES, type NotifierConfig, type NotifierType } from '@/lib/notifiers.shared';
+import { DEFAULT_SMTP_PORT, NOTIFIER_TYPES, type NotifierConfig, type NotifierType } from '@/lib/notifiers.shared';
 import { ALERT_TYPES, type AlertType, type NotifyTypes } from '@/lib/alertTypes';
 import { notifierLogKey, webhookLogKey, type DeliveryLogEntry } from '@/lib/deliveryLog.shared';
 import { WEBHOOK_EVENTS, type WebhookSubscription, type WebhookEvent } from '@/lib/webhooks.shared';
@@ -42,6 +45,8 @@ import { mfaCodeReady, mfaPasswordReady, describeMfaError } from '@/lib/mfaSetti
 import { QrCode } from '@/components/QrCode';
 import { McpManager } from './McpManager';
 import { CalendarFeedManager } from './CalendarFeedManager';
+import { ActivityFeed } from './ActivityFeed';
+import { useAttributionNames } from '@/components/CreatedBy';
 import { UpdateChecker } from './UpdateChecker';
 import { WebPushToggle } from './WebPushToggle';
 import { BookmarkletManager } from './BookmarkletManager';
@@ -51,7 +56,7 @@ import { getSampleDataStatus, loadSampleData, clearSampleData } from './sampleDa
 import { renderStoragePath, TEMPLATE_TOKENS } from '@/lib/storagePath';
 import { CURRENCIES } from '@/lib/money';
 import type { SerializedCard } from '@/types';
-import { useT, useLocale } from '@/components/LocaleProvider';
+import { useT, useLocale, useMoney } from '@/components/LocaleProvider';
 import { SHOPPING_COUNTRIES, SHOPPING_PRESETS } from '@/lib/shoppingRegion';
 import type { TKey } from '@/lib/i18n';
 import { formatDate, formatTime, formatDateTime } from '@/lib/i18n/format';
@@ -101,6 +106,24 @@ type Info = {
   lists: ListEditorEntry[];
 };
 
+// Settings shows these in the app language; lib/notifiers.shared and lib/webhooks.shared keep
+// the English originals for the server side.
+const NOTIF_HINT: Record<NotifierType, TKey> = {
+  ntfy: 'notif.hintNtfy',
+  discord: 'notif.hintDiscord',
+  slack: 'notif.hintSlack',
+  telegram: 'notif.hintTelegram',
+  webhook: 'notif.hintWebhook',
+  email: 'notif.hintEmail',
+};
+const WH_EVENT: Record<WebhookEvent, { label: TKey; hint: TKey }> = {
+  'receipt.parsed': { label: 'wh.evReceipt', hint: 'wh.evReceiptHint' },
+  'budget.exceeded': { label: 'wh.evBudget', hint: 'wh.evBudgetHint' },
+  'installment.due': { label: 'wh.evInstallment', hint: 'wh.evInstallmentHint' },
+  'price.drop': { label: 'wh.evPrice', hint: 'wh.evPriceHint' },
+};
+const CSV_KIND: Record<'receipts' | 'expenses' | 'items', TKey> = { receipts: 'nav.receipts', expenses: 'nav.expenses', items: 'nav.inventory' };
+
 // Vision-capable local models that fit a Mac mini M4 16GB (receipts/cards need vision).
 const MODEL_SUGGESTIONS: { name: string; note: string; vision: boolean }[] = [
   { name: 'qwen2.5vl:7b', note: 'Vision+text · ~6GB · balanced default', vision: true },
@@ -118,13 +141,13 @@ const OPENROUTER_SUGGESTIONS = ['openai/gpt-4o-mini', 'anthropic/claude-3.5-sonn
 // Mirror of the server-side vision detection (lib/aiConfig.ts) for inline warnings.
 const isVisionName = (name: string) => /vl|vision|llava|minicpm-v|moondream|bakllava|llama3\.2-vision/i.test(name);
 
-type TabId = 'general' | 'money' | 'ai' | 'storage' | 'data' | 'notifications' | 'users' | 'system';
+type TabId = 'general' | 'money' | 'ai' | 'storage' | 'data' | 'notifications' | 'users' | 'activity' | 'system';
 
 import type { Role } from '@/lib/roles';
 
 type CurrentUser = { id: string; name: string; role: Role };
 
-const TABS: { id: TabId; label: string; icon: React.ReactNode; adminOnly?: boolean; selfHostOnly?: boolean }[] = [
+const TABS: { id: TabId; label: string; icon: React.ReactNode; adminOnly?: boolean; selfHostOnly?: boolean; multiUserOnly?: boolean }[] = [
   { id: 'general', label: 'General', icon: <SlidersHorizontal size={15} /> },
   { id: 'money', label: 'Money', icon: <CreditCard size={15} /> },
   // Hosted: AI moves to Workspace → AI (key + toggles in one control-plane place), so hide the
@@ -134,6 +157,9 @@ const TABS: { id: TabId; label: string; icon: React.ReactNode; adminOnly?: boole
   { id: 'data', label: 'Stores & lists', icon: <StoreIcon size={15} /> },
   { id: 'notifications', label: 'Notifications', icon: <Bell size={15} />, adminOnly: true },
   { id: 'users', label: 'Users', icon: <Users size={15} />, adminOnly: true, selfHostOnly: true },
+  // P89 (#23): who added or trashed what. Every role may read it, but only once there is a
+  // second account: on a single-user install there is nobody else's activity to show.
+  { id: 'activity', label: 'Activity', icon: <History size={15} />, multiUserOnly: true },
   // P77 — host-level numbers (Mongo latency, volume free space, job queue). Shared
   // infrastructure on the managed SaaS, so self-host + admin only.
   { id: 'system', label: 'System status', icon: <Activity size={15} />, adminOnly: true, selfHostOnly: true },
@@ -147,6 +173,7 @@ const TAB_KEY: Record<TabId, TKey> = {
   data: 'set.tabData',
   notifications: 'set.tabNotifications',
   users: 'set.tabUsers',
+  activity: 'set.tabActivity',
   system: 'set.tabSystem',
 };
 
@@ -155,7 +182,8 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
   const t = useT();
   const [tab, setTab] = useState<TabId>('general');
   const isAdmin = currentUser.role === 'admin';
-  const visibleTabs = TABS.filter((t) => (!t.adminOnly || isAdmin));
+  const multiUser = useAttributionNames() !== null;
+  const visibleTabs = TABS.filter((t) => (!t.adminOnly || isAdmin) && (!t.multiUserOnly || multiUser));
   const searchParams = useSearchParams();
 
   // A ?tab= deep-link (e.g. from the "Set up AI" banner) wins; otherwise restore the
@@ -181,12 +209,8 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
   }
 
   return (
-    <main className="max-w-[1400px] mx-auto px-4 py-6 pb-24">
-      <div className="mb-5">
-        <h1 className="text-2xl md:text-3xl font-bold" style={{ fontFamily: 'var(--font-display)' }}>
-          {t('nav.settings')}
-        </h1>
-      </div>
+    <main className={PAGE_MAIN}>
+      <PageHeader title={t('nav.settings')} />
 
       <div className="flex flex-col md:flex-row gap-5">
         {/* Tab navigation — sidebar on desktop, scrollable pills on mobile */}
@@ -334,6 +358,7 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
 
 
           {tab === 'users' && isAdmin && <UsersManager currentUserId={currentUser.id} />}
+          {tab === 'activity' && multiUser && <ActivityFeed />}
 
           {tab === 'system' && isAdmin && (
             <Section title={t('sys.title')} icon={<Activity size={15} />}>
@@ -402,7 +427,7 @@ function AiMasterAndFeatures({ ai, canEdit }: { ai: AiInfo; canEdit: boolean }) 
           <div className="text-xs text-[color:var(--color-text-faint)]">{t('set.enableAiDesc')}</div>
         </div>
         {canEdit ? (
-          <Switch checked={enabled} onChange={toggleMaster} />
+          <Switch label={t('set.enableAi')} checked={enabled} onChange={toggleMaster} />
         ) : (
           <span className="text-xs text-[color:var(--color-text-faint)]">{enabled ? t('set.on') : t('set.off')}</span>
         )}
@@ -424,7 +449,7 @@ function AiMasterAndFeatures({ ai, canEdit }: { ai: AiInfo; canEdit: boolean }) 
                     </div>
                     <div className="text-xs text-[color:var(--color-text-faint)]">{t(('af.' + f.key + 'Desc') as TKey)}</div>
                   </div>
-                  {canEdit && <Switch checked={features[f.key] !== false} onChange={(v) => toggleFeature(f.key, v)} />}
+                  {canEdit && <Switch label={t(('af.' + f.key) as TKey)} checked={features[f.key] !== false} onChange={(v) => toggleFeature(f.key, v)} />}
                 </div>
               ))}
             </div>
@@ -480,7 +505,7 @@ function ModelPicker({
 
   return (
     <Field label={t('set.modelField')}>
-      <input value={model} onChange={(e) => onModel(e.target.value)} className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} />
+      <input value={model} onChange={(e) => onModel(e.target.value)} className={controlClass} style={{ fontFamily: 'var(--font-mono)' }} />
       <div className="flex items-center gap-2 mt-2 flex-wrap">
         <button
           type="button"
@@ -573,7 +598,7 @@ function CloudKeyModel({
           onChange={(e) => onKey(e.target.value)}
           placeholder={hasKey ? '••••••••••••  (saved)' : keyPlaceholder}
           autoComplete="new-password" data-1p-ignore data-lpignore="true"
-          className={inputClass}
+          className={controlClass}
           style={{ fontFamily: 'var(--font-mono)' }}
         />
       </Field>
@@ -645,7 +670,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
       try {
         await saveAiConfig(fd);
       } catch (err) {
-        setMsg(`Could not save: ${(err as Error).message || 'unknown error'}`);
+        setMsg(t('set.couldNotSave', { error: (err as Error).message || '?' }));
         return;
       }
       setApiKey('');
@@ -653,7 +678,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
       setGeminiKey('');
       setOpenrouterKey('');
       setCustomKey('');
-      setMsg('Saved ✓');
+      setMsg(t('common.savedOk'));
       setTimeout(() => setMsg(null), 2500);
     });
   }
@@ -661,19 +686,19 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
   function doPull(name?: string) {
     const n = (name ?? pullName).trim();
     if (!n) return;
-    setMsg(`Downloading ${n}… (this can take a few minutes)`);
+    setMsg(t('set.pulling', { name: n }));
     startTransition(async () => {
       const r = await pullOllamaModel(n);
-      setMsg(r.ok ? `Downloaded ${n} ✓ — select it as active and Save` : `Download failed: ${r.error}`);
+      setMsg(r.ok ? t('set.pulled', { name: n }) : t('set.pullFailed', { error: r.error ?? '' }));
       if (r.ok && !name) setPullName('');
     });
   }
 
   function doTest() {
-    setTest('testing…');
+    setTest(t('common.testing'));
     startTransition(async () => {
       const r = await testAnthropic();
-      setTest(r.ok ? 'Connection OK ✓' : `Failed: ${r.error}`);
+      setTest(r.ok ? t('common.connectionOk') : t('common.failedWith', { error: r.error ?? '' }));
     });
   }
 
@@ -737,7 +762,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
               value={ollamaHost}
               onChange={(e) => setOllamaHost(e.target.value)}
               placeholder="http://localhost:11434"
-              className={inputClass}
+              className={controlClass}
               style={{ fontFamily: 'var(--font-mono)' }}
             />
             <p className="text-[10px] text-[color:var(--color-text-faint)] mt-1" style={{ fontFamily: 'var(--font-mono)' }}>
@@ -747,7 +772,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
 
           <Field label={t('set.textModel')}>
             {installedNames.length > 0 ? (
-              <select value={ollamaModel} onChange={(e) => setOllamaModel(e.target.value)} className={selectClass}>
+              <select value={ollamaModel} onChange={(e) => setOllamaModel(e.target.value)} className={controlClass}>
                 {!installedNames.includes(ollamaModel) && <option value={ollamaModel}>{ollamaModel} {t('set.notInstalled')}</option>}
                 {ai.installed.map((m) => (
                   <option key={m.name} value={m.name}>
@@ -756,13 +781,13 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
                 ))}
               </select>
             ) : (
-              <input value={ollamaModel} onChange={(e) => setOllamaModel(e.target.value)} className={inputClass} />
+              <input value={ollamaModel} onChange={(e) => setOllamaModel(e.target.value)} className={controlClass} />
             )}
           </Field>
 
           <Field label={t('set.visionModel')}>
             {installedNames.length > 0 ? (
-              <select value={visionModel} onChange={(e) => setVisionModel(e.target.value)} className={selectClass}>
+              <select value={visionModel} onChange={(e) => setVisionModel(e.target.value)} className={controlClass}>
                 {!installedNames.includes(visionModel) && <option value={visionModel}>{visionModel} {t('set.notInstalled')}</option>}
                 {ai.installed.map((m) => (
                   <option key={m.name} value={m.name}>
@@ -771,7 +796,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
                 ))}
               </select>
             ) : (
-              <input value={visionModel} onChange={(e) => setVisionModel(e.target.value)} className={inputClass} />
+              <input value={visionModel} onChange={(e) => setVisionModel(e.target.value)} className={controlClass} />
             )}
             {visionModel && !isVisionName(visionModel) && (
               <p className="text-[10px] text-[color:var(--color-red)] mt-1" style={{ fontFamily: 'var(--font-mono)' }}>
@@ -786,7 +811,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
                 value={pullName}
                 onChange={(e) => setPullName(e.target.value)}
                 placeholder={t('set.modelPlaceholder')}
-                className={inputClass}
+                className={controlClass}
                 style={{ fontFamily: 'var(--font-mono)' }}
               />
               <button
@@ -835,7 +860,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
               onChange={(e) => setApiKey(e.target.value)}
               placeholder={ai.hasKey ? '••••••••••••  (saved)' : 'sk-ant-...'}
               autoComplete="new-password" data-1p-ignore data-lpignore="true"
-              className={inputClass}
+              className={controlClass}
               style={{ fontFamily: 'var(--font-mono)' }}
             />
           </Field>
@@ -857,7 +882,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
               autoComplete="off"
               data-1p-ignore
               data-lpignore="true"
-              className={inputClass}
+              className={controlClass}
               style={{ fontFamily: 'var(--font-mono)' }}
             />
             <p className="mt-1 text-[10px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
@@ -875,7 +900,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
             </button>
             {test && (
               <span
-                className={cn('text-[11px]', test.startsWith('Connection OK') ? 'text-[color:var(--color-accent)]' : test === 'testing…' ? 'text-[color:var(--color-text-dim)]' : 'text-[color:var(--color-red)]')}
+                className={cn('text-[11px]', test.startsWith(t('common.connectionOk')) ? 'text-[color:var(--color-accent)]' : test === t('common.testing') ? 'text-[color:var(--color-text-dim)]' : 'text-[color:var(--color-red)]')}
                 style={{ fontFamily: 'var(--font-mono)' }}
               >
                 {test}
@@ -941,7 +966,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
               value={customBaseUrl}
               onChange={(e) => setCustomBaseUrl(e.target.value)}
               placeholder="http://localhost:1234/v1"
-              className={inputClass}
+              className={controlClass}
               style={{ fontFamily: 'var(--font-mono)' }}
             />
             <p className="text-[10px] text-[color:var(--color-text-faint)] mt-1" style={{ fontFamily: 'var(--font-mono)' }}>
@@ -977,6 +1002,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
           <button
             type="button"
             role="switch"
+            aria-label={t('set.confirmBulk')}
             aria-checked={confirmBulk}
             onClick={() => {
               const v = !confirmBulk;
@@ -1006,7 +1032,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
             value={monthlyBudget}
             onChange={(e) => setMonthlyBudget(e.target.value)}
             placeholder="0"
-            className={inputClass}
+            className={controlClass}
             style={{ fontFamily: 'var(--font-mono)' }}
           />
         </Field>
@@ -1070,7 +1096,7 @@ function ScraperAiSettings({ scraperAi, installed, hasAnthropicKey }: { scraperA
     setMsg(null);
     startTransition(async () => {
       await saveScraperAi(fd);
-      setMsg('Saved ✓');
+      setMsg(t('common.savedOk'));
       setTimeout(() => setMsg(null), 2500);
     });
   }
@@ -1106,7 +1132,7 @@ function ScraperAiSettings({ scraperAi, installed, hasAnthropicKey }: { scraperA
       {provider === 'ollama' ? (
         <Field label={t('set.scraperModel')}>
           {installedNames.length > 0 ? (
-            <select value={model} onChange={(e) => setModel(e.target.value)} className={selectClass}>
+            <select value={model} onChange={(e) => setModel(e.target.value)} className={controlClass}>
               <option value="">{t('set.defaultOllamaEnv')}</option>
               {!installedNames.includes(model) && model && <option value={model}>{model} {t('set.notInstalled')}</option>}
               {installed.map((m) => (
@@ -1116,7 +1142,7 @@ function ScraperAiSettings({ scraperAi, installed, hasAnthropicKey }: { scraperA
               ))}
             </select>
           ) : (
-            <input value={model} onChange={(e) => setModel(e.target.value)} placeholder="qwen2.5:14b" className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} />
+            <input value={model} onChange={(e) => setModel(e.target.value)} placeholder="qwen2.5:14b" className={controlClass} style={{ fontFamily: 'var(--font-mono)' }} />
           )}
           <p className="text-[10px] text-[color:var(--color-text-faint)] mt-1" style={{ fontFamily: 'var(--font-mono)' }}>
             {t('set.scraperModelHint')}
@@ -1147,6 +1173,7 @@ function ScraperAiSettings({ scraperAi, installed, hasAnthropicKey }: { scraperA
         <button
           type="button"
           role="switch"
+          aria-label={t('set.scraperEnabled')}
           aria-checked={enabled}
           onClick={() => setEnabled((v) => !v)}
           className={cn(
@@ -1166,14 +1193,14 @@ function ScraperAiSettings({ scraperAi, installed, hasAnthropicKey }: { scraperA
           value={maxLinks}
           onChange={(e) => setMaxLinks(e.target.value)}
           placeholder="0"
-          className={inputClass}
+          className={controlClass}
           style={{ fontFamily: 'var(--font-mono)' }}
         />
         <p className="text-[10px] text-[color:var(--color-text-faint)] mt-1">{t('set.scraperMaxLinksHint')}</p>
       </Field>
       {/* #330: what a scheduled scrape covers. Shopping always goes first. */}
       <Field label={t('set.scraperScope')}>
-        <select value={scope} onChange={(e) => setScope(e.target.value as typeof scope)} className={selectClass}>
+        <select value={scope} onChange={(e) => setScope(e.target.value as typeof scope)} className={controlClass}>
           <option value="both">{t('set.scraperScopeBoth')}</option>
           <option value="shopping">{t('set.scraperScopeShopping')}</option>
           <option value="inventory">{t('set.scraperScopeInventory')}</option>
@@ -1190,7 +1217,7 @@ function ScraperAiSettings({ scraperAi, installed, hasAnthropicKey }: { scraperA
             inputMode="numeric"
             value={ownedDays}
             onChange={(e) => setOwnedDays(e.target.value)}
-            className={inputClass}
+            className={controlClass}
             style={{ fontFamily: 'var(--font-mono)' }}
           />
         </Field>
@@ -1396,11 +1423,11 @@ function OnedriveWizard({ connected: initialConnected, account }: { connected: b
             {advanced && (
               <div className="mt-2 space-y-2">
                 <ol className="text-[10px] text-[color:var(--color-text-faint)] space-y-0.5 list-decimal pl-4 leading-relaxed">
-                  <li><a href="https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade" target="_blank" rel="noreferrer" className="text-[color:var(--color-cyan)] hover:underline">Azure → App registrations</a> → New registration → personal accounts, no redirect URI.</li>
-                  <li>Authentication → Allow public client flows → Yes → Save. Copy the client id.</li>
+                  <li><a href="https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade" target="_blank" rel="noreferrer" className="text-[color:var(--color-cyan)] hover:underline">Azure → App registrations</a> {t('set.azureStep1')}</li>
+                  <li>{t('set.azureStep2')}</li>
                 </ol>
                 <Field label={t('set.appClientId')}>
-                  <input value={clientId} onChange={(e) => setClientId(e.target.value)} placeholder="00000000-0000-0000-0000-000000000000" className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} />
+                  <input value={clientId} onChange={(e) => setClientId(e.target.value)} placeholder="00000000-0000-0000-0000-000000000000" className={controlClass} style={{ fontFamily: 'var(--font-mono)' }} />
                 </Field>
               </div>
             )}
@@ -1498,24 +1525,24 @@ function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Inf
       await saveStorageConfig(fd);
       setPass('');
       setM2Pass('');
-      setMsg('Saved ✓');
+      setMsg(t('common.savedOk'));
       setTimeout(() => setMsg(null), 2500);
     });
   }
 
   function doTest() {
-    setTest('testing…');
+    setTest(t('common.testing'));
     startTransition(async () => {
       const r = backend === 'onedrive' ? await testOnedriveConnection() : await testRemoteConnection();
-      setTest(r.ok ? 'Connection OK ✓' : `Failed: ${r.error}`);
+      setTest(r.ok ? t('common.connectionOk') : t('common.failedWith', { error: r.error ?? '' }));
     });
   }
 
   function doTest2() {
-    setTest2('testing…');
+    setTest2(t('common.testing'));
     startTransition(async () => {
       const r = await testSecondaryRemote();
-      setTest2(r.ok ? 'Connection OK ✓' : `Failed: ${r.error}`);
+      setTest2(r.ok ? t('common.connectionOk') : t('common.failedWith', { error: r.error ?? '' }));
     });
   }
 
@@ -1523,24 +1550,24 @@ function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Inf
     setTest(null);
     // OneDrive: enqueue background job so it executes resiliently in the background queue.
     if (backend === 'onedrive') {
-      setMsg('Enqueuing sync job…');
+      setMsg(t('set.syncQueueing'));
       startTransition(async () => {
         const r = await enqueueOnedriveSync();
         if (r.ok) {
-          setMsg(`Sync job queued (${r.count} item${r.count === 1 ? '' : 's'}) ✓`);
+          setMsg(t('set.syncQueued', { n: r.count ?? 0 }));
         } else {
-          setMsg(`✗ ${r.error || 'Failed to queue sync job'}`);
+          setMsg(`✗ ${r.error || t('set.syncQueueFailed')}`);
         }
       });
       return;
     }
     // SMB/FTP: single connection, one-shot.
-    setMsg('Syncing… (this can take a while)');
+    setMsg(t('set.syncing'));
     startTransition(async () => {
       const r = await syncToRemote();
       if (r.pushed > 0) setSyncedNow(true);
-      if (r.ok) setMsg(`Synced ${r.pushed} file(s)${r.skipped ? ` · ${r.skipped} skipped` : ''} ✓`);
-      else setMsg(`Synced ${r.pushed}, ${r.failed} failed${r.error ? `: ${r.error}` : ''}${r.errors[0] ? ` — ${r.errors[0]}` : ''}`);
+      if (r.ok) setMsg(r.skipped ? t('set.syncedSkipped', { n: r.pushed, skipped: r.skipped }) : t('set.synced', { n: r.pushed }));
+      else setMsg(`${t('set.syncedFailed', { n: r.pushed, failed: r.failed })}${r.error ? `: ${r.error}` : ''}${r.errors[0] ? ` · ${r.errors[0]}` : ''}`);
     });
   }
 
@@ -1580,29 +1607,29 @@ function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Inf
       {(backend === 'smb' || backend === 'ftp') && (
         <div className="grid sm:grid-cols-2 gap-3 pt-1">
           <Field label={t('set.hostIp')}>
-            <input value={host} onChange={(e) => setHost(e.target.value)} placeholder="192.168.10.20" className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} />
+            <input value={host} onChange={(e) => setHost(e.target.value)} placeholder="192.168.10.20" className={controlClass} style={{ fontFamily: 'var(--font-mono)' }} />
           </Field>
           <Field label={t('set.portBlank', { default: backend === 'smb' ? '445' : '21' })}>
-            <input value={port} onChange={(e) => setPort(e.target.value)} placeholder={backend === 'smb' ? '445' : '21'} className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} />
+            <input value={port} onChange={(e) => setPort(e.target.value)} placeholder={backend === 'smb' ? '445' : '21'} className={controlClass} style={{ fontFamily: 'var(--font-mono)' }} />
           </Field>
           {backend === 'smb' && (
             <Field label={t('set.shareName')}>
-              <input value={share} onChange={(e) => setShare(e.target.value)} placeholder="home" className={inputClass} />
+              <input value={share} onChange={(e) => setShare(e.target.value)} placeholder="home" className={controlClass} />
             </Field>
           )}
           <Field label={t('set.username')}>
-            <input value={user} onChange={(e) => setUser(e.target.value)} className={inputClass} autoComplete="new-password" data-1p-ignore data-lpignore="true" />
+            <input value={user} onChange={(e) => setUser(e.target.value)} className={controlClass} autoComplete="new-password" data-1p-ignore data-lpignore="true" />
           </Field>
           <Field label={storage.hasPass ? t('set.passwordSaved') : t('set.password')}>
-            <input type="password" value={pass} onChange={(e) => setPass(e.target.value)} placeholder={storage.hasPass ? '••••••••' : ''} className={inputClass} autoComplete="new-password" data-1p-ignore data-lpignore="true" />
+            <input type="password" value={pass} onChange={(e) => setPass(e.target.value)} placeholder={storage.hasPass ? '••••••••' : ''} className={controlClass} autoComplete="new-password" data-1p-ignore data-lpignore="true" />
           </Field>
           <Field label={t('set.baseFolder')}>
-            <input value={basePath} onChange={(e) => setBasePath(e.target.value)} placeholder="Pharos" className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} />
+            <input value={basePath} onChange={(e) => setBasePath(e.target.value)} placeholder="Pharos" className={controlClass} style={{ fontFamily: 'var(--font-mono)' }} />
           </Field>
           {backend === 'ftp' && (
             <div className="flex items-center justify-between sm:col-span-2">
               <span className="text-xs text-[color:var(--color-text-dim)]">{t('set.ftpsTls')}</span>
-              <Switch checked={secure} onChange={setSecure} />
+              <Switch label={t('set.ftpsTls')} checked={secure} onChange={setSecure} />
             </div>
           )}
         </div>
@@ -1614,10 +1641,10 @@ function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Inf
         </div>
         <div className="grid sm:grid-cols-2 gap-3">
           <Field label={t('set.folderTemplate')}>
-            <input value={folderTpl} onChange={(e) => setFolderTpl(e.target.value)} className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} />
+            <input value={folderTpl} onChange={(e) => setFolderTpl(e.target.value)} className={controlClass} style={{ fontFamily: 'var(--font-mono)' }} />
           </Field>
           <Field label={t('set.filenameTemplate')}>
-            <input value={nameTpl} onChange={(e) => setNameTpl(e.target.value)} className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} />
+            <input value={nameTpl} onChange={(e) => setNameTpl(e.target.value)} className={controlClass} style={{ fontFamily: 'var(--font-mono)' }} />
           </Field>
         </div>
         <div className="text-[10px] text-[color:var(--color-text-faint)] leading-relaxed" style={{ fontFamily: 'var(--font-mono)' }}>
@@ -1635,7 +1662,7 @@ function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Inf
             <p className="text-xs font-medium">{t('set.autoMirror')}</p>
             <p className="text-[10px] text-[color:var(--color-text-faint)] mt-0.5">{t('set.autoMirrorDesc')}</p>
           </div>
-          <Switch checked={mirror} onChange={setMirror} />
+          <Switch label={t('set.autoMirror')} checked={mirror} onChange={setMirror} />
         </div>
       )}
 
@@ -1644,12 +1671,12 @@ function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Inf
       {backend !== 'local' && (
         <div className="pt-2 border-t border-[color:var(--color-border)] mt-1 space-y-3">
           <div className="flex items-center gap-2 text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider" style={{ fontFamily: 'var(--font-mono)' }}>
-            <Server size={12} /> Second destination (3-2-1 backup)
+            <Server size={12} /> {t('set.secondDest')}
           </div>
           <p className="text-[10px] text-[color:var(--color-text-faint)] -mt-1">
-            A second, independent offsite copy. Files are pushed here alongside the primary, best-effort — a failure here never affects the primary.
+            {t('set.secondDestHelp')}
           </p>
-          <Row label="Backend">
+          <Row label={t('set.backend')}>
             <div className="flex gap-1.5 flex-wrap">
               {([
                 { v: '' as const, label: 'None' },
@@ -1674,29 +1701,29 @@ function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Inf
           {(m2Backend === 'smb' || m2Backend === 'ftp') && (
             <div className="grid sm:grid-cols-2 gap-3">
               <Field label={t('set.hostIp')}>
-                <input value={m2Host} onChange={(e) => setM2Host(e.target.value)} placeholder="192.168.10.30" className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} />
+                <input value={m2Host} onChange={(e) => setM2Host(e.target.value)} placeholder="192.168.10.30" className={controlClass} style={{ fontFamily: 'var(--font-mono)' }} />
               </Field>
               <Field label={t('set.portBlank', { default: m2Backend === 'smb' ? '445' : '21' })}>
-                <input value={m2Port} onChange={(e) => setM2Port(e.target.value)} placeholder={m2Backend === 'smb' ? '445' : '21'} className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} />
+                <input value={m2Port} onChange={(e) => setM2Port(e.target.value)} placeholder={m2Backend === 'smb' ? '445' : '21'} className={controlClass} style={{ fontFamily: 'var(--font-mono)' }} />
               </Field>
               {m2Backend === 'smb' && (
                 <Field label={t('set.shareName')}>
-                  <input value={m2Share} onChange={(e) => setM2Share(e.target.value)} placeholder="backup" className={inputClass} />
+                  <input value={m2Share} onChange={(e) => setM2Share(e.target.value)} placeholder="backup" className={controlClass} />
                 </Field>
               )}
               <Field label={t('set.username')}>
-                <input value={m2User} onChange={(e) => setM2User(e.target.value)} className={inputClass} autoComplete="new-password" data-1p-ignore data-lpignore="true" />
+                <input value={m2User} onChange={(e) => setM2User(e.target.value)} className={controlClass} autoComplete="new-password" data-1p-ignore data-lpignore="true" />
               </Field>
               <Field label={storage.hasPass2 ? t('set.passwordSaved') : t('set.password')}>
-                <input type="password" value={m2Pass} onChange={(e) => setM2Pass(e.target.value)} placeholder={storage.hasPass2 ? '••••••••' : ''} className={inputClass} autoComplete="new-password" data-1p-ignore data-lpignore="true" />
+                <input type="password" value={m2Pass} onChange={(e) => setM2Pass(e.target.value)} placeholder={storage.hasPass2 ? '••••••••' : ''} className={controlClass} autoComplete="new-password" data-1p-ignore data-lpignore="true" />
               </Field>
               <Field label={t('set.baseFolder')}>
-                <input value={m2BasePath} onChange={(e) => setM2BasePath(e.target.value)} placeholder="Pharos" className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} />
+                <input value={m2BasePath} onChange={(e) => setM2BasePath(e.target.value)} placeholder="Pharos" className={controlClass} style={{ fontFamily: 'var(--font-mono)' }} />
               </Field>
               {m2Backend === 'ftp' && (
                 <div className="flex items-center justify-between sm:col-span-2">
                   <span className="text-xs text-[color:var(--color-text-dim)]">{t('set.ftpsTls')}</span>
-                  <Switch checked={m2Secure} onChange={setM2Secure} />
+                  <Switch label={t('set.ftpsTls')} checked={m2Secure} onChange={setM2Secure} />
                 </div>
               )}
               <div className="sm:col-span-2 flex items-center gap-2 flex-wrap">
@@ -1705,7 +1732,7 @@ function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Inf
                 </button>
                 {test2 && (
                   <span
-                    className={cn('text-[11px]', test2.startsWith('Connection OK') ? 'text-[color:var(--color-accent)]' : test2 === 'testing…' ? 'text-[color:var(--color-text-dim)]' : 'text-[color:var(--color-red)]')}
+                    className={cn('text-[11px]', test2.startsWith(t('common.connectionOk')) ? 'text-[color:var(--color-accent)]' : test2 === t('common.testing') ? 'text-[color:var(--color-text-dim)]' : 'text-[color:var(--color-red)]')}
                     style={{ fontFamily: 'var(--font-mono)' }}
                   >
                     {test2}
@@ -1733,7 +1760,7 @@ function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Inf
         )}
         {test && (
           <span
-            className={cn('text-[11px]', test.startsWith('Connection OK') ? 'text-[color:var(--color-accent)]' : test === 'testing…' ? 'text-[color:var(--color-text-dim)]' : 'text-[color:var(--color-red)]')}
+            className={cn('text-[11px]', test.startsWith(t('common.connectionOk')) ? 'text-[color:var(--color-accent)]' : test === t('common.testing') ? 'text-[color:var(--color-text-dim)]' : 'text-[color:var(--color-red)]')}
             style={{ fontFamily: 'var(--font-mono)' }}
           >
             {test}
@@ -1773,11 +1800,14 @@ function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Inf
 
 // ─── Defaults & alerts + Notifications ───────────────────────────────────────
 
-function Switch({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+/** `label` is required: a bare switch has no text, so without it a screen reader announces an
+ *  unnamed toggle (the e2e axe check fails on it). Pass the setting's visible name. */
+function Switch({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
   return (
     <button
       type="button"
       role="switch"
+      aria-label={label}
       aria-checked={checked}
       onClick={() => onChange(!checked)}
       className={cn(
@@ -1797,6 +1827,7 @@ const ghostBtn =
   'flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] hover:border-[color:var(--color-accent)] transition-colors disabled:opacity-50';
 
 function BudgetsManager({ settings }: { settings: AppSettings }) {
+  const money = useMoney();
   const t = useT();
   const [pending, startTransition] = useTransition();
   const [budgets, setBudgets] = useState<Record<string, string>>(() =>
@@ -1880,7 +1911,7 @@ function BudgetsManager({ settings }: { settings: AppSettings }) {
           {suggesting ? <Loader2 size={13} className="animate-spin" /> : <TrendingUp size={13} />}
           {t('set.suggestBudgets')}
         </button>
-        <span className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>{t('set.budgetTotal', { amount: `${cur()}${total.toLocaleString('en-GB')}` })}</span>
+        <span className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>{t('set.budgetTotal', { amount: money(total) })}</span>
         {msg && <span className="text-[11px] text-[color:var(--color-accent)]">{msg}</span>}
       </div>
       <label className="flex items-center justify-between gap-3 mt-3 pt-3 border-t border-[color:var(--color-border)] cursor-pointer">
@@ -1888,7 +1919,7 @@ function BudgetsManager({ settings }: { settings: AppSettings }) {
           <span className="text-xs font-medium block">{t('set.budgetRollover')}</span>
           <span className="text-[10px] text-[color:var(--color-text-faint)] block">{t('set.budgetRolloverDesc')}</span>
         </span>
-        <Switch checked={rollover} onChange={toggleRollover} />
+        <Switch label={t('set.budgetRollover')} checked={rollover} onChange={toggleRollover} />
       </label>
     </Section>
   );
@@ -2016,6 +2047,7 @@ function CategoryRulesManager({ settings }: { settings: AppSettings }) {
 }
 
 function AssetAccountsManager({ settings }: { settings: AppSettings }) {
+  const money = useMoney();
   const t = useT();
   const [pending, startTransition] = useTransition();
   const [rows, setRows] = useState<Array<{ name: string; balance: string }>>(() => {
@@ -2082,7 +2114,7 @@ function AssetAccountsManager({ settings }: { settings: AppSettings }) {
         <button onClick={save} disabled={pending} className="text-xs px-3 py-1.5 rounded-lg bg-[color:var(--color-accent)] text-black font-semibold hover:opacity-90 disabled:opacity-50">
           {pending ? t('common.saving') : t('set.saveAccounts')}
         </button>
-        <span className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>{t('set.accountsTotal', { amount: `${cur()}${total.toLocaleString('en-GB')}` })}</span>
+        <span className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>{t('set.accountsTotal', { amount: money(total) })}</span>
         {msg && <span className="text-[11px] text-[color:var(--color-accent)]">{msg}</span>}
       </div>
     </Section>
@@ -2125,7 +2157,7 @@ function DepreciationManager({ settings }: { settings: AppSettings }) {
       <p className="text-xs text-[color:var(--color-text-dim)] mb-3">{t('set.depreciationDesc')}</p>
       <label className="flex items-center justify-between gap-3 mb-3">
         <span className="text-xs text-[color:var(--color-text-dim)]">{t('set.depreciationEnabled')}</span>
-        <Switch checked={enabled} onChange={setEnabled} />
+        <Switch label={t('set.depreciationEnabled')} checked={enabled} onChange={setEnabled} />
       </label>
       {enabled && (
         <>
@@ -2239,7 +2271,7 @@ function DefaultsManager({ settings }: { settings: AppSettings }) {
       <div className="grid sm:grid-cols-2 gap-4">
         <label className="block">
           <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.currency')}</span>
-          <select value={currency} onChange={(e) => setCurrency(e.target.value)} className={inputClass}>
+          <select value={currency} onChange={(e) => setCurrency(e.target.value)} className={controlClass}>
             {CURRENCIES.map((c) => (
               <option key={c.code} value={c.code}>
                 {c.label}
@@ -2249,26 +2281,26 @@ function DefaultsManager({ settings }: { settings: AppSettings }) {
         </label>
         <label className="block">
           <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.defaultVat')}</span>
-          <input type="number" min="0" max="100" step="0.5" value={vatRate} onChange={(e) => setVatRate(e.target.value)} className={inputClass} />
+          <input type="number" min="0" max="100" step="0.5" value={vatRate} onChange={(e) => setVatRate(e.target.value)} className={controlClass} />
         </label>
         <label className="block">
           <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.defaultView')}</span>
-          <select value={view} onChange={(e) => setView(e.target.value as 'grid' | 'list')} className={inputClass}>
+          <select value={view} onChange={(e) => setView(e.target.value as 'grid' | 'list')} className={controlClass}>
             <option value="grid">{t('v.grid')}</option>
             <option value="list">{t('v.list')}</option>
           </select>
         </label>
         <label className="block">
           <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.defaultWarranty')}</span>
-          <input type="number" min="0" max="120" value={warrantyMonths} onChange={(e) => setWarrantyMonths(e.target.value)} className={inputClass} />
+          <input type="number" min="0" max="120" value={warrantyMonths} onChange={(e) => setWarrantyMonths(e.target.value)} className={controlClass} />
         </label>
         <label className="block">
           <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.warrantyAlert')}</span>
-          <input type="number" min="0" max="730" value={alertDays} onChange={(e) => setAlertDays(e.target.value)} className={inputClass} />
+          <input type="number" min="0" max="730" value={alertDays} onChange={(e) => setAlertDays(e.target.value)} className={controlClass} />
         </label>
         <label className="block">
           <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.returnWindow')}</span>
-          <input type="number" min="0" max="365" value={returnDays} onChange={(e) => setReturnDays(e.target.value)} className={inputClass} />
+          <input type="number" min="0" max="365" value={returnDays} onChange={(e) => setReturnDays(e.target.value)} className={controlClass} />
         </label>
         <label className="block">
           <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.shoppingCountry')}</span>
@@ -2280,7 +2312,7 @@ function DefaultsManager({ settings }: { settings: AppSettings }) {
               // Start from the country's usual cross-border shops; the user edits from there.
               setExtraShops((SHOPPING_PRESETS[code]?.extraShops ?? []).join(', '));
             }}
-            className={inputClass}
+            className={controlClass}
           >
             <option value="">{t('set.shoppingCountryAny')}</option>
             {[...SHOPPING_COUNTRIES]
@@ -2295,52 +2327,52 @@ function DefaultsManager({ settings }: { settings: AppSettings }) {
         {shoppingCountry && (
           <label className="block">
             <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.shoppingExtraShops')}</span>
-            <input value={extraShops} onChange={(e) => setExtraShops(e.target.value)} placeholder="amazon.de" className={inputClass} />
+            <input value={extraShops} onChange={(e) => setExtraShops(e.target.value)} placeholder="amazon.de" className={controlClass} />
             <span className="block mt-1 text-[11px] text-[color:var(--color-text-faint)]">{t('set.shoppingExtraShopsHint')}</span>
           </label>
         )}
         <label className="block">
           <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.trialAlert')}</span>
-          <input type="number" min="0" max="60" value={trialDays} onChange={(e) => setTrialDays(e.target.value)} className={inputClass} />
+          <input type="number" min="0" max="60" value={trialDays} onChange={(e) => setTrialDays(e.target.value)} className={controlClass} />
         </label>
         <label className="block">
           <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.billAlert')}</span>
-          <input type="number" min="0" max="90" value={billDays} onChange={(e) => setBillDays(e.target.value)} className={inputClass} />
+          <input type="number" min="0" max="90" value={billDays} onChange={(e) => setBillDays(e.target.value)} className={controlClass} />
         </label>
         <label className="block">
           <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.documentAlert')}</span>
-          <input type="number" min="0" max="180" value={docDays} onChange={(e) => setDocDays(e.target.value)} className={inputClass} />
+          <input type="number" min="0" max="180" value={docDays} onChange={(e) => setDocDays(e.target.value)} className={controlClass} />
         </label>
         <label className="block">
           <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.specialDateAlert')}</span>
-          <input type="number" min="0" max="180" value={specialDays} onChange={(e) => setSpecialDays(e.target.value)} className={inputClass} />
+          <input type="number" min="0" max="180" value={specialDays} onChange={(e) => setSpecialDays(e.target.value)} className={controlClass} />
         </label>
         <label className="block">
           <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.maintenanceAlert')}</span>
-          <input type="number" min="0" max="180" value={maintDays} onChange={(e) => setMaintDays(e.target.value)} className={inputClass} />
+          <input type="number" min="0" max="180" value={maintDays} onChange={(e) => setMaintDays(e.target.value)} className={controlClass} />
         </label>
         <label className="block">
           <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.lendingAlert')}</span>
-          <input type="number" min="0" max="180" value={lendDays} onChange={(e) => setLendDays(e.target.value)} className={inputClass} />
+          <input type="number" min="0" max="180" value={lendDays} onChange={(e) => setLendDays(e.target.value)} className={controlClass} />
         </label>
         <label className="block">
           <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.claimStaleAlert')}</span>
-          <input type="number" min="0" max="180" value={claimStaleDays} onChange={(e) => setClaimStaleDays(e.target.value)} className={inputClass} />
+          <input type="number" min="0" max="180" value={claimStaleDays} onChange={(e) => setClaimStaleDays(e.target.value)} className={controlClass} />
         </label>
         <label className="block">
           <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.syncStaleAlert')}</span>
-          <input type="number" min="0" max="365" value={syncStaleDays} onChange={(e) => setSyncStaleDays(e.target.value)} className={inputClass} />
+          <input type="number" min="0" max="365" value={syncStaleDays} onChange={(e) => setSyncStaleDays(e.target.value)} className={controlClass} />
         </label>
         <label className="block">
           <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.subscriptionReviewAlert')}</span>
-          <input type="number" min="0" max="730" value={subscriptionReviewDays} onChange={(e) => setSubscriptionReviewDays(e.target.value)} className={inputClass} />
+          <input type="number" min="0" max="730" value={subscriptionReviewDays} onChange={(e) => setSubscriptionReviewDays(e.target.value)} className={controlClass} />
         </label>
         <div className="flex items-center justify-between gap-3 self-end pb-1">
           <span className="min-w-0">
             <span className="text-xs font-medium block">{t('set.autoAddStores')}</span>
             <span className="text-[10px] text-[color:var(--color-text-faint)] block">{t('set.autoAddStoresDesc')}</span>
           </span>
-          <Switch checked={autoAdd} onChange={setAutoAdd} />
+          <Switch label={t('set.autoAddStores')} checked={autoAdd} onChange={setAutoAdd} />
         </div>
         {/* P9 opt-in: keeps the currency + FX-rate fields out of the way for the
             single-currency majority. Totals always stay in the base currency above. */}
@@ -2349,7 +2381,7 @@ function DefaultsManager({ settings }: { settings: AppSettings }) {
             <span className="text-xs font-medium block">{t('set.multiCurrency')}</span>
             <span className="text-[10px] text-[color:var(--color-text-faint)] block">{t('set.multiCurrencyDesc', { code: currency })}</span>
           </span>
-          <Switch checked={multiCurrency} onChange={setMultiCurrency} />
+          <Switch label={t('set.multiCurrency')} checked={multiCurrency} onChange={setMultiCurrency} />
         </div>
       </div>
       <div className="flex items-center gap-3 pt-3 border-t border-[color:var(--color-border)] mt-1">
@@ -2365,6 +2397,7 @@ function DefaultsManager({ settings }: { settings: AppSettings }) {
 /** Recent outbound delivery attempts for one channel (P80). Until this existed a failed
  *  delivery left no trace at all, so a broken endpoint looked identical to a quiet week. */
 function DeliveryHistory({ log }: { log?: DeliveryLogEntry[] }) {
+  const t = useT();
   const locale = useLocale();
   const [expanded, setExpanded] = useState(false);
   if (!log || log.length === 0) return null;
@@ -2374,21 +2407,21 @@ function DeliveryHistory({ log }: { log?: DeliveryLogEntry[] }) {
   return (
     <div className="pt-2 border-t border-[color:var(--color-border)] space-y-1">
       <p className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
-        Recent deliveries {failing && <span className="text-[color:var(--color-red)]">· last one failed</span>}
+        {t('notif.recent')} {failing && <span className="text-[color:var(--color-red)]">· {t('notif.lastFailed')}</span>}
       </p>
       {shown.map((r, i) => (
         <div key={`${r.at}-${i}`} className="flex items-center gap-2 text-[11px]" style={{ fontFamily: 'var(--font-mono)' }}>
           <span className={cn('h-1.5 w-1.5 rounded-full shrink-0', r.ok ? 'bg-[color:var(--color-accent)]' : 'bg-[color:var(--color-red)]')} />
           <span className="text-[color:var(--color-text-faint)]">{formatDateTime(r.at, locale)}</span>
           <span className={cn('truncate', r.ok ? 'text-[color:var(--color-text-dim)]' : 'text-[color:var(--color-red)]')}>
-            {r.ok ? `delivered${r.status ? ` · ${r.status}` : ''}` : r.error || 'failed'}
+            {r.ok ? `${t('notif.delivered')}${r.status ? ` · ${r.status}` : ''}` : r.error || t('notif.failed')}
           </span>
           {r.attempts > 1 && <span className="text-[color:var(--color-gold)] shrink-0">×{r.attempts}</span>}
         </div>
       ))}
       {rows.length > 3 && (
         <button type="button" onClick={() => setExpanded((v) => !v)} className="text-[10px] text-[color:var(--color-cyan)]">
-          {expanded ? 'show less' : `show all ${rows.length}`}
+          {expanded ? t('notif.showLess') : t('notif.showAll', { n: rows.length })}
         </button>
       )}
     </div>
@@ -2426,7 +2459,7 @@ function ChannelCard({
         <select
           value={ch.type}
           onChange={(e) => set({ type: e.target.value as NotifierType })}
-          className={cn(inputClass, 'w-auto')}
+          className={cn(controlClass, 'w-auto')}
           style={{ fontFamily: 'var(--font-mono)' }}
         >
           {NOTIFIER_TYPES.map((nt) => (
@@ -2437,10 +2470,10 @@ function ChannelCard({
           value={ch.label || ''}
           onChange={(e) => set({ label: e.target.value })}
           placeholder={t('set.chLabelOptional')}
-          className={cn(inputClass, 'flex-1')}
+          className={cn(controlClass, 'flex-1')}
         />
-        <Switch checked={ch.enabled} onChange={(v) => set({ enabled: v })} />
-        <button type="button" onClick={onRemove} className="p-1.5 rounded-lg text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)]" aria-label="Remove channel">
+        <Switch label={ch.label || ch.type} checked={ch.enabled} onChange={(v) => set({ enabled: v })} />
+        <button type="button" onClick={onRemove} className="p-1.5 rounded-lg text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)]" aria-label={t('notif.removeChannel')}>
           <Trash2 size={14} />
         </button>
       </div>
@@ -2449,8 +2482,8 @@ function ChannelCard({
         <input
           value={ch.url || ''}
           onChange={(e) => set({ url: e.target.value })}
-          placeholder={ch.type === 'ntfy' ? 'https://ntfy.sh/your-topic' : 'Webhook URL'}
-          className={inputClass}
+          placeholder={ch.type === 'ntfy' ? 'https://ntfy.sh/your-topic' : t('notif.webhookUrl')}
+          className={controlClass}
           style={{ fontFamily: 'var(--font-mono)' }}
         />
       )}
@@ -2458,29 +2491,84 @@ function ChannelCard({
         <input
           value={ch.token || ''}
           onChange={(e) => set({ token: e.target.value })}
-          placeholder="Bot token (123456:ABC-…)"
-          className={inputClass}
+          placeholder={t('notif.botToken')}
+          className={controlClass}
           style={{ fontFamily: 'var(--font-mono)' }}
         />
+      )}
+      {meta.needs.includes('smtp') && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <input
+              value={ch.host || ''}
+              onChange={(e) => set({ host: e.target.value })}
+              placeholder={t('notif.smtpHost')}
+              aria-label={t('notif.smtpHostLabel')}
+              className={cn(controlClass, 'flex-1 min-w-0')}
+              style={{ fontFamily: 'var(--font-mono)' }}
+            />
+            <input
+              type="number"
+              min={1}
+              max={65535}
+              value={ch.port ?? DEFAULT_SMTP_PORT}
+              // 465 is implicit TLS; the usual 587/25 start plain and upgrade with STARTTLS.
+              onChange={(e) => set({ port: Number(e.target.value), secure: Number(e.target.value) === 465 })}
+              aria-label={t('notif.smtpPort')}
+              className={cn(controlClass, 'w-20')}
+              style={{ fontFamily: 'var(--font-mono)' }}
+            />
+          </div>
+          <label className="flex items-center gap-2 text-[11px] text-[color:var(--color-text-dim)]">
+            <Switch label={t('notif.tlsLabel')} checked={!!ch.secure} onChange={(v) => set({ secure: v })} />
+            {t('notif.tlsHelp')}
+          </label>
+          <div className="flex items-center gap-2">
+            <input
+              value={ch.user || ''}
+              onChange={(e) => set({ user: e.target.value })}
+              placeholder={t('notif.smtpUser')}
+              aria-label={t('notif.smtpUserLabel')}
+              autoComplete="off"
+              className={cn(controlClass, 'flex-1 min-w-0')}
+            />
+            <input
+              type="password"
+              value={ch.pass || ''}
+              onChange={(e) => set({ pass: e.target.value })}
+              placeholder={t('notif.smtpPass')}
+              aria-label={t('notif.smtpPassLabel')}
+              autoComplete="new-password"
+              className={cn(controlClass, 'flex-1 min-w-0')}
+            />
+          </div>
+          <input
+            value={ch.from || ''}
+            onChange={(e) => set({ from: e.target.value })}
+            placeholder={t('notif.from')}
+            aria-label={t('notif.fromLabel')}
+            className={controlClass}
+          />
+        </div>
       )}
       {meta.needs.includes('target') && (
         <input
           value={ch.target || ''}
           onChange={(e) => set({ target: e.target.value })}
-          placeholder="Chat id (e.g. 123456789)"
-          className={inputClass}
+          placeholder={ch.type === 'email' ? t('notif.sendTo') : t('notif.chatId')}
+          className={controlClass}
           style={{ fontFamily: 'var(--font-mono)' }}
         />
       )}
 
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[10px] text-[color:var(--color-text-faint)]">{meta.hint}</span>
+        <span className="text-[10px] text-[color:var(--color-text-faint)]">{t(NOTIF_HINT[ch.type])}</span>
         <button type="button" onClick={onTest} disabled={testing} className={cn(ghostBtn, 'text-[color:var(--color-cyan)] py-1.5')}>
-          {testing ? <Loader2 size={12} className="animate-spin" /> : <Bell size={12} />} Test
+          {testing ? <Loader2 size={12} className="animate-spin" /> : <Bell size={12} />} {t('common.test')}
         </button>
       </div>
       {testMsg && (
-        <p className={cn('text-[11px]', testMsg.startsWith('Failed') ? 'text-[color:var(--color-red)]' : 'text-[color:var(--color-accent)]')} style={{ fontFamily: 'var(--font-mono)' }}>
+        <p className={cn('text-[11px]', testMsg.startsWith(t('common.failedWith', { error: '' })) ? 'text-[color:var(--color-red)]' : 'text-[color:var(--color-accent)]')} style={{ fontFamily: 'var(--font-mono)' }}>
           {testMsg}
         </p>
       )}
@@ -2490,6 +2578,7 @@ function ChannelCard({
 }
 
 function NotificationsManager() {
+  const t = useT();
   const [pending, startTransition] = useTransition();
   const [channels, setChannels] = useState<NotifierConfig[] | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
@@ -2522,12 +2611,12 @@ function NotificationsManager() {
     setChannels((p) => (p ?? []).filter((x) => x.id !== id));
   }
   function save() {
-    setMsg('Saving…');
+    setMsg(t('common.saving'));
     startTransition(async () => {
       await saveNotifierChannels(channels ?? []);
       if (types) await saveNotifyTypes(types);
       if (quiet) await saveQuietHours(quiet);
-      setMsg('Saved ✓');
+      setMsg(t('common.savedOk'));
     });
   }
   function testOne(c: NotifierConfig) {
@@ -2535,38 +2624,36 @@ function NotificationsManager() {
     setTestMsgs((p) => ({ ...p, [c.id]: '' }));
     startTransition(async () => {
       const r = await testNotifierChannel(c);
-      setTestMsgs((p) => ({ ...p, [c.id]: r.ok ? 'Test sent ✓' : `Failed: ${r.error}` }));
+      setTestMsgs((p) => ({ ...p, [c.id]: r.ok ? t('common.testSent') : t('common.failedWith', { error: r.error ?? '' }) }));
       setTesting('');
     });
   }
   function check() {
-    setMsg('Checking…');
+    setMsg(t('common.checking'));
     startTransition(async () => {
       await saveNotifierChannels(channels ?? []);
       // Persist the toggles first, otherwise the run below would still use the saved set
       // and the summary would not match the checkboxes the owner is looking at.
       if (types) await saveNotifyTypes(types);
       const r = await runAlertChecks();
-      setMsg((r.sent ? '✓ Sent · ' : '(no enabled channels) · ') + r.summary.replace(/\n/g, ' · '));
+      setMsg(`${r.sent ? t('notif.sent') : t('notif.noEnabled')} · ${r.summary.replace(/\n/g, ' · ')}`);
       setLogs(await getDeliveryLogs()); // the dispatch just wrote new rows
     });
   }
 
   return (
-    <Section title="Notifications" icon={<Bell size={15} />}>
+    <Section title={t('set.tabNotifications')} icon={<Bell size={15} />}>
       <p className="text-xs text-[color:var(--color-text-dim)] -mt-1">
-        Alerts for deals, installments due this month, and warranties expiring soon always show in the in-app{' '}
-        <span className="text-[color:var(--color-accent)]">bell</span>. Add channels below to also push them out — ntfy, Discord, Slack,
-        Telegram, or any webhook (route to email via Zapier/n8n).
+        {t('notif.intro')}
       </p>
 
       <div className="space-y-2.5">
         {channels === null ? (
           <p className="text-xs text-[color:var(--color-text-faint)] py-4 flex items-center gap-2">
-            <Loader2 size={13} className="animate-spin" /> Loading channels…
+            <Loader2 size={13} className="animate-spin" /> {t('notif.loadingChannels')}
           </p>
         ) : channels.length === 0 ? (
-          <p className="text-xs text-[color:var(--color-text-faint)] py-3">No outbound channels yet — alerts only show in the bell.</p>
+          <p className="text-xs text-[color:var(--color-text-faint)] py-3">{t('notif.noChannels')}</p>
         ) : (
           channels.map((c) => (
             <ChannelCard
@@ -2584,7 +2671,7 @@ function NotificationsManager() {
       </div>
 
       <button type="button" onClick={add} className={cn(ghostBtn, 'w-full justify-center')}>
-        <Plus size={13} /> Add channel
+        <Plus size={13} /> {t('notif.addChannel')}
       </button>
 
       {/* P102: native browser push — no external account needed */}
@@ -2592,18 +2679,18 @@ function NotificationsManager() {
 
       <div className="pt-3 border-t border-[color:var(--color-border)]">
         <p className="text-xs text-[color:var(--color-text-dim)] mb-2">
-          What gets pushed out — untick a category to keep it in the bell only. Saved with the button below.
+          {t('notif.typesHelp')}
         </p>
         {types === null ? (
           <p className="text-xs text-[color:var(--color-text-faint)] py-2 flex items-center gap-2">
-            <Loader2 size={13} className="animate-spin" /> Loading alert types…
+            <Loader2 size={13} className="animate-spin" /> {t('notif.loadingTypes')}
           </p>
         ) : (
           <div className="grid gap-1 sm:grid-cols-2">
             {ALERT_TYPES.map((at) => (
               <label key={at.key} className="flex items-center gap-1.5 text-[11px] text-[color:var(--color-text-dim)]">
                 <input type="checkbox" checked={types[at.key]} onChange={() => toggleType(at.key)} />
-                {at.label}
+                {t(`alert.${at.key}` as TKey)}
               </label>
             ))}
           </div>
@@ -2613,26 +2700,25 @@ function NotificationsManager() {
       {/* P86: quiet hours / DND window for the scheduled alert cron */}
       <div className="pt-3 border-t border-[color:var(--color-border)]">
         <p className="text-xs text-[color:var(--color-text-dim)] mb-2">
-          Quiet hours — the scheduled check holds outbound alerts during this window and sends them once it ends
-          (server time). Alerts still appear in the bell. Leave blank to disable. The manual button below always sends.
+          {t('notif.quietHelp')}
         </p>
         <div className="flex items-center gap-2 flex-wrap text-[11px] text-[color:var(--color-text-dim)]">
           <label className="flex items-center gap-1.5">
-            From
+            {t('notif.quietFrom')}
             <input
               type="time"
               value={quiet?.start ?? ''}
               onChange={(e) => setQuiet((p) => ({ start: e.target.value, end: p?.end ?? '' }))}
-              className={cn(inputClass, 'w-auto')}
+              className={cn(controlClass, 'w-auto')}
             />
           </label>
           <label className="flex items-center gap-1.5">
-            to
+            {t('notif.quietTo')}
             <input
               type="time"
               value={quiet?.end ?? ''}
               onChange={(e) => setQuiet((p) => ({ start: p?.start ?? '', end: e.target.value }))}
-              className={cn(inputClass, 'w-auto')}
+              className={cn(controlClass, 'w-auto')}
             />
           </label>
           {quiet?.start && quiet?.end && quiet.start !== quiet.end && (
@@ -2641,7 +2727,7 @@ function NotificationsManager() {
               onClick={() => setQuiet({ start: '', end: '' })}
               className="text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)] underline"
             >
-              clear
+              {t('common.clear')}
             </button>
           )}
         </div>
@@ -2649,14 +2735,14 @@ function NotificationsManager() {
 
       <div className="flex items-center gap-2 flex-wrap pt-3 border-t border-[color:var(--color-border)] mt-1">
         <button type="button" onClick={save} disabled={pending || channels === null} className={saveBtn}>
-          {pending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Save
+          {pending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} {t('common.save')}
         </button>
         <button type="button" onClick={check} disabled={pending || channels === null} className={cn(ghostBtn, 'text-[color:var(--color-gold)]')}>
-          <Sparkles size={13} /> Check & notify now
+          <Sparkles size={13} /> {t('notif.checkNow')}
         </button>
       </div>
       {msg && (
-        <p className={cn('text-[11px]', msg.startsWith('Failed') ? 'text-[color:var(--color-red)]' : 'text-[color:var(--color-accent)]')} style={{ fontFamily: 'var(--font-mono)' }}>
+        <p className={cn('text-[11px]', msg.startsWith(t('common.failedWith', { error: '' })) ? 'text-[color:var(--color-red)]' : 'text-[color:var(--color-accent)]')} style={{ fontFamily: 'var(--font-mono)' }}>
           {msg}
         </p>
       )}
@@ -2690,6 +2776,7 @@ function WebhookCard({
   copied: boolean;
   log?: DeliveryLogEntry[];
 }) {
+  const t = useT();
   const set = (patch: Partial<WebhookSubscription>) => onChange({ ...sub, ...patch });
   function toggleEvent(ev: WebhookEvent) {
     const has = sub.events.includes(ev);
@@ -2701,11 +2788,11 @@ function WebhookCard({
         <input
           value={sub.label || ''}
           onChange={(e) => set({ label: e.target.value })}
-          placeholder="Label (optional)"
-          className={cn(inputClass, 'flex-1')}
+          placeholder={t('set.chLabelOptional')}
+          className={cn(controlClass, 'flex-1')}
         />
-        <Switch checked={sub.enabled} onChange={(v) => set({ enabled: v })} />
-        <button type="button" onClick={onRemove} className="p-1.5 rounded-lg text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)]" aria-label="Remove webhook">
+        <Switch label={sub.label || t('wh.webhook')} checked={sub.enabled} onChange={(v) => set({ enabled: v })} />
+        <button type="button" onClick={onRemove} className="p-1.5 rounded-lg text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)]" aria-label={t('wh.remove')}>
           <Trash2 size={14} />
         </button>
       </div>
@@ -2714,7 +2801,7 @@ function WebhookCard({
         value={sub.url}
         onChange={(e) => set({ url: e.target.value })}
         placeholder="https://your-automation.example/hook"
-        className={inputClass}
+        className={controlClass}
         style={{ fontFamily: 'var(--font-mono)' }}
       />
 
@@ -2723,14 +2810,15 @@ function WebhookCard({
           className="flex-1 min-w-0 text-xs bg-[color:var(--color-surface-3)] border border-[color:var(--color-border)] rounded-lg px-3 py-2 truncate"
           style={{ fontFamily: 'var(--font-mono)' }}
         >
-          {sub.secret || '(generated on save)'}
+          {sub.secret || t('wh.generated')}
         </code>
         {sub.secret && (
           <button
             type="button"
             onClick={onCopySecret}
             className="shrink-0 p-2 rounded-lg bg-[color:var(--color-surface-3)] border border-[color:var(--color-border)] text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]"
-            title="Copy signing secret"
+            title={t('wh.copySecret')}
+            aria-label={t('wh.copySecret')}
           >
             {copied ? <Check size={14} className="text-[color:var(--color-accent)]" /> : <Copy size={14} />}
           </button>
@@ -2743,7 +2831,7 @@ function WebhookCard({
             key={ev.type}
             type="button"
             onClick={() => toggleEvent(ev.type)}
-            title={ev.hint}
+            title={t(WH_EVENT[ev.type].hint)}
             className={cn(
               'text-[11px] px-2.5 py-1 rounded-full border transition-colors',
               sub.events.includes(ev.type)
@@ -2751,19 +2839,19 @@ function WebhookCard({
                 : 'border-[color:var(--color-border)] text-[color:var(--color-text-faint)] hover:border-[color:var(--color-accent)]'
             )}
           >
-            {ev.label}
+            {t(WH_EVENT[ev.type].label)}
           </button>
         ))}
       </div>
 
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[10px] text-[color:var(--color-text-faint)]">Signed via X-Pharos-Signature (HMAC-SHA256).</span>
+        <span className="text-[10px] text-[color:var(--color-text-faint)]">{t('wh.signed')}</span>
         <button type="button" onClick={onTest} disabled={testing || !sub.url} className={cn(ghostBtn, 'text-[color:var(--color-cyan)] py-1.5')}>
-          {testing ? <Loader2 size={12} className="animate-spin" /> : <Webhook size={12} />} Test
+          {testing ? <Loader2 size={12} className="animate-spin" /> : <Webhook size={12} />} {t('common.test')}
         </button>
       </div>
       {testMsg && (
-        <p className={cn('text-[11px]', testMsg.startsWith('Failed') ? 'text-[color:var(--color-red)]' : 'text-[color:var(--color-accent)]')} style={{ fontFamily: 'var(--font-mono)' }}>
+        <p className={cn('text-[11px]', testMsg.startsWith(t('common.failedWith', { error: '' })) ? 'text-[color:var(--color-red)]' : 'text-[color:var(--color-accent)]')} style={{ fontFamily: 'var(--font-mono)' }}>
           {testMsg}
         </p>
       )}
@@ -2773,6 +2861,7 @@ function WebhookCard({
 }
 
 function WebhookManager() {
+  const t = useT();
   const [pending, startTransition] = useTransition();
   const [subs, setSubs] = useState<WebhookSubscription[] | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
@@ -2798,15 +2887,15 @@ function WebhookManager() {
     setSubs((p) => (p ?? []).filter((x) => x.id !== id));
   }
   function save() {
-    setMsg('Saving…');
+    setMsg(t('common.saving'));
     startTransition(async () => {
       const r = await saveWebhookSubscriptions(subs ?? []);
       if (!r.ok) {
-        setMsg(`Failed: ${r.error}`);
+        setMsg(t('common.failedWith', { error: r.error ?? '' }));
         return;
       }
       setSubs(await getWebhookSubscriptions()); // pick up server-generated secrets
-      setMsg('Saved ✓');
+      setMsg(t('common.savedOk'));
     });
   }
   function testOne(s: WebhookSubscription) {
@@ -2814,7 +2903,7 @@ function WebhookManager() {
     setTestMsgs((p) => ({ ...p, [s.id]: '' }));
     startTransition(async () => {
       const r = await testWebhookSubscription(s);
-      setTestMsgs((p) => ({ ...p, [s.id]: r.ok ? 'Test sent ✓' : `Failed: ${r.error}` }));
+      setTestMsgs((p) => ({ ...p, [s.id]: r.ok ? t('common.testSent') : t('common.failedWith', { error: r.error ?? '' }) }));
       setTesting('');
     });
   }
@@ -2825,23 +2914,18 @@ function WebhookManager() {
   }
 
   return (
-    <Section title="Webhooks" icon={<Webhook size={15} />}>
+    <Section title={t('wh.title')} icon={<Webhook size={15} />}>
       <p className="text-xs text-[color:var(--color-text-dim)] -mt-1">
-        Automation hooks for Home Assistant, n8n, or Node-RED — each subscription fires a signed JSON POST when
-        one of its selected events happens. <span className="text-[color:var(--color-accent)]">Receipt parsed</span> fires
-        immediately on every scan; <span className="text-[color:var(--color-accent)]">budget exceeded</span>,{' '}
-        <span className="text-[color:var(--color-accent)]">installment due</span>, and{' '}
-        <span className="text-[color:var(--color-accent)]">price drop</span> fire when the alert scan above runs
-        (&quot;Check &amp; notify now&quot;, or your own cron hitting the same check).
+        {t('wh.intro')}
       </p>
 
       <div className="space-y-2.5">
         {subs === null ? (
           <p className="text-xs text-[color:var(--color-text-faint)] py-4 flex items-center gap-2">
-            <Loader2 size={13} className="animate-spin" /> Loading webhooks…
+            <Loader2 size={13} className="animate-spin" /> {t('wh.loading')}
           </p>
         ) : subs.length === 0 ? (
-          <p className="text-xs text-[color:var(--color-text-faint)] py-3">No webhooks yet.</p>
+          <p className="text-xs text-[color:var(--color-text-faint)] py-3">{t('wh.none')}</p>
         ) : (
           subs.map((s) => (
             <WebhookCard
@@ -2861,16 +2945,16 @@ function WebhookManager() {
       </div>
 
       <button type="button" onClick={add} className={cn(ghostBtn, 'w-full justify-center')}>
-        <Plus size={13} /> Add webhook
+        <Plus size={13} /> {t('wh.add')}
       </button>
 
       <div className="flex items-center gap-2 flex-wrap pt-3 border-t border-[color:var(--color-border)] mt-1">
         <button type="button" onClick={save} disabled={pending || subs === null} className={saveBtn}>
-          {pending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Save
+          {pending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} {t('common.save')}
         </button>
       </div>
       {msg && (
-        <p className={cn('text-[11px]', msg.startsWith('Failed') ? 'text-[color:var(--color-red)]' : 'text-[color:var(--color-accent)]')} style={{ fontFamily: 'var(--font-mono)' }}>
+        <p className={cn('text-[11px]', msg.startsWith(t('common.failedWith', { error: '' })) ? 'text-[color:var(--color-red)]' : 'text-[color:var(--color-accent)]')} style={{ fontFamily: 'var(--font-mono)' }}>
           {msg}
         </p>
       )}
@@ -3025,16 +3109,16 @@ function ImapImportManager({ imap }: { imap: ImapInfo }) {
     startTransition(async () => {
       await saveImapConfigAction(fd);
       setPass('');
-      setMsg('Saved ✓');
+      setMsg(t('common.savedOk'));
       setTimeout(() => setMsg(null), 2500);
     });
   }
 
   function doTest() {
-    setTest('testing…');
+    setTest(t('common.testing'));
     startTransition(async () => {
       const r = await testImapConnectionAction();
-      setTest(r.ok ? `Connection OK ✓ (${r.messageCount} message${r.messageCount === 1 ? '' : 's'})` : `Failed: ${r.error}`);
+      setTest(r.ok ? t('set.imapOk', { ok: t('common.connectionOk'), n: r.messageCount ?? 0 }) : t('common.failedWith', { error: r.error ?? '' }));
     });
   }
 
@@ -3061,28 +3145,28 @@ function ImapImportManager({ imap }: { imap: ImapInfo }) {
 
       <div className="flex items-center justify-between gap-3">
         <span className="text-xs font-medium">{t('set.imapEnabled')}</span>
-        <Switch checked={enabled} onChange={setEnabled} />
+        <Switch label={t('set.imapEnabled')} checked={enabled} onChange={setEnabled} />
       </div>
 
       <div className="grid sm:grid-cols-2 gap-3 pt-1">
         <Field label={t('set.imapHost')}>
-          <input value={host} onChange={(e) => setHost(e.target.value)} placeholder="imap.gmail.com" className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} autoComplete="new-password" data-1p-ignore data-lpignore="true" />
+          <input value={host} onChange={(e) => setHost(e.target.value)} placeholder="imap.gmail.com" className={controlClass} style={{ fontFamily: 'var(--font-mono)' }} autoComplete="new-password" data-1p-ignore data-lpignore="true" />
         </Field>
         <Field label={t('set.imapPort')}>
-          <input value={port} onChange={(e) => setPort(e.target.value)} placeholder="993" className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} />
+          <input value={port} onChange={(e) => setPort(e.target.value)} placeholder="993" className={controlClass} style={{ fontFamily: 'var(--font-mono)' }} />
         </Field>
         <Field label={t('set.imapUsername')}>
-          <input value={user} onChange={(e) => setUser(e.target.value)} className={inputClass} autoComplete="new-password" data-1p-ignore data-lpignore="true" />
+          <input value={user} onChange={(e) => setUser(e.target.value)} className={controlClass} autoComplete="new-password" data-1p-ignore data-lpignore="true" />
         </Field>
         <Field label={imap.hasPass ? t('set.imapPasswordSaved') : t('set.imapPassword')}>
-          <input type="password" value={pass} onChange={(e) => setPass(e.target.value)} placeholder={imap.hasPass ? '••••••••' : ''} className={inputClass} autoComplete="new-password" data-1p-ignore data-lpignore="true" />
+          <input type="password" value={pass} onChange={(e) => setPass(e.target.value)} placeholder={imap.hasPass ? '••••••••' : ''} className={controlClass} autoComplete="new-password" data-1p-ignore data-lpignore="true" />
         </Field>
         <Field label={t('set.imapFolder')}>
-          <input value={folder} onChange={(e) => setFolder(e.target.value)} placeholder="INBOX" className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} />
+          <input value={folder} onChange={(e) => setFolder(e.target.value)} placeholder="INBOX" className={controlClass} style={{ fontFamily: 'var(--font-mono)' }} />
         </Field>
         <div className="flex items-center justify-between">
           <span className="text-xs text-[color:var(--color-text-dim)]">{t('set.imapSecure')}</span>
-          <Switch checked={secure} onChange={setSecure} />
+          <Switch label={t('set.imapSecure')} checked={secure} onChange={setSecure} />
         </div>
       </div>
       <p className="text-[10px] text-[color:var(--color-text-faint)]">{t('set.imapAppPasswordHint')}</p>
@@ -3100,7 +3184,7 @@ function ImapImportManager({ imap }: { imap: ImapInfo }) {
           </button>
         )}
         {test && (
-          <span className={cn('text-[11px]', test.startsWith('Connection OK') ? 'text-[color:var(--color-accent)]' : test === 'testing…' ? 'text-[color:var(--color-text-dim)]' : 'text-[color:var(--color-red)]')} style={{ fontFamily: 'var(--font-mono)' }}>
+          <span className={cn('text-[11px]', test.startsWith(t('common.connectionOk')) ? 'text-[color:var(--color-accent)]' : test === t('common.testing') ? 'text-[color:var(--color-text-dim)]' : 'text-[color:var(--color-red)]')} style={{ fontFamily: 'var(--font-mono)' }}>
             {test}
           </span>
         )}
@@ -3194,6 +3278,7 @@ function SampleDataManager() {
 }
 
 function BackupRestore() {
+  const money = useMoney();
   const locale = useLocale();
   const t = useT();
   const [pending, startTransition] = useTransition();
@@ -3202,6 +3287,7 @@ function BackupRestore() {
   const verifyRef = useRef<HTMLInputElement>(null);
   const [report, setReport] = useState<{ ok: boolean; headline: string; issues: { level: string; message: string }[] } | null>(null);
   const confirm = useConfirm();
+  const prompt = usePrompt();
   const nowYear = new Date().getFullYear();
   const [taxYear, setTaxYear] = useState(nowYear);
 
@@ -3223,27 +3309,26 @@ function BackupRestore() {
         download(json, `pharos-backup-${new Date().toISOString().slice(0, 10)}.json`, 'application/json');
         setMsg(t('set.backupDownloaded'));
       } catch (e) {
-        setMsg(`Export failed: ${(e as Error).message.slice(0, 80)}`);
+        setMsg(t('set.exportFailed', { error: (e as Error).message.slice(0, 80) }));
       }
     });
   }
 
   // P54: passphrase-encrypted export. Passphrase is prompted, used once, never stored.
-  function handleExportEncrypted() {
+  async function handleExportEncrypted() {
     setMsg(null);
-    const pass = window.prompt('Passphrase to encrypt this backup (min 8 chars). You will need it to restore — it is NOT stored anywhere.');
+    const pass = await prompt({ title: t('set.encTitle'), message: t('set.encHelp'), label: t('set.encPassLabel'), type: 'password', minLength: 8 });
     if (pass === null) return; // cancelled
-    if (pass.length < 8) { setMsg('Passphrase must be at least 8 characters.'); return; }
-    const confirmPass = window.prompt('Re-enter the passphrase to confirm.');
+    const confirmPass = await prompt({ title: t('set.encTitle'), label: t('set.encPassAgain'), type: 'password', minLength: 8, confirmLabel: t('set.exportEncrypted') });
     if (confirmPass === null) return;
-    if (confirmPass !== pass) { setMsg('Passphrases did not match.'); return; }
+    if (confirmPass !== pass) { setMsg(t('set.encMismatch')); return; }
     startTransition(async () => {
       try {
         const env = await exportDataEncrypted(pass);
         download(env, `pharos-backup-${new Date().toISOString().slice(0, 10)}.enc.json`, 'application/json');
-        setMsg('Encrypted backup downloaded ✓');
+        setMsg(t('set.encDone'));
       } catch (e) {
-        setMsg(`Encrypted export failed: ${(e as Error).message.slice(0, 80)}`);
+        setMsg(t('set.encFailed', { error: (e as Error).message.slice(0, 80) }));
       }
     });
   }
@@ -3272,7 +3357,7 @@ function BackupRestore() {
     const encrypted = looksEncrypted(text);
     let pass = '';
     if (encrypted) {
-      const entered = window.prompt('This backup is encrypted. Enter its passphrase to restore.');
+      const entered = await prompt({ title: t('set.decTitle'), message: t('set.decHelp'), label: t('set.encPassLabel'), type: 'password', confirmLabel: t('common.restore') });
       if (entered === null) { setMsg(null); return; } // cancelled
       pass = entered;
     }
@@ -3325,9 +3410,9 @@ function BackupRestore() {
         a.download = `pharos-${kind}-${new Date().toISOString().slice(0, 10)}.csv`;
         a.click();
         URL.revokeObjectURL(url);
-        setMsg(`✓ ${kind} CSV downloaded`);
+        setMsg(t('set.csvDone', { kind: t(CSV_KIND[kind]) }));
       } catch (e) {
-        setMsg(`CSV failed: ${(e as Error).message.slice(0, 80)}`);
+        setMsg(t('set.csvFailed', { error: (e as Error).message.slice(0, 80) }));
       }
     });
   }
@@ -3347,9 +3432,9 @@ function BackupRestore() {
         a.download = `pharos-insurance-export-${new Date().toISOString().slice(0, 10)}.zip`;
         a.click();
         URL.revokeObjectURL(url);
-        setMsg(t('set.insuranceExportDone', { n: itemCount, total: `${cur()}${totalValue.toFixed(2)}` }));
+        setMsg(t('set.insuranceExportDone', { n: itemCount, total: money(totalValue) }));
       } catch (e) {
-        setMsg(`Insurance export failed: ${(e as Error).message.slice(0, 80)}`);
+        setMsg(t('set.insuranceFailed', { error: (e as Error).message.slice(0, 80) }));
       }
     });
   }
@@ -3369,9 +3454,9 @@ function BackupRestore() {
         a.download = `pharos-tax-export-${taxYear}.zip`;
         a.click();
         URL.revokeObjectURL(url);
-        setMsg(t('set.taxExportDone', { n: itemCount, total: `${cur()}${totalValue.toFixed(2)}` }));
+        setMsg(t('set.taxExportDone', { n: itemCount, total: money(totalValue) }));
       } catch (e) {
-        setMsg(`Tax export failed: ${(e as Error).message.slice(0, 80)}`);
+        setMsg(t('set.taxFailed', { error: (e as Error).message.slice(0, 80) }));
       }
     });
   }
@@ -3412,7 +3497,7 @@ function BackupRestore() {
           onChange={(e) => e.target.files?.[0] && handleVerify(e.target.files[0])}
         />
         {msg && (
-          <span className={cn('text-[11px]', msg.startsWith('Failed') || msg.includes('failed') ? 'text-[color:var(--color-red)]' : 'text-[color:var(--color-accent)]')} style={{ fontFamily: 'var(--font-mono)' }}>
+          <span className={cn('text-[11px]', msg.startsWith(t('common.failedWith', { error: '' })) || msg.includes('failed') ? 'text-[color:var(--color-red)]' : 'text-[color:var(--color-accent)]')} style={{ fontFamily: 'var(--font-mono)' }}>
             {msg}
           </span>
         )}
@@ -3460,6 +3545,7 @@ function BackupRestore() {
       </p>
       <div className="flex items-center gap-2 flex-wrap mt-3 pt-3 border-t border-[color:var(--color-border)]">
         <select
+          aria-label={t('set.taxYear')}
           value={taxYear}
           onChange={(e) => setTaxYear(Number(e.target.value))}
           className="text-xs px-2 py-1.5 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)]"
@@ -3589,15 +3675,15 @@ function StoreForm({ store, onDone }: { store?: StoreLite; onDone: () => void })
 
   return (
     <div className="bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg p-2.5 space-y-2">
-      <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t('set.storeNamePlaceholder')} className={inputClass} />
+      <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t('set.storeNamePlaceholder')} className={controlClass} />
       <input
         value={aliases}
         onChange={(e) => setAliases(e.target.value)}
         placeholder={t('set.aliasesPlaceholder')}
-        className={inputClass}
+        className={controlClass}
         style={{ fontFamily: 'var(--font-mono)' }}
       />
-      <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder={t('set.urlPlaceholder')} className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} />
+      <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder={t('set.urlPlaceholder')} className={controlClass} style={{ fontFamily: 'var(--font-mono)' }} />
       <input
         type="number"
         min="0"
@@ -3605,7 +3691,7 @@ function StoreForm({ store, onDone }: { store?: StoreLite; onDone: () => void })
         value={returnDays}
         onChange={(e) => setReturnDays(e.target.value)}
         placeholder={t('set.storeReturnWindowPlaceholder')}
-        className={inputClass}
+        className={controlClass}
         style={{ fontFamily: 'var(--font-mono)' }}
       />
       <div className="flex items-center gap-2">
@@ -3680,7 +3766,7 @@ function CardsManager({ cards }: { cards: SerializedCard[] }) {
                 {c.type} · {c.kind}{c.last4 ? ` · ••${c.last4}` : ''}
               </span>
             </div>
-            <Switch checked={c.active} onChange={(v) => startTransition(() => void toggleCardActive(c._id, v))} />
+            <Switch label={c.name} checked={c.active} onChange={(v) => startTransition(() => void toggleCardActive(c._id, v))} />
             <button onClick={() => openEdit(c)} className="text-[color:var(--color-text-faint)] hover:text-[color:var(--color-accent)] p-1"><Pencil size={13} /></button>
             <button onClick={() => remove(c)} className="text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] p-1"><Trash2 size={13} /></button>
           </div>
@@ -3691,15 +3777,15 @@ function CardsManager({ cards }: { cards: SerializedCard[] }) {
       {editing ? (
         <div className="mt-3 p-3 rounded-xl border border-[color:var(--color-border)] space-y-2.5">
           <div className="grid grid-cols-2 gap-2">
-            <input value={form.name} onChange={(e) => set({ name: e.target.value })} placeholder={t('set.cardNamePlaceholder')} className={inputClass} />
-            <input value={form.last4} onChange={(e) => set({ last4: e.target.value.slice(0, 4) })} placeholder={t('set.last4Placeholder')} className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} />
-            <input value={form.bank} onChange={(e) => set({ bank: e.target.value })} placeholder={t('set.bankPlaceholder')} className={inputClass} />
-            <input type="number" value={form.creditLimit} onChange={(e) => set({ creditLimit: e.target.value })} placeholder={t('set.creditLimitPlaceholder')} className={inputClass} />
-            <select value={form.kind} onChange={(e) => set({ kind: e.target.value })} className={selectClass}>
+            <input value={form.name} onChange={(e) => set({ name: e.target.value })} placeholder={t('set.cardNamePlaceholder')} className={controlClass} />
+            <input value={form.last4} onChange={(e) => set({ last4: e.target.value.slice(0, 4) })} placeholder={t('set.last4Placeholder')} className={controlClass} style={{ fontFamily: 'var(--font-mono)' }} />
+            <input value={form.bank} onChange={(e) => set({ bank: e.target.value })} placeholder={t('set.bankPlaceholder')} className={controlClass} />
+            <input type="number" value={form.creditLimit} onChange={(e) => set({ creditLimit: e.target.value })} placeholder={t('set.creditLimitPlaceholder')} className={controlClass} />
+            <select value={form.kind} onChange={(e) => set({ kind: e.target.value })} className={controlClass}>
               <option value="credit">{t('set.credit')}</option>
               <option value="debit">{t('set.debit')}</option>
             </select>
-            <select value={form.type} onChange={(e) => set({ type: e.target.value })} className={selectClass}>
+            <select value={form.type} onChange={(e) => set({ type: e.target.value })} className={controlClass}>
               {CARD_TYPES.map((ct) => <option key={ct} value={ct}>{ct}</option>)}
             </select>
           </div>
@@ -3734,6 +3820,7 @@ function UsersManager({ currentUserId }: { currentUserId: string }) {
   const [form, setForm] = useState({ username: '', name: '', password: '', role: 'member' });
   const [error, setError] = useState('');
   const confirm = useConfirm();
+  const prompt = usePrompt();
 
   const reload = () => startTransition(async () => { setUsers(await listUsers()); setLoading(false); });
   useEffect(() => { reload(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
@@ -3757,8 +3844,8 @@ function UsersManager({ currentUserId }: { currentUserId: string }) {
     if (role === u.role) return;
     startTransition(async () => { const r = await setUserRole(u.id, role); if (!r.ok) setError(r.error || t('common.failed')); reload(); });
   }
-  function resetPwd(u: UserRow) {
-    const pwd = window.prompt(t('set.resetPwdPrompt', { name: u.username }));
+  async function resetPwd(u: UserRow) {
+    const pwd = await prompt({ title: t('set.resetPwdTitle'), label: t('set.resetPwdPrompt', { name: u.username }), type: 'password', minLength: 8, confirmLabel: t('common.save') });
     if (!pwd) return;
     startTransition(async () => { const r = await changeUserPassword(u.id, pwd); setError(r.ok ? '' : (r.error || t('common.failed'))); });
   }
@@ -3803,10 +3890,10 @@ function UsersManager({ currentUserId }: { currentUserId: string }) {
       {adding ? (
         <div className="mt-3 p-3 rounded-xl border border-[color:var(--color-border)] space-y-2.5">
           <div className="grid grid-cols-2 gap-2">
-            <input value={form.username} onChange={(e) => setForm((f) => ({ ...f, username: e.target.value }))} placeholder={t('set.usernamePlaceholder')} className={inputClass} />
-            <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder={t('set.displayNamePlaceholder')} className={inputClass} />
-            <input value={form.password} onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))} type="password" placeholder={t('set.passwordPlaceholder')} className={inputClass} />
-            <select value={form.role} onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))} className={selectClass}>
+            <input value={form.username} onChange={(e) => setForm((f) => ({ ...f, username: e.target.value }))} placeholder={t('set.usernamePlaceholder')} className={controlClass} />
+            <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder={t('set.displayNamePlaceholder')} className={controlClass} />
+            <input value={form.password} onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))} type="password" placeholder={t('set.passwordPlaceholder')} className={controlClass} />
+            <select value={form.role} onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))} className={controlClass}>
               <option value="viewer">{t('set.viewer')}</option>
               <option value="member">{t('set.member')}</option>
               <option value="admin">{t('set.admin')}</option>
@@ -3858,8 +3945,8 @@ function SelfPasswordCard() {
     <Section title={t('set.yourPassword')} icon={<KeyRound size={15} />}>
       {open ? (
         <div className="space-y-2.5">
-          <input value={oldPwd} onChange={(e) => setOldPwd(e.target.value)} type="password" placeholder={t('set.currentPwdPlaceholder')} className={inputClass} />
-          <input value={newPwd} onChange={(e) => setNewPwd(e.target.value)} type="password" placeholder={t('set.newPwdPlaceholder')} className={inputClass} />
+          <input value={oldPwd} onChange={(e) => setOldPwd(e.target.value)} type="password" placeholder={t('set.currentPwdPlaceholder')} className={controlClass} />
+          <input value={newPwd} onChange={(e) => setNewPwd(e.target.value)} type="password" placeholder={t('set.newPwdPlaceholder')} className={controlClass} />
           <div className="flex items-center gap-2">
             <button onClick={submit} disabled={pending} className={saveBtn}>{pending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} {t('set.update')}</button>
             <button onClick={() => { setOpen(false); setMsg(null); }} className={ghostBtn}><X size={13} /> {t('common.cancel')}</button>
@@ -4017,7 +4104,7 @@ function SelfMfaCard() {
       {stage === 'need-password-to-start' && (
         <div className="space-y-2.5">
           <p className="text-xs text-[color:var(--color-text-dim)]">{t('set.twoFactorPasswordToStart')}</p>
-          <input value={reauthPassword} onChange={(e) => setReauthPassword(e.target.value)} type="password" autoComplete="current-password" placeholder={t('set.currentPwdPlaceholder')} className={inputClass} />
+          <input value={reauthPassword} onChange={(e) => setReauthPassword(e.target.value)} type="password" autoComplete="current-password" placeholder={t('set.currentPwdPlaceholder')} className={controlClass} />
           <div className="flex items-center gap-2">
             <button onClick={() => beginEnrollment(reauthPassword)} disabled={pending || !mfaPasswordReady(reauthPassword)} className={saveBtn}>
               {pending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} {pending ? t('set.twoFactorContinuing') : t('set.twoFactorContinue')}
@@ -4043,7 +4130,7 @@ function SelfMfaCard() {
               inputMode="numeric"
               autoComplete="one-time-code"
               placeholder="000000"
-              className={cn(inputClass, 'mt-1 max-w-[10rem] text-center tracking-[0.3em]')}
+              className={cn(controlClass, 'mt-1 max-w-[10rem] text-center tracking-[0.3em]')}
               style={{ fontFamily: 'var(--font-mono)' }}
             />
           </label>
@@ -4059,7 +4146,7 @@ function SelfMfaCard() {
       {stage === 'need-password-to-disable' && (
         <div className="space-y-2.5">
           <p className="text-xs text-[color:var(--color-text-dim)]">{t('set.twoFactorPasswordToDisable')}</p>
-          <input value={disablePassword} onChange={(e) => setDisablePassword(e.target.value)} type="password" autoComplete="current-password" placeholder={t('set.currentPwdPlaceholder')} className={inputClass} />
+          <input value={disablePassword} onChange={(e) => setDisablePassword(e.target.value)} type="password" autoComplete="current-password" placeholder={t('set.currentPwdPlaceholder')} className={controlClass} />
           <div className="flex items-center gap-2">
             <button
               onClick={confirmDisable}
@@ -4138,7 +4225,7 @@ function ListEditor({ entry }: { entry: ListEditorEntry }) {
         ))}
       </div>
       <div className="flex items-center gap-1.5">
-        <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') add(); }} placeholder={t('set.addCategoryPlaceholder')} className={cn(inputClass, 'text-xs py-1.5')} />
+        <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') add(); }} placeholder={t('set.addCategoryPlaceholder')} className={cn(controlClass, 'text-xs py-1.5')} />
         <button onClick={add} className={ghostBtn}><Plus size={13} /></button>
         <button onClick={() => save(values)} disabled={pending} className={saveBtn}>{pending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} {t('common.save')}</button>
         <button onClick={() => { setValues(entry.default); save(entry.default); }} disabled={pending} title={t('set.resetDefault')} className={ghostBtn}><RotateCcw size={13} /></button>
@@ -4183,7 +4270,7 @@ function SpacesManager({ spaces }: { spaces: string[] }) {
           ))}
         </div>
         <div className="flex items-center gap-1.5">
-          <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') add(); }} placeholder={t('set.spacesPlaceholder')} className={cn(inputClass, 'text-xs py-1.5')} />
+          <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') add(); }} placeholder={t('set.spacesPlaceholder')} className={cn(controlClass, 'text-xs py-1.5')} />
           <button onClick={add} className={ghostBtn}><Plus size={13} /></button>
           <button onClick={() => save(values)} disabled={pending} className={saveBtn}>{pending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} {t('common.save')}</button>
           {msg && <span className="text-[11px] text-[color:var(--color-accent)]" style={{ fontFamily: 'var(--font-mono)' }}>{msg}</span>}
@@ -4193,21 +4280,7 @@ function SpacesManager({ spaces }: { spaces: string[] }) {
   );
 }
 
-const selectClass =
-  'w-full bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[color:var(--color-accent)]';
-const inputClass =
-  'w-full bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[color:var(--color-accent)]';
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="min-w-0">
-      <label className="block text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider mb-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
-        {label}
-      </label>
-      {children}
-    </div>
-  );
-}
 
 function Section({ title, icon, children }: { title: string; icon?: React.ReactNode; children: React.ReactNode }) {
   return (

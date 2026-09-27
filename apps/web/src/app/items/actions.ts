@@ -39,6 +39,7 @@ import { parseCustomFields, MAX_CUSTOM_FIELDS } from '@/lib/customFields';
 import { maintenanceApplies, normalizeMaintenanceInterval } from '@/lib/maintenance';
 import { isLentOut, lendingApplies, normalizeBorrower } from '@/lib/lending';
 import { parseWarrantyClaims, MAX_WARRANTY_CLAIMS } from '@/lib/warrantyClaims';
+import { normalizeBundle } from '@/lib/bundles';
 import { addExpense } from '@/app/expenses/actions';
 
 const CATEGORIES = ['network', 'storage', 'compute', 'audio', 'video', 'mobile', 'peripheral', 'consumable', 'other'] as const;
@@ -85,6 +86,8 @@ const ItemFormSchema = z.object({
   tags: z.string().default(''),
   serialNumber: z.string().default(''),
   location: z.string().default(''),
+  // P39 build / project. Blank = not part of one; normalised by lib/bundles.ts.
+  bundle: z.preprocess((v) => normalizeBundle(v), z.string().default('')),
   // P41 maintenance schedule. Both blank keeps the item exactly as it was: an empty
   // interval normalises to null ("no schedule"), never to 0, so the absence round-trips.
   maintenanceIntervalDays: z.preprocess(
@@ -1592,6 +1595,7 @@ export async function mergeItems(
     if (keep.warrantyUntil == null && d.warrantyUntil != null) keep.warrantyUntil = d.warrantyUntil;
     if (!keep.serialNumber && d.serialNumber) keep.serialNumber = d.serialNumber;
     if (!keep.location && d.location) keep.location = d.location;
+    if (!keep.bundle && d.bundle) keep.bundle = d.bundle;
 
     // Union tags (dedup case-insensitively, cap 8)
     const seenTags = new Set((keep.tags ?? []).map((t) => t.toLowerCase()));

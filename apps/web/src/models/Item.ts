@@ -1,5 +1,6 @@
 import { Schema, model, models, type Model, type InferSchemaType } from 'mongoose';
 import { softDeletePlugin } from '@/lib/softDelete';
+import { createdByPlugin } from '@/lib/createdBy';
 
 // Single source of truth for item status. Used by the schema enum AND by the
 // /api/v1/items POST + PATCH routes (whitelist validation) so they never drift.
@@ -74,7 +75,7 @@ const WarrantyClaimSchema = new Schema(
 const ItemSchema = new Schema(
   {
     num: { type: String, default: '' },
-    title: { type: String, required: true, index: 'text' },
+    title: { type: String, required: true }, // text-indexed with specs + notes below (one text index per collection)
     category: {
       type: String,
       // Relaxed from an enum → free string so users can add custom categories
@@ -172,6 +173,10 @@ const ItemSchema = new Schema(
     warrantyUntil: { type: Date, default: null },
     serialNumber: { type: String, default: '' },
     location: { type: String, default: '' }, // where it physically lives (room / rack / shelf)
+    // P39: the build / project this item is a part of ("Battle Station", "10G upgrade").
+    // Free string, '' = not part of one, which is every pre-P39 record. The roll-up (what
+    // the parts cost, how many are installed) is derived in lib/bundles.ts, never stored.
+    bundle: { type: String, default: '', index: true },
 
     aiFilledAt: { type: Date, default: null }, // last time AI fill-from-web enriched it (status badge → don't re-do)
 
@@ -187,6 +192,7 @@ ItemSchema.index({ title: 'text', specs: 'text', notes: 'text' });
 ItemSchema.index({ updatedAt: -1 });
 
 ItemSchema.plugin(softDeletePlugin);
+ItemSchema.plugin(createdByPlugin); // P75: who added it (display only)
 
 export type ItemDoc = InferSchemaType<typeof ItemSchema> & { _id: string };
 

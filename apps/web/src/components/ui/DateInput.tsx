@@ -14,10 +14,14 @@ interface DateInputProps {
   id?: string;
   className?: string;
   disabled?: boolean;
+  /** ISO bounds for the calendar picker (a date-range filter keeps from ≤ to). */
+  min?: string;
+  max?: string;
+  'aria-label'?: string;
 }
 
 const base =
-  'w-full bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg text-sm text-[color:var(--color-text)] placeholder:text-[color:var(--color-text-faint)] focus:outline-none focus:border-[color:var(--color-accent)] transition-colors pl-4 pr-9 py-2';
+  'w-full bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg text-sm text-[color:var(--color-text)] placeholder:text-[color:var(--color-text-faint)] focus:outline-none focus:border-[color:var(--color-accent)] transition-colors pl-3 pr-9 py-2';
 
 /**
  * Date field that shows the APP's locale order (ΗΗ/ΜΜ/ΕΕΕΕ in Greek) instead of the operating
@@ -25,7 +29,7 @@ const base =
  * calendar button opens the browser's own picker on a hidden native input, because a picker
  * grid has no field order to get wrong and re-implementing one is not worth the weight.
  */
-export function DateInput({ value, onValueChange, required, name, id, className, disabled }: DateInputProps) {
+export function DateInput({ value, onValueChange, required, name, id, className, disabled, min, max, 'aria-label': ariaLabel }: DateInputProps) {
   const locale = useLocale();
   const t = useT();
   const [text, setText] = useState(() => formatIsoDate(value, locale));
@@ -59,6 +63,7 @@ export function DateInput({ value, onValueChange, required, name, id, className,
       <input
         ref={textRef}
         id={id}
+        aria-label={ariaLabel}
         type="text"
         inputMode="numeric"
         autoComplete="off"
@@ -87,6 +92,8 @@ export function DateInput({ value, onValueChange, required, name, id, className,
         aria-hidden
         disabled={disabled}
         value={value}
+        min={min}
+        max={max}
         className="absolute right-0 bottom-0 w-px h-px opacity-0 pointer-events-none"
         onChange={(e) => {
           emit(e.target.value);

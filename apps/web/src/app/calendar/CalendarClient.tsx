@@ -1,10 +1,10 @@
 'use client';
-import { PAGE_MAIN, PageHeader, HeaderStat } from '@/components/ui/PageHeader';
+import { PAGE_MAIN, PageHeader, HeaderStat, ViewToggle } from '@/components/ui/PageHeader';
 import { useState, useEffect } from 'react';
-import { useLocale, useT } from '@/components/LocaleProvider';
+import { useLocale, useMoney, useT } from '@/components/LocaleProvider';
 import type { TKey } from '@/lib/i18n';
 import { CalendarClock, Layers, ShieldCheck, Ticket, Wallet, Banknote, Receipt, Target, CalendarDays, LayoutGrid, ChevronLeft, ChevronRight } from 'lucide-react';
-import { cur } from '@/lib/money';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { cn } from '@/components/ui/cn';
 import { formatDate } from '@/lib/i18n/format';
 import { dayOf } from '@/lib/calendarDay';
@@ -33,12 +33,11 @@ const KIND_META: Record<Kind, { icon: React.ReactNode; color: string; short: str
 // A third 'List' view (one flat chronological list) was removed in #325: the Agenda view
 // already lists every entry, grouped by month, and reads better.
 type View = 'month' | 'agenda';
-const VIEWS: { id: View; label: string; icon: React.ReactNode }[] = [
-  { id: 'month', label: 'Month', icon: <LayoutGrid size={14} /> },
-  { id: 'agenda', label: 'Agenda', icon: <CalendarDays size={14} /> },
+const VIEWS: { id: View; icon: React.ReactNode }[] = [
+  { id: 'month', icon: <LayoutGrid size={15} /> },
+  { id: 'agenda', icon: <CalendarDays size={15} /> },
 ];
 
-const fmt = (n: number) => `${cur()}${n.toLocaleString('en-GB')}`;
 // `date` is a plain `YYYY-MM-DD` the SERVER chose (see `ymd` in page.tsx) — not an instant.
 // `new Date('2026-05-01')` parses it as UTC midnight, so it must be formatted in UTC as well;
 // without the timeZone it would be re-read in the viewer's zone and shift back a day for
@@ -49,6 +48,8 @@ const dayMonth = (value: string, locale: string) =>
 
 
 function Amount({ e }: { e: Entry }) {
+  const money = useMoney();
+  const fmt = (n: number) => money(n, undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
   if (e.amount == null) return null;
   return (
     <span className={cn('font-bold', e.kind === 'income' && 'text-[color:var(--color-accent)]')} style={display}>
@@ -81,9 +82,15 @@ function EntryRow({ e }: { e: Entry }) {
 }
 
 // ── Month grid ──────────────────────────────────────────────────────────────
-const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+/** Monday-first short weekday names in the app language (5 Jan 2026 was a Monday). */
+const weekdays = (locale: string) =>
+  Array.from({ length: 7 }, (_, i) => formatDate(new Date(2026, 0, 5 + i), locale, { weekday: 'short' }));
 
 function MonthGrid({ month }: { month: MonthBlock }) {
+  const t = useT();
+  const locale = useLocale();
+  const money = useMoney();
+  const fmt = (n: number) => money(n, undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
   const [y, mo] = month.key.split('-').map(Number); // mo = 1-12
   const first = new Date(y, mo - 1, 1);
   const firstWeekday = (first.getDay() + 6) % 7; // Mon = 0
@@ -113,7 +120,7 @@ function MonthGrid({ month }: { month: MonthBlock }) {
             const meta = KIND_META[e.kind];
             return (
               <span key={i} className="inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-lg border" style={{ ...mono, color: meta.color, borderColor: `color-mix(in srgb, ${meta.color} 40%, transparent)`, background: `color-mix(in srgb, ${meta.color} 10%, transparent)` }}>
-                {meta.icon} {e.label}{e.amount != null && <b> {fmt(e.amount)}/mo</b>}
+                {meta.icon} {e.label}{e.amount != null && <b> {fmt(e.amount)}{t('cal.perMo')}</b>}
               </span>
             );
           })}
@@ -121,7 +128,7 @@ function MonthGrid({ month }: { month: MonthBlock }) {
       )}
 
       <div className="grid grid-cols-7 gap-1">
-        {WEEKDAYS.map((w) => (
+        {weekdays(locale).map((w) => (
           <div key={w} className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider text-center pb-1" style={mono}>
             {w}
           </div>
@@ -166,6 +173,8 @@ function MonthGrid({ month }: { month: MonthBlock }) {
 }
 
 export function CalendarClient({ months, dueThisMonth }: { months: MonthBlock[]; dueThisMonth: number }) {
+  const money = useMoney();
+  const fmt = (n: number) => money(n, undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
   const t = useT();
   const [view, setView] = useState<View>('month');
   const [monthIdx, setMonthIdx] = useState(0);
@@ -186,30 +195,12 @@ export function CalendarClient({ months, dueThisMonth }: { months: MonthBlock[];
     <main className={PAGE_MAIN}>
       <PageHeader title={t('nav.calendar')} count={t('cal.next3')}>
         <HeaderStat label={t('cal.dueThisMonth')} value={fmt(dueThisMonth)} color="var(--color-gold)" />
+        {/* The view switch sits in the header, where every other page keeps it. */}
+        <ViewToggle value={view} onChange={go} options={VIEWS.map((v) => ({ value: v.id, icon: v.icon, title: t(`cal.${v.id}` as TKey) }))} />
       </PageHeader>
 
-      {/* View toggle */}
-      <div className="flex items-center gap-1.5 mb-5">
-        {VIEWS.map((v) => (
-          <button
-            key={v.id}
-            onClick={() => go(v.id)}
-            className={cn(
-              'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all',
-              view === v.id
-                ? 'bg-[color:var(--color-accent)] text-black'
-                : 'bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]'
-            )}
-          >
-            {v.icon} {t(`cal.${v.id}` as TKey)}
-          </button>
-        ))}
-      </div>
-
       {empty ? (
-        <div className="rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-8 text-center text-sm text-[color:var(--color-text-dim)]">
-          {t('cal.empty')}
-        </div>
+        <EmptyState icon={<CalendarDays />} title={t('cal.empty')} />
       ) : view === 'month' ? (
         <section>
           <div className="flex items-center justify-between mb-3">

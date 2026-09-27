@@ -172,7 +172,7 @@ Check status with `docker compose ps` and logs with
 
 ## 5. First-run admin setup
 
-Open **http://localhost:3000** (or your host's address). On first launch there is
+Open **<http://localhost:3000>** (or your host's address). On first launch there is
 no account yet, so PHAROS shows a **first-run setup wizard** that:
 
 1. Creates your **admin** account (username + password). Passwords are hashed

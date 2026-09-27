@@ -1,5 +1,6 @@
 'use client';
 import { PAGE_MAIN, PageHeader } from '@/components/ui/PageHeader';
+import { DateInput } from '@/components/ui/DateInput';
 import { useMemo, useState, useTransition } from 'react';
 import { useLocale, useT, useMoney } from '@/components/LocaleProvider';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
@@ -127,13 +128,9 @@ export function SavingsClient({ data }: { data: SavingsData }) {
             </span>
             <label className="flex items-center gap-2 text-[11px] text-[color:var(--color-text-dim)]">
               {t('sav.pickDate')}
-              <input
-                type="date"
-                value={dateStr}
-                onChange={(e) => setDateStr(e.target.value)}
-                className="bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-2 py-1 text-[11px] text-[color:var(--color-text)] focus:outline-none focus:border-[color:var(--color-accent)]"
-                style={{ fontFamily: 'var(--font-mono)' }}
-              />
+              <span className="w-36">
+                <DateInput value={dateStr} onValueChange={setDateStr} className="py-1 text-[11px]" />
+              </span>
             </label>
           </div>
           {forecast === null ? (
@@ -226,12 +223,7 @@ export function SavingsClient({ data }: { data: SavingsData }) {
           </label>
           <label className="flex flex-col gap-1 text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-[0.12em]" style={{ fontFamily: 'var(--font-mono)' }}>
             {t('sav.planDate')}
-            <input
-              type="date"
-              value={planDate}
-              onChange={(e) => setPlanDate(e.target.value)}
-              className="bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-2 py-1.5 text-sm text-[color:var(--color-text)] focus:outline-none focus:border-[color:var(--color-accent)]"
-            />
+            <DateInput value={planDate} onValueChange={setPlanDate} className="py-1.5 normal-case tracking-normal" />
           </label>
           {adHoc && <SaveAsGoal amount={Number(planAmount)} date={planDate} />}
         </div>

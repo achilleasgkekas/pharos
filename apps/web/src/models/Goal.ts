@@ -1,5 +1,6 @@
 import { Schema, model, models, type Model, type InferSchemaType } from 'mongoose';
 import { softDeletePlugin } from '@/lib/softDelete';
+import { createdByPlugin } from '@/lib/createdBy';
 
 // A single manual contribution toward a goal (same shape as a bill payment). Positive
 // amount = money put aside; a mistaken entry is removed rather than negated.
@@ -32,6 +33,7 @@ const GoalSchema = new Schema(
 GoalSchema.index({ updatedAt: -1 });
 
 GoalSchema.plugin(softDeletePlugin);
+GoalSchema.plugin(createdByPlugin); // P75: who added it (display only)
 
 export type GoalDoc = InferSchemaType<typeof GoalSchema> & { _id: string };
 

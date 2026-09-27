@@ -1,5 +1,6 @@
 import { Schema, model, models, type Model, type InferSchemaType } from 'mongoose';
 import { softDeletePlugin } from '@/lib/softDelete';
+import { createdByPlugin } from '@/lib/createdBy';
 
 // Recurring cost-split among household members (P73). Same shape/semantics as
 // Expense.split (lib/split.ts, reused as-is): you pay the charge each cycle, each
@@ -69,6 +70,7 @@ const SubscriptionSchema = new Schema(
 SubscriptionSchema.index({ updatedAt: -1 });
 
 SubscriptionSchema.plugin(softDeletePlugin);
+SubscriptionSchema.plugin(createdByPlugin); // P75: who added it (display only)
 
 export type SubscriptionDoc = InferSchemaType<typeof SubscriptionSchema> & { _id: string };
 

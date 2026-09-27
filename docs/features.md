@@ -53,6 +53,17 @@ adds people in **Settings → Users** with one of three roles:
 Each person can change their own password and turn on two-factor authentication
 (TOTP) in Settings → General.
 
+Once there is more than one account, records show who added them ("Added by
+Maria") on items, expenses, receipts and tasks. It is recorded for anything added
+in the app, through the REST API or over MCP; records from before this existed,
+and ones created by background jobs, show nothing. A single-user install sees no
+change at all.
+
+**Settings → Activity** lists the last 100 things household members added or
+moved to Trash, newest first, with who did it and a link to the record. Every
+role can read it; it appears only once there is a second account. Edits are not
+listed.
+
 ## Inventory & Shopping (Items)
 
 One data model, two views. An **Item** is anything you own or plan to buy, with a
@@ -68,6 +79,11 @@ links and prices rather than duplicating the product.
 
 Highlights:
 
+- **Builds.** Give related items the same **build / project** name (a PC build, a
+  rack, a network upgrade) and filter either list by it: a card shows how many parts
+  the build has, how many are planned, ordered, received or installed, what the
+  bought parts cost and what the wishlisted ones still add up to, across both views.
+  Each part's detail links back to the whole build.
 - **Price tracking.** Set a **target price** and the item shows the best current
   store price, the lowest price ever seen, a price-position bar (where the current
   best sits between the cheapest and most expensive), a trend arrow, and a "good
@@ -623,6 +639,15 @@ The command bar has a **Search / AI toggle**: in Search mode it is the global
 search below; in AI mode it is the assistant. The AI command bar requires an
 Anthropic-capable provider (see [Configuration → AI providers](configuration.md#ai-providers)).
 
+In AI mode a **microphone button** lets you dictate instead of typing. It uses the
+browser's own speech recognition (Chrome, Edge, Safari) in the interface language;
+the words appear in the box as you speak, and nothing is sent until you review
+them and press send. Pharos never receives the audio, but note that Chrome and
+Edge run recognition on their vendor's servers, not on the device. The button is hidden in browsers
+without speech recognition (Firefox) and when Pharos is opened over plain `http`
+on a non-localhost address, because browsers only grant the microphone to secure
+origins.
+
 ## Search
 
 Global search across items, receipts, statements, tasks, subscriptions,
@@ -643,7 +668,7 @@ overdue or due soon, price hikes, trials ending, subscriptions due a usage revie
 documents expiring, vehicle dates due, special dates coming up, maintenance due,
 lent items due back, warranty claims with no movement, and a remote backup that
 has fallen behind. The in-app **bell** shows all of them. The same checks send a
-human-readable summary through your configured channel (ntfy, Discord, Slack, Telegram,
+human-readable summary through your configured channel (ntfy, Discord, Slack, Telegram, email,
 web push, or a generic webhook), and each category can be switched off on its own; see
 [Configuration → Notifications](configuration.md#notifications)). You can trigger
 a check on demand or send a test message from Settings.
@@ -715,7 +740,7 @@ Configuration is grouped into tabs:
   printable receipts report, **migration import** (YNAB and other tools), and Trash.
 - **Stores & lists** — known stores (with duplicate detection / merge) and the
   editable dropdown taxonomies (item / expense / subscription categories).
-- **Notifications** (admin) — alert channels (ntfy, Discord, Slack, Telegram,
+- **Notifications** (admin) — alert channels (ntfy, Discord, Slack, Telegram, email,
   web push, webhook), per-category switches, lead times, test and check-now
   buttons; outbound event webhooks for automation platforms.
 - **Users** (admin) — add household members and viewers, change roles.

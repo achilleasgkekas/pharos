@@ -4,20 +4,20 @@ import { currentModel } from './tenancy/connection';
 import { sendNtfyTo } from './notify';
 import { assertPublicUrl } from './ssrf';
 import { safeFetch } from './safeFetch';
-import { NOTIFIER_TYPES, type NotifierConfig, type NotifierType } from './notifiers.shared';
+import { DEFAULT_SMTP_PORT, NOTIFIER_TYPES, smtpFields, type NotifierConfig, type NotifierType } from './notifiers.shared';
 import { deliverWithRetry, describeOutcome, type DeliveryOutcome } from './deliveryRetry';
 import { recordDeliveries } from './deliveryLog';
 import { notifierLogKey } from './deliveryLog.shared';
 import { dispatchWebPush } from './webPush';
+import { sendPlainMail } from './mailer';
 
 export { NOTIFIER_TYPES };
 export type { NotifierConfig, NotifierType };
 
 /**
  * Pluggable outbound notifier. Alerts (deals, installments due, expiring
- * warranties) fan out to every enabled channel. All channels are plain HTTP
- * POSTs, so no extra dependency is needed — email is reachable via a generic
- * webhook (Zapier/Make/n8n) or a self-hosted relay.
+ * warranties) fan out to every enabled channel. Every channel is a plain HTTP
+ * POST except `email`, which talks SMTP through lib/mailer.ts.
  *
  * Channels live as an array on AppConfig.notifiers. ntfy is just one channel
  * type; the legacy ntfyUrl/ntfyEnabled fields are migrated in on read so older
@@ -72,6 +72,24 @@ async function postTelegram(token: string, chatId: string, text: string): Promis
   return toOutcome(() => fetch(`https://api.telegram.org/bot${safeToken}/sendMessage`, jsonInit({ chat_id: chatId, text })));
 }
 
+/** Send an alert over SMTP. A refused login (EAUTH) or a 5xx reply (bad sender or
+ *  recipient) will fail the same way on every retry, so both are permanent; timeouts,
+ *  refused connections and 4xx greylisting stay transient and get the normal backoff. */
+async function sendEmail(c: NotifierConfig, subject: string, text: string): Promise<DeliveryOutcome> {
+  if (!c.host || !c.target || !c.from) return MISSING_CONFIG;
+  try {
+    await sendPlainMail(
+      { host: c.host, port: c.port || DEFAULT_SMTP_PORT, secure: !!c.secure, user: c.user, pass: c.pass, from: c.from },
+      { to: c.target, subject, text }
+    );
+    return { ok: true };
+  } catch (err) {
+    const e = err as { message?: string; code?: string; responseCode?: number };
+    const permanent = e.code === 'EAUTH' || (typeof e.responseCode === 'number' && e.responseCode >= 500);
+    return { ok: false, error: (e.message || 'SMTP delivery failed').slice(0, 160), ...(permanent ? { permanent: true } : {}) };
+  }
+}
+
 /** One delivery attempt. Title is ASCII-only for ntfy; the body keeps any unicode (e.g. Greek). */
 async function attemptOne(c: NotifierConfig, title: string, message: string): Promise<DeliveryOutcome> {
   switch (c.type) {
@@ -91,6 +109,8 @@ async function attemptOne(c: NotifierConfig, title: string, message: string): Pr
       return c.token && c.target ? postTelegram(c.token, c.target, `${title}\n${message}`) : MISSING_CONFIG;
     case 'webhook':
       return c.url ? postJson(c.url, { title, message, ts: new Date().toISOString() }) : MISSING_CONFIG;
+    case 'email':
+      return sendEmail(c, title, message);
     default:
       return { ok: false, error: 'Unknown channel type', permanent: true };
   }
@@ -116,6 +136,7 @@ function coerce(raw: unknown, i: number): NotifierConfig | null {
     url: r.url ? String(r.url) : '',
     token: r.token ? String(r.token) : '',
     target: r.target ? String(r.target) : '',
+    ...(type === 'email' ? smtpFields(r) : {}),
   };
 }
 

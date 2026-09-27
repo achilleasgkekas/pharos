@@ -24,6 +24,7 @@ We take the security of Pharos seriously. If you discover a security vulnerabili
 ### What to Include in Your Report
 
 To help us investigate and triage quickly, please include:
+
 - A description of the vulnerability and its potential impact.
 - Step-by-step instructions or a minimal proof-of-concept (PoC) to reproduce the issue.
 - The environment, affected component, and commit/version tested.

@@ -16,6 +16,8 @@ import { getServerT } from '@/lib/i18n/server';
 import { LocaleProvider } from '@/components/LocaleProvider';
 import { sentryDsn, sentryEnvironment } from '@/lib/errorReporting';
 import { saasMode } from '@/lib/tenancy/saasMode';
+import { loadAttributionNames } from '@/lib/attribution';
+import { AttributionProvider } from '@/components/CreatedBy';
 
 export const metadata: Metadata = {
   title: 'PHAROS · Personal Hub',
@@ -78,6 +80,8 @@ export default async function RootLayout({
       else if (!providerReady) banner = 'no-provider';
     }
   }
+  // P75: who added each record. Null (nothing shown) until the instance has a second user.
+  const attribution = user ? await loadAttributionNames() : null;
   return (
     <html lang={locale} suppressHydrationWarning>
       <head>
@@ -102,6 +106,7 @@ export default async function RootLayout({
       <body>
         <CurrencyInit symbol={symbol} />
         <LocaleProvider locale={locale} dict={dict} currency={currency}>
+        <AttributionProvider names={attribution}>
         <Providers>
           {/* SiteNav renders only for signed-in users AND not on a chrome-less route (see
               ChromeGate). Keep `children` in a STABLE sibling position so flipping auth
@@ -115,6 +120,7 @@ export default async function RootLayout({
           )}
           {children}
         </Providers>
+        </AttributionProvider>
         </LocaleProvider>
       </body>
     </html>

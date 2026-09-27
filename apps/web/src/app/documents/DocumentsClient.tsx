@@ -1,40 +1,28 @@
 'use client';
 import { PAGE_MAIN, PageHeader, HeaderButton, PrimaryAction } from '@/components/ui/PageHeader';
 import { useState, useMemo, useTransition } from 'react';
-import { Trash2, Check, Archive, ArchiveRestore, Pencil, X, FileCheck2 } from 'lucide-react';
+import { Trash2, Check, Archive, ArchiveRestore, Pencil, X, IdCard } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { DateInput } from '@/components/ui/DateInput';
-import { Input } from '@/components/ui/Input';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { Field } from '@/components/ui/Field';
+import { Input, controlClass } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { cn } from '@/components/ui/cn';
 import { documentDaysUntilExpiry, documentStatus, type DocStatus } from '@/lib/documentExpiry';
 import type { SerializedDocument } from '@/types';
+import type { TFunc } from '@/lib/i18n';
 import { createDocument, updateDocument, deleteDocument, setDocumentArchived } from './actions';
 import { formatDate } from '@/lib/i18n/format';
-import { useLocale } from '@/components/LocaleProvider';
+import { useLocale, useT } from '@/components/LocaleProvider';
 
-// P42 — personal document expiry tracker. Inline English wording (like BillsClient), which
-// is not yet run through i18n; only the nav label is translated.
+// P42: personal document expiry tracker.
 
-const inputClass =
-  'w-full bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[color:var(--color-accent)]';
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="block">
-      <span className="block text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-[0.12em] mb-1" style={{ fontFamily: 'var(--font-mono)' }}>
-        {label}
-      </span>
-      {children}
-    </label>
-  );
-}
-
-const STATUS_STYLE: Record<DocStatus, { label: (d: number) => string; color: string }> = {
-  expired: { label: (d) => `expired ${-d}d ago`, color: 'var(--color-red)' },
-  soon: { label: (d) => (d === 0 ? 'expires today' : `in ${d}d`), color: 'var(--color-gold)' },
-  ok: { label: (d) => `in ${d}d`, color: 'var(--color-text-faint)' },
+const STATUS_STYLE: Record<DocStatus, { label: (d: number, t: TFunc) => string; color: string }> = {
+  expired: { label: (d, t) => t('doc.expiredAgo', { n: -d }), color: 'var(--color-red)' },
+  soon: { label: (d, t) => (d === 0 ? t('doc.expiresToday') : t('common.inDays', { n: d })), color: 'var(--color-gold)' },
+  ok: { label: (d, t) => t('common.inDays', { n: d }), color: 'var(--color-text-faint)' },
 };
 
 const fmtDate = (s: string | null, locale: string) => formatDate(s, locale, { day: '2-digit', month: 'short', year: 'numeric' }, '—');
@@ -48,6 +36,7 @@ const toInputDate = (s: string | null) => {
 type Draft = Partial<SerializedDocument> | null;
 
 export function DocumentsClient({ documents, leadDays }: { documents: SerializedDocument[]; leadDays: number }) {
+  const t = useT();
   const locale = useLocale();
   const confirm = useConfirm();
   const [pending, startTransition] = useTransition();
@@ -76,16 +65,16 @@ export function DocumentsClient({ documents, leadDays }: { documents: Serialized
       const id = editing && editing._id;
       const r = id ? await updateDocument(id, fd) : await createDocument(fd);
       if (r.ok) setEditing(null);
-      else setError(r.error || 'Could not save');
+      else setError(r.error || t('common.saveFailed'));
     });
   }
 
   function remove(d: SerializedDocument) {
     startTransition(async () => {
       const ok = await confirm({
-        title: 'Delete document',
-        message: `Delete “${d.title}”? It moves to Trash (restorable for 30 days).`,
-        confirmLabel: 'Delete',
+        title: t('doc.deleteTitle'),
+        message: t('doc.deleteBody', { title: d.title }),
+        confirmLabel: t('common.delete'),
         danger: true,
       });
       if (ok) await deleteDocument(d._id);
@@ -95,23 +84,20 @@ export function DocumentsClient({ documents, leadDays }: { documents: Serialized
   return (
     <main className={PAGE_MAIN}>
       <PageHeader
-        title="Documents"
-        count={`${visible.length} shown`}
-        subtitle={<>Passports, IDs, driving licences, residence permits, vehicle registration/MOT — anything with a renewal deadline. You get an alert when one is within {leadDays} days of expiring (Settings → General).</>}
+        title={t('nav.documents')}
+        count={t('common.shown', { n: visible.length })}
+        subtitle={t('doc.subtitle', { n: leadDays })}
       >
         {archivedCount > 0 && (
-          <HeaderButton onClick={() => setShowArchived((v) => !v)}>
-            {showArchived ? 'Hide archived' : `Show archived (${archivedCount})`}
+          <HeaderButton icon={<Archive size={14} />} aria-pressed={showArchived} onClick={() => setShowArchived((v) => !v)}>
+            {showArchived ? t('common.hideArchived') : t('common.showArchived', { n: archivedCount })}
           </HeaderButton>
         )}
         <PrimaryAction onClick={openNew} />
       </PageHeader>
 
       {visible.length === 0 ? (
-        <div className="py-20 text-center text-[color:var(--color-text-faint)]">
-          <FileCheck2 size={40} className="mx-auto mb-3 opacity-40" />
-          <p className="text-sm">No documents yet. Add your passport, ID, or licence to track its expiry.</p>
-        </div>
+        <EmptyState icon={<IdCard />} title={t('doc.empty')} />
       ) : (
         <div className="space-y-2">
           {visible.map((d) => {
@@ -122,7 +108,7 @@ export function DocumentsClient({ documents, leadDays }: { documents: Serialized
               <div
                 key={d._id}
                 className={cn(
-                  'flex items-center gap-3 rounded-xl border p-3 transition-colors',
+                  'flex items-center gap-3 rounded-xl border bg-[color:var(--color-surface)] px-3 py-2.5 transition-colors',
                   d.archived ? 'border-[color:var(--color-border)] opacity-60' : 'border-[color:var(--color-border)] hover:border-[color:var(--color-border-light)]'
                 )}
               >
@@ -133,21 +119,22 @@ export function DocumentsClient({ documents, leadDays }: { documents: Serialized
                     {d.holder && <span className="text-[10px] text-[color:var(--color-text-dim)]">· {d.holder}</span>}
                   </div>
                   <div className="flex items-center gap-2 flex-wrap text-[11px] text-[color:var(--color-text-faint)] mt-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
-                    <span>exp {fmtDate(d.expiryDate, locale)}</span>
-                    {days !== null && <span style={{ color: s.color }}>· {s.label(days)}</span>}
+                    <span>{t('doc.expShort', { date: fmtDate(d.expiryDate, locale) })}</span>
+                    {days !== null && <span style={{ color: s.color }}>· {s.label(days, t)}</span>}
                     {d.number && <span className="truncate">· #{d.number}</span>}
                   </div>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
-                  <button onClick={() => openEdit(d)} title="Edit" className="p-1.5 rounded-lg text-[color:var(--color-text-faint)] hover:text-[color:var(--color-accent)]"><Pencil size={14} /></button>
+                  <button onClick={() => openEdit(d)} title={t('common.edit')} aria-label={t('common.edit')} className="p-1.5 rounded-lg text-[color:var(--color-text-faint)] hover:text-[color:var(--color-accent)]"><Pencil size={14} /></button>
                   <button
                     onClick={() => startTransition(async () => { await setDocumentArchived(d._id, !d.archived); })}
-                    title={d.archived ? 'Unarchive' : 'Archive'}
+                    title={d.archived ? t('common.unarchive') : t('common.archive')}
+                    aria-label={d.archived ? t('common.unarchive') : t('common.archive')}
                     className="p-1.5 rounded-lg text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)]"
                   >
                     {d.archived ? <ArchiveRestore size={14} /> : <Archive size={14} />}
                   </button>
-                  <button onClick={() => remove(d)} title="Delete" className="p-1.5 rounded-lg text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)]"><Trash2 size={14} /></button>
+                  <button onClick={() => remove(d)} title={t('common.delete')} aria-label={t('common.delete')} className="p-1.5 rounded-lg text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)]"><Trash2 size={14} /></button>
                 </div>
               </div>
             );
@@ -155,39 +142,39 @@ export function DocumentsClient({ documents, leadDays }: { documents: Serialized
         </div>
       )}
 
-      <Modal open={editing !== null} onClose={() => setEditing(null)} title={editing && editing._id ? 'Edit document' : 'New document'} size="md">
+      <Modal open={editing !== null} onClose={() => setEditing(null)} title={editing && editing._id ? t('doc.edit') : t('doc.new')} size="md">
         <form
           action={submit}
           className="space-y-3"
         >
-          <Field label="Title *">
-            <Input name="title" defaultValue={editing?.title || ''} placeholder="Passport" required />
+          <Field label={t('doc.fTitle')}>
+            <Input name="title" defaultValue={editing?.title || ''} placeholder={t('doc.titleHint')} required />
           </Field>
           <div className="grid sm:grid-cols-2 gap-3">
-            <Field label="Type">
-              <Input name="type" defaultValue={editing?.type || ''} placeholder="passport / id / licence" />
+            <Field label={t('common.type')}>
+              <Input name="type" defaultValue={editing?.type || ''} placeholder={t('doc.typeHint')} />
             </Field>
-            <Field label="Holder">
-              <Input name="holder" defaultValue={editing?.holder || ''} placeholder="who it belongs to" />
+            <Field label={t('doc.fHolder')}>
+              <Input name="holder" defaultValue={editing?.holder || ''} placeholder={t('doc.holderHint')} />
             </Field>
-            <Field label="Document number">
+            <Field label={t('doc.fNumber')}>
               <Input name="number" defaultValue={editing?.number || ''} />
             </Field>
-            <Field label="Issued (optional)">
-              <DateInput name="issuedAt" value={toInputDate(editing?.issuedAt ?? null)} onValueChange={(v) => setEditing(prev => ({ ...(prev || {}), issuedAt: v }))} className={inputClass} />
+            <Field label={t('doc.fIssued')}>
+              <DateInput name="issuedAt" value={toInputDate(editing?.issuedAt ?? null)} onValueChange={(v) => setEditing(prev => ({ ...(prev || {}), issuedAt: v }))} className={controlClass} />
             </Field>
-            <Field label="Expires *">
-              <DateInput name="expiryDate" required value={toInputDate(editing?.expiryDate ?? null)} onValueChange={(v) => setEditing(prev => ({ ...(prev || {}), expiryDate: v }))} className={inputClass} />
+            <Field label={t('doc.fExpires')}>
+              <DateInput name="expiryDate" required value={toInputDate(editing?.expiryDate ?? null)} onValueChange={(v) => setEditing(prev => ({ ...(prev || {}), expiryDate: v }))} className={controlClass} />
             </Field>
           </div>
-          <Field label="Notes">
-            <textarea name="notes" defaultValue={editing?.notes || ''} rows={2} className={inputClass} />
+          <Field label={t('v.fNotes')}>
+            <textarea name="notes" defaultValue={editing?.notes || ''} rows={2} className={controlClass} />
           </Field>
           {error && <p className="text-xs text-[color:var(--color-red)]" style={{ fontFamily: 'var(--font-mono)' }}>{error}</p>}
           <div className="flex justify-end gap-2 pt-1">
-            <Button type="button" variant="ghost" onClick={() => setEditing(null)}><X size={14} /> Cancel</Button>
+            <Button type="button" variant="ghost" onClick={() => setEditing(null)}><X size={14} /> {t('common.cancel')}</Button>
             <Button type="submit" variant="primary" disabled={pending}>
-              <Check size={14} /> {editing && editing._id ? 'Save' : 'Add'}
+              <Check size={14} /> {editing && editing._id ? t('common.save') : t('common.add')}
             </Button>
           </div>
         </form>

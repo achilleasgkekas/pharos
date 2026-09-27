@@ -149,7 +149,6 @@ AGPL terms apply if you offer it as a network service to others. See the
 Yes. The only costs are your own hardware and electricity, plus optional cloud AI
 usage if you choose a cloud provider instead of local Ollama.
 
-
 ## Troubleshooting
 
 ### The app or AI is not working — where do I start?
@@ -158,12 +157,12 @@ The [Troubleshooting guide](troubleshooting.md) groups the most common problems
 by area (startup, login, database, AI, storage, notifications, import,
 performance) and links back to the relevant guide for each.
 
-### I updated the app and an open tab throws an error.
+### I updated the app and an open tab throws an error
 
 That is a stale bundle after a rebuild: the open tab still references old server
 actions. Do a hard refresh (Cmd/Ctrl+Shift+R). This is expected after any deploy.
 
-### AI says "offline" even though my cloud key works.
+### AI says "offline" even though my cloud key works
 
 The status indicator is provider-aware, but a half-configured provider falls back
 to local Ollama. Check that the selected provider and its key/model are set in

@@ -26,6 +26,8 @@ vi.mock('@/models/AppConfig', () => ({ AppConfig: { findOne, updateOne } }));
 vi.mock('./tenancy/connection', () => ({ currentModel: async () => ({ findOne, updateOne }) }));
 vi.mock('./notify', () => ({ sendNtfyTo: vi.fn(async () => true) }));
 vi.mock('node:dns/promises', () => ({ lookup: vi.fn() }));
+const { sendPlainMail } = vi.hoisted(() => ({ sendPlainMail: vi.fn() }));
+vi.mock('./mailer', () => ({ sendPlainMail }));
 
 import { lookup } from 'node:dns/promises';
 import { dispatchAlert } from './notifiers';
@@ -156,5 +158,36 @@ describe('dispatchAlert — delivery log', () => {
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200 })));
 
     await expect(dispatchAlert('t', 'm')).resolves.toEqual({ sent: 1, total: 1 });
+  });
+});
+
+describe('dispatchAlert — email retry policy', () => {
+  const emailChannel = {
+    notifiers: [{ id: 'e1', type: 'email', enabled: true, host: 'smtp.example.com', port: 587, from: 'a@example.com', target: 'b@example.com' }],
+  };
+
+  beforeEach(() => {
+    state.doc = emailChannel;
+    sendPlainMail.mockReset();
+  });
+
+  it('does not retry a refused login', async () => {
+    sendPlainMail.mockRejectedValue(Object.assign(new Error('Invalid login: 535'), { code: 'EAUTH', responseCode: 535 }));
+    expect(await dispatchAlert('t', 'm')).toEqual({ sent: 0, total: 1 });
+    expect(sendPlainMail).toHaveBeenCalledTimes(1);
+    expect(writtenLog()['notifier:e1'][0]).toMatchObject({ ok: false, attempts: 1 });
+  });
+
+  it('does not retry a 5xx reply (e.g. recipient rejected)', async () => {
+    sendPlainMail.mockRejectedValue(Object.assign(new Error('550 no such user'), { code: 'EENVELOPE', responseCode: 550 }));
+    await dispatchAlert('t', 'm');
+    expect(sendPlainMail).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries a connection failure and records the success', async () => {
+    sendPlainMail.mockRejectedValueOnce(Object.assign(new Error('connect ETIMEDOUT'), { code: 'ETIMEDOUT' })).mockResolvedValueOnce(undefined);
+    expect(await dispatchAlert('t', 'm')).toEqual({ sent: 1, total: 1 });
+    expect(sendPlainMail).toHaveBeenCalledTimes(2);
+    expect(writtenLog()['notifier:e1'][0]).toMatchObject({ ok: true, attempts: 2 });
   });
 });

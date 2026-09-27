@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { NOTIFIER_TYPES, type NotifierType } from './notifiers.shared';
+import { DEFAULT_SMTP_PORT, NOTIFIER_TYPES, smtpFields, type NotifierType } from './notifiers.shared';
 
 // notifiers.shared.ts is the client-safe notifier metadata (no DB/server imports) that the
 // Settings UI reads to render the per-channel config forms. NOTIFIER_TYPES.needs drives which
-// fields (url/token/target) a channel shows and validates, so a mismatch here silently breaks
+// fields (url/token/target/smtp) a channel shows and validates, so a mismatch here silently breaks
 // notifier setup. Pure module → every invariant is checkable in isolation.
 
 // Canonical NotifierType union (mirrors the source type). Updating the source must update this.
-const EXPECTED_TYPES: NotifierType[] = ['ntfy', 'discord', 'slack', 'telegram', 'webhook'];
-const VALID_NEEDS = new Set(['url', 'token', 'target']);
+const EXPECTED_TYPES: NotifierType[] = ['ntfy', 'discord', 'slack', 'telegram', 'webhook', 'email'];
+const VALID_NEEDS = new Set(['url', 'token', 'target', 'smtp']);
 
 describe('NOTIFIER_TYPES', () => {
   it('is a non-empty list', () => {
@@ -63,9 +63,40 @@ describe('NOTIFIER_TYPES', () => {
     expect(tg!.needs).not.toContain('url');
   });
 
+  it('requires the SMTP block and a recipient target for email (and no url)', () => {
+    const email = NOTIFIER_TYPES.find((n) => n.type === 'email');
+    expect(email).toBeDefined();
+    expect(new Set(email!.needs)).toEqual(new Set(['smtp', 'target']));
+    expect(email!.needs).not.toContain('url');
+  });
+
   it('lets every type be looked up by its type field', () => {
     for (const type of EXPECTED_TYPES) {
       expect(NOTIFIER_TYPES.find((n) => n.type === type)).toBeTruthy();
     }
+  });
+});
+
+describe('smtpFields', () => {
+  it('trims the text fields and keeps the password verbatim', () => {
+    expect(
+      smtpFields({ host: ' smtp.example.com ', port: '465', secure: true, user: ' me ', pass: ' p w ', from: ' a@b.c ' })
+    ).toEqual({ host: 'smtp.example.com', port: 465, secure: true, user: 'me', pass: ' p w ', from: 'a@b.c' });
+  });
+
+  it('falls back to the default port for a blank, zero or out-of-range port', () => {
+    for (const port of [undefined, '', 0, -1, 70000, 'abc']) {
+      expect(smtpFields({ port }).port).toBe(DEFAULT_SMTP_PORT);
+    }
+  });
+
+  it('turns secure on only for an explicit true', () => {
+    expect(smtpFields({ secure: 'true' }).secure).toBe(false);
+    expect(smtpFields({}).secure).toBe(false);
+    expect(smtpFields({ secure: true }).secure).toBe(true);
+  });
+
+  it('defaults every missing field to an empty string', () => {
+    expect(smtpFields({})).toEqual({ host: '', port: DEFAULT_SMTP_PORT, secure: false, user: '', pass: '', from: '' });
   });
 });

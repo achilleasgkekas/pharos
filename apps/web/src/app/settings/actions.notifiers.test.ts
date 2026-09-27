@@ -470,6 +470,22 @@ describe('saveNotifierChannels', () => {
     expect(notifiers[1].label).toHaveLength(60);
   });
 
+  it('stores the normalised SMTP fields on an email channel only', async () => {
+    await saveNotifierChannels([
+      {
+        id: 'e1', type: 'email', enabled: true, target: ' me@example.com ',
+        host: ' smtp.example.com ', port: 465, secure: true, user: ' me ', pass: 'app-pw', from: ' a@example.com ',
+      } as NotifierConfig,
+      { id: 'n1', type: 'slack', enabled: true, url: 'https://slack.example/hook', host: 'ignored' } as NotifierConfig,
+    ]);
+    const [, update] = appConfigUpdateOne.mock.calls[0];
+    const notifiers = (update as Record<string, { notifiers: NotifierConfig[] }>).$set.notifiers;
+    expect(notifiers[0]).toMatchObject({
+      target: 'me@example.com', host: 'smtp.example.com', port: 465, secure: true, user: 'me', pass: 'app-pw', from: 'a@example.com',
+    });
+    expect(notifiers[1]).not.toHaveProperty('host');
+  });
+
   it('mirrors the first ntfy-type channel into legacy ntfyUrl/ntfyEnabled', async () => {
     await saveNotifierChannels([
       { id: 'n0', type: 'discord', enabled: true, url: 'https://discord.example/hook' } as NotifierConfig,
@@ -509,6 +525,12 @@ describe('testNotifierChannel', () => {
     testNotifierMock.mockResolvedValueOnce(false);
     const res = await testNotifierChannel({ id: 'n1', type: 'slack', enabled: true } as NotifierConfig);
     expect(res).toEqual({ ok: false, error: 'Delivery failed — check the URL/token' });
+  });
+
+  it('points at the SMTP settings when an email test fails', async () => {
+    testNotifierMock.mockResolvedValueOnce(false);
+    const res = await testNotifierChannel({ id: 'e1', type: 'email', enabled: true } as NotifierConfig);
+    expect(res).toEqual({ ok: false, error: 'Delivery failed — check the SMTP server, login and addresses' });
   });
 });
 
