@@ -56,7 +56,7 @@ import { getSampleDataStatus, loadSampleData, clearSampleData } from './sampleDa
 import { renderStoragePath, TEMPLATE_TOKENS } from '@/lib/storagePath';
 import { CURRENCIES } from '@/lib/money';
 import type { SerializedCard } from '@/types';
-import { useT, useLocale } from '@/components/LocaleProvider';
+import { useT, useLocale, useMoney } from '@/components/LocaleProvider';
 import { SHOPPING_COUNTRIES, SHOPPING_PRESETS } from '@/lib/shoppingRegion';
 import type { TKey } from '@/lib/i18n';
 import { formatDate, formatTime, formatDateTime } from '@/lib/i18n/format';
@@ -105,6 +105,24 @@ type Info = {
   cardList: SerializedCard[];
   lists: ListEditorEntry[];
 };
+
+// Settings shows these in the app language; lib/notifiers.shared and lib/webhooks.shared keep
+// the English originals for the server side.
+const NOTIF_HINT: Record<NotifierType, TKey> = {
+  ntfy: 'notif.hintNtfy',
+  discord: 'notif.hintDiscord',
+  slack: 'notif.hintSlack',
+  telegram: 'notif.hintTelegram',
+  webhook: 'notif.hintWebhook',
+  email: 'notif.hintEmail',
+};
+const WH_EVENT: Record<WebhookEvent, { label: TKey; hint: TKey }> = {
+  'receipt.parsed': { label: 'wh.evReceipt', hint: 'wh.evReceiptHint' },
+  'budget.exceeded': { label: 'wh.evBudget', hint: 'wh.evBudgetHint' },
+  'installment.due': { label: 'wh.evInstallment', hint: 'wh.evInstallmentHint' },
+  'price.drop': { label: 'wh.evPrice', hint: 'wh.evPriceHint' },
+};
+const CSV_KIND: Record<'receipts' | 'expenses' | 'items', TKey> = { receipts: 'nav.receipts', expenses: 'nav.expenses', items: 'nav.inventory' };
 
 // Vision-capable local models that fit a Mac mini M4 16GB (receipts/cards need vision).
 const MODEL_SUGGESTIONS: { name: string; note: string; vision: boolean }[] = [
@@ -652,7 +670,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
       try {
         await saveAiConfig(fd);
       } catch (err) {
-        setMsg(`Could not save: ${(err as Error).message || 'unknown error'}`);
+        setMsg(t('set.couldNotSave', { error: (err as Error).message || '?' }));
         return;
       }
       setApiKey('');
@@ -660,7 +678,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
       setGeminiKey('');
       setOpenrouterKey('');
       setCustomKey('');
-      setMsg('Saved ✓');
+      setMsg(t('common.savedOk'));
       setTimeout(() => setMsg(null), 2500);
     });
   }
@@ -668,19 +686,19 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
   function doPull(name?: string) {
     const n = (name ?? pullName).trim();
     if (!n) return;
-    setMsg(`Downloading ${n}… (this can take a few minutes)`);
+    setMsg(t('set.pulling', { name: n }));
     startTransition(async () => {
       const r = await pullOllamaModel(n);
-      setMsg(r.ok ? `Downloaded ${n} ✓ — select it as active and Save` : `Download failed: ${r.error}`);
+      setMsg(r.ok ? t('set.pulled', { name: n }) : t('set.pullFailed', { error: r.error ?? '' }));
       if (r.ok && !name) setPullName('');
     });
   }
 
   function doTest() {
-    setTest('testing…');
+    setTest(t('common.testing'));
     startTransition(async () => {
       const r = await testAnthropic();
-      setTest(r.ok ? 'Connection OK ✓' : `Failed: ${r.error}`);
+      setTest(r.ok ? t('common.connectionOk') : t('common.failedWith', { error: r.error ?? '' }));
     });
   }
 
@@ -882,7 +900,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
             </button>
             {test && (
               <span
-                className={cn('text-[11px]', test.startsWith('Connection OK') ? 'text-[color:var(--color-accent)]' : test === 'testing…' ? 'text-[color:var(--color-text-dim)]' : 'text-[color:var(--color-red)]')}
+                className={cn('text-[11px]', test.startsWith(t('common.connectionOk')) ? 'text-[color:var(--color-accent)]' : test === t('common.testing') ? 'text-[color:var(--color-text-dim)]' : 'text-[color:var(--color-red)]')}
                 style={{ fontFamily: 'var(--font-mono)' }}
               >
                 {test}
@@ -1078,7 +1096,7 @@ function ScraperAiSettings({ scraperAi, installed, hasAnthropicKey }: { scraperA
     setMsg(null);
     startTransition(async () => {
       await saveScraperAi(fd);
-      setMsg('Saved ✓');
+      setMsg(t('common.savedOk'));
       setTimeout(() => setMsg(null), 2500);
     });
   }
@@ -1405,8 +1423,8 @@ function OnedriveWizard({ connected: initialConnected, account }: { connected: b
             {advanced && (
               <div className="mt-2 space-y-2">
                 <ol className="text-[10px] text-[color:var(--color-text-faint)] space-y-0.5 list-decimal pl-4 leading-relaxed">
-                  <li><a href="https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade" target="_blank" rel="noreferrer" className="text-[color:var(--color-cyan)] hover:underline">Azure → App registrations</a> → New registration → personal accounts, no redirect URI.</li>
-                  <li>Authentication → Allow public client flows → Yes → Save. Copy the client id.</li>
+                  <li><a href="https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade" target="_blank" rel="noreferrer" className="text-[color:var(--color-cyan)] hover:underline">Azure → App registrations</a> {t('set.azureStep1')}</li>
+                  <li>{t('set.azureStep2')}</li>
                 </ol>
                 <Field label={t('set.appClientId')}>
                   <input value={clientId} onChange={(e) => setClientId(e.target.value)} placeholder="00000000-0000-0000-0000-000000000000" className={controlClass} style={{ fontFamily: 'var(--font-mono)' }} />
@@ -1507,24 +1525,24 @@ function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Inf
       await saveStorageConfig(fd);
       setPass('');
       setM2Pass('');
-      setMsg('Saved ✓');
+      setMsg(t('common.savedOk'));
       setTimeout(() => setMsg(null), 2500);
     });
   }
 
   function doTest() {
-    setTest('testing…');
+    setTest(t('common.testing'));
     startTransition(async () => {
       const r = backend === 'onedrive' ? await testOnedriveConnection() : await testRemoteConnection();
-      setTest(r.ok ? 'Connection OK ✓' : `Failed: ${r.error}`);
+      setTest(r.ok ? t('common.connectionOk') : t('common.failedWith', { error: r.error ?? '' }));
     });
   }
 
   function doTest2() {
-    setTest2('testing…');
+    setTest2(t('common.testing'));
     startTransition(async () => {
       const r = await testSecondaryRemote();
-      setTest2(r.ok ? 'Connection OK ✓' : `Failed: ${r.error}`);
+      setTest2(r.ok ? t('common.connectionOk') : t('common.failedWith', { error: r.error ?? '' }));
     });
   }
 
@@ -1532,24 +1550,24 @@ function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Inf
     setTest(null);
     // OneDrive: enqueue background job so it executes resiliently in the background queue.
     if (backend === 'onedrive') {
-      setMsg('Enqueuing sync job…');
+      setMsg(t('set.syncQueueing'));
       startTransition(async () => {
         const r = await enqueueOnedriveSync();
         if (r.ok) {
-          setMsg(`Sync job queued (${r.count} item${r.count === 1 ? '' : 's'}) ✓`);
+          setMsg(t('set.syncQueued', { n: r.count ?? 0 }));
         } else {
-          setMsg(`✗ ${r.error || 'Failed to queue sync job'}`);
+          setMsg(`✗ ${r.error || t('set.syncQueueFailed')}`);
         }
       });
       return;
     }
     // SMB/FTP: single connection, one-shot.
-    setMsg('Syncing… (this can take a while)');
+    setMsg(t('set.syncing'));
     startTransition(async () => {
       const r = await syncToRemote();
       if (r.pushed > 0) setSyncedNow(true);
-      if (r.ok) setMsg(`Synced ${r.pushed} file(s)${r.skipped ? ` · ${r.skipped} skipped` : ''} ✓`);
-      else setMsg(`Synced ${r.pushed}, ${r.failed} failed${r.error ? `: ${r.error}` : ''}${r.errors[0] ? ` — ${r.errors[0]}` : ''}`);
+      if (r.ok) setMsg(r.skipped ? t('set.syncedSkipped', { n: r.pushed, skipped: r.skipped }) : t('set.synced', { n: r.pushed }));
+      else setMsg(`${t('set.syncedFailed', { n: r.pushed, failed: r.failed })}${r.error ? `: ${r.error}` : ''}${r.errors[0] ? ` · ${r.errors[0]}` : ''}`);
     });
   }
 
@@ -1653,12 +1671,12 @@ function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Inf
       {backend !== 'local' && (
         <div className="pt-2 border-t border-[color:var(--color-border)] mt-1 space-y-3">
           <div className="flex items-center gap-2 text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider" style={{ fontFamily: 'var(--font-mono)' }}>
-            <Server size={12} /> Second destination (3-2-1 backup)
+            <Server size={12} /> {t('set.secondDest')}
           </div>
           <p className="text-[10px] text-[color:var(--color-text-faint)] -mt-1">
-            A second, independent offsite copy. Files are pushed here alongside the primary, best-effort — a failure here never affects the primary.
+            {t('set.secondDestHelp')}
           </p>
-          <Row label="Backend">
+          <Row label={t('set.backend')}>
             <div className="flex gap-1.5 flex-wrap">
               {([
                 { v: '' as const, label: 'None' },
@@ -1714,7 +1732,7 @@ function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Inf
                 </button>
                 {test2 && (
                   <span
-                    className={cn('text-[11px]', test2.startsWith('Connection OK') ? 'text-[color:var(--color-accent)]' : test2 === 'testing…' ? 'text-[color:var(--color-text-dim)]' : 'text-[color:var(--color-red)]')}
+                    className={cn('text-[11px]', test2.startsWith(t('common.connectionOk')) ? 'text-[color:var(--color-accent)]' : test2 === t('common.testing') ? 'text-[color:var(--color-text-dim)]' : 'text-[color:var(--color-red)]')}
                     style={{ fontFamily: 'var(--font-mono)' }}
                   >
                     {test2}
@@ -1742,7 +1760,7 @@ function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Inf
         )}
         {test && (
           <span
-            className={cn('text-[11px]', test.startsWith('Connection OK') ? 'text-[color:var(--color-accent)]' : test === 'testing…' ? 'text-[color:var(--color-text-dim)]' : 'text-[color:var(--color-red)]')}
+            className={cn('text-[11px]', test.startsWith(t('common.connectionOk')) ? 'text-[color:var(--color-accent)]' : test === t('common.testing') ? 'text-[color:var(--color-text-dim)]' : 'text-[color:var(--color-red)]')}
             style={{ fontFamily: 'var(--font-mono)' }}
           >
             {test}
@@ -1809,6 +1827,7 @@ const ghostBtn =
   'flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] hover:border-[color:var(--color-accent)] transition-colors disabled:opacity-50';
 
 function BudgetsManager({ settings }: { settings: AppSettings }) {
+  const money = useMoney();
   const t = useT();
   const [pending, startTransition] = useTransition();
   const [budgets, setBudgets] = useState<Record<string, string>>(() =>
@@ -1892,7 +1911,7 @@ function BudgetsManager({ settings }: { settings: AppSettings }) {
           {suggesting ? <Loader2 size={13} className="animate-spin" /> : <TrendingUp size={13} />}
           {t('set.suggestBudgets')}
         </button>
-        <span className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>{t('set.budgetTotal', { amount: `${cur()}${total.toLocaleString('en-GB')}` })}</span>
+        <span className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>{t('set.budgetTotal', { amount: money(total) })}</span>
         {msg && <span className="text-[11px] text-[color:var(--color-accent)]">{msg}</span>}
       </div>
       <label className="flex items-center justify-between gap-3 mt-3 pt-3 border-t border-[color:var(--color-border)] cursor-pointer">
@@ -2028,6 +2047,7 @@ function CategoryRulesManager({ settings }: { settings: AppSettings }) {
 }
 
 function AssetAccountsManager({ settings }: { settings: AppSettings }) {
+  const money = useMoney();
   const t = useT();
   const [pending, startTransition] = useTransition();
   const [rows, setRows] = useState<Array<{ name: string; balance: string }>>(() => {
@@ -2094,7 +2114,7 @@ function AssetAccountsManager({ settings }: { settings: AppSettings }) {
         <button onClick={save} disabled={pending} className="text-xs px-3 py-1.5 rounded-lg bg-[color:var(--color-accent)] text-black font-semibold hover:opacity-90 disabled:opacity-50">
           {pending ? t('common.saving') : t('set.saveAccounts')}
         </button>
-        <span className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>{t('set.accountsTotal', { amount: `${cur()}${total.toLocaleString('en-GB')}` })}</span>
+        <span className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>{t('set.accountsTotal', { amount: money(total) })}</span>
         {msg && <span className="text-[11px] text-[color:var(--color-accent)]">{msg}</span>}
       </div>
     </Section>
@@ -2377,6 +2397,7 @@ function DefaultsManager({ settings }: { settings: AppSettings }) {
 /** Recent outbound delivery attempts for one channel (P80). Until this existed a failed
  *  delivery left no trace at all, so a broken endpoint looked identical to a quiet week. */
 function DeliveryHistory({ log }: { log?: DeliveryLogEntry[] }) {
+  const t = useT();
   const locale = useLocale();
   const [expanded, setExpanded] = useState(false);
   if (!log || log.length === 0) return null;
@@ -2386,21 +2407,21 @@ function DeliveryHistory({ log }: { log?: DeliveryLogEntry[] }) {
   return (
     <div className="pt-2 border-t border-[color:var(--color-border)] space-y-1">
       <p className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
-        Recent deliveries {failing && <span className="text-[color:var(--color-red)]">· last one failed</span>}
+        {t('notif.recent')} {failing && <span className="text-[color:var(--color-red)]">· {t('notif.lastFailed')}</span>}
       </p>
       {shown.map((r, i) => (
         <div key={`${r.at}-${i}`} className="flex items-center gap-2 text-[11px]" style={{ fontFamily: 'var(--font-mono)' }}>
           <span className={cn('h-1.5 w-1.5 rounded-full shrink-0', r.ok ? 'bg-[color:var(--color-accent)]' : 'bg-[color:var(--color-red)]')} />
           <span className="text-[color:var(--color-text-faint)]">{formatDateTime(r.at, locale)}</span>
           <span className={cn('truncate', r.ok ? 'text-[color:var(--color-text-dim)]' : 'text-[color:var(--color-red)]')}>
-            {r.ok ? `delivered${r.status ? ` · ${r.status}` : ''}` : r.error || 'failed'}
+            {r.ok ? `${t('notif.delivered')}${r.status ? ` · ${r.status}` : ''}` : r.error || t('notif.failed')}
           </span>
           {r.attempts > 1 && <span className="text-[color:var(--color-gold)] shrink-0">×{r.attempts}</span>}
         </div>
       ))}
       {rows.length > 3 && (
         <button type="button" onClick={() => setExpanded((v) => !v)} className="text-[10px] text-[color:var(--color-cyan)]">
-          {expanded ? 'show less' : `show all ${rows.length}`}
+          {expanded ? t('notif.showLess') : t('notif.showAll', { n: rows.length })}
         </button>
       )}
     </div>
@@ -2452,7 +2473,7 @@ function ChannelCard({
           className={cn(controlClass, 'flex-1')}
         />
         <Switch label={ch.label || ch.type} checked={ch.enabled} onChange={(v) => set({ enabled: v })} />
-        <button type="button" onClick={onRemove} className="p-1.5 rounded-lg text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)]" aria-label="Remove channel">
+        <button type="button" onClick={onRemove} className="p-1.5 rounded-lg text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)]" aria-label={t('notif.removeChannel')}>
           <Trash2 size={14} />
         </button>
       </div>
@@ -2461,7 +2482,7 @@ function ChannelCard({
         <input
           value={ch.url || ''}
           onChange={(e) => set({ url: e.target.value })}
-          placeholder={ch.type === 'ntfy' ? 'https://ntfy.sh/your-topic' : 'Webhook URL'}
+          placeholder={ch.type === 'ntfy' ? 'https://ntfy.sh/your-topic' : t('notif.webhookUrl')}
           className={controlClass}
           style={{ fontFamily: 'var(--font-mono)' }}
         />
@@ -2470,7 +2491,7 @@ function ChannelCard({
         <input
           value={ch.token || ''}
           onChange={(e) => set({ token: e.target.value })}
-          placeholder="Bot token (123456:ABC-…)"
+          placeholder={t('notif.botToken')}
           className={controlClass}
           style={{ fontFamily: 'var(--font-mono)' }}
         />
@@ -2481,8 +2502,8 @@ function ChannelCard({
             <input
               value={ch.host || ''}
               onChange={(e) => set({ host: e.target.value })}
-              placeholder="SMTP host (smtp.gmail.com)"
-              aria-label="SMTP host"
+              placeholder={t('notif.smtpHost')}
+              aria-label={t('notif.smtpHostLabel')}
               className={cn(controlClass, 'flex-1 min-w-0')}
               style={{ fontFamily: 'var(--font-mono)' }}
             />
@@ -2493,21 +2514,21 @@ function ChannelCard({
               value={ch.port ?? DEFAULT_SMTP_PORT}
               // 465 is implicit TLS; the usual 587/25 start plain and upgrade with STARTTLS.
               onChange={(e) => set({ port: Number(e.target.value), secure: Number(e.target.value) === 465 })}
-              aria-label="SMTP port"
+              aria-label={t('notif.smtpPort')}
               className={cn(controlClass, 'w-20')}
               style={{ fontFamily: 'var(--font-mono)' }}
             />
           </div>
           <label className="flex items-center gap-2 text-[11px] text-[color:var(--color-text-dim)]">
-            <Switch label="Use TLS from the start (port 465)" checked={!!ch.secure} onChange={(v) => set({ secure: v })} />
-            TLS from the start (port 465). Off uses STARTTLS when the server offers it.
+            <Switch label={t('notif.tlsLabel')} checked={!!ch.secure} onChange={(v) => set({ secure: v })} />
+            {t('notif.tlsHelp')}
           </label>
           <div className="flex items-center gap-2">
             <input
               value={ch.user || ''}
               onChange={(e) => set({ user: e.target.value })}
-              placeholder="Username (blank for an open relay)"
-              aria-label="SMTP username"
+              placeholder={t('notif.smtpUser')}
+              aria-label={t('notif.smtpUserLabel')}
               autoComplete="off"
               className={cn(controlClass, 'flex-1 min-w-0')}
             />
@@ -2515,8 +2536,8 @@ function ChannelCard({
               type="password"
               value={ch.pass || ''}
               onChange={(e) => set({ pass: e.target.value })}
-              placeholder="Password / app password"
-              aria-label="SMTP password"
+              placeholder={t('notif.smtpPass')}
+              aria-label={t('notif.smtpPassLabel')}
               autoComplete="new-password"
               className={cn(controlClass, 'flex-1 min-w-0')}
             />
@@ -2524,8 +2545,8 @@ function ChannelCard({
           <input
             value={ch.from || ''}
             onChange={(e) => set({ from: e.target.value })}
-            placeholder="From (Pharos <alerts@example.com>)"
-            aria-label="From address"
+            placeholder={t('notif.from')}
+            aria-label={t('notif.fromLabel')}
             className={controlClass}
           />
         </div>
@@ -2534,20 +2555,20 @@ function ChannelCard({
         <input
           value={ch.target || ''}
           onChange={(e) => set({ target: e.target.value })}
-          placeholder={ch.type === 'email' ? 'Send to (you@example.com, comma-separated for several)' : 'Chat id (e.g. 123456789)'}
+          placeholder={ch.type === 'email' ? t('notif.sendTo') : t('notif.chatId')}
           className={controlClass}
           style={{ fontFamily: 'var(--font-mono)' }}
         />
       )}
 
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[10px] text-[color:var(--color-text-faint)]">{meta.hint}</span>
+        <span className="text-[10px] text-[color:var(--color-text-faint)]">{t(NOTIF_HINT[ch.type])}</span>
         <button type="button" onClick={onTest} disabled={testing} className={cn(ghostBtn, 'text-[color:var(--color-cyan)] py-1.5')}>
-          {testing ? <Loader2 size={12} className="animate-spin" /> : <Bell size={12} />} Test
+          {testing ? <Loader2 size={12} className="animate-spin" /> : <Bell size={12} />} {t('common.test')}
         </button>
       </div>
       {testMsg && (
-        <p className={cn('text-[11px]', testMsg.startsWith('Failed') ? 'text-[color:var(--color-red)]' : 'text-[color:var(--color-accent)]')} style={{ fontFamily: 'var(--font-mono)' }}>
+        <p className={cn('text-[11px]', testMsg.startsWith(t('common.failedWith', { error: '' })) ? 'text-[color:var(--color-red)]' : 'text-[color:var(--color-accent)]')} style={{ fontFamily: 'var(--font-mono)' }}>
           {testMsg}
         </p>
       )}
@@ -2557,6 +2578,7 @@ function ChannelCard({
 }
 
 function NotificationsManager() {
+  const t = useT();
   const [pending, startTransition] = useTransition();
   const [channels, setChannels] = useState<NotifierConfig[] | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
@@ -2589,12 +2611,12 @@ function NotificationsManager() {
     setChannels((p) => (p ?? []).filter((x) => x.id !== id));
   }
   function save() {
-    setMsg('Saving…');
+    setMsg(t('common.saving'));
     startTransition(async () => {
       await saveNotifierChannels(channels ?? []);
       if (types) await saveNotifyTypes(types);
       if (quiet) await saveQuietHours(quiet);
-      setMsg('Saved ✓');
+      setMsg(t('common.savedOk'));
     });
   }
   function testOne(c: NotifierConfig) {
@@ -2602,38 +2624,36 @@ function NotificationsManager() {
     setTestMsgs((p) => ({ ...p, [c.id]: '' }));
     startTransition(async () => {
       const r = await testNotifierChannel(c);
-      setTestMsgs((p) => ({ ...p, [c.id]: r.ok ? 'Test sent ✓' : `Failed: ${r.error}` }));
+      setTestMsgs((p) => ({ ...p, [c.id]: r.ok ? t('common.testSent') : t('common.failedWith', { error: r.error ?? '' }) }));
       setTesting('');
     });
   }
   function check() {
-    setMsg('Checking…');
+    setMsg(t('common.checking'));
     startTransition(async () => {
       await saveNotifierChannels(channels ?? []);
       // Persist the toggles first, otherwise the run below would still use the saved set
       // and the summary would not match the checkboxes the owner is looking at.
       if (types) await saveNotifyTypes(types);
       const r = await runAlertChecks();
-      setMsg((r.sent ? '✓ Sent · ' : '(no enabled channels) · ') + r.summary.replace(/\n/g, ' · '));
+      setMsg(`${r.sent ? t('notif.sent') : t('notif.noEnabled')} · ${r.summary.replace(/\n/g, ' · ')}`);
       setLogs(await getDeliveryLogs()); // the dispatch just wrote new rows
     });
   }
 
   return (
-    <Section title="Notifications" icon={<Bell size={15} />}>
+    <Section title={t('set.tabNotifications')} icon={<Bell size={15} />}>
       <p className="text-xs text-[color:var(--color-text-dim)] -mt-1">
-        Alerts for deals, installments due this month, and warranties expiring soon always show in the in-app{' '}
-        <span className="text-[color:var(--color-accent)]">bell</span>. Add channels below to also push them out — ntfy, Discord, Slack,
-        Telegram, email over your own SMTP server, or any webhook.
+        {t('notif.intro')}
       </p>
 
       <div className="space-y-2.5">
         {channels === null ? (
           <p className="text-xs text-[color:var(--color-text-faint)] py-4 flex items-center gap-2">
-            <Loader2 size={13} className="animate-spin" /> Loading channels…
+            <Loader2 size={13} className="animate-spin" /> {t('notif.loadingChannels')}
           </p>
         ) : channels.length === 0 ? (
-          <p className="text-xs text-[color:var(--color-text-faint)] py-3">No outbound channels yet — alerts only show in the bell.</p>
+          <p className="text-xs text-[color:var(--color-text-faint)] py-3">{t('notif.noChannels')}</p>
         ) : (
           channels.map((c) => (
             <ChannelCard
@@ -2651,7 +2671,7 @@ function NotificationsManager() {
       </div>
 
       <button type="button" onClick={add} className={cn(ghostBtn, 'w-full justify-center')}>
-        <Plus size={13} /> Add channel
+        <Plus size={13} /> {t('notif.addChannel')}
       </button>
 
       {/* P102: native browser push — no external account needed */}
@@ -2659,18 +2679,18 @@ function NotificationsManager() {
 
       <div className="pt-3 border-t border-[color:var(--color-border)]">
         <p className="text-xs text-[color:var(--color-text-dim)] mb-2">
-          What gets pushed out — untick a category to keep it in the bell only. Saved with the button below.
+          {t('notif.typesHelp')}
         </p>
         {types === null ? (
           <p className="text-xs text-[color:var(--color-text-faint)] py-2 flex items-center gap-2">
-            <Loader2 size={13} className="animate-spin" /> Loading alert types…
+            <Loader2 size={13} className="animate-spin" /> {t('notif.loadingTypes')}
           </p>
         ) : (
           <div className="grid gap-1 sm:grid-cols-2">
             {ALERT_TYPES.map((at) => (
               <label key={at.key} className="flex items-center gap-1.5 text-[11px] text-[color:var(--color-text-dim)]">
                 <input type="checkbox" checked={types[at.key]} onChange={() => toggleType(at.key)} />
-                {at.label}
+                {t(`alert.${at.key}` as TKey)}
               </label>
             ))}
           </div>
@@ -2680,12 +2700,11 @@ function NotificationsManager() {
       {/* P86: quiet hours / DND window for the scheduled alert cron */}
       <div className="pt-3 border-t border-[color:var(--color-border)]">
         <p className="text-xs text-[color:var(--color-text-dim)] mb-2">
-          Quiet hours — the scheduled check holds outbound alerts during this window and sends them once it ends
-          (server time). Alerts still appear in the bell. Leave blank to disable. The manual button below always sends.
+          {t('notif.quietHelp')}
         </p>
         <div className="flex items-center gap-2 flex-wrap text-[11px] text-[color:var(--color-text-dim)]">
           <label className="flex items-center gap-1.5">
-            From
+            {t('notif.quietFrom')}
             <input
               type="time"
               value={quiet?.start ?? ''}
@@ -2694,7 +2713,7 @@ function NotificationsManager() {
             />
           </label>
           <label className="flex items-center gap-1.5">
-            to
+            {t('notif.quietTo')}
             <input
               type="time"
               value={quiet?.end ?? ''}
@@ -2708,7 +2727,7 @@ function NotificationsManager() {
               onClick={() => setQuiet({ start: '', end: '' })}
               className="text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)] underline"
             >
-              clear
+              {t('common.clear')}
             </button>
           )}
         </div>
@@ -2716,14 +2735,14 @@ function NotificationsManager() {
 
       <div className="flex items-center gap-2 flex-wrap pt-3 border-t border-[color:var(--color-border)] mt-1">
         <button type="button" onClick={save} disabled={pending || channels === null} className={saveBtn}>
-          {pending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Save
+          {pending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} {t('common.save')}
         </button>
         <button type="button" onClick={check} disabled={pending || channels === null} className={cn(ghostBtn, 'text-[color:var(--color-gold)]')}>
-          <Sparkles size={13} /> Check & notify now
+          <Sparkles size={13} /> {t('notif.checkNow')}
         </button>
       </div>
       {msg && (
-        <p className={cn('text-[11px]', msg.startsWith('Failed') ? 'text-[color:var(--color-red)]' : 'text-[color:var(--color-accent)]')} style={{ fontFamily: 'var(--font-mono)' }}>
+        <p className={cn('text-[11px]', msg.startsWith(t('common.failedWith', { error: '' })) ? 'text-[color:var(--color-red)]' : 'text-[color:var(--color-accent)]')} style={{ fontFamily: 'var(--font-mono)' }}>
           {msg}
         </p>
       )}
@@ -2757,6 +2776,7 @@ function WebhookCard({
   copied: boolean;
   log?: DeliveryLogEntry[];
 }) {
+  const t = useT();
   const set = (patch: Partial<WebhookSubscription>) => onChange({ ...sub, ...patch });
   function toggleEvent(ev: WebhookEvent) {
     const has = sub.events.includes(ev);
@@ -2768,11 +2788,11 @@ function WebhookCard({
         <input
           value={sub.label || ''}
           onChange={(e) => set({ label: e.target.value })}
-          placeholder="Label (optional)"
+          placeholder={t('set.chLabelOptional')}
           className={cn(controlClass, 'flex-1')}
         />
-        <Switch label={sub.label || 'Webhook'} checked={sub.enabled} onChange={(v) => set({ enabled: v })} />
-        <button type="button" onClick={onRemove} className="p-1.5 rounded-lg text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)]" aria-label="Remove webhook">
+        <Switch label={sub.label || t('wh.webhook')} checked={sub.enabled} onChange={(v) => set({ enabled: v })} />
+        <button type="button" onClick={onRemove} className="p-1.5 rounded-lg text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)]" aria-label={t('wh.remove')}>
           <Trash2 size={14} />
         </button>
       </div>
@@ -2790,14 +2810,15 @@ function WebhookCard({
           className="flex-1 min-w-0 text-xs bg-[color:var(--color-surface-3)] border border-[color:var(--color-border)] rounded-lg px-3 py-2 truncate"
           style={{ fontFamily: 'var(--font-mono)' }}
         >
-          {sub.secret || '(generated on save)'}
+          {sub.secret || t('wh.generated')}
         </code>
         {sub.secret && (
           <button
             type="button"
             onClick={onCopySecret}
             className="shrink-0 p-2 rounded-lg bg-[color:var(--color-surface-3)] border border-[color:var(--color-border)] text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]"
-            title="Copy signing secret"
+            title={t('wh.copySecret')}
+            aria-label={t('wh.copySecret')}
           >
             {copied ? <Check size={14} className="text-[color:var(--color-accent)]" /> : <Copy size={14} />}
           </button>
@@ -2810,7 +2831,7 @@ function WebhookCard({
             key={ev.type}
             type="button"
             onClick={() => toggleEvent(ev.type)}
-            title={ev.hint}
+            title={t(WH_EVENT[ev.type].hint)}
             className={cn(
               'text-[11px] px-2.5 py-1 rounded-full border transition-colors',
               sub.events.includes(ev.type)
@@ -2818,19 +2839,19 @@ function WebhookCard({
                 : 'border-[color:var(--color-border)] text-[color:var(--color-text-faint)] hover:border-[color:var(--color-accent)]'
             )}
           >
-            {ev.label}
+            {t(WH_EVENT[ev.type].label)}
           </button>
         ))}
       </div>
 
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[10px] text-[color:var(--color-text-faint)]">Signed via X-Pharos-Signature (HMAC-SHA256).</span>
+        <span className="text-[10px] text-[color:var(--color-text-faint)]">{t('wh.signed')}</span>
         <button type="button" onClick={onTest} disabled={testing || !sub.url} className={cn(ghostBtn, 'text-[color:var(--color-cyan)] py-1.5')}>
-          {testing ? <Loader2 size={12} className="animate-spin" /> : <Webhook size={12} />} Test
+          {testing ? <Loader2 size={12} className="animate-spin" /> : <Webhook size={12} />} {t('common.test')}
         </button>
       </div>
       {testMsg && (
-        <p className={cn('text-[11px]', testMsg.startsWith('Failed') ? 'text-[color:var(--color-red)]' : 'text-[color:var(--color-accent)]')} style={{ fontFamily: 'var(--font-mono)' }}>
+        <p className={cn('text-[11px]', testMsg.startsWith(t('common.failedWith', { error: '' })) ? 'text-[color:var(--color-red)]' : 'text-[color:var(--color-accent)]')} style={{ fontFamily: 'var(--font-mono)' }}>
           {testMsg}
         </p>
       )}
@@ -2840,6 +2861,7 @@ function WebhookCard({
 }
 
 function WebhookManager() {
+  const t = useT();
   const [pending, startTransition] = useTransition();
   const [subs, setSubs] = useState<WebhookSubscription[] | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
@@ -2865,15 +2887,15 @@ function WebhookManager() {
     setSubs((p) => (p ?? []).filter((x) => x.id !== id));
   }
   function save() {
-    setMsg('Saving…');
+    setMsg(t('common.saving'));
     startTransition(async () => {
       const r = await saveWebhookSubscriptions(subs ?? []);
       if (!r.ok) {
-        setMsg(`Failed: ${r.error}`);
+        setMsg(t('common.failedWith', { error: r.error ?? '' }));
         return;
       }
       setSubs(await getWebhookSubscriptions()); // pick up server-generated secrets
-      setMsg('Saved ✓');
+      setMsg(t('common.savedOk'));
     });
   }
   function testOne(s: WebhookSubscription) {
@@ -2881,7 +2903,7 @@ function WebhookManager() {
     setTestMsgs((p) => ({ ...p, [s.id]: '' }));
     startTransition(async () => {
       const r = await testWebhookSubscription(s);
-      setTestMsgs((p) => ({ ...p, [s.id]: r.ok ? 'Test sent ✓' : `Failed: ${r.error}` }));
+      setTestMsgs((p) => ({ ...p, [s.id]: r.ok ? t('common.testSent') : t('common.failedWith', { error: r.error ?? '' }) }));
       setTesting('');
     });
   }
@@ -2892,23 +2914,18 @@ function WebhookManager() {
   }
 
   return (
-    <Section title="Webhooks" icon={<Webhook size={15} />}>
+    <Section title={t('wh.title')} icon={<Webhook size={15} />}>
       <p className="text-xs text-[color:var(--color-text-dim)] -mt-1">
-        Automation hooks for Home Assistant, n8n, or Node-RED — each subscription fires a signed JSON POST when
-        one of its selected events happens. <span className="text-[color:var(--color-accent)]">Receipt parsed</span> fires
-        immediately on every scan; <span className="text-[color:var(--color-accent)]">budget exceeded</span>,{' '}
-        <span className="text-[color:var(--color-accent)]">installment due</span>, and{' '}
-        <span className="text-[color:var(--color-accent)]">price drop</span> fire when the alert scan above runs
-        (&quot;Check &amp; notify now&quot;, or your own cron hitting the same check).
+        {t('wh.intro')}
       </p>
 
       <div className="space-y-2.5">
         {subs === null ? (
           <p className="text-xs text-[color:var(--color-text-faint)] py-4 flex items-center gap-2">
-            <Loader2 size={13} className="animate-spin" /> Loading webhooks…
+            <Loader2 size={13} className="animate-spin" /> {t('wh.loading')}
           </p>
         ) : subs.length === 0 ? (
-          <p className="text-xs text-[color:var(--color-text-faint)] py-3">No webhooks yet.</p>
+          <p className="text-xs text-[color:var(--color-text-faint)] py-3">{t('wh.none')}</p>
         ) : (
           subs.map((s) => (
             <WebhookCard
@@ -2928,16 +2945,16 @@ function WebhookManager() {
       </div>
 
       <button type="button" onClick={add} className={cn(ghostBtn, 'w-full justify-center')}>
-        <Plus size={13} /> Add webhook
+        <Plus size={13} /> {t('wh.add')}
       </button>
 
       <div className="flex items-center gap-2 flex-wrap pt-3 border-t border-[color:var(--color-border)] mt-1">
         <button type="button" onClick={save} disabled={pending || subs === null} className={saveBtn}>
-          {pending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Save
+          {pending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} {t('common.save')}
         </button>
       </div>
       {msg && (
-        <p className={cn('text-[11px]', msg.startsWith('Failed') ? 'text-[color:var(--color-red)]' : 'text-[color:var(--color-accent)]')} style={{ fontFamily: 'var(--font-mono)' }}>
+        <p className={cn('text-[11px]', msg.startsWith(t('common.failedWith', { error: '' })) ? 'text-[color:var(--color-red)]' : 'text-[color:var(--color-accent)]')} style={{ fontFamily: 'var(--font-mono)' }}>
           {msg}
         </p>
       )}
@@ -3092,16 +3109,16 @@ function ImapImportManager({ imap }: { imap: ImapInfo }) {
     startTransition(async () => {
       await saveImapConfigAction(fd);
       setPass('');
-      setMsg('Saved ✓');
+      setMsg(t('common.savedOk'));
       setTimeout(() => setMsg(null), 2500);
     });
   }
 
   function doTest() {
-    setTest('testing…');
+    setTest(t('common.testing'));
     startTransition(async () => {
       const r = await testImapConnectionAction();
-      setTest(r.ok ? `Connection OK ✓ (${r.messageCount} message${r.messageCount === 1 ? '' : 's'})` : `Failed: ${r.error}`);
+      setTest(r.ok ? t('set.imapOk', { ok: t('common.connectionOk'), n: r.messageCount ?? 0 }) : t('common.failedWith', { error: r.error ?? '' }));
     });
   }
 
@@ -3167,7 +3184,7 @@ function ImapImportManager({ imap }: { imap: ImapInfo }) {
           </button>
         )}
         {test && (
-          <span className={cn('text-[11px]', test.startsWith('Connection OK') ? 'text-[color:var(--color-accent)]' : test === 'testing…' ? 'text-[color:var(--color-text-dim)]' : 'text-[color:var(--color-red)]')} style={{ fontFamily: 'var(--font-mono)' }}>
+          <span className={cn('text-[11px]', test.startsWith(t('common.connectionOk')) ? 'text-[color:var(--color-accent)]' : test === t('common.testing') ? 'text-[color:var(--color-text-dim)]' : 'text-[color:var(--color-red)]')} style={{ fontFamily: 'var(--font-mono)' }}>
             {test}
           </span>
         )}
@@ -3261,6 +3278,7 @@ function SampleDataManager() {
 }
 
 function BackupRestore() {
+  const money = useMoney();
   const locale = useLocale();
   const t = useT();
   const [pending, startTransition] = useTransition();
@@ -3392,9 +3410,9 @@ function BackupRestore() {
         a.download = `pharos-${kind}-${new Date().toISOString().slice(0, 10)}.csv`;
         a.click();
         URL.revokeObjectURL(url);
-        setMsg(`✓ ${kind} CSV downloaded`);
+        setMsg(t('set.csvDone', { kind: t(CSV_KIND[kind]) }));
       } catch (e) {
-        setMsg(`CSV failed: ${(e as Error).message.slice(0, 80)}`);
+        setMsg(t('set.csvFailed', { error: (e as Error).message.slice(0, 80) }));
       }
     });
   }
@@ -3414,9 +3432,9 @@ function BackupRestore() {
         a.download = `pharos-insurance-export-${new Date().toISOString().slice(0, 10)}.zip`;
         a.click();
         URL.revokeObjectURL(url);
-        setMsg(t('set.insuranceExportDone', { n: itemCount, total: `${cur()}${totalValue.toFixed(2)}` }));
+        setMsg(t('set.insuranceExportDone', { n: itemCount, total: money(totalValue) }));
       } catch (e) {
-        setMsg(`Insurance export failed: ${(e as Error).message.slice(0, 80)}`);
+        setMsg(t('set.insuranceFailed', { error: (e as Error).message.slice(0, 80) }));
       }
     });
   }
@@ -3436,9 +3454,9 @@ function BackupRestore() {
         a.download = `pharos-tax-export-${taxYear}.zip`;
         a.click();
         URL.revokeObjectURL(url);
-        setMsg(t('set.taxExportDone', { n: itemCount, total: `${cur()}${totalValue.toFixed(2)}` }));
+        setMsg(t('set.taxExportDone', { n: itemCount, total: money(totalValue) }));
       } catch (e) {
-        setMsg(`Tax export failed: ${(e as Error).message.slice(0, 80)}`);
+        setMsg(t('set.taxFailed', { error: (e as Error).message.slice(0, 80) }));
       }
     });
   }
@@ -3479,7 +3497,7 @@ function BackupRestore() {
           onChange={(e) => e.target.files?.[0] && handleVerify(e.target.files[0])}
         />
         {msg && (
-          <span className={cn('text-[11px]', msg.startsWith('Failed') || msg.includes('failed') ? 'text-[color:var(--color-red)]' : 'text-[color:var(--color-accent)]')} style={{ fontFamily: 'var(--font-mono)' }}>
+          <span className={cn('text-[11px]', msg.startsWith(t('common.failedWith', { error: '' })) || msg.includes('failed') ? 'text-[color:var(--color-red)]' : 'text-[color:var(--color-accent)]')} style={{ fontFamily: 'var(--font-mono)' }}>
             {msg}
           </span>
         )}
