@@ -1,5 +1,6 @@
 'use server';
 import { connectDB } from '@/lib/db';
+import { PERIOD_RE, periodForUpdate } from '@/lib/expensePeriod';
 import { Expense as ExpenseModel, type ExpenseDoc } from '@/models/Expense';
 import type { AnyBulkWriteOperation } from 'mongoose';
 import { withRequestTenant } from '@/lib/tenancy/request';
@@ -118,6 +119,11 @@ async function inheritFromSeries(kind: Kind, vKey: string, sKey = ''): Promise<{
   const prev = await Expense.findOne({ kind, vendorKey: vKey, seriesKey: sKey || { $in: ['', null] } }).sort({ date: -1 }).lean();
   if (!prev) return null;
   return { category: prev.category, recurring: prev.recurring, recurringCycle: prev.recurringCycle, space: prev.space, taxDeductible: prev.taxDeductible, taxCategory: prev.taxCategory };
+}
+
+/** 'Period must be YYYY-MM' for a bad period, else the generic message. */
+function invalidMessage(error: z.ZodError): string {
+  return error.issues.some((i) => i.path[0] === 'period') ? 'Period must be YYYY-MM' : 'Invalid data';
 }
 
 function periodFrom(date: Date, parsedPeriod?: string): string {
@@ -324,7 +330,8 @@ const UpdateSchema = z.object({
   currency: z.string().default(''),
   fxRate: z.coerce.number().min(0).default(0),
   date: z.string(),
-  period: z.string().default(''),
+  // #355: '' (derive from the date) or a real month. Free text used to store "09/2026" as-is.
+  period: z.string().trim().regex(PERIOD_RE).default(''),
   recurring: z.boolean().default(false),
   recurringCycle: z.enum(RECURRING_CYCLE_VALUES).default(''),
   // #231: optional name of a separate series under this vendor ("iCloud" under "Apple").
@@ -362,7 +369,7 @@ const UpdateSchema = z.object({
 export async function updateExpense(id: string, data: z.input<typeof UpdateSchema>): Promise<{ ok: boolean; error?: string }> {
   await assertCanWrite();
   const p = UpdateSchema.safeParse(data);
-  if (!p.success) return { ok: false, error: 'Invalid data' };
+  if (!p.success) return { ok: false, error: invalidMessage(p.error) };
   const d = p.data;
   return withRequestTenant(async () => {
   try {
@@ -371,6 +378,16 @@ export async function updateExpense(id: string, data: z.input<typeof UpdateSchem
     const date = safeDate(d.date);
     const splits = cleanPaymentSplits(d.paymentSplits);
     const fx = resolveFx({ amount: d.amount, currency: d.currency, fxRate: d.fxRate }, (await getAppSettings()).currency);
+    // #355: the stored date and period, to tell a period that mirrored the old date from one
+    // chosen on purpose. A failed read keeps the sent period (the old behaviour), never the save.
+    let before: { date?: Date; period?: string } | null = null;
+    if (d.period) {
+      try {
+        before = (await Expense.findOne({ _id: id }).select('date period').lean()) as typeof before;
+      } catch {
+        before = null;
+      }
+    }
     await Expense.updateOne(
       { _id: id },
       {
@@ -387,7 +404,7 @@ export async function updateExpense(id: string, data: z.input<typeof UpdateSchem
           origAmount: fx.origAmount,
           fxRate: fx.fxRate,
           date,
-          period: d.period || periodFrom(date),
+          period: periodForUpdate(d.period, date, before),
           recurring: d.recurring,
           recurringCycle: d.recurringCycle,
           series: d.series.trim(),
@@ -435,7 +452,7 @@ export async function addExpense(
 ): Promise<{ ok: boolean; id?: string; error?: string }> {
   await assertCanWrite();
   const p = AddSchema.safeParse(data);
-  if (!p.success) return { ok: false, error: 'Invalid data' };
+  if (!p.success) return { ok: false, error: invalidMessage(p.error) };
   const d = p.data;
   const fixedId = opts?.id ?? '';
   if (fixedId && !/^[0-9a-f]{24}$/.test(fixedId)) return { ok: false, error: 'Invalid data' };

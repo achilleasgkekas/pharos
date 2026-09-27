@@ -18,6 +18,12 @@ interface DateInputProps {
   min?: string;
   max?: string;
   'aria-label'?: string;
+  /**
+   * A filter, not a form (#355): keep the last complete date while the user types a new one,
+   * instead of emitting '' on every unfinished keystroke (which switched a filter off and made
+   * the list jump). Clearing the field still emits ''.
+   */
+  keepWhileTyping?: boolean;
 }
 
 const base =
@@ -29,7 +35,7 @@ const base =
  * calendar button opens the browser's own picker on a hidden native input, because a picker
  * grid has no field order to get wrong and re-implementing one is not worth the weight.
  */
-export function DateInput({ value, onValueChange, required, name, id, className, disabled, min, max, 'aria-label': ariaLabel }: DateInputProps) {
+export function DateInput({ value, onValueChange, required, name, id, className, disabled, min, max, 'aria-label': ariaLabel, keepWhileTyping }: DateInputProps) {
   const locale = useLocale();
   const t = useT();
   const [text, setText] = useState(() => formatIsoDate(value, locale));
@@ -48,10 +54,16 @@ export function DateInput({ value, onValueChange, required, name, id, className,
   }, [value, locale]);
 
   const parsed = parseLocaleDate(text, locale);
+  // #355: min and max used to bind only the calendar popup; a typed date ignored them.
+  const problem =
+    parsed === null ? t('date.invalid')
+    : parsed && min && parsed < min ? t('date.beforeMin', { date: formatIsoDate(min, locale) })
+    : parsed && max && parsed > max ? t('date.afterMax', { date: formatIsoDate(max, locale) })
+    : '';
 
   useEffect(() => {
-    textRef.current?.setCustomValidity(parsed === null ? t('date.invalid') : '');
-  }, [parsed, t]);
+    textRef.current?.setCustomValidity(problem);
+  }, [problem]);
 
   function emit(iso: string) {
     emitted.current = iso;
@@ -73,13 +85,16 @@ export function DateInput({ value, onValueChange, required, name, id, className,
         placeholder={datePlaceholder(locale, {
           day: t('date.placeholderDay'), month: t('date.placeholderMonth'), year: t('date.placeholderYear'),
         })}
-        aria-invalid={parsed === null || undefined}
+        aria-invalid={problem ? true : undefined}
+        title={problem || undefined}
         className={cn(base, className)}
         onChange={(e) => {
           setText(e.target.value);
           // An unfinished date emits '' so the form never submits the stale previous value;
-          // the custom validity above is what tells the user why.
-          emit(parseLocaleDate(e.target.value, locale) ?? '');
+          // the custom validity above is what tells the user why. A filter keeps its value.
+          const next = parseLocaleDate(e.target.value, locale);
+          if (next === null && keepWhileTyping) return;
+          emit(next ?? '');
         }}
         onBlur={() => { if (parsed) setText(formatIsoDate(parsed, locale)); }}
       />
@@ -94,7 +109,9 @@ export function DateInput({ value, onValueChange, required, name, id, className,
         value={value}
         min={min}
         max={max}
-        className="absolute right-0 bottom-0 w-px h-px opacity-0 pointer-events-none"
+        // Covers the whole field (invisible, not clickable) so showPicker() opens the calendar
+        // under the field, not off its bottom-right corner (#355).
+        className="absolute inset-0 w-full h-full opacity-0 pointer-events-none"
         onChange={(e) => {
           emit(e.target.value);
           setText(formatIsoDate(e.target.value, locale));

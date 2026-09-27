@@ -31,7 +31,8 @@ import { NO_SPACE, matchesSpace, spaceFilterOptions } from '@/lib/spaceFilter';
 import { useLocale, useT } from '@/components/LocaleProvider';
 import { DuplicatesModal } from './DuplicatesModal';
 import { useRouter } from 'next/navigation';
-import { formatDate, compareNames } from '@/lib/i18n/format';
+import { compareNames } from '@/lib/i18n/format';
+import { recordDay, formatRecordDay } from '@/lib/recordDay';
 
 function fileUrl(filePath: string) {
   const u = `/api/files/${filePath.split('/').map(encodeURIComponent).join('/')}`;
@@ -93,6 +94,9 @@ export function ReceiptsClient({
   // list could not answer before: there was only store + status + a substring search.
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  // #355: typed dates skip the picker's min/max, so a From after the To is caught here and shown,
+  // instead of silently emptying the list.
+  const rangeInvalid = !!(dateFrom && dateTo && dateFrom > dateTo);
   const [categoryFilter, setCategoryFilter] = useState('');
   const [paymentFilter, setPaymentFilter] = useState('');
   const [spaceFilter, setSpaceFilter] = useState(''); // #146: same filter as Expenses
@@ -213,10 +217,10 @@ export function ReceiptsClient({
         if (statusFilter === 'failed' && !(!r.verified && empty)) return false;
         if (statusFilter === 'parsed' && !(!r.verified && !empty)) return false;
       }
-      // Date range: compare on the YYYY-MM-DD prefix so it is timezone-proof and both
-      // ends are inclusive (picking the same day twice shows that day's receipts).
-      if (dateFrom || dateTo) {
-        const day = (r.date || '').slice(0, 10);
+      // Date range, both ends inclusive, on the same day the list prints (#355): the UTC prefix
+      // put a receipt shown as 01/09 under 31/08.
+      if ((dateFrom || dateTo) && !rangeInvalid) {
+        const day = recordDay(r.date);
         if (!day) return false;
         if (dateFrom && day < dateFrom) return false;
         if (dateTo && day > dateTo) return false;
@@ -257,7 +261,7 @@ export function ReceiptsClient({
           return new Date(b.date).getTime() - new Date(a.date).getTime();
       }
     });
-  }, [receipts, storeFilter, statusFilter, search, sortBy, dateFrom, dateTo, categoryFilter, paymentFilter, spaceFilter]);
+  }, [receipts, storeFilter, statusFilter, search, sortBy, dateFrom, dateTo, rangeInvalid, categoryFilter, paymentFilter, spaceFilter]);
 
   // Deep-link from global search
   useOpenParam((id) => {
@@ -315,18 +319,18 @@ export function ReceiptsClient({
 
   const anyRFilter = !!(storeFilter || statusFilter !== 'all' || search || sortBy !== 'recent' || dateFrom || dateTo || categoryFilter || paymentFilter || spaceFilter);
   /** One-tap ranges for the two questions people actually ask a receipt archive. */
-  const applyDatePreset = (preset: 'thisMonth' | 'lastMonth' | 'thisYear') => {
+  const presetRange = (preset: 'thisMonth' | 'lastMonth' | 'thisYear'): [string, string] => {
     const now = new Date();
     const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    if (preset === 'thisYear') {
-      setDateFrom(`${now.getFullYear()}-01-01`);
-      setDateTo(ymd(now));
-      return;
-    }
+    if (preset === 'thisYear') return [`${now.getFullYear()}-01-01`, ymd(now)];
     const offset = preset === 'lastMonth' ? -1 : 0;
-    setDateFrom(ymd(new Date(now.getFullYear(), now.getMonth() + offset, 1)));
     // Day 0 of the following month = the last day of this one, leap years included.
-    setDateTo(ymd(new Date(now.getFullYear(), now.getMonth() + offset + 1, 0)));
+    return [ymd(new Date(now.getFullYear(), now.getMonth() + offset, 1)), ymd(new Date(now.getFullYear(), now.getMonth() + offset + 1, 0))];
+  };
+  const applyDatePreset = (preset: 'thisMonth' | 'lastMonth' | 'thisYear') => {
+    const [from, to] = presetRange(preset);
+    setDateFrom(from);
+    setDateTo(to);
   };
 
   const resetRFilters = () => {
@@ -364,26 +368,55 @@ export function ReceiptsClient({
         </FilterSection>
       )}
       <FilterSection label={t('rc.fltPeriod')}>
+        {/* #355: visible From / To labels, a typed range checked, the filter applied only to whole
+            dates (partial typing keeps the previous value), the active preset shown, and Clear. */}
         <div className="flex flex-col gap-1.5 min-w-0">
-          <DateInput value={dateFrom} max={dateTo || undefined} onValueChange={setDateFrom} aria-label={t('rc.fltFrom')} className="py-1.5 text-xs" />
-          <DateInput value={dateTo} min={dateFrom || undefined} onValueChange={setDateTo} aria-label={t('rc.fltTo')} className="py-1.5 text-xs" />
+          <label className="block">
+            <span className="block text-[10px] text-[color:var(--color-text-faint)] mb-0.5">{t('rc.fltFrom')}</span>
+            <DateInput value={dateFrom} max={dateTo || undefined} onValueChange={setDateFrom} keepWhileTyping aria-label={t('rc.fltFrom')} className="py-1.5 text-xs" />
+          </label>
+          <label className="block">
+            <span className="block text-[10px] text-[color:var(--color-text-faint)] mb-0.5">{t('rc.fltTo')}</span>
+            <DateInput value={dateTo} min={dateFrom || undefined} onValueChange={setDateTo} keepWhileTyping aria-label={t('rc.fltTo')} className="py-1.5 text-xs" />
+          </label>
+          {rangeInvalid && <p role="alert" className="text-[11px] text-[color:var(--color-red)]">{t('rc.fltRangeInvalid')}</p>}
         </div>
         <div className="flex flex-wrap gap-1 mt-1.5">
           {([
             ['thisMonth', t('rc.fltThisMonth')],
             ['lastMonth', t('rc.fltLastMonth')],
             ['thisYear', t('rc.fltThisYear')],
-          ] as const).map(([k, label]) => (
+          ] as const).map(([k, label]) => {
+            const [from, to] = presetRange(k);
+            const active = dateFrom === from && dateTo === to;
+            return (
+              <button
+                key={k}
+                type="button"
+                aria-pressed={active}
+                onClick={() => applyDatePreset(k)}
+                className={cn(
+                  'text-[10px] px-2 py-1 rounded-md border transition-colors',
+                  active
+                    ? 'border-[color:var(--color-accent)] text-[color:var(--color-accent)]'
+                    : 'border-[color:var(--color-border)] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)] hover:border-[color:var(--color-accent)]'
+                )}
+                style={{ fontFamily: 'var(--font-mono)' }}
+              >
+                {label}
+              </button>
+            );
+          })}
+          {(dateFrom || dateTo) && (
             <button
-              key={k}
               type="button"
-              onClick={() => applyDatePreset(k)}
-              className="text-[10px] px-2 py-1 rounded-md border border-[color:var(--color-border)] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)] hover:border-[color:var(--color-accent)] transition-colors"
+              onClick={() => { setDateFrom(''); setDateTo(''); }}
+              className="text-[10px] px-2 py-1 rounded-md text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)] underline underline-offset-2"
               style={{ fontFamily: 'var(--font-mono)' }}
             >
-              {label}
+              {t('common.clear')}
             </button>
-          ))}
+          )}
         </div>
       </FilterSection>
       {usedCategories.length > 0 && (
@@ -608,7 +641,7 @@ function ReceiptRow({ receipt, base, onClick }: { receipt: SerializedReceipt; ba
         </span>
         <span className="text-[10px] text-[color:var(--color-text-faint)] mt-0.5 flex items-center gap-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
           <span className="truncate">
-            {isNaN(d.getTime()) ? '—' : formatDate(d, locale)} · {receipt.lineItems?.length ?? 0} {t('it.items')}
+            {isNaN(d.getTime()) ? '—' : formatRecordDay(receipt.date, locale)} · {receipt.lineItems?.length ?? 0} {t('it.items')}
             {receipt.fileType === 'pdf' ? ' · pdf' : isHtml ? ' · email' : ''}
           </span>
           <ReturnBadge days={receipt.returnDaysLeft} />
@@ -723,7 +756,7 @@ function ReceiptCard({
           style={{ fontFamily: 'var(--font-mono)' }}
         >
           <span>
-            {formatDate(receipt.date, locale)}
+            {formatRecordDay(receipt.date, locale)}
             {receipt.lineItems.length > 0 && ` · ${receipt.lineItems.length} ${t('it.items')}`}
           </span>
           <ReturnBadge days={receipt.returnDaysLeft} />
@@ -884,7 +917,7 @@ function ReceiptDetailModal({
     const printed = (n: number) => toPrinted(n, rate).toString();
     return {
       store: r.store,
-      date: r.date.slice(0, 10),
+      date: recordDay(r.date),
       total: (foreign ? r.origAmount || r.total : r.total).toString(),
       subtotal: printed(r.subtotal || 0),
       vatAmount: printed(r.vatAmount || 0),

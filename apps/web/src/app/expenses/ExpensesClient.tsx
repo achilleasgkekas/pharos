@@ -32,6 +32,7 @@ import { OpenInOneDriveButton } from '@/components/OpenInOneDriveButton';
 import { useLocale, useT, useMoney } from '@/components/LocaleProvider';
 import type { TKey } from '@/lib/i18n';
 import { formatDate, compareNames } from '@/lib/i18n/format';
+import { PERIOD_RE, periodFollowsDate } from '@/lib/expensePeriod';
 import { vendorKey, seriesGroupKey } from './lib';
 import { NO_SPACE, matchesSpace, spaceFilterOptions } from '@/lib/spaceFilter';
 
@@ -629,7 +630,13 @@ function toForm(e: SerializedExpense, base: string): FormState {
 
 function FormFields({ form, set, cards, vendors, categories, spaces, fx, seriesByVendor }: { form: FormState; set: (p: Partial<FormState>) => void; cards: SerializedCard[]; vendors: string[]; categories: string[]; spaces: string[]; fx: FxCtx; seriesByVendor: Record<string, string[]> }) {
   const t = useT();
+  const locale = useLocale();
   const seriesOptions = seriesByVendor[vendorKey(form.vendor)] ?? [];
+  // #355: a period that just mirrors the date moves with it; one the user (or the AI, reading a
+  // bill that covers another month) set to a different month stays put.
+  const [periodLinked, setPeriodLinked] = useState(() => periodFollowsDate(form.period, form.date));
+  const periodBad = !!form.period && !PERIOD_RE.test(form.period.trim());
+  const countsIn = /^\d{4}-\d{2}$/.test((form.period || form.date).slice(0, 7)) ? (form.period || form.date).slice(0, 7) : '';
   const foreign = fx.enabled && isForeignCurrency(form.currency, fx.base);
   const printedAmount = Number(form.amount) || 0;
   const rate = Number(form.fxRate) || 0;
@@ -665,7 +672,10 @@ function FormFields({ form, set, cards, vendors, categories, spaces, fx, seriesB
           </Field>
         )}
         <Field label={t('ex.fDate')}>
-          <DateInput value={form.date} onValueChange={(v) => set({ date: v })} />
+          <DateInput
+            value={form.date}
+            onValueChange={(v) => set(periodLinked && v && form.period ? { date: v, period: v.slice(0, 7) } : { date: v })}
+          />
         </Field>
         <Field label={t('sub.fPayment')}>
           <CardSelect cards={cards} value={form.paymentMethod} onChange={(v) => set({ paymentMethod: v })} />
@@ -685,7 +695,20 @@ function FormFields({ form, set, cards, vendors, categories, spaces, fx, seriesB
           </select>
         </Field>
         <Field label={t('ex.fPeriod')}>
-          <Input value={form.period} onChange={(e) => set({ period: e.target.value })} placeholder="2026-06" />
+          <Input
+            value={form.period}
+            onChange={(e) => {
+              set({ period: e.target.value });
+              setPeriodLinked(periodFollowsDate(e.target.value, form.date));
+            }}
+            placeholder="YYYY-MM"
+            aria-invalid={periodBad || undefined}
+          />
+          <span className={cn('block mt-1 text-[11px]', periodBad ? 'text-[color:var(--color-red)]' : 'text-[color:var(--color-text-faint)]')}>
+            {periodBad
+              ? t('ex.periodInvalid')
+              : countsIn && t('ex.periodCountsIn', { month: formatDate(`${countsIn}-01`, locale, { month: 'long', year: 'numeric', timeZone: 'UTC' }) })}
+          </span>
         </Field>
       </div>
       {/* #231: two subscriptions from one vendor ("Apple" → iCloud, TV+) are two series only when the
