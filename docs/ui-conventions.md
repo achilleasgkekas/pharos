@@ -84,6 +84,13 @@ A form ends with the actions on the right: a ghost Cancel, then the primary Save
 - The E2E run checks `/`, `/items`, `/expenses`, `/bills`, `/settings` and `/login` with axe
   for serious and critical issues.
 
+## Checking a change
+
+- The E2E smoke test opens every page at 1280px and at 390px and fails if a page scrolls
+  sideways on the phone.
+- Every CI run attaches a `page-screenshots` artifact: each page at desktop and phone width.
+  Open it to see what a UI change looks like everywhere, without running the app.
+
 ## When the rules do not fit
 
 The test's allowlists name the known exceptions and why: the landing hero, sign-in, setup,

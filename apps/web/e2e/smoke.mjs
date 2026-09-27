@@ -8,11 +8,17 @@
 //    component that crashes on real data, a missing env var, a broken import in one route.
 // 3. Every page fits a 390px phone without scrolling sideways.
 // 4. The REST API refuses an unauthenticated request.
+import { mkdirSync } from 'node:fs';
 import { chromium } from 'playwright';
 
 const BASE = process.env.BASE_URL || 'http://127.0.0.1:3000';
 const USER = 'ci-admin';
 const PASS = 'ci-password-123';
+// SHOTS_DIR set: keep a screenshot of every page, desktop and phone. CI attaches them to the run
+// (#351), so a reviewer can see what a UI change looks like on every page without running it.
+const SHOTS = process.env.SHOTS_DIR;
+if (SHOTS) mkdirSync(SHOTS, { recursive: true });
+const shotName = (path, tag) => `${SHOTS}/${tag}-${path === '/' ? 'home' : path.slice(1).replace(/\//g, '_')}.png`;
 
 const PAGES = [
   '/', '/items', '/shopping', '/shopping-list', '/receipts', '/expenses', '/income', '/bills',
@@ -70,6 +76,7 @@ for (const path of PAGES) {
   if (!h1) fail(`${path} rendered no <h1>`);
   if (pageErrors.length) fail(`${path} threw in the browser: ${pageErrors[0]}`);
   if (status < 500 && h1 && !crashed && !pageErrors.length) console.log(`✓ ${path}`);
+  if (SHOTS) await page.screenshot({ path: shotName(path, 'desktop'), fullPage: true });
 }
 
 // ── 3. Every page fits a phone (#351) ─────────────────────────────────────
@@ -90,6 +97,7 @@ for (const path of PAGES) {
     }
     return { scroll: document.documentElement.scrollWidth, view, widest };
   });
+  if (SHOTS) await page.screenshot({ path: shotName(path, 'phone'), fullPage: true });
   if (scroll > view + 1) fail(`${path} is ${scroll}px wide on a ${view}px phone (first overflow: ${widest})`);
   else console.log(`✓ ${path} fits 390px`);
 }

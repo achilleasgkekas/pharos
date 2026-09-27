@@ -113,3 +113,7 @@ docs/DOCS_PROGRESS.md
 *.p12
 *.pfx
 *.key
+
+# E2E output (CI uploads these as artifacts)
+apps/web/e2e-shots/
+apps/web/e2e-failure-*.png
