@@ -148,16 +148,10 @@ export function BillsClient({
 
   return (
     <main className={PAGE_MAIN}>
-<<<<<<< HEAD
-      <PageHeader title="Bills" count={`${openBills.length} open`}>
-        {totalDue > 0 && <HeaderStat label="to pay" value={money(totalDue)} color="var(--color-text)" />}
-        {noRateCount > 0 && <HeaderStat label="need a rate" value={noRateCount} color="var(--color-gold)" />}
-        {overdueCount > 0 && <HeaderStat label="overdue" value={overdueCount} color="var(--color-red)" />}
-=======
       <PageHeader title={t('nav.bills')} count={t('bill.openCount', { n: openBills.length })}>
         {totalDue > 0 && <HeaderStat label={t('bill.toPay')} value={money(totalDue)} color="var(--color-text)" />}
+        {noRateCount > 0 && <HeaderStat label="need a rate" value={noRateCount} color="var(--color-gold)" />}
         {overdueCount > 0 && <HeaderStat label={t('bill.stOverdue')} value={overdueCount} color="var(--color-red)" />}
->>>>>>> origin/main
         <PrimaryAction onClick={() => setShowCreate(true)} />
       </PageHeader>
 
