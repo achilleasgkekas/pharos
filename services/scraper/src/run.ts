@@ -1,8 +1,8 @@
 import { config } from './config.js';
 import { Item } from './db.js';
 import { fetchPageText, storeFromUrl } from './scrape.js';
-import { extractPrice, isOllamaHealthy } from './extract.js';
-import { getScraperAiConfig, getScrapeScope, getShoppingMarket } from './appConfig.js';
+import { extractPrice, isOllamaHealthy, AiCallError } from './extract.js';
+import { getScraperAiConfig, getScrapeScope, getShoppingMarket, recordScraperAiStatus } from './appConfig.js';
 import { selectForScrape } from './scrapeOrder.js';
 import { isInMarket } from './shoppingRegion.js';
 import { notify } from './notify.js';
@@ -12,6 +12,8 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 /** One full scrape pass over every item that has product links. */
 export async function runOnce(): Promise<{ items: number; checks: number; updates: number; alerts: number }> {
   const stats = { items: 0, checks: 0, updates: 0, alerts: 0 };
+  // #359: the first AI failure of the pass, reported to Settings at the end.
+  let aiError: { message: string; model: string } | null = null;
 
   const ai = await getScraperAiConfig({ ollamaModel: config.ollamaModel });
   if (ai.provider === 'anthropic') {
@@ -85,6 +87,9 @@ export async function runOnce(): Promise<{ items: number; checks: number; update
           console.log(`  · ${item.title} @ ${storeFromUrl(link.url!)}: no price`);
         }
       } catch (err) {
+        if (err instanceof AiCallError) {
+          aiError ??= { message: err.message.slice(0, 300), model: err.model };
+        }
         console.error(`  ✗ ${storeFromUrl(link.url!)}: ${(err as Error).message}`);
         if (note === 'no-price') note = 'error';
       }
@@ -134,6 +139,8 @@ export async function runOnce(): Promise<{ items: number; checks: number; update
     }
   }
 
+  // A pass with Anthropic calls leaves its outcome for Settings: the first AI error, or null.
+  if (ai.provider === 'anthropic' && stats.checks > 0) await recordScraperAiStatus(aiError);
   console.log(`[scrape] done: ${stats.updates} updated, ${stats.alerts} alerts (${stats.checks} checks)`);
   return stats;
 }

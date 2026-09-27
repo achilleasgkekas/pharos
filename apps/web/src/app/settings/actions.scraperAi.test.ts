@@ -157,13 +157,13 @@ describe('getScraperAi', () => {
 
   it('defaults to ollama + empty model when nothing is stored', async () => {
     const cfg = await getScraperAi();
-    expect(cfg).toEqual({ provider: 'ollama', model: '', enabled: true, maxLinks: 0, scope: 'both', ownedIntervalDays: 7, findLinks: true });
+    expect(cfg).toEqual({ provider: 'ollama', model: '', enabled: true, maxLinks: 0, scope: 'both', ownedIntervalDays: 7, findLinks: true, lastAiError: null });
   });
 
   it('returns anthropic only on an exact stored match', async () => {
     appConfigFindOneLean.mockResolvedValueOnce({ scraperProvider: 'anthropic', scraperModel: 'claude-haiku-4-5' });
     const cfg = await getScraperAi();
-    expect(cfg).toEqual({ provider: 'anthropic', model: 'claude-haiku-4-5', enabled: true, maxLinks: 0, scope: 'both', ownedIntervalDays: 7, findLinks: true });
+    expect(cfg).toEqual({ provider: 'anthropic', model: 'claude-haiku-4-5', enabled: true, maxLinks: 0, scope: 'both', ownedIntervalDays: 7, findLinks: true, lastAiError: null });
   });
 
   it('falls back to ollama for any other stored value', async () => {
@@ -178,7 +178,23 @@ describe('getScraperAi', () => {
   });
 });
 
+describe('getScraperAi: last scraper AI error (#359)', () => {
+  it("returns the scraper's last AI failure from its own status collection", async () => {
+    const findOne = vi.fn(async () => ({ lastAiError: { message: 'Anthropic HTTP 404: model not found', model: 'claude-3-5-haiku-latest', at: new Date('2026-09-27T06:00:00Z') } }));
+    connectDBMock.mockResolvedValueOnce(undefined).mockResolvedValueOnce({ connection: { db: { collection: vi.fn(() => ({ findOne })) } } } as never);
+    const cfg = await getScraperAi();
+    expect(cfg.lastAiError).toEqual({ message: 'Anthropic HTTP 404: model not found', model: 'claude-3-5-haiku-latest', at: '2026-09-27T06:00:00.000Z' });
+  });
+});
+
 describe('saveScraperAi', () => {
+  it('refuses a model Anthropic has retired, without writing (#359)', async () => {
+    const res = await saveScraperAi(fd({ scraperProvider: 'anthropic', scraperModel: 'claude-3-5-haiku-latest' }));
+    expect(res.ok).toBe(false);
+    expect(res.error).toContain('claude-haiku-4-5');
+    expect(appConfigUpdateOne).not.toHaveBeenCalled();
+  });
+
   it('requires admin before touching the DB', async () => {
     requireAdminMock.mockRejectedValueOnce(new Error('not admin'));
     await expect(saveScraperAi(fd({ scraperProvider: 'anthropic', scraperModel: 'x' }))).rejects.toThrow('not admin');

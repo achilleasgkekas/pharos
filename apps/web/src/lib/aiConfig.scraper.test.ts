@@ -31,9 +31,9 @@ function base(overrides: Partial<AiConfig> = {}): AiConfig {
 
 describe('scraperConfig', () => {
   it('routes to Anthropic + the scraper model when scraperProvider=anthropic and a key exists', () => {
-    const out = scraperConfig(base({ scraperProvider: 'anthropic', scraperModel: 'claude-3-5-haiku-latest' }));
+    const out = scraperConfig(base({ scraperProvider: 'anthropic', scraperModel: 'claude-haiku-4-5' }));
     expect(out.provider).toBe('anthropic');
-    expect(out.anthropicModel).toBe('claude-3-5-haiku-latest'); // NOT the main sonnet
+    expect(out.anthropicModel).toBe('claude-haiku-4-5'); // NOT the main sonnet
   });
 
   it('falls back to the main anthropic model when scraperProvider=anthropic but scraperModel is blank', () => {
@@ -43,9 +43,9 @@ describe('scraperConfig', () => {
   });
 
   it('falls back to Ollama when the scraper is set to Anthropic but NO key is configured', () => {
-    const out = scraperConfig(base({ scraperProvider: 'anthropic', scraperModel: 'claude-3-5-haiku-latest', anthropicApiKey: '' }));
+    const out = scraperConfig(base({ scraperProvider: 'anthropic', scraperModel: 'claude-haiku-4-5', anthropicApiKey: '' }));
     expect(out.provider).toBe('ollama');
-    expect(out.ollamaModel).toBe('claude-3-5-haiku-latest'); // scraperModel wins as the ollama model name
+    expect(out.ollamaModel).toBe('claude-haiku-4-5'); // scraperModel wins as the ollama model name
   });
 
   it('routes to Ollama + the scraper model when scraperProvider=ollama', () => {
@@ -60,7 +60,7 @@ describe('scraperConfig', () => {
   });
 
   it('does not mutate the input config', () => {
-    const input = base({ scraperProvider: 'anthropic', scraperModel: 'claude-3-5-haiku-latest' });
+    const input = base({ scraperProvider: 'anthropic', scraperModel: 'claude-haiku-4-5' });
     const snapshot = { ...input };
     scraperConfig(input);
     expect(input).toEqual(snapshot);

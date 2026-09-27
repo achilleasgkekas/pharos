@@ -77,6 +77,19 @@ vLLM host), an optional key, and a model.
 `ANTHROPIC_API_KEY` can also be supplied as an environment variable as a
 fallback for the Anthropic key.
 
+**Claude models.** The recommended model for reading documents is
+`claude-sonnet-5`; the price scraper's recommended model is `claude-haiku-4-5`,
+the low-cost one. **Load models** lists the models your key can use today,
+newest first, from Anthropic's Models API. Pharos refuses to save a model that
+Anthropic has retired or that your key cannot see. If a model saved earlier is
+retired later, Pharos switches it to the replacement on its own and says so once
+in Settings → AI. **Test connection** checks the main model and, when the
+scraper uses Anthropic, the scraper model too. The list of retired models lives
+in `apps/web/src/lib/claudeModels.ts` (with a copy for the scraper in
+`services/scraper/src/claudeModels.ts`); see Anthropic's
+[model deprecations](https://platform.claude.com/docs/en/about-claude/model-deprecations)
+page.
+
 > **Fail-safe:** if the selected provider is half-configured (e.g. `anthropic`
 > chosen but no key, or `custom` chosen without a base URL/model), Pharos falls
 > back to `ollama` rather than erroring.

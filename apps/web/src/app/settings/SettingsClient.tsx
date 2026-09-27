@@ -9,11 +9,12 @@ import { PAGE_MAIN, PageHeader } from '@/components/ui/PageHeader';
 import { controlClass } from '@/components/ui/Input';
 import { Field } from '@/components/ui/Field';
 import { useConfirm, usePrompt } from '@/components/ui/ConfirmDialog';
-import { saveAiConfig, pullOllamaModel, testAnthropic, saveStore, deleteStore, setAiConfirmBulk, exportData, exportDataEncrypted, importData, importDataEncrypted, verifyBackup, exportCSV, exportInsuranceBundle, exportTaxBundle, saveBudgets, saveBudgetRollover, suggestBudgets, saveAssetAccounts, saveDepreciation, saveCategoryRules, setAiEnabled, setAiFeature, fetchProviderModels } from './actions';
+import { saveAiConfig, pullOllamaModel, testAnthropic, saveStore, deleteStore, setAiConfirmBulk, exportData, exportDataEncrypted, importData, importDataEncrypted, verifyBackup, exportCSV, exportInsuranceBundle, exportTaxBundle, saveBudgets, saveBudgetRollover, suggestBudgets, saveAssetAccounts, saveDepreciation, saveCategoryRules, setAiEnabled, setAiFeature, fetchProviderModels, dismissAiModelNotices } from './actions';
 import { applyCategoryRulesToExisting } from '@/app/expenses/actions';
 import type { CategoryRule } from '@/lib/categoryRules';
 import { AI_FEATURES } from '@/lib/aiFeatures';
 import { PROVIDER_RECOMMEND, SCRAPER_RECOMMEND, type FetchedModel } from '@/lib/aiModels';
+import { CLAUDE_SUGGESTIONS, CLAUDE_SCRAPER_SUGGESTIONS, modelLifecycle } from '@/lib/claudeModels';
 import { StoreDuplicatesModal } from './StoreDuplicatesModal';
 import { YnabImportModal } from './YnabImportModal';
 import type { StoreLite } from '@/lib/storeService';
@@ -89,6 +90,8 @@ type AiInfo = {
   enabled: boolean; // AI master switch
   features: Record<string, boolean>; // per-feature overrides (absent = on)
   ready: boolean; // provider-aware readiness
+  /** #359: saved models swapped because Anthropic retired them. */
+  modelNotices: { field: 'anthropicModel' | 'scraperModel'; from: string; to: string; retiredOn: string }[];
 };
 
 type Info = {
@@ -133,7 +136,6 @@ const MODEL_SUGGESTIONS: { name: string; note: string; vision: boolean }[] = [
   { name: 'qwen2.5:14b', note: 'Text-only · ~9GB · best local text', vision: false },
 ];
 
-const CLAUDE_SUGGESTIONS = ['claude-sonnet-4-5-20250929', 'claude-3-5-sonnet-latest', 'claude-3-5-haiku-latest'];
 const OPENAI_SUGGESTIONS = ['gpt-4o-mini', 'gpt-4o', 'gpt-4.1-mini'];
 const GEMINI_SUGGESTIONS = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
 const OPENROUTER_SUGGESTIONS = ['openai/gpt-4o-mini', 'anthropic/claude-3.5-sonnet', 'google/gemini-2.0-flash-001'];
@@ -472,7 +474,7 @@ function AiMasterAndFeatures({ ai, canEdit }: { ai: AiInfo; canEdit: boolean }) 
 /** Model field with a "Load models" button that pulls the provider's live list
  *  (cost per 1M tokens + a ★ recommended pick). Falls back to suggestion chips. */
 function ModelPicker({
-  provider, model, onModel, typedKey, hasKey, baseUrl, suggestions, recommend, hint,
+  provider, model, onModel, typedKey, hasKey, baseUrl, workspaceId, suggestions, recommend, hint,
 }: {
   provider: ProviderId;
   model: string;
@@ -480,6 +482,7 @@ function ModelPicker({
   typedKey: string;
   hasKey: boolean;
   baseUrl?: string;
+  workspaceId?: string;
   suggestions: string[];
   recommend?: { model: string; reason: string };
   hint?: string;
@@ -495,7 +498,7 @@ function ModelPicker({
     setErr('');
     setLoading(true);
     try {
-      const r = await fetchProviderModels(provider, typedKey.trim() || undefined, baseUrl?.trim() || undefined);
+      const r = await fetchProviderModels(provider, typedKey.trim() || undefined, baseUrl?.trim() || undefined, workspaceId?.trim() || undefined);
       if (r.ok && r.models) setModels(r.models);
       else setErr(r.error || t('set.failedLoadModels'));
     } finally {
@@ -503,9 +506,20 @@ function ModelPicker({
     }
   }
 
+  // #359: say so when the typed or saved Claude model is retired or on its way out.
+  const life = provider === 'anthropic' ? modelLifecycle(model) : ({ status: 'active' } as const);
+
   return (
     <Field label={t('set.modelField')}>
       <input value={model} onChange={(e) => onModel(e.target.value)} className={controlClass} style={{ fontFamily: 'var(--font-mono)' }} />
+      {life.status !== 'active' && (
+        <p className={cn('text-[11px] mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1', life.status === 'retired' ? 'text-[color:var(--color-red)]' : 'text-[color:var(--color-gold)]')}>
+          <span>{life.status === 'retired' ? t('set.modelRetired', { date: life.retiredOn }) : t('set.modelDeprecated')}</span>
+          <button type="button" onClick={() => onModel(life.replacement)} className="underline underline-offset-2" style={{ fontFamily: 'var(--font-mono)' }}>
+            {t('set.useModel', { model: life.replacement })}
+          </button>
+        </p>
+      )}
       <div className="flex items-center gap-2 mt-2 flex-wrap">
         <button
           type="button"
@@ -546,7 +560,10 @@ function ModelPicker({
                 className={cn('w-full flex items-center gap-2 px-2.5 py-1.5 text-left transition-colors hover:bg-[color:var(--color-surface-2)]', model === m.id && 'bg-[color:var(--color-surface-2)]')}
               >
                 {m.recommended && <Star size={11} className="text-[color:var(--color-accent)] shrink-0" />}
-                <span className="text-[11px] min-w-0 flex-1 truncate" style={{ fontFamily: 'var(--font-mono)' }}>{m.id}</span>
+                <span className="text-[11px] min-w-0 flex-1 truncate" style={{ fontFamily: 'var(--font-mono)' }} title={m.name}>
+                  {m.id}
+                  {m.name && <span className="ml-1.5 text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-sans)' }}>{m.name}</span>}
+                </span>
                 {m.vision && <span className="text-[9px] px-1 py-0.5 rounded bg-[color:var(--color-surface-3)] text-[color:var(--color-text-faint)] shrink-0">vision</span>}
                 <span className="text-[10px] text-[color:var(--color-text-dim)] shrink-0 tabular-nums" style={{ fontFamily: 'var(--font-mono)' }}>
                   {m.in == null ? '—' : m.in === 0 && m.out === 0 ? 'free' : `$${m.in}/$${m.out}`}
@@ -639,6 +656,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
   const [pullName, setPullName] = useState('');
   const [msg, setMsg] = useState<string | null>(null);
   const [test, setTest] = useState<string | null>(null);
+  const [testFailed, setTestFailed] = useState(false);
   const [confirmBulk, setConfirmBulk] = useState(ai.confirmBulk);
   const [monthlyBudget, setMonthlyBudget] = useState(ai.monthlyBudget ? String(ai.monthlyBudget) : '');
 
@@ -668,7 +686,11 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
       // likely rejection is the admin guard (a member-role session in a shared or hosted
       // workspace), and that is worth saying out loud.
       try {
-        await saveAiConfig(fd);
+        const r = await saveAiConfig(fd);
+        if (!r.ok) {
+          setMsg(t('set.couldNotSave', { error: r.error || '?' }));
+          return;
+        }
       } catch (err) {
         setMsg(t('set.couldNotSave', { error: (err as Error).message || '?' }));
         return;
@@ -696,9 +718,15 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
 
   function doTest() {
     setTest(t('common.testing'));
+    setTestFailed(false);
     startTransition(async () => {
       const r = await testAnthropic();
-      setTest(r.ok ? t('common.connectionOk') : t('common.failedWith', { error: r.error ?? '' }));
+      const main = r.ok ? t('common.connectionOk') : t('common.failedWith', { error: r.error ?? '' });
+      const scraper = r.scraper
+        ? t('set.scraperTestResult', { model: r.scraper.model, result: r.scraper.ok ? t('common.connectionOk') : t('common.failedWith', { error: r.scraper.error ?? '' }) })
+        : '';
+      setTestFailed(!r.ok || (r.scraper ? !r.scraper.ok : false));
+      setTest(scraper ? `${main} · ${scraper}` : main);
     });
   }
 
@@ -706,6 +734,21 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
 
   return (
     <Section title={t('set.aiEngineTitle')} icon={<Sparkles size={15} />}>
+      {/* #359: models swapped because Anthropic retired them, shown until dismissed. */}
+      {ai.modelNotices.length > 0 && (
+        <div className="rounded-lg border border-[color:var(--color-gold)]/40 bg-[color:var(--color-gold)]/10 px-3 py-2 text-[11px] text-[color:var(--color-text)] flex items-start gap-3">
+          <div className="flex-1 space-y-1">
+            {ai.modelNotices.map((n, i) => (
+              <p key={i}>
+                {t('set.modelSwapped', { from: n.from, date: n.retiredOn, which: t(n.field === 'scraperModel' ? 'set.whichScraper' : 'set.whichMain'), to: n.to })}
+              </p>
+            ))}
+          </div>
+          <button type="button" onClick={() => startTransition(async () => { await dismissAiModelNotices(); })} className="shrink-0 text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] underline underline-offset-2">
+            {t('common.dismiss')}
+          </button>
+        </div>
+      )}
       {/* Provider toggle */}
       <Row label={t('set.provider')}>
         <div className="flex gap-1.5 flex-wrap">
@@ -872,6 +915,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
             hasKey={ai.hasKey}
             suggestions={CLAUDE_SUGGESTIONS}
             recommend={PROVIDER_RECOMMEND.anthropic}
+            workspaceId={anthropicWorkspaceId}
           />
           <Field label={t('set.anthropicWorkspaceId')}>
             <input
@@ -900,7 +944,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
             </button>
             {test && (
               <span
-                className={cn('text-[11px]', test.startsWith(t('common.connectionOk')) ? 'text-[color:var(--color-accent)]' : test === t('common.testing') ? 'text-[color:var(--color-text-dim)]' : 'text-[color:var(--color-red)]')}
+                className={cn('text-[11px]', test === t('common.testing') ? 'text-[color:var(--color-text-dim)]' : testFailed ? 'text-[color:var(--color-red)]' : 'text-[color:var(--color-accent)]')}
                 style={{ fontFamily: 'var(--font-mono)' }}
               >
                 {test}
@@ -1073,6 +1117,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
 
 function ScraperAiSettings({ scraperAi, installed, hasAnthropicKey }: { scraperAi: ScraperAiConfig; installed: { name: string; sizeGB: number }[]; hasAnthropicKey: boolean }) {
   const t = useT();
+  const locale = useLocale();
   const [pending, startTransition] = useTransition();
   const [provider, setProvider] = useState<'ollama' | 'anthropic'>(scraperAi.provider);
   const [model, setModel] = useState(scraperAi.model);
@@ -1095,7 +1140,11 @@ function ScraperAiSettings({ scraperAi, installed, hasAnthropicKey }: { scraperA
     fd.set('scraperFindLinks', String(findLinks));
     setMsg(null);
     startTransition(async () => {
-      await saveScraperAi(fd);
+      const r = await saveScraperAi(fd);
+      if (!r.ok) {
+        setMsg(t('set.couldNotSave', { error: r.error || '?' }));
+        return;
+      }
       setMsg(t('common.savedOk'));
       setTimeout(() => setMsg(null), 2500);
     });
@@ -1156,12 +1205,17 @@ function ScraperAiSettings({ scraperAi, installed, hasAnthropicKey }: { scraperA
             onModel={setModel}
             typedKey=""
             hasKey={hasAnthropicKey}
-            suggestions={['claude-3-5-haiku-latest', 'claude-3-haiku-20240307']}
+            suggestions={CLAUDE_SCRAPER_SUGGESTIONS}
             recommend={SCRAPER_RECOMMEND.anthropic}
           />
           <p className="text-[10px] text-[color:var(--color-gold)]" style={{ fontFamily: 'var(--font-mono)' }}>
             {t('set.scraperAnthropicWarn')}
           </p>
+          {scraperAi.lastAiError && (
+            <p className="text-[10px] text-[color:var(--color-red)]" style={{ fontFamily: 'var(--font-mono)' }}>
+              {t('set.scraperLastError', { when: formatDateTime(scraperAi.lastAiError.at, locale), model: scraperAi.lastAiError.model, message: scraperAi.lastAiError.message })}
+            </p>
+          )}
         </div>
       )}
 

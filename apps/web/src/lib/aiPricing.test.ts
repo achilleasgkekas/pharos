@@ -10,6 +10,7 @@ describe('rateForModel', () => {
     expect(rateForModel('claude-sonnet-5')).toEqual({ inputPerMTok: 2_000_000, outputPerMTok: 10_000_000 });
     expect(rateForModel('claude-haiku-4-5')).toEqual({ inputPerMTok: 1_000_000, outputPerMTok: 5_000_000 });
     expect(rateForModel('claude-opus-5')).toEqual({ inputPerMTok: 5_000_000, outputPerMTok: 25_000_000 });
+    expect(rateForModel('claude-opus-5-5')).toEqual({ inputPerMTok: 4_000_000, outputPerMTok: 20_000_000 });
     expect(rateForModel('claude-fable-5-1')).toEqual({ inputPerMTok: 10_000_000, outputPerMTok: 50_000_000 });
   });
 

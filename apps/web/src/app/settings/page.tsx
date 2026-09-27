@@ -8,7 +8,7 @@ import { AppConfig as AppConfigModel } from '@/models/AppConfig';
 import { withRequestTenant } from '@/lib/tenancy/request';
 import { currentModel } from '@/lib/tenancy/connection';
 import { isOllamaHealthy, isAiReady } from '@/lib/ollama';
-import { getAiConfig } from '@/lib/aiConfig';
+import { getAiConfig, retiredModelSwaps } from '@/lib/aiConfig';
 import { getAiBudgetStatus } from '@/lib/aiBudget';
 import { getAppSettings } from '@/lib/appSettings';
 import { getStores } from '@/lib/storeService';
@@ -90,6 +90,18 @@ async function getInfo() {
       enabled: doc?.aiEnabled !== false, // master switch, default ON
       features: (doc?.aiFeatures as Record<string, boolean>) || {},
       ready: aiReady, // provider-aware readiness (drives per-feature status chips)
+      // #359: saved models swapped because Anthropic retired them; shown once in Settings → AI.
+      // The read of `doc` above can race the swap in getAiConfig on the first load, so a swap not
+      // yet written is derived here too; once written, `doc` holds no retired id and adds nothing.
+      modelNotices: [
+        ...((doc?.aiModelNotices as { field: string; from: string; to: string; retiredOn: string }[] | undefined) ?? []),
+        ...retiredModelSwaps({ anthropicModel: doc?.anthropicModel as string | undefined, scraperModel: doc?.scraperModel as string | undefined }),
+      ].map((n) => ({
+        field: n.field === 'scraperModel' ? ('scraperModel' as const) : ('anthropicModel' as const),
+        from: String(n.from ?? ''),
+        to: String(n.to ?? ''),
+        retiredOn: String(n.retiredOn ?? ''),
+      })),
     },
   };
   });

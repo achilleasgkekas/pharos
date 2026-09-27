@@ -30,6 +30,14 @@ function stripFences(s: string): string {
   return s.replace(/```(?:json)?/gi, '').replace(/```/g, '').trim();
 }
 
+/** The AI call itself failed (as opposed to fetching the page); run.ts reports it to Settings. */
+export class AiCallError extends Error {
+  constructor(message: string, readonly model: string) {
+    super(message);
+    this.name = 'AiCallError';
+  }
+}
+
 /** Ask the configured model (Ollama or Anthropic) for the current price on a page.
  *  Provider, model and the prompt are read from the shared AppConfig (Settings). */
 export async function extractPrice(page: ScrapedPage): Promise<ExtractedPrice> {
@@ -44,7 +52,12 @@ export async function extractPrice(page: ScrapedPage): Promise<ExtractedPrice> {
     .join('\n\n');
 
   if (ai.provider === 'anthropic' && ai.anthropicApiKey) {
-    const json = await anthropicPriceJSON({ apiKey: ai.anthropicApiKey, model: ai.model, system, user: content });
+    let json: unknown;
+    try {
+      json = await anthropicPriceJSON({ apiKey: ai.anthropicApiKey, model: ai.model, system, user: content });
+    } catch (err) {
+      throw new AiCallError((err as Error).message, ai.model);
+    }
     return PriceSchema.parse(json);
   }
 

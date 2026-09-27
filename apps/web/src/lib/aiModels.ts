@@ -3,6 +3,8 @@
 // prices change over time — treat the table as a guide. OpenRouter is the exception:
 // its /models endpoint returns LIVE pricing, which we use instead of this table.
 
+import { CLAUDE_MAIN_DEFAULT, CLAUDE_SCRAPER_DEFAULT } from './claudeModels';
+
 export type AiProviderId = 'ollama' | 'anthropic' | 'openai' | 'gemini' | 'openrouter' | 'custom';
 
 /** A fetched model with optional cost (USD per 1M tokens) + flags. */
@@ -12,11 +14,13 @@ export type FetchedModel = {
   out: number | null; // output $/1M
   vision: boolean;
   recommended: boolean;
+  /** Human-readable name when the provider gives one (Anthropic's `display_name`). */
+  name?: string;
 };
 
 /** Recommended model per provider + a one-line reason (vision-capable, sensible default). */
 export const PROVIDER_RECOMMEND: Partial<Record<AiProviderId, { model: string; reason: string }>> = {
-  anthropic: { model: 'claude-sonnet-4-5-20250929', reason: 'Best accuracy + vision; claude-3-5-haiku is the cheap option' },
+  anthropic: { model: CLAUDE_MAIN_DEFAULT, reason: 'Reads receipts and PDFs accurately at a moderate price; claude-haiku-4-5 is the low-cost option' },
   openai: { model: 'gpt-4o-mini', reason: 'Cheap, vision-capable, great default' },
   gemini: { model: 'gemini-2.0-flash', reason: 'Fast, cheap, reads images natively' },
   openrouter: { model: 'openai/gpt-4o-mini', reason: 'Cheap + vision; one key, every model' },
@@ -24,13 +28,22 @@ export const PROVIDER_RECOMMEND: Partial<Record<AiProviderId, { model: string; r
 
 /** A lighter/cheaper pick for the price scraper (text-only task — no vision needed). */
 export const SCRAPER_RECOMMEND: Partial<Record<AiProviderId, { model: string; reason: string }>> = {
-  anthropic: { model: 'claude-3-5-haiku-latest', reason: 'Cheapest Claude — plenty for plain price extraction' },
+  anthropic: { model: CLAUDE_SCRAPER_DEFAULT, reason: 'The low-cost Claude model, plenty for plain price extraction' },
 };
 
 // Approx public list prices, USD per 1M tokens. Matched by substring; the LONGEST
 // matching key wins (so "gpt-4o-mini" beats "gpt-4o").
 const PRICING: { match: string; in: number; out: number }[] = [
-  // Anthropic
+  // Anthropic (list prices checked 2026-09-27). The recommended models must have a price
+  // here (#359); the full per-model table with cache rates is #360.
+  { match: 'claude-fable-5', in: 10, out: 50 },
+  { match: 'claude-opus-5', in: 5, out: 25 },
+  { match: 'claude-opus-5-5', in: 4, out: 20 },
+  { match: 'claude-sonnet-5', in: 2, out: 10 },
+  { match: 'claude-opus-4-5', in: 5, out: 25 },
+  { match: 'claude-opus-4-6', in: 5, out: 25 },
+  { match: 'claude-opus-4-7', in: 5, out: 25 },
+  { match: 'claude-opus-4-8', in: 5, out: 25 },
   { match: 'claude-opus-4', in: 15, out: 75 },
   { match: 'claude-3-opus', in: 15, out: 75 },
   { match: 'claude-sonnet-4', in: 3, out: 15 },
@@ -73,5 +86,5 @@ export function priceForModel(id: string): { in: number; out: number } | null {
 export function looksVisionModel(id: string): boolean {
   const l = id.toLowerCase();
   if (/gpt-3\.5|text-|embed|whisper|tts|davinci|moderation|instruct/.test(l)) return false;
-  return /gpt-4o|gpt-4\.1|o4|claude-3-5|claude-3-7|claude-sonnet-4|claude-opus-4|claude-haiku-4|gemini|vl|vision|llava|minicpm-v|pixtral|llama-3\.2|qwen.*vl/.test(l);
+  return /gpt-4o|gpt-4\.1|o4|claude-3-5|claude-3-7|claude-(sonnet|opus|haiku|fable|mythos)-\d|gemini|vl|vision|llava|minicpm-v|pixtral|llama-3\.2|qwen.*vl/.test(l);
 }

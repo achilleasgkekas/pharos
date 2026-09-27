@@ -1,6 +1,7 @@
 import mongoose, { Schema } from 'mongoose';
 import { normalizeScrapeScope, DEFAULT_OWNED_INTERVAL_DAYS, type ScrapeScope } from './scrapeOrder.js';
 import { marketFor, normalizeShoppingCountry, normalizeShopList, type ShoppingMarket } from './shoppingRegion.js';
+import { CLAUDE_SCRAPER_DEFAULT, usableClaudeModel } from './claudeModels.js';
 
 // Read-only view of the web app's AppConfig singleton (collection `appconfigs`).
 // We only need the scraper-relevant fields, so the schema is loose (strict:false)
@@ -41,8 +42,9 @@ export async function getScraperAiConfig(defaults: { ollamaModel: string }): Pro
       v = {
         provider,
         model:
+          // #359: a saved model Anthropic has retired fails on every call; use its replacement.
           provider === 'anthropic'
-            ? scraperModel || anthropicModel || 'claude-3-5-haiku-latest'
+            ? usableClaudeModel(scraperModel || anthropicModel || CLAUDE_SCRAPER_DEFAULT)
             : scraperModel || defaults.ollamaModel,
         anthropicApiKey:
           (typeof doc.anthropicApiKey === 'string' && doc.anthropicApiKey) || process.env.ANTHROPIC_API_KEY || '',
@@ -82,5 +84,24 @@ export async function getScrapeScope(): Promise<{ scope: ScrapeScope; ownedInter
     return { scope: normalizeScrapeScope(doc?.scraperScope), ownedIntervalDays: Number.isFinite(days) ? days : DEFAULT_OWNED_INTERVAL_DAYS };
   } catch {
     return { scope: 'both', ownedIntervalDays: DEFAULT_OWNED_INTERVAL_DAYS };
+  }
+}
+
+const StatusModel = mongoose.models.ScraperStatus || mongoose.model('ScraperStatus', new Schema({ key: String }, { collection: 'scraperstatus', strict: false }));
+
+/**
+ * The last AI failure of a pass (#359), or null after a pass whose AI calls all worked. Settings
+ * → Scraper AI shows it, so a retired model or a revoked key no longer fails unseen. Its own
+ * collection: AppConfig stays read-only for the scraper. Best-effort, never throws.
+ */
+export async function recordScraperAiStatus(error: { message: string; model: string } | null): Promise<void> {
+  try {
+    await StatusModel.updateOne(
+      { key: 'singleton' },
+      { $set: { lastAiError: error ? { ...error, at: new Date() } : null, lastRunAt: new Date() } },
+      { upsert: true },
+    );
+  } catch {
+    /* status is informational */
   }
 }
