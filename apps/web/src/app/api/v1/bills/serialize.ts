@@ -1,5 +1,5 @@
 import { iso } from '@/lib/apiList';
-import { billStatus, billPaidAmount, billRemaining, billPaymentState, type BillStatus, type BillPaymentState } from '@/lib/bill';
+import { billStatus, billPaidAmount, billNeedsRate, billRemaining, billPaymentState, type BillStatus, type BillPaymentState } from '@/lib/bill';
 
 export type BillPaymentLean = { _id?: unknown; amount?: number; date?: Date | null; note?: string; expenseId?: string };
 
@@ -20,16 +20,22 @@ export type BillLean = {
  *
  *  P61 added `payments`/`paidAmount`/`remaining`/`paymentState` as PURELY ADDITIVE fields.
  *  `status` deliberately keeps its four values: a client that reads it keeps working, and a
- *  half-paid bill that is late still reports `overdue` rather than hiding it behind progress. */
-export function trim(b: BillLean): {
+ *  half-paid bill that is late still reports `overdue` rather than hiding it behind progress.
+ *
+ *  #297: `base` is the deployment's base currency. A foreign bill with no exchange rate yet
+ *  reports `needsFxRate: true` and `remaining: null`: its `amount` is the printed foreign
+ *  figure, which cannot be netted against base-currency instalments or added to a
+ *  base-currency total, and handing a client a number would invite exactly that. */
+export function trim(b: BillLean, base: string): {
   id: string; title: string; vendor: string; amount: number; currency: string;
   origAmount: number; fxRate: number; dueDate: string | null;
   paidAt: string | null; category: string; cycle: string; notes: string; space: string; archived: boolean;
-  status: BillStatus; paidAmount: number; remaining: number; paymentState: BillPaymentState;
+  status: BillStatus; paidAmount: number; remaining: number | null; paymentState: BillPaymentState; needsFxRate: boolean;
   payments: { id: string; amount: number; date: string | null; note: string }[];
   updatedAt: string | null; deleted: boolean;
 } {
   const payments = b.payments ?? [];
+  const money = { ...b, payments, paidAt: b.paidAt ?? null };
   return {
     id: String(b._id), title: b.title, vendor: b.vendor ?? '', amount: b.amount ?? 0,
     currency: b.currency ?? 'EUR', origAmount: b.origAmount ?? 0, fxRate: b.fxRate ?? 0,
@@ -37,8 +43,9 @@ export function trim(b: BillLean): {
     cycle: b.cycle ?? '', notes: b.notes ?? '', space: b.space ?? '', archived: !!b.archived,
     status: billStatus(b.dueDate, b.paidAt ?? null),
     paidAmount: billPaidAmount(payments),
-    remaining: billRemaining(b.amount, payments, b.paidAt ?? null),
-    paymentState: billPaymentState(b.amount, payments, b.paidAt ?? null),
+    remaining: billRemaining(money, base),
+    paymentState: billPaymentState(money, base),
+    needsFxRate: billNeedsRate(money, base),
     payments: payments.map((p) => ({
       id: String(p._id ?? ''), amount: Number(p.amount) || 0, date: iso(p.date ?? null), note: p.note ?? '',
     })),

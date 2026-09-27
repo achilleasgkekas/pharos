@@ -20,7 +20,7 @@ import { cur, currencySymbol, CURRENCIES } from '@/lib/money';
 import { convertToBase, deriveFxRate, formatMoney, isForeignCurrency, normalizeCurrency } from '@/lib/fx';
 import { FxBadge } from '@/components/FxBadge';
 import { FxRateButton } from '@/components/FxRateButton';
-import { billStatus, billDaysUntilDue, billPaidAmount, billRemaining, billPaymentState, type BillStatus } from '@/lib/bill';
+import { billStatus, billDaysUntilDue, billPaidAmount, billNeedsRate, billRemaining, billPaymentState, type BillStatus } from '@/lib/bill';
 import type { SerializedBill } from '@/types';
 import {
   createBill, updateBill, deleteBill, setBillArchived, markBillPaid, markBillUnpaid,
@@ -94,21 +94,25 @@ export function BillsClient({
   // P61: urgency (billStatus) and payment progress are two separate axes, so a bill that is
   // half paid AND late still sorts and reads as overdue. `remaining` is what is genuinely
   // still owed, which is what the "to pay" header should total.
+  // #297: `remaining` is null for a foreign bill still waiting for its exchange rate. Its
+  // printed figure is not base currency, so it stays OUT of the "to pay" total and is counted
+  // separately instead of being added in as if $100 were €100.
   const withStatus = useMemo(
     () =>
       bills.map((b) => ({
         b,
         status: billStatus(b.dueDate, b.paidAt),
-        partPaid: billPaymentState(b.amount, b.payments, b.paidAt) === 'partially-paid',
-        remaining: billRemaining(b.amount, b.payments, b.paidAt),
+        partPaid: billPaymentState(b, fx.base) === 'partially-paid',
+        remaining: billRemaining(b, fx.base),
       })),
-    [bills]
+    [bills, fx.base]
   );
 
   const openBills = withStatus.filter(({ b, status }) => !b.archived && status !== 'paid');
   const overdueCount = openBills.filter(({ status }) => status === 'overdue').length;
   const partPaidCount = openBills.filter(({ partPaid }) => partPaid).length;
-  const totalDue = openBills.reduce((s, { remaining }) => s + remaining, 0);
+  const totalDue = openBills.reduce((s, { remaining }) => s + (remaining ?? 0), 0);
+  const noRateCount = openBills.filter(({ remaining }) => remaining === null).length;
 
   const visible = useMemo(() => {
     const rows = withStatus.filter(({ b, status, partPaid }) => {
@@ -146,6 +150,7 @@ export function BillsClient({
     <main className={PAGE_MAIN}>
       <PageHeader title={t('nav.bills')} count={t('bill.openCount', { n: openBills.length })}>
         {totalDue > 0 && <HeaderStat label={t('bill.toPay')} value={money(totalDue)} color="var(--color-text)" />}
+        {noRateCount > 0 && <HeaderStat label="need a rate" value={noRateCount} color="var(--color-gold)" />}
         {overdueCount > 0 && <HeaderStat label={t('bill.stOverdue')} value={overdueCount} color="var(--color-red)" />}
         <PrimaryAction onClick={() => setShowCreate(true)} />
       </PageHeader>
@@ -212,7 +217,8 @@ function BillRow({
   bill: SerializedBill;
   status: BillStatus;
   partPaid: boolean;
-  remaining: number;
+  /** null = a foreign bill with no exchange rate yet, so no base-currency balance (#297). */
+  remaining: number | null;
   fx: FxCtx;
   pending: boolean;
   onOpen: () => void;
@@ -223,7 +229,11 @@ function BillRow({
   const locale = useLocale();
   const paidSoFar = billPaidAmount(bill.payments);
   const total = bill.amount || 0;
-  const progress = partPaid && total > 0 ? Math.min(100, Math.round((paidSoFar / total) * 100)) : 0;
+  // #297: no rate, no base-currency total, so neither a progress bar nor "x of y" can be drawn:
+  // the headline is the printed figure in its own currency instead.
+  const noRate = remaining === null;
+  const printed = noRate ? formatMoney(bill.origAmount || 0, bill.currency || fx.base, locale) : '';
+  const progress = partPaid && !noRate && total > 0 ? Math.min(100, Math.round((paidSoFar / total) * 100)) : 0;
   return (
     <div
       className={cn(
@@ -247,7 +257,12 @@ function BillRow({
           {dueLabel(bill, locale, t)}
         </p>
         {/* P61: how far along a part-paid bill is, without stealing the urgency chip. */}
-        {partPaid && (
+        {partPaid && noRate && (
+          <p className="mt-1.5 text-[10px] text-[color:var(--color-cyan)]" style={{ fontFamily: 'var(--font-mono)' }}>
+            {money(paidSoFar)} paid so far
+          </p>
+        )}
+        {partPaid && !noRate && (
           <div className="mt-1.5 flex items-center gap-2">
             <div className="h-1 w-24 rounded-full bg-[color:var(--color-surface-2)] overflow-hidden">
               <div className="h-full rounded-full bg-[color:var(--color-cyan)]" style={{ width: `${progress}%` }} />
@@ -261,9 +276,14 @@ function BillRow({
       <div className="text-right shrink-0">
         <p className={cn('font-bold', status === 'paid' ? 'text-[color:var(--color-text-faint)]' : 'text-[color:var(--color-text)]')} style={{ fontFamily: 'var(--font-display)' }}>
           {/* The headline figure is what is still owed once instalments exist. */}
-          {money(partPaid ? remaining : bill.amount || 0)}
+          {noRate ? printed : money(partPaid ? (remaining ?? 0) : bill.amount || 0)}
         </p>
-        {partPaid && (
+        {noRate && status !== 'paid' && (
+          <p className="text-[10px] text-[color:var(--color-gold)]" style={{ fontFamily: 'var(--font-mono)' }}>
+            needs a rate · not in total
+          </p>
+        )}
+        {partPaid && !noRate && (
           <p className="text-[10px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
             {t('bill.leftOf', { total: money(total) })}
           </p>
@@ -338,7 +358,11 @@ function BillForm({
   // P61 — instalment state for the payment panel below the form.
   const [showPartial, setShowPartial] = useState(false);
   const paidSoFar = billPaidAmount(bill?.payments);
-  const remaining = billRemaining(bill?.amount, bill?.payments, bill?.paidAt);
+  const remaining = bill ? billRemaining(bill, fx.base) : 0;
+  // #297: a foreign bill with no exchange rate. Its instalments are base currency and its
+  // amount is not, so what is left cannot be worked out, and never settles on its own.
+  const noRate = !!bill && billNeedsRate(bill, fx.base);
+  const printedTotal = noRate && bill ? formatMoney(bill.origAmount || 0, bill.currency || fx.base, locale) : '';
 
   return (
     <div className="space-y-5">
@@ -482,8 +506,14 @@ function BillForm({
                 <div className="rounded-lg border border-[color:var(--color-cyan)]/30 bg-[color:var(--color-surface-2)] p-3 space-y-2">
                   <p className="text-sm">
                     <span className="text-[color:var(--color-cyan)] font-semibold">{money(paidSoFar)}</span>
-                    <span className="text-[color:var(--color-text-dim)]"> {t('bill.paidOf', { total: money(bill.amount || 0) })} · </span>
-                    <span className="text-[color:var(--color-text)] font-semibold">{t('bill.left', { amount: money(remaining) })}</span>
+                    {remaining === null ? (
+                      <span className="text-[color:var(--color-text-dim)]"> paid toward {printedTotal}</span>
+                    ) : (
+                      <>
+                        <span className="text-[color:var(--color-text-dim)]"> {t('bill.paidOf', { total: money(bill.amount || 0) })} · </span>
+                        <span className="text-[color:var(--color-text)] font-semibold">{t('bill.left', { amount: money(remaining) })}</span>
+                      </>
+                    )}
                   </p>
                   <ul className="space-y-1">
                     {(bill.payments || []).map((p) => (
@@ -518,6 +548,14 @@ function BillForm({
                 </div>
               )}
 
+              {noRate && (
+                <p className="text-[11px] text-[color:var(--color-gold)]">
+                  ⚠ No exchange rate yet, so what is left in {fx.base} is unknown: this bill is kept out of the
+                  &quot;to pay&quot; total and your payments will not mark it paid on their own. Add its exchange rate to fix both.
+                  {paidSoFar > 0 && ' Until then, "Pay the rest" cannot log the final payment as an expense.'}
+                </p>
+              )}
+
               <label className="flex items-center gap-2 text-sm text-[color:var(--color-text-dim)] cursor-pointer">
                 <input type="checkbox" checked={logExpense} onChange={(e) => setLogExpense(e.target.checked)} />
                 {t('bill.alsoLog')}
@@ -530,7 +568,7 @@ function BillForm({
                   disabled={pending}
                   onClick={() => startTransition(async () => { await markBillPaid(bill._id, { logExpense }); onDeleted?.(); })}
                 >
-                  <Check size={14} /> {paidSoFar > 0 ? t('bill.payRest', { amount: money(remaining) }) : t('bill.markPaid')}
+                  <Check size={14} /> {paidSoFar > 0 ? (remaining === null ? 'Pay the rest' : t('bill.payRest', { amount: money(remaining) })) : t('bill.markPaid')}
                 </Button>
                 <Button type="button" variant="ghost" disabled={pending} onClick={() => setShowPartial((v) => !v)}>
                   <Coins size={14} /> {showPartial ? t('common.cancel') : t('bill.logPartial')}
@@ -578,7 +616,8 @@ function PartialPaymentForm({
   onDone,
 }: {
   billId: string;
-  remaining: number;
+  /** null = unknown until the bill gets its exchange rate (#297). */
+  remaining: number | null;
   logExpense: boolean;
   foreignBill: boolean;
   base: string;
@@ -612,7 +651,7 @@ function PartialPaymentForm({
     <div className="rounded-lg border border-[color:var(--color-border-light)] bg-[color:var(--color-surface-2)] p-3 space-y-3">
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <Field label={t('ex.fAmount', { cur: cur() })}>
-          <Input type="number" step="0.01" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder={remaining.toFixed(2)} />
+          <Input type="number" step="0.01" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder={remaining === null ? '0.00' : remaining.toFixed(2)} />
         </Field>
         <Field label={t('bill.fPaidOn')}>
           <DateInput value={date} onValueChange={setDate} />
@@ -632,7 +671,9 @@ function PartialPaymentForm({
           <Coins size={14} /> {t('bill.logPayment')}
         </Button>
         <p className="text-[11px] text-[color:var(--color-text-faint)]">
-          {t('bill.leftHint', { amount: money(remaining) })}
+          {remaining === null
+            ? 'Needs an exchange rate before payments can settle it.'
+            : t('bill.leftHint', { amount: money(remaining) })}
         </p>
       </div>
     </div>

@@ -77,7 +77,7 @@ vi.mock('next/cache', () => ({ revalidatePath: (p: string) => revalidatePathMock
 import { billPaidExpenseId, billPaymentExpenseId, billPaymentId } from '@/lib/billExpenseId';
 import {
   createBill, updateBill, setBillArchived, deleteBill, markBillPaid, markBillUnpaid,
-  logBillPayment, removeBillPayment,
+  logBillPayment, removeBillPayment, settleBillsCoveredByPayments,
 } from './actions';
 
 function formData(fields: Record<string, string>): FormData {
@@ -963,5 +963,81 @@ describe('bill payments are idempotent (#299)', () => {
     const res = await logBillPayment('b1', { amount: 50, logExpense: true, key: 'k1' });
     expect(res).toEqual({ ok: false, error: 'Bill is already paid' });
     expect(addExpenseMock).not.toHaveBeenCalled();
+  });
+});
+
+// #297: a foreign bill saved without an exchange rate keeps its PRINTED figure in `amount`
+// ($100 -> amount 100). Its instalments are base currency, so the two cannot be compared or
+// subtracted until the rate is in; before this, €100 of instalments "covered" a $100 bill.
+describe('a foreign bill with no exchange rate (#297)', () => {
+  const noRate = { _id: 'b1', title: 'AWS', vendor: 'AWS', category: 'other', amount: 100, currency: 'USD', origAmount: 100, fxRate: 0, cycle: '', linkedExpenseId: '' };
+
+  it('logBillPayment never settles it, even when the instalments reach the printed number', async () => {
+    billFindById
+      .mockResolvedValueOnce({ ...noRate, paidAt: null, payments: [{ amount: 60 }] })
+      .mockResolvedValueOnce({ ...noRate, paidAt: null, payments: [{ amount: 60 }, { amount: 40 }] });
+    const res = await logBillPayment('b1', { amount: 40 });
+    expect(res).toEqual({ ok: true, settled: false });
+    expect(billFindByIdAndUpdate).not.toHaveBeenCalled();
+  });
+
+  it('the same instalments do settle it once a rate makes the amount base currency', async () => {
+    const converted = { ...noRate, amount: 92, fxRate: 0.92 };
+    billFindById
+      .mockResolvedValueOnce({ ...converted, paidAt: null, payments: [{ amount: 60 }] })
+      .mockResolvedValueOnce({ ...converted, paidAt: null, payments: [{ amount: 60 }, { amount: 40 }] })
+      .mockResolvedValueOnce({ ...converted, paidAt: null, payments: [{ amount: 60 }, { amount: 40 }] });
+    const res = await logBillPayment('b1', { amount: 40 });
+    expect(res).toEqual({ ok: true, settled: true });
+  });
+
+  it('markBillPaid books no final-payment expense, since the balance cannot be worked out', async () => {
+    billFindById.mockResolvedValueOnce({ ...noRate, paidAt: null, payments: [{ amount: 40 }] });
+    const res = await markBillPaid('b1', { logExpense: true });
+    expect(res.ok).toBe(true);
+    // Neither "100 - 40" (dollars minus euros) nor the whole bill again on top of the instalment.
+    expect(addExpenseMock).not.toHaveBeenCalled();
+    expect(billFindByIdAndUpdate.mock.calls[0][1].paidAt).toBeInstanceOf(Date);
+  });
+
+  it('markBillPaid with no instalments still logs the printed figure with its currency', async () => {
+    billFindById.mockResolvedValueOnce({ ...noRate, paidAt: null, payments: [] });
+    await markBillPaid('b1', { logExpense: true });
+    // The expense is flagged "needs a rate" in turn, instead of being passed off as base currency.
+    expect(addExpenseMock.mock.calls[0][0]).toMatchObject({ amount: 100, currency: 'USD', fxRate: 0 });
+  });
+
+  it('updateBill does not settle it when an edit leaves the rate missing', async () => {
+    billFindById.mockResolvedValueOnce({ ...noRate, paidAt: null, payments: [{ amount: 100, date: new Date() }] });
+    await updateBill('b1', formData({ title: 'AWS', dueDate: '01/07/2026', amount: '100', currency: 'USD' }));
+    expect(billFindByIdAndUpdate.mock.calls.some(([, u]) => 'paidAt' in u)).toBe(false);
+  });
+
+  it('updateBill settles it once the edit supplies a rate the instalments now cover', async () => {
+    const payments = [{ amount: 92, date: new Date(2026, 6, 3) }];
+    const converted = { ...noRate, amount: 92, fxRate: 0.92, paidAt: null, payments };
+    billFindById.mockResolvedValueOnce(converted).mockResolvedValueOnce(converted);
+    await updateBill('b1', formData({ title: 'AWS', dueDate: '01/07/2026', amount: '100', currency: 'USD', fxRate: '0.92' }));
+    const stamp = billFindByIdAndUpdate.mock.calls.find(([, u]) => 'paidAt' in u);
+    expect(localYmd(stamp![1].paidAt)).toBe('2026-07-03');
+  });
+
+  it('settleBillsCoveredByPayments settles only the bills whose instalments now cover them', async () => {
+    billFindById.mockImplementation(async (id: string) =>
+      id === 'covered'
+        ? { ...noRate, _id: id, amount: 92, fxRate: 0.92, paidAt: null, payments: [{ amount: 92, date: new Date(2026, 6, 3) }] }
+        : { ...noRate, _id: id, amount: 92, fxRate: 0.92, paidAt: null, payments: [{ amount: 50, date: new Date(2026, 6, 3) }] }
+    );
+    await settleBillsCoveredByPayments(['covered', 'owing']);
+    const stamps = billFindByIdAndUpdate.mock.calls.filter(([, u]) => 'paidAt' in u);
+    expect(stamps.map(([id]) => id)).toEqual(['covered']);
+  });
+
+  it('removeBillPayment never un-pays it (it was never settled by instalments)', async () => {
+    billFindById
+      .mockResolvedValueOnce({ ...noRate, paidAt: new Date(), payments: [{ amount: 100 }] })
+      .mockResolvedValueOnce({ ...noRate, paidAt: new Date(), payments: [] });
+    await removeBillPayment('b1', 'p1');
+    expect(billUpdateOne).toHaveBeenCalledTimes(1); // only the $pull
   });
 });

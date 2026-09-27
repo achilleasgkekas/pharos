@@ -29,8 +29,8 @@ export async function GET(req: NextRequest) {
     const find = Bill.find(filter).sort({ dueDate: 1 }).skip(p.offset).limit(p.limit);
     const count = Bill.countDocuments(filter);
     if (p.updatedSince) { find.setOptions({ withDeleted: true }); count.setOptions({ withDeleted: true }); }
-    const [docs, total] = await Promise.all([find.lean() as Promise<BillLean[]>, count]);
-    return NextResponse.json(listEnvelope(docs.map(trim), total, p));
+    const [docs, total, settings] = await Promise.all([find.lean() as Promise<BillLean[]>, count, getAppSettings()]);
+    return NextResponse.json(listEnvelope(docs.map((d) => trim(d, settings.currency)), total, p));
   });
 }
 
@@ -48,9 +48,10 @@ export async function POST(req: NextRequest) {
     if (!dueDate || Number.isNaN(dueDate.getTime())) return apiError('valid dueDate required');
     await connectDB();
     const Bill = await currentModel(BillModel);
+    const baseCurrency = (await getAppSettings()).currency;
     const fx = resolveFx(
       { amount: numField(b, 'amount') ?? 0, currency: strField(b, 'currency'), fxRate: numField(b, 'fxRate') ?? 0 },
-      (await getAppSettings()).currency
+      baseCurrency
     );
     const doc = await Bill.create({
       title,
@@ -67,6 +68,6 @@ export async function POST(req: NextRequest) {
       paidAt: null,
       archived: false,
     });
-    return NextResponse.json({ bill: trim(doc.toObject() as BillLean) }, { status: 201 });
+    return NextResponse.json({ bill: trim(doc.toObject() as BillLean, baseCurrency) }, { status: 201 });
   });
 }

@@ -91,6 +91,25 @@ export function needsFxRate(
   return (Number(e.origAmount) || 0) > 0 && (Number(e.fxRate) || 0) <= 0;
 }
 
+/**
+ * Sum `amount` across stored documents as base currency, LEAVING OUT the ones still waiting
+ * for an exchange rate (#297). Their `amount` is the printed foreign figure, so adding it
+ * would turn 10,000 JPY into 10,000 of the base currency. `needsRate` counts what was left
+ * out, so the caller can say so next to the total instead of hiding it.
+ */
+export function sumBase(
+  docs: Array<{ amount?: number | null; currency?: string | null; origAmount?: number | null; fxRate?: number | null }>,
+  base: string
+): { total: number; needsRate: number } {
+  let total = 0;
+  let needsRate = 0;
+  for (const d of docs) {
+    if (needsFxRate(d, base)) needsRate++;
+    else total += Number(d.amount) || 0;
+  }
+  return { total: Math.round(total * 100) / 100, needsRate };
+}
+
 /** Printed amount x rate, rounded to cents (money is stored to 2dp everywhere). */
 export function convertToBase(origAmount: number, fxRate: number): number {
   const a = Number(origAmount);

@@ -4,7 +4,8 @@ import { useRouter } from 'next/navigation';
 import { Bell, Tag, ShieldCheck, CreditCard, TrendingUp, AlarmClock, FileText, Wrench, Handshake, PackageOpen, IdCard, Cake, Car, X } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import { cur } from '@/lib/money';
-import { useT } from '@/components/LocaleProvider';
+import { useT, useLocale } from '@/components/LocaleProvider';
+import { formatMoney } from '@/lib/fx';
 import { relTime } from '@/lib/i18n/format';
 import {
   getNotifications,
@@ -46,6 +47,7 @@ const KIND_COLOR: Record<NotifKind, string> = {
  *  instead of owning the boolean itself. */
 export function NotificationBell({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const t = useT();
+  const locale = useLocale();
   const router = useRouter();
   const ref = useRef<HTMLDivElement>(null);
   const [items, setItems] = useState<SerializedNotification[]>([]);
@@ -117,10 +119,12 @@ export function NotificationBell({ open, onOpenChange }: { open: boolean; onOpen
     }
     if (n.kind === 'subreview') return { heading: n.title, sub: t('notif.subscriptionReviewSub', { days: n.body }) };
     if (n.kind === 'bill') {
-      const [days, amount] = n.body.split('|');
+      // body = "<days>|<amount>", or "<days>|<printed>|<ISO>" for a foreign bill still waiting
+      // for its exchange rate (#297), which must not be shown under the base symbol.
+      const [days, amount, code] = n.body.split('|');
       const d = Number(days);
       const key = d < 0 ? 'notif.billOverdueSub' : d === 0 ? 'notif.billTodaySub' : 'notif.billDueSub';
-      return { heading: n.title, sub: t(key, { days: Math.abs(d), amount: cur() + amount }) };
+      return { heading: n.title, sub: t(key, { days: Math.abs(d), amount: code ? formatMoney(Number(amount), code, locale) : cur() + amount }) };
     }
     if (n.kind === 'maintenance') {
       const d = Number(n.body);

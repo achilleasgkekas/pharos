@@ -197,6 +197,7 @@ export const nl: Partial<Dict> = {
   'ex.fFxRate': 'Koers ({base} per 1 {code})',
   'ex.fFxCharged': 'of afgeschreven ({cur})',
   'ex.fxNoRate': 'nog geen koers, behouden zoals afgedrukt (niet omgerekend naar {base})',
+  'ex.totalsNoRate': '{n} zonder wisselkoers, niet meegeteld',
   'fx.marketRate': 'Marktkoers',
   'fx.marketRateHint': 'Haal de ECB-referentiekoers op (een suggestie, niet wat je kaart is afgeschreven)',
   'fx.rateAsOf': 'ECB {date}',

@@ -1,4 +1,5 @@
 import { addCycle } from '@/lib/billingCycle';
+import { needsFxRate } from '@/lib/fx';
 // P28 — pure, DB-free helpers for the bill / payable status tracker. A bill's
 // status is DERIVED from its due date and whether it has been paid, so both the
 // client list, the server actions, and the notification scan agree without any
@@ -70,14 +71,40 @@ export function billPaidAmount(payments: BillPayment[] | null | undefined): numb
   return round2(payments.reduce((s, p) => s + (Number(p?.amount) || 0), 0));
 }
 
-/** What is still owed. Never negative: an overpayment reads as settled, not as credit. */
-export function billRemaining(
-  amount: number | null | undefined,
-  payments: BillPayment[] | null | undefined,
-  paidAt?: string | Date | null
-): number {
-  if (paidAt) return 0;
-  return round2(Math.max(0, (Number(amount) || 0) - billPaidAmount(payments)));
+/**
+ * The fields the payment helpers below read. The P9 triple (currency / origAmount / fxRate)
+ * is part of it on purpose: a bill's `amount` is only comparable with its base-currency
+ * instalments when it really IS base currency, and that is decided by those three fields.
+ */
+export type BillMoney = {
+  amount?: number | null;
+  payments?: BillPayment[] | null;
+  paidAt?: string | Date | null;
+  currency?: string | null;
+  origAmount?: number | null;
+  fxRate?: number | null;
+};
+
+/**
+ * #297: a foreign bill saved without an exchange rate keeps its PRINTED figure in `amount`
+ * (resolveFx refuses to guess 1:1). That figure is not base currency, so it can neither be
+ * compared with the base-currency instalments nor summed into a base-currency total. Every
+ * helper below takes the base code for exactly this reason: forgetting the check is a type
+ * error, not a silent €100 = $100.
+ */
+export function billNeedsRate(b: BillMoney, base: string): boolean {
+  return needsFxRate(b, base);
+}
+
+/**
+ * What is still owed, in base currency. Never negative: an overpayment reads as settled,
+ * not as credit. `null` when it cannot be known because the bill still needs an exchange
+ * rate (#297): callers must leave it out of any total rather than add a foreign figure in.
+ */
+export function billRemaining(b: BillMoney, base: string): number | null {
+  if (b.paidAt) return 0;
+  if (billNeedsRate(b, base)) return null;
+  return round2(Math.max(0, (Number(b.amount) || 0) - billPaidAmount(b.payments)));
 }
 
 /**
@@ -86,28 +113,23 @@ export function billRemaining(
  *  - partially-paid → something was paid, a balance remains
  *  - unpaid         → nothing paid yet (the pre-P61 default for every existing bill)
  *
- * A zero-amount bill is never auto-settled by a payment; there is no total to reach.
+ * A zero-amount bill is never auto-settled by a payment; there is no total to reach. Nor is
+ * a bill still waiting for an exchange rate (#297): its instalments are base currency, its
+ * amount is not, so "covered" cannot be decided until the rate is in.
  */
-export function billPaymentState(
-  amount: number | null | undefined,
-  payments: BillPayment[] | null | undefined,
-  paidAt?: string | Date | null
-): BillPaymentState {
-  if (paidAt) return 'paid';
-  const paid = billPaidAmount(payments);
+export function billPaymentState(b: BillMoney, base: string): BillPaymentState {
+  if (b.paidAt) return 'paid';
+  const paid = billPaidAmount(b.payments);
   if (paid <= 0) return 'unpaid';
-  const total = Number(amount) || 0;
-  if (total > 0 && paid >= total) return 'paid';
+  if (billIsSettledByPayments(b, base)) return 'paid';
   return 'partially-paid';
 }
 
 /** True once the instalments cover the bill, i.e. when logging one should settle it. */
-export function billIsSettledByPayments(
-  amount: number | null | undefined,
-  payments: BillPayment[] | null | undefined
-): boolean {
-  const total = Number(amount) || 0;
-  return total > 0 && billPaidAmount(payments) >= total;
+export function billIsSettledByPayments(b: BillMoney, base: string): boolean {
+  if (billNeedsRate(b, base)) return false;
+  const total = Number(b.amount) || 0;
+  return total > 0 && billPaidAmount(b.payments) >= total;
 }
 
 /** Advance a date by one billing cycle (used to spawn the next recurring instance). */

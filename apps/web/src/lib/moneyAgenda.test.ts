@@ -53,6 +53,8 @@ vi.mock('@/models/Goal', () => ({ Goal: { find: goalFind } }));
 // SAAS_MODE is off in tests, where the real helper is the identity anyway; stubbing it keeps this
 // suite free of a Mongo connection while the mocked models above stay the ones under test.
 vi.mock('@/lib/tenancy/connection', () => ({ currentModel: async (m: unknown) => m }));
+// Only the base currency is read: it decides which bills still need an exchange rate (#297).
+vi.mock('@/lib/appSettings', () => ({ getAppSettings: async () => ({ currency: 'EUR' }) }));
 
 import { computeMoneyAgenda } from './moneyAgenda';
 
@@ -474,6 +476,30 @@ describe('computeMoneyAgenda — open bills (P67)', () => {
     setRows({ bills: [{ title: '', vendor: 'ΟΤΕ', amount: 30, payments: [], dueDate: new Date(2026, 2, 12) }] });
     const { months } = await computeMoneyAgenda(NOW);
     expect(months[0].entries[0].label).toBe('ΟΤΕ');
+  });
+
+  // #297: $100 printed with no rate keeps 100 in `amount`. Counting it would add dollars to euros.
+  it('keeps a foreign bill with no exchange rate on its date but out of every total', async () => {
+    setRows({
+      bills: [
+        { title: 'AWS', amount: 100, currency: 'USD', origAmount: 100, fxRate: 0, payments: [{ amount: 40 }], dueDate: new Date(2026, 2, 20) },
+        { title: 'ΔΕΗ', amount: 50, currency: 'EUR', origAmount: 0, fxRate: 0, payments: [], dueDate: new Date(2026, 2, 21) },
+      ],
+    });
+    const { months, dueThisMonth } = await computeMoneyAgenda(NOW);
+    const aws = months[0].entries.find((e) => e.label === 'AWS')!;
+    expect(aws.amount).toBeNull();
+    expect(aws.sub).toContain('$100.00');
+    expect(months[0].out).toBe(50);
+    expect(dueThisMonth).toBe(50);
+  });
+
+  it('projects the currency fields billRemaining needs to spot a missing rate', async () => {
+    const select = vi.fn(() => ({ lean: async () => [] as unknown[] }));
+    billFind.mockImplementation(() => ({ select }));
+    await computeMoneyAgenda(NOW);
+    const fields = String((select.mock.calls[0] as unknown[])[0]).split(/\s+/);
+    expect(fields).toEqual(expect.arrayContaining(['amount', 'payments', 'currency', 'origAmount', 'fxRate']));
   });
 });
 

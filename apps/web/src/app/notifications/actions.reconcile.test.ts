@@ -306,6 +306,21 @@ describe('generateNotifications — bill alert kind', () => {
     await generateNotifications();
     expect(notificationInsertMany).not.toHaveBeenCalled();
   });
+
+  // #297: $100 printed with no rate. Quoting "€100" (or "€60" after a €40 instalment) is wrong
+  // both ways, so the alert carries the printed figure and its own code for the bell to format.
+  it('quotes a foreign bill with no exchange rate in its printed currency', async () => {
+    state.bills = [{ _id: 'b1', title: 'AWS', amount: 100, currency: 'USD', origAmount: 100, fxRate: 0, payments: [{ amount: 40 }], dueDate: '2026-07-23' }];
+    await generateNotifications();
+    expect(notificationInsertMany).toHaveBeenCalledWith([expect.objectContaining({ dedupeKey: 'bill:b1:2026-07-23', body: '3|100|USD' })]);
+  });
+
+  it('asks the DB for the currency fields that decide whether a bill needs a rate', async () => {
+    await generateNotifications();
+    const q = billFind.mock.results[0].value as { select: { mock: { calls: string[][] } } };
+    const fields = String(q.select.mock.calls[0][0]).split(/\s+/);
+    expect(fields).toEqual(expect.arrayContaining(['amount', 'payments', 'currency', 'origAmount', 'fxRate']));
+  });
 });
 
 // #197: both windows were configurable and the push sweep (runAlertChecks) honoured them,

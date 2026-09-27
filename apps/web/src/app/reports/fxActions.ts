@@ -19,6 +19,7 @@ import { normalizeCurrency } from '@/lib/fx';
 import { revalidatePath } from 'next/cache';
 import type { Model } from 'mongoose';
 import { assertCanWrite } from '@/lib/auth';
+import { settleBillsCoveredByPayments } from '@/app/bills/actions';
 
 export type FxApplyResult = { ok: true; applied: number } | { ok: false; error: string };
 
@@ -80,6 +81,8 @@ export async function applyFxRate(kind: string, id: string, rate: number): Promi
       if (!patch) return { ok: true, applied: 0 };
 
       await M.updateOne({ _id: id }, { $set: patch });
+      // #297: instalments logged while the rate was missing could not settle the bill; now they can.
+      if (kind === 'bill') await settleBillsCoveredByPayments([id]);
       revalidateMoneyRoutes();
       return { ok: true, applied: 1 };
     } catch (err) {
@@ -110,6 +113,7 @@ export async function applyFxRateToCurrency(currency: string, rate: number): Pro
       // narrowed to this one printed code.
       const filter = { ...fxNeedsRateFilter(base), currency: code };
       let applied = 0;
+      const billIds: string[] = [];
 
       for (const kind of ['expense', 'receipt', 'item', 'subscription', 'statement', 'bill'] as FxIssueKind[]) {
         const M = await currentModel(modelFor(kind));
@@ -128,8 +132,11 @@ export async function applyFxRateToCurrency(currency: string, rate: number): Pro
         if (ops.length) {
           await M.bulkWrite(ops);
           applied += ops.length;
+          if (kind === 'bill') billIds.push(...ops.map((o) => String(o.updateOne.filter._id)));
         }
       }
+      // #297: see applyFxRate.
+      await settleBillsCoveredByPayments(billIds);
 
       if (applied > 0) revalidateMoneyRoutes();
       return { ok: true, applied };

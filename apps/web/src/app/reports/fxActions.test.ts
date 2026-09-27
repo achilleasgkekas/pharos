@@ -136,6 +136,8 @@ vi.mock('@/lib/fxApply', () => ({
 }));
 vi.mock('@/lib/fx', () => ({ normalizeCurrency: normalizeCurrencyMock }));
 vi.mock('next/cache', () => ({ revalidatePath: (...args: unknown[]) => revalidatePathMock(...args) }));
+const { settleBillsMock } = vi.hoisted(() => ({ settleBillsMock: vi.fn(async (_ids: string[]) => {}) }));
+vi.mock('@/app/bills/actions', () => ({ settleBillsCoveredByPayments: settleBillsMock }));
 
 import { applyFxRate, applyFxRateToCurrency } from './fxActions';
 
@@ -226,6 +228,18 @@ describe('applyFxRate', () => {
     expect(revalidatePathMock).toHaveBeenCalledTimes(MONEY_ROUTES.length);
     for (const route of MONEY_ROUTES) expect(revalidatePathMock).toHaveBeenCalledWith(route);
     expect(result).toEqual({ ok: true, applied: 1 });
+    expect(settleBillsMock).not.toHaveBeenCalled();
+  });
+
+  // #297: instalments logged while the rate was missing could not settle the bill.
+  it('offers a converted bill to the instalment settlement check', async () => {
+    models.bill.findByIdLean.mockResolvedValueOnce({ _id: VALID_ID, currency: 'USD', origAmount: 100 });
+    fxApplyPatchMock.mockReturnValueOnce({ fxRate: 0.92, amount: 92 });
+
+    await applyFxRate('bill', VALID_ID, 0.92);
+
+    expect(models.bill.updateOne).toHaveBeenCalled();
+    expect(settleBillsMock).toHaveBeenCalledWith([VALID_ID]);
   });
 
   it('dispatches kind "income" to the same Expense model as "expense"', async () => {
@@ -352,6 +366,8 @@ describe('applyFxRateToCurrency', () => {
       { updateOne: { filter: { _id: billDoc._id }, update: { $set: billPatch } } },
     ]);
     expect(result).toEqual({ ok: true, applied: 2 });
+    // #297: only the converted bills are offered to the settlement check.
+    expect(settleBillsMock).toHaveBeenCalledWith([billDoc._id]);
   });
 
   it('revalidates money routes only when something was actually applied', async () => {
