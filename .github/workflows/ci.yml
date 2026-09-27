@@ -192,6 +192,15 @@ jobs:
           node e2e/smoke.mjs
         env:
           BASE_URL: http://127.0.0.1:3000
+          SHOTS_DIR: e2e-shots
+      # Every page at desktop and phone width, for reviewing a UI change without running it (#351).
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: page-screenshots
+          path: apps/web/e2e-shots/
+          retention-days: 7
+          if-no-files-found: ignore
       # The critical paths through the real UI (item, expense, bill paid -> expense, fuel fill ->
       # expense, backup export -> restore), then axe on the key pages. Needs the account smoke made.
       - name: E2E flows and accessibility

@@ -4,6 +4,7 @@ import { Loader2, BellRing, BellOff } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import { getWebPushKey, savePushSubscription, deletePushSubscription, testWebPush } from './webPushActions';
 import { enableWebPush } from '@/lib/webPushClient';
+import { useT } from '@/components/LocaleProvider';
 
 /**
  * P102: "Enable browser push" — the one notifier channel that needs no external account.
@@ -16,6 +17,7 @@ import { enableWebPush } from '@/lib/webPushClient';
  */
 
 export function WebPushToggle() {
+  const t = useT();
   const [supported, setSupported] = useState<boolean | null>(null);
   const [subscribed, setSubscribed] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -54,7 +56,7 @@ export function WebPushToggle() {
       if (r.ok) setSubscribed(true);
       setMsg(r.message);
     } catch (e) {
-      setMsg((e as Error)?.message || 'Could not enable browser push.');
+      setMsg((e as Error)?.message || t('push.enableFailed'));
     } finally {
       setBusy(false);
     }
@@ -71,9 +73,9 @@ export function WebPushToggle() {
         await sub.unsubscribe();
       }
       setSubscribed(false);
-      setMsg('Browser push disabled.');
+      setMsg(t('push.disabled'));
     } catch (e) {
-      setMsg((e as Error)?.message || 'Could not disable browser push.');
+      setMsg((e as Error)?.message || t('push.disableFailed'));
     } finally {
       setBusy(false);
     }
@@ -84,7 +86,7 @@ export function WebPushToggle() {
     setMsg('');
     try {
       const r = await testWebPush();
-      setMsg(r.sent > 0 ? 'Test push sent ✓' : 'No devices received it — is push still allowed?');
+      setMsg(r.sent > 0 ? t('push.testSent') : t('push.noDevices'));
     } finally {
       setBusy(false);
     }
@@ -94,7 +96,7 @@ export function WebPushToggle() {
     return (
       <div className="pt-3 border-t border-[color:var(--color-border)]">
         <p className="text-xs text-[color:var(--color-text-faint)]">
-          Browser push isn&apos;t supported here (needs a modern browser over HTTPS, or install the app).
+          {t('push.unsupported')}
         </p>
       </div>
     );
@@ -103,8 +105,7 @@ export function WebPushToggle() {
   return (
     <div className="pt-3 border-t border-[color:var(--color-border)] space-y-2">
       <p className="text-xs text-[color:var(--color-text-dim)]">
-        Browser push — get alerts on this device with no external account. Works even when the tab is closed once you
-        allow notifications. Per browser/device; each device opts in on its own.
+        {t('push.intro')}
       </p>
       <div className="flex items-center gap-2 flex-wrap">
         {subscribed ? (
@@ -114,7 +115,7 @@ export function WebPushToggle() {
             disabled={busy}
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] disabled:opacity-50"
           >
-            {busy ? <Loader2 size={13} className="animate-spin" /> : <BellOff size={13} />} Disable browser push
+            {busy ? <Loader2 size={13} className="animate-spin" /> : <BellOff size={13} />} {t('push.disable')}
           </button>
         ) : (
           <button
@@ -123,7 +124,7 @@ export function WebPushToggle() {
             disabled={busy}
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold bg-[color:var(--color-surface-2)] border border-[color:var(--color-accent)] text-[color:var(--color-accent)] hover:opacity-80 disabled:opacity-50"
           >
-            {busy ? <Loader2 size={13} className="animate-spin" /> : <BellRing size={13} />} Enable browser push
+            {busy ? <Loader2 size={13} className="animate-spin" /> : <BellRing size={13} />} {t('push.enable')}
           </button>
         )}
         {subscribed && (
@@ -133,7 +134,7 @@ export function WebPushToggle() {
             disabled={busy}
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] disabled:opacity-50"
           >
-            Send test
+            {t('push.sendTest')}
           </button>
         )}
       </div>
