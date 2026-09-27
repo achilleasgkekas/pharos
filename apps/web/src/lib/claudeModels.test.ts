@@ -8,7 +8,8 @@ import {
   modelLifecycle,
   usableClaudeModel,
 } from './claudeModels';
-import * as scraperCopy from '../../../../services/scraper/src/claudeModels';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { PROVIDER_RECOMMEND, SCRAPER_RECOMMEND, priceForModel } from './aiModels';
 
 // #359: the app offered, recommended and fell back to Claude Haiku 3.5 months after Anthropic
@@ -77,10 +78,16 @@ describe('every model the app offers is usable', () => {
 });
 
 describe('the price scraper keeps the same list (services/scraper/src/claudeModels.ts)', () => {
-  it('has the same defaults and retirement rules as the web app', () => {
-    expect(scraperCopy.CLAUDE_SCRAPER_DEFAULT).toBe(CLAUDE_SCRAPER_DEFAULT);
-    expect(scraperCopy.CLAUDE_MAIN_DEFAULT).toBe(CLAUDE_MAIN_DEFAULT);
-    expect(scraperCopy.RETIREMENT_RULES).toEqual(RETIREMENT_RULES);
-    expect(scraperCopy.usableClaudeModel('claude-3-5-haiku-latest')).toBe('claude-haiku-4-5');
+  // Read as text, not imported: the web Docker image builds from apps/web alone and its
+  // typecheck would not find the scraper package.
+  const body = (file: string) => {
+    const src = readFileSync(file, 'utf8');
+    return src.slice(src.indexOf('/** Document parsing'));
+  };
+
+  it('has the same code after its header comment', () => {
+    const web = body(join(__dirname, 'claudeModels.ts'));
+    const scraper = body(join(__dirname, '..', '..', '..', '..', 'services', 'scraper', 'src', 'claudeModels.ts'));
+    expect(scraper).toBe(web);
   });
 });
