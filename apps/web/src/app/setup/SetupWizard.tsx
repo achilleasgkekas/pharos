@@ -10,6 +10,7 @@ import { useTheme } from '@/components/ThemeProvider';
 import { CURRENCIES } from '@/lib/money';
 import { useT, useLocale } from '@/components/LocaleProvider';
 import { SHOPPING_COUNTRIES, countryFromLanguageTag } from '@/lib/shoppingRegion';
+import { CLAUDE_MAIN_DEFAULT } from '@/lib/claudeModels';
 
 const STEPS = ['Account', 'Basics', 'AI', 'Done'];
 
@@ -19,7 +20,7 @@ const SELECT_CLS =
 type Provider = 'ollama' | 'anthropic' | 'openai' | 'gemini' | 'openrouter' | 'custom';
 const PROVIDERS: { id: Provider; label: string; needsKey: boolean; modelHint: string }[] = [
   { id: 'ollama', label: 'Ollama (local, free)', needsKey: false, modelHint: 'qwen2.5vl:7b' },
-  { id: 'anthropic', label: 'Anthropic (Claude)', needsKey: true, modelHint: 'claude-sonnet-4-6' },
+  { id: 'anthropic', label: 'Anthropic (Claude)', needsKey: true, modelHint: CLAUDE_MAIN_DEFAULT },
   { id: 'openai', label: 'OpenAI', needsKey: true, modelHint: 'gpt-4o-mini' },
   { id: 'gemini', label: 'Google Gemini', needsKey: true, modelHint: 'gemini-2.0-flash' },
   { id: 'openrouter', label: 'OpenRouter', needsKey: true, modelHint: 'openai/gpt-4o-mini' },
@@ -110,7 +111,11 @@ export function SetupWizard() {
       fd.set('customModel', model);
     }
     start(async () => {
-      await saveSetupAi(fd);
+      const r = await saveSetupAi(fd);
+      if (!r.ok) {
+        setError(r.error || '?');
+        return;
+      }
       setStep(4);
     });
   }

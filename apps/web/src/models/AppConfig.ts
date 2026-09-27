@@ -1,3 +1,4 @@
+import { CLAUDE_MAIN_DEFAULT } from '@/lib/claudeModels';
 import { Schema, model, models, type Model, type InferSchemaType } from 'mongoose';
 
 /**
@@ -16,7 +17,13 @@ const AppConfigSchema = new Schema(
     // active text model can be a smarter text-only one (e.g. qwen2.5:14b).
     ollamaVisionModel: { type: String, default: '' }, // '' → OLLAMA_VISION_MODEL env
     anthropicApiKey: { type: String, default: '' }, // server-only, never sent to the client
-    anthropicModel: { type: String, default: 'claude-sonnet-4-5-20250929' },
+    anthropicModel: { type: String, default: CLAUDE_MAIN_DEFAULT },
+    // #359: saved models that were swapped because Anthropic retired them. Settings → AI shows
+    // each one once; dismissing clears the list.
+    aiModelNotices: {
+      type: [new Schema({ field: String, from: String, to: String, retiredOn: String, at: String }, { _id: false })],
+      default: [],
+    },
     anthropicWorkspaceId: { type: String, default: '' }, // for identity-linked keys → anthropic-workspace-id header; not a secret
 
     // Cost guard: confirm (with a rough cost estimate) before starting a BULK AI job.

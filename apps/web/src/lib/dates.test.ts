@@ -4,52 +4,56 @@ import { safeDate, safeDateOrNull } from './dates';
 // dates.ts parses receipt/statement dates that native `new Date()` mishandles.
 // The critical rule: European day-first (DD/MM/YYYY, DD-MM-YYYY, DD.MM.YYYY) is
 // reordered to ISO so a Greek receipt's "03/04/2025" becomes 3 April, not 4 March.
-// EU-branch inputs use local midnight (T00:00:00), so getFullYear/getMonth/getDate
-// are timezone-stable and safe to assert directly; ISO date-only strings are parsed
-// as UTC by V8, so those we compare via getTime() against a reference to stay portable.
+// EU-branch inputs become UTC midnight (#355), like every other date-only value, so the
+// UTC getters give the printed day on any server; ISO date-only strings are parsed as UTC
+// by V8 too, so those we compare via getTime() against a reference to stay portable.
 
 const FALLBACK = new Date('2000-01-01T00:00:00Z');
 
 describe('safeDate — European day-first parsing', () => {
+  it('stores the day at UTC midnight, whatever zone the server runs in (#355)', () => {
+    expect(safeDate('23/09/2025', FALLBACK).toISOString()).toBe('2025-09-23T00:00:00.000Z');
+  });
+
   it('parses DD/MM/YYYY as day-first', () => {
     const d = safeDate('23/09/2025', FALLBACK);
-    expect(d.getFullYear()).toBe(2025);
-    expect(d.getMonth()).toBe(8); // September (0-indexed)
-    expect(d.getDate()).toBe(23);
+    expect(d.getUTCFullYear()).toBe(2025);
+    expect(d.getUTCMonth()).toBe(8); // September (0-indexed)
+    expect(d.getUTCDate()).toBe(23);
   });
 
   it('parses DD-MM-YYYY with hyphen separators', () => {
     const d = safeDate('23-09-2025', FALLBACK);
-    expect(d.getFullYear()).toBe(2025);
-    expect(d.getMonth()).toBe(8);
-    expect(d.getDate()).toBe(23);
+    expect(d.getUTCFullYear()).toBe(2025);
+    expect(d.getUTCMonth()).toBe(8);
+    expect(d.getUTCDate()).toBe(23);
   });
 
   it('parses DD.MM.YYYY with dot separators', () => {
     const d = safeDate('23.09.2025', FALLBACK);
-    expect(d.getFullYear()).toBe(2025);
-    expect(d.getMonth()).toBe(8);
-    expect(d.getDate()).toBe(23);
+    expect(d.getUTCFullYear()).toBe(2025);
+    expect(d.getUTCMonth()).toBe(8);
+    expect(d.getUTCDate()).toBe(23);
   });
 
   it('accepts single-digit day and month', () => {
     const d = safeDate('3/4/2025', FALLBACK);
-    expect(d.getMonth()).toBe(3); // April
-    expect(d.getDate()).toBe(3);
+    expect(d.getUTCMonth()).toBe(3); // April
+    expect(d.getUTCDate()).toBe(3);
   });
 
   it('treats the first group as the day even when it exceeds 12', () => {
     // 13/04/2025 could only be day-first; proves it is not read as month-first.
     const d = safeDate('13/04/2025', FALLBACK);
-    expect(d.getMonth()).toBe(3); // April
-    expect(d.getDate()).toBe(13);
+    expect(d.getUTCMonth()).toBe(3); // April
+    expect(d.getUTCDate()).toBe(13);
   });
 
   it('trims surrounding whitespace before parsing', () => {
     const d = safeDate('  23/09/2025  ', FALLBACK);
-    expect(d.getFullYear()).toBe(2025);
-    expect(d.getMonth()).toBe(8);
-    expect(d.getDate()).toBe(23);
+    expect(d.getUTCFullYear()).toBe(2025);
+    expect(d.getUTCMonth()).toBe(8);
+    expect(d.getUTCDate()).toBe(23);
   });
 });
 
@@ -108,8 +112,8 @@ describe('safeDateOrNull', () => {
   it('returns a Date for valid European input', () => {
     const d = safeDateOrNull('23/09/2025');
     expect(d).toBeInstanceOf(Date);
-    expect(d?.getMonth()).toBe(8);
-    expect(d?.getDate()).toBe(23);
+    expect(d?.getUTCMonth()).toBe(8);
+    expect(d?.getUTCDate()).toBe(23);
   });
 
   it('returns null for invalid, empty, null and non-string input', () => {

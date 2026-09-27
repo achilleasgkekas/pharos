@@ -193,6 +193,28 @@ describe('PATCH partial-update', () => {
 // stores base currency. These pin the "recompute the four fields together" rule: a partial edit
 // must never leave a row half-converted, and re-saving an unchanged foreign row must not
 // convert it twice.
+describe('PATCH period (#355)', () => {
+  it('a new date moves a period that mirrored the old date', async () => {
+    existingState.doc = { _id: OID, date: new Date('2026-09-28T00:00:00Z'), period: '2026-09' };
+    updateState.doc = { _id: OID };
+    await PATCH(makeReq({ body: { date: '2026-10-03' } }), ctx(OID));
+    expect(lastSet().period).toBe('2026-10');
+  });
+
+  it('a new date leaves a period chosen for another month alone', async () => {
+    existingState.doc = { _id: OID, date: new Date('2026-10-02T00:00:00Z'), period: '2026-09' };
+    updateState.doc = { _id: OID };
+    await PATCH(makeReq({ body: { date: '2026-10-05' } }), ctx(OID));
+    expect(lastSet()).not.toHaveProperty('period');
+  });
+
+  it('rejects a period that is not YYYY-MM with 400 and no update', async () => {
+    const res = await PATCH(makeReq({ body: { period: '09/2026' } }), ctx(OID));
+    expect(res.status).toBe(400);
+    expect(expenseUpdate).not.toHaveBeenCalled();
+  });
+});
+
 describe('PATCH multi-currency (P9)', () => {
   it('a body without currency/fxRate stores the amount untouched, with the triple at base/0/0', async () => {
     updateState.doc = { _id: OID, vendor: 'ΔΕΗ', amount: 84 };

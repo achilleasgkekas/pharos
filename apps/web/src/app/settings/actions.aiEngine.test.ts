@@ -57,6 +57,7 @@ const {
   invalidateOllamaHealthMock,
   revalidatePathMock,
   anthropicTestMock,
+  anthropicModelCheckMock,
   fetchMock,
 } = vi.hoisted(() => ({
   connectDBMock: vi.fn(async () => {}),
@@ -75,7 +76,8 @@ const {
   invalidateAiConfigCacheMock: vi.fn(),
   invalidateOllamaHealthMock: vi.fn(),
   revalidatePathMock: vi.fn(),
-  anthropicTestMock: vi.fn(async (_key: string, _model: string) => ({ ok: true })),
+  anthropicTestMock: vi.fn(async (_key: string, _model: string, _ws?: string) => ({ ok: true }) as { ok: boolean; error?: string }),
+  anthropicModelCheckMock: vi.fn(async (_key: string, _model: string, _ws?: string) => 'ok' as 'ok' | 'missing' | 'unknown'),
   fetchMock: vi.fn(),
 }));
 
@@ -131,7 +133,7 @@ vi.mock('@/lib/returnWindow', () => ({ effectiveReturnWindow: vi.fn(), returnDay
 vi.mock('@/lib/budgetSuggest', () => ({ suggestBudgetsFromExpenses: vi.fn() }));
 vi.mock('@/lib/categoryRules', () => ({ resolveCategoryRules: vi.fn() }));
 vi.mock('@/lib/priceHike', () => ({ detectPriceHikes: vi.fn() }));
-vi.mock('@/lib/anthropic', () => ({ anthropicTest: anthropicTestMock }));
+vi.mock('@/lib/anthropic', () => ({ anthropicTest: anthropicTestMock, anthropicModelCheck: anthropicModelCheckMock }));
 vi.mock('@/lib/appSettings', () => ({ getAppSettings: vi.fn(), invalidateAppSettings: vi.fn() , invalidateAppSettingsForRequest: vi.fn(async () => {})}));
 vi.mock('@/lib/auth', () => ({ requireAdmin: requireAdminMock, assertCanWrite: vi.fn(async () => {}) }));
 vi.mock('@/lib/onedrive', () => ({
@@ -334,7 +336,35 @@ describe('saveAiConfig', () => {
   it('defaults anthropicModel when blank', async () => {
     await saveAiConfig(formData({ provider: 'anthropic' }));
     const [, update] = appConfigUpdateOne.mock.calls[0];
-    expect((update as Record<string, unknown>).$set).toMatchObject({ anthropicModel: 'claude-sonnet-4-5-20250929' });
+    expect((update as Record<string, unknown>).$set).toMatchObject({ anthropicModel: 'claude-sonnet-5' });
+  });
+
+  it('refuses a model Anthropic has retired, naming the replacement, without writing (#359)', async () => {
+    const res = await saveAiConfig(formData({ provider: 'anthropic', anthropicModel: 'claude-3-5-haiku-latest' }));
+    expect(res.ok).toBe(false);
+    expect(res.error).toContain('2026-02-19');
+    expect(res.error).toContain('claude-haiku-4-5');
+    expect(appConfigUpdateOne).not.toHaveBeenCalled();
+  });
+
+  it('refuses a model the key cannot see (Models API 404), using the typed key and workspace', async () => {
+    anthropicModelCheckMock.mockResolvedValueOnce('missing');
+    const res = await saveAiConfig(formData({ provider: 'anthropic', anthropicModel: 'claude-typo', anthropicApiKey: 'sk-typed', anthropicWorkspaceId: 'wrkspc_1' }));
+    expect(anthropicModelCheckMock).toHaveBeenCalledWith('sk-typed', 'claude-typo', 'wrkspc_1');
+    expect(res.ok).toBe(false);
+    expect(appConfigUpdateOne).not.toHaveBeenCalled();
+  });
+
+  it('still saves when the Models API cannot be reached (never blocks offline)', async () => {
+    anthropicModelCheckMock.mockResolvedValueOnce('unknown');
+    const res = await saveAiConfig(formData({ provider: 'anthropic', anthropicModel: 'claude-sonnet-5', anthropicApiKey: 'sk-typed' }));
+    expect(res).toEqual({ ok: true });
+  });
+
+  it('does not check the Anthropic model when another provider is selected', async () => {
+    await saveAiConfig(formData({ provider: 'ollama', anthropicModel: 'claude-3-5-haiku-latest', anthropicApiKey: 'sk-typed' }));
+    expect(anthropicModelCheckMock).not.toHaveBeenCalled();
+    expect(appConfigUpdateOne).toHaveBeenCalled();
   });
 
   it('only overwrites an API key when a non-blank value was typed', async () => {
@@ -368,7 +398,7 @@ describe('fetchProviderModels', () => {
 
   it('uses a typed key over the saved one, marks the recommended model, sorts recommended-first', async () => {
     fetchMock.mockResolvedValueOnce(
-      jsonResponse({ data: [{ id: 'claude-3-5-haiku-20241022' }, { id: 'claude-sonnet-4-5-20250929' }] })
+      jsonResponse({ data: [{ id: 'claude-opus-5' }, { id: 'claude-sonnet-5' }] })
     );
     const res = await fetchProviderModels('anthropic', 'sk-typed-key');
     expect(res.ok).toBe(true);
@@ -376,8 +406,37 @@ describe('fetchProviderModels', () => {
       expect.stringContaining('api.anthropic.com'),
       expect.objectContaining({ headers: expect.objectContaining({ 'x-api-key': 'sk-typed-key' }) })
     );
-    expect(res.models![0].id).toBe('claude-sonnet-4-5-20250929');
+    expect(res.models![0].id).toBe('claude-sonnet-5');
     expect(res.models![0].recommended).toBe(true);
+  });
+
+  it("anthropic (#359): keeps the API's newest-first order, names, vision from capabilities; drops retired ids", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        data: [
+          { id: 'claude-fable-5-1', display_name: 'Claude Fable 5.1', created_at: '2026-09-01T00:00:00Z', capabilities: { image_input: { supported: true } } },
+          { id: 'claude-text-only-x', display_name: 'Text only', capabilities: { image_input: { supported: false } } },
+          { id: 'claude-3-5-haiku-20241022', display_name: 'Claude Haiku 3.5' },
+          { id: 'claude-haiku-4-5-20251001', display_name: 'Claude Haiku 4.5', capabilities: { image_input: { supported: true } } },
+        ],
+        has_more: false,
+      })
+    );
+    const res = await fetchProviderModels('anthropic', 'sk-key');
+    expect(res.models!.map((m) => m.id)).toEqual(['claude-fable-5-1', 'claude-text-only-x', 'claude-haiku-4-5-20251001']);
+    expect(res.models![0]).toMatchObject({ name: 'Claude Fable 5.1', vision: true });
+    expect(res.models![1].vision).toBe(false);
+  });
+
+  it('anthropic (#359): sends the workspace header and follows pagination', async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ data: [{ id: 'claude-sonnet-5' }], has_more: true, last_id: 'claude-sonnet-5' }))
+      .mockResolvedValueOnce(jsonResponse({ data: [{ id: 'claude-haiku-4-5' }], has_more: false, last_id: 'claude-haiku-4-5' }));
+    const res = await fetchProviderModels('anthropic', 'sk-key', undefined, 'wrkspc_9');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[1][0]).toContain('after_id=claude-sonnet-5');
+    expect(fetchMock.mock.calls[0][1]).toMatchObject({ headers: { 'anthropic-workspace-id': 'wrkspc_9' } });
+    expect(res.models!.map((m) => m.id)).toEqual(['claude-sonnet-5', 'claude-haiku-4-5']);
   });
 
   it('openai: filters to gpt-4/o1/o3/o4/chatgpt ids, excluding audio/realtime/embedding etc.', async () => {
@@ -502,7 +561,7 @@ describe('testAnthropic', () => {
     process.env.ANTHROPIC_API_KEY = 'env-key';
     try {
       await testAnthropic();
-      expect(anthropicTestMock).toHaveBeenCalledWith('env-key', 'claude-sonnet-4-5-20250929', '');
+      expect(anthropicTestMock).toHaveBeenCalledWith('env-key', 'claude-sonnet-5', '');
     } finally {
       if (prev === undefined) delete process.env.ANTHROPIC_API_KEY;
       else process.env.ANTHROPIC_API_KEY = prev;
@@ -519,6 +578,23 @@ describe('testAnthropic', () => {
     appConfigFindOneLean.mockResolvedValueOnce({ anthropicApiKey: 'saved-key', anthropicModel: 'claude-haiku', anthropicWorkspaceId: 'wrkspc_abc' });
     await testAnthropic();
     expect(anthropicTestMock).toHaveBeenCalledWith('saved-key', 'claude-haiku', 'wrkspc_abc');
+  });
+});
+
+describe('testAnthropic: the scraper model too (#359)', () => {
+  it('also pings the scraper model when the scraper uses Anthropic, and reports it separately', async () => {
+    appConfigFindOneLean.mockResolvedValueOnce({ anthropicApiKey: 'k', anthropicModel: 'claude-sonnet-5', scraperProvider: 'anthropic', scraperModel: 'claude-haiku-4-5' });
+    anthropicTestMock.mockResolvedValueOnce({ ok: true }).mockResolvedValueOnce({ ok: false, error: 'HTTP 404' });
+    const res = await testAnthropic();
+    expect(anthropicTestMock).toHaveBeenNthCalledWith(2, 'k', 'claude-haiku-4-5', '');
+    expect(res).toEqual({ ok: true, scraper: { model: 'claude-haiku-4-5', ok: false, error: 'HTTP 404' } });
+  });
+
+  it('pings once when the scraper has no model of its own', async () => {
+    appConfigFindOneLean.mockResolvedValueOnce({ anthropicApiKey: 'k', anthropicModel: 'claude-sonnet-5', scraperProvider: 'anthropic' });
+    const res = await testAnthropic();
+    expect(anthropicTestMock).toHaveBeenCalledTimes(1);
+    expect(res.scraper).toEqual({ model: 'claude-sonnet-5', ok: true, error: undefined });
   });
 });
 

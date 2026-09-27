@@ -52,12 +52,14 @@ const {
 
 // #231: every inheritance lookup's filter, to check which series it reads from.
 const findOneFilters: Array<Record<string, unknown>> = [];
+// #355: the stored date + period updateExpense reads before an edit (null = not found).
+const expenseStoredLean = vi.fn(async () => null as { date?: Date; period?: string } | null);
 const expenseModel = {
   create: expenseCreate,
   updateOne: expenseUpdateOne,
   findOne: (filter: Record<string, unknown>) => {
     findOneFilters.push(filter);
-    return { sort: () => ({ lean: expenseFindOneSortLean }) };
+    return { sort: () => ({ lean: expenseFindOneSortLean }), select: () => ({ lean: expenseStoredLean }) };
   },
   find: () => ({ select: () => ({ lean: expenseFindSelectLean }) }),
   bulkWrite: expenseBulkWrite,
@@ -138,6 +140,24 @@ describe('updateExpense', () => {
     expenseUpdateOne.mockClear();
     await updateExpense('e1', { date: '2026-06-15', period: '2026-05' } as any);
     expect(expenseUpdateOne.mock.calls[0][1].$set.period).toBe('2026-05');
+  });
+
+  it('moves a period that mirrored the old date when the date moves to another month (#355)', async () => {
+    expenseStoredLean.mockResolvedValueOnce({ date: new Date('2026-09-28T00:00:00Z'), period: '2026-09' });
+    await updateExpense('e1', { date: '2026-10-03', period: '2026-09' } as any);
+    expect(expenseUpdateOne.mock.calls[0][1].$set.period).toBe('2026-10');
+  });
+
+  it('keeps a period that differs from the stored date on purpose (#355)', async () => {
+    expenseStoredLean.mockResolvedValueOnce({ date: new Date('2026-10-02T00:00:00Z'), period: '2026-09' });
+    await updateExpense('e1', { date: '2026-10-05', period: '2026-09' } as any);
+    expect(expenseUpdateOne.mock.calls[0][1].$set.period).toBe('2026-09');
+  });
+
+  it('rejects a period that is not YYYY-MM, without writing (#355)', async () => {
+    const res = await updateExpense('e1', { date: '2026-10-03', period: '09/2026' } as any);
+    expect(res).toEqual({ ok: false, error: 'Period must be YYYY-MM' });
+    expect(expenseUpdateOne).not.toHaveBeenCalled();
   });
 
   it('trims space/taxCategory and cleans the split array via the real cleanSplit', async () => {

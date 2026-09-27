@@ -25,7 +25,9 @@ function parseFlexibleDate(value: unknown): Date | null {
     const day = Number(dd);
     const month = Number(mm);
     if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
-      const iso = new Date(`${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}T00:00:00`);
+      // UTC midnight, like every other date-only value (#355); without the Z it was midnight in
+      // the SERVER's zone, so the stored day depended on where the app ran.
+      const iso = new Date(`${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}T00:00:00Z`);
       if (!isNaN(iso.getTime())) return iso;
     }
   }

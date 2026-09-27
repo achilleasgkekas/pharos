@@ -4,6 +4,7 @@ import { tenantDb, tenantModel } from './tenancy/connection';
 import { softRequestTenant } from './tenancy/request';
 import { currentTenant, hasTenantContext } from './tenancy/current';
 import type { TenantContext } from './tenancy/context';
+import { CLAUDE_MAIN_DEFAULT, modelLifecycle } from './claudeModels';
 
 export type AiProvider = 'ollama' | 'anthropic' | 'openai' | 'gemini' | 'openrouter' | 'custom';
 
@@ -117,6 +118,9 @@ export async function getAiConfig(): Promise<AiConfig> {
   } catch {
     /* DB down → use env defaults */
   }
+  // #359: a saved model Anthropic has retired fails on every call. Swap it for its replacement
+  // once, in the database, and leave a notice for Settings → AI to show.
+  if (doc) doc = await migrateRetiredModels(ctx, doc);
   const ollamaModel = doc?.ollamaModel || process.env.OLLAMA_MODEL || 'qwen2.5vl:7b';
   // Vision model resolution: explicit setting → else reuse the active model if it
   // can see → else the env/default vision model. Guarantees image parses never
@@ -130,7 +134,7 @@ export async function getAiConfig(): Promise<AiConfig> {
     ollamaModel,
     ollamaVisionModel,
     anthropicApiKey: doc?.anthropicApiKey || process.env.ANTHROPIC_API_KEY || '',
-    anthropicModel: doc?.anthropicModel || 'claude-sonnet-4-5-20250929',
+    anthropicModel: doc?.anthropicModel || CLAUDE_MAIN_DEFAULT,
     anthropicWorkspaceId: doc?.anthropicWorkspaceId || process.env.ANTHROPIC_WORKSPACE_ID || '',
     openaiApiKey: doc?.openaiApiKey || process.env.OPENAI_API_KEY || '',
     openaiModel: doc?.openaiModel || 'gpt-4o-mini',
@@ -160,6 +164,38 @@ export async function getAiConfig(): Promise<AiConfig> {
   }
   cache.set(key, { v, t: Date.now() });
   return v;
+}
+
+/** One automatic model swap, shown once in Settings → AI (#359). */
+export type AiModelNotice = { field: 'anthropicModel' | 'scraperModel'; from: string; to: string; retiredOn: string; at: string };
+
+/** The replacements `doc` needs: saved Claude models that Anthropic has retired. Pure, exported for tests. */
+export function retiredModelSwaps(doc: { anthropicModel?: string; scraperModel?: string }, now = new Date()): AiModelNotice[] {
+  const out: AiModelNotice[] = [];
+  for (const field of ['anthropicModel', 'scraperModel'] as const) {
+    const from = (doc[field] || '').trim();
+    const l = modelLifecycle(from);
+    if (from && l.status === 'retired') out.push({ field, from, to: l.replacement, retiredOn: l.retiredOn, at: now.toISOString() });
+  }
+  return out;
+}
+
+async function migrateRetiredModels<T extends { anthropicModel?: string; scraperModel?: string }>(ctx: TenantContext, doc: T): Promise<T> {
+  const swaps = retiredModelSwaps(doc);
+  if (!swaps.length) return doc;
+  const next = { ...doc };
+  const $set: Record<string, string> = {};
+  for (const sw of swaps) {
+    next[sw.field] = sw.to;
+    $set[sw.field] = sw.to;
+  }
+  try {
+    const Config = tenantModel(await tenantDb(ctx), AppConfig);
+    await Config.updateOne({ key: 'singleton' }, { $set, $push: { aiModelNotices: { $each: swaps } } });
+  } catch {
+    /* the swap still applies to this read; the write is retried on the next one */
+  }
+  return next;
 }
 
 /**

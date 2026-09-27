@@ -154,6 +154,29 @@ export async function anthropicRaw(opts: {
   return { content: data.content ?? [], stopReason: data.stop_reason ?? 'end_turn' };
 }
 
+/**
+ * Does this key see this model? `GET /v1/models/{id}` (#359): `missing` only on a clear 404, so
+ * a network hiccup or an outage never blocks saving; `unknown` means "could not tell".
+ */
+export async function anthropicModelCheck(
+  apiKey: string,
+  model: string,
+  workspaceId?: string,
+): Promise<'ok' | 'missing' | 'unknown'> {
+  try {
+    const h = anthropicHeaders(apiKey, workspaceId);
+    delete h['content-type'];
+    const res = await fetch(`https://api.anthropic.com/v1/models/${encodeURIComponent(model)}`, {
+      headers: h,
+      signal: AbortSignal.timeout(10000),
+    });
+    if (res.ok) return 'ok';
+    return res.status === 404 ? 'missing' : 'unknown';
+  } catch {
+    return 'unknown';
+  }
+}
+
 /** Lightweight credential check used by the settings "Test" button. */
 export async function anthropicTest(
   apiKey: string,

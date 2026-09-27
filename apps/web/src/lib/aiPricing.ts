@@ -44,6 +44,7 @@ const M = 1_000_000;
 /** [substring, rate] pairs, checked in order — put more specific ids before shorter ones. */
 const RATES: Array<[RegExp, AiRate]> = [
   [/fable-5|mythos-5/, { inputPerMTok: 10 * M, outputPerMTok: 50 * M }],
+  [/opus-5-5/, { inputPerMTok: 4 * M, outputPerMTok: 20 * M }],
   [/opus-5|opus-4-[678]/, { inputPerMTok: 5 * M, outputPerMTok: 25 * M }],
   [/sonnet-5/, { inputPerMTok: 2 * M, outputPerMTok: 10 * M }],
   [/sonnet-4-6/, { inputPerMTok: 3 * M, outputPerMTok: 15 * M }],

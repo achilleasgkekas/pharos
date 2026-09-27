@@ -3,7 +3,8 @@
 const { MongoClient } = require('mongodb');
 const { execFileSync } = require('child_process');
 
-const MODEL = 'claude-sonnet-4-5-20250929';
+// Same default as the app (apps/web/src/lib/claudeModels.ts); override with CLAUDE_MODEL.
+const MODEL = process.env.CLAUDE_MODEL || 'claude-sonnet-5';
 const PROMPT =
   'You parse Greek/EU retail receipts and invoices. From the text below, return ONLY a JSON object: ' +
   '{"total": number, "subtotal": number, "vatAmount": number, "items": [{"name": string, "qty": number, "price": number, "vatRate": number}]}. ' +

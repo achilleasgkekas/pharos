@@ -85,6 +85,10 @@ export function SavingsClient({ data }: { data: SavingsData }) {
   const [planDate, setPlanDate] = useState(() => isoDay(addMonths(new Date(), 12)));
 
   const forecastDate = useMemo(() => parseDay(dateStr), [dateStr]);
+  // #355: a forecast is about the future and only as far as the projection reaches. A past date
+  // used to return today's opening balance as its "forecast".
+  const today = isoDay(new Date());
+  const horizon = projection.length ? isoDay(new Date(new Date(projection[projection.length - 1].end).getTime() - 1)) : undefined;
   const forecast = useMemo(() => (forecastDate ? balanceOn(projection, forecastDate) : null), [projection, forecastDate]);
   const startBalance = projection[0]?.openBalance ?? data.startBalance;
 
@@ -129,11 +133,13 @@ export function SavingsClient({ data }: { data: SavingsData }) {
             <label className="flex items-center gap-2 text-[11px] text-[color:var(--color-text-dim)]">
               {t('sav.pickDate')}
               <span className="w-36">
-                <DateInput value={dateStr} onValueChange={setDateStr} className="py-1 text-[11px]" />
+                <DateInput value={dateStr} onValueChange={setDateStr} min={today} max={horizon} className="py-1 text-[11px]" />
               </span>
             </label>
           </div>
-          {forecast === null ? (
+          {dateStr && dateStr < today ? (
+            <p className="text-sm text-[color:var(--color-text-dim)]">{t('sav.pastDate')}</p>
+          ) : forecast === null ? (
             <p className="text-sm text-[color:var(--color-text-dim)]">{t('sav.beyondHorizon')}</p>
           ) : (
             <>
@@ -223,7 +229,7 @@ export function SavingsClient({ data }: { data: SavingsData }) {
           </label>
           <label className="flex flex-col gap-1 text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-[0.12em]" style={{ fontFamily: 'var(--font-mono)' }}>
             {t('sav.planDate')}
-            <DateInput value={planDate} onValueChange={setPlanDate} className="py-1.5 normal-case tracking-normal" />
+            <DateInput value={planDate} onValueChange={setPlanDate} min={today} className="py-1.5 normal-case tracking-normal" />
           </label>
           {adHoc && <SaveAsGoal amount={Number(planAmount)} date={planDate} />}
         </div>

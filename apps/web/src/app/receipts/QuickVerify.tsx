@@ -10,6 +10,7 @@ import { Check, ArrowRight, Pencil, Archive, FileText, Loader2, Zap } from 'luci
 import type { SerializedReceipt } from '@/types';
 import { quickVerifyReceipt, archiveReceipt } from './actions';
 import { useT } from '@/components/LocaleProvider';
+import { recordDay } from '@/lib/recordDay';
 
 function fileUrl(filePath: string) {
   const u = `/api/files/${filePath.split('/').map(encodeURIComponent).join('/')}`;
@@ -50,7 +51,7 @@ export function QuickVerify({
   useEffect(() => {
     if (!r) return;
     setStore(r.store || '');
-    setDate(r.date ? new Date(r.date).toISOString().slice(0, 10) : '');
+    setDate(recordDay(r.date)); // the day the list shows (#355), not the UTC day
     // A foreign receipt is reviewed (and submitted) in the currency it is printed in;
     // quickVerifyReceipt converts it back with the receipt's stored rate.
     const printed = isForeignCurrency(r.currency, base) ? r.origAmount || r.total : r.total;

@@ -1,3 +1,4 @@
+import { PERIOD_RE, periodForUpdate } from '@/lib/expensePeriod';
 import { NextRequest, NextResponse } from 'next/server';
 import { RECURRING_CYCLES } from '@/lib/billingCycle';
 import { withAuth, apiError } from '@/lib/apiAuth';
@@ -32,7 +33,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (b.kind === 'income' || b.kind === 'expense') set.kind = b.kind;
     if (typeof b.notes === 'string') set.notes = b.notes;
     if (b.date) { const d = new Date(String(b.date)); if (!Number.isNaN(d.getTime())) set.date = d; }
-    if (typeof b.period === 'string') set.period = b.period;
+    if (typeof b.period === 'string') {
+      if (!PERIOD_RE.test(b.period.trim())) return apiError('period must be YYYY-MM');
+      set.period = b.period.trim();
+    }
     if (typeof b.recurring === 'boolean') set.recurring = b.recurring;
     // empty string clears the cycle; same enum guard as POST /api/v1/expenses
     if (b.recurringCycle === '' || RECURRING_CYCLES.includes(String(b.recurringCycle) as never)) set.recurringCycle = String(b.recurringCycle);
@@ -64,6 +68,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       set.currency = fx.currency;
       set.origAmount = fx.origAmount;
       set.fxRate = fx.fxRate;
+    }
+
+    // #355: a new date without a period moves a period that only mirrored the old date, so the
+    // expense stops counting in its old month. A period set to another month on purpose stays.
+    if (set.date instanceof Date && typeof b.period !== 'string') {
+      const before = (await Expense.findById(id).lean().catch(() => null)) as { date?: Date; period?: string } | null;
+      if (before?.period) {
+        const next = periodForUpdate(before.period, set.date, before);
+        if (next !== before.period) set.period = next;
+      }
     }
 
     if (!Object.keys(set).length) return apiError('no valid fields');

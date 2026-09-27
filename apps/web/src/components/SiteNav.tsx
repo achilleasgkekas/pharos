@@ -160,9 +160,8 @@ function UserMenu({ user }: { user: SessionUser }) {
           >
             <Settings size={15} /> {t('nav.settings')}
           </Link>
-          <div className="px-1">
-            <LanguageSwitcher variant="row" />
-          </div>
+          {/* No wrapper padding: the row carries the same px-2.5 as its siblings (#357). */}
+          <LanguageSwitcher variant="row" />
           <button type="button" onClick={toggle} className={menuRow}>
             {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
             {theme === 'dark' ? t('nav.lightMode') : t('nav.darkMode')}

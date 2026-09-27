@@ -48,9 +48,11 @@ export async function saveSetupBasics(currency: string, vat: number, shoppingCou
 }
 
 /** Step 3a — configure an AI provider (reuses the main settings writer) + enable AI. */
-export async function saveSetupAi(formData: FormData): Promise<{ ok: boolean }> {
+export async function saveSetupAi(formData: FormData): Promise<{ ok: boolean; error?: string }> {
   await requireAdmin();
-  await saveAiConfig(formData);
+  // #359: a model the key cannot use is refused here too; the wizard shows why and stays put.
+  const saved = await saveAiConfig(formData);
+  if (!saved.ok) return saved;
   await connectDB();
   await AppConfig.updateOne({ key: 'singleton' }, { $set: { aiEnabled: true } }, { upsert: true });
   invalidateAiConfigCache();

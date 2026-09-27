@@ -61,7 +61,8 @@ import { effectiveReturnWindow, returnDaysLeft } from '@/lib/returnWindow';
 import { suggestBudgetsFromExpenses, type BudgetExpenseRow } from '@/lib/budgetSuggest';
 import { resolveCategoryRules } from '@/lib/categoryRules';
 import { detectPriceHikes, type HikeEntry } from '@/lib/priceHike';
-import { anthropicTest } from '@/lib/anthropic';
+import { anthropicTest, anthropicModelCheck } from '@/lib/anthropic';
+import { CLAUDE_MAIN_DEFAULT, modelLifecycle } from '@/lib/claudeModels';
 import { getAppSettings, invalidateAppSettingsForRequest } from '@/lib/appSettings';
 import { assertCanWrite, requireAdmin } from '@/lib/auth';
 import { AI_FEATURE_KEYS, type AiFeatureKey } from '@/lib/aiFeatures';
@@ -190,8 +191,22 @@ export async function pullOllamaModel(name: string): Promise<{ ok: boolean; erro
   }
 }
 
+/**
+ * Why a Claude model id cannot be saved, or null (#359). A retired id is refused outright; with a
+ * key at hand the Models API is asked, and only a clear "not found" refuses, so being offline
+ * never blocks a save.
+ */
+async function claudeModelProblem(model: string, key: string, workspaceId: string): Promise<string | null> {
+  const life = modelLifecycle(model);
+  if (life.status === 'retired') return `${model} was retired by Anthropic on ${life.retiredOn}. Use ${life.replacement} instead.`;
+  if (!key || !/^claude-/i.test(model)) return null;
+  return (await anthropicModelCheck(key, model, workspaceId)) === 'missing'
+    ? `${model} is not available to this Anthropic API key. Load the model list and pick one from it.`
+    : null;
+}
+
 /** Persist the AI backend settings (singleton config doc). */
-export async function saveAiConfig(formData: FormData): Promise<{ ok: boolean }> {
+export async function saveAiConfig(formData: FormData): Promise<{ ok: boolean; error?: string }> {
   await requireAdmin();
   const PROVIDERS = ['ollama', 'anthropic', 'openai', 'gemini', 'openrouter', 'custom'];
   const rawProvider = String(formData.get('provider') || 'ollama');
@@ -200,17 +215,25 @@ export async function saveAiConfig(formData: FormData): Promise<{ ok: boolean }>
   const ollamaModel = String(formData.get('ollamaModel') || '').trim();
   const ollamaVisionModel = String(formData.get('ollamaVisionModel') || '').trim();
 
+  const anthropicModel = String(formData.get('anthropicModel') || '').trim() || CLAUDE_MAIN_DEFAULT;
+  const anthropicWorkspaceId = String(formData.get('anthropicWorkspaceId') || '').trim();
+  if (provider === 'anthropic') {
+    const key = String(formData.get('anthropicApiKey') || '').trim() || (await getAiConfig()).anthropicApiKey;
+    const problem = await claudeModelProblem(anthropicModel, key, anthropicWorkspaceId);
+    if (problem) return { ok: false, error: problem };
+  }
+
   await connectDB();
   const update: Record<string, unknown> = {
     aiProvider: provider,
     ollamaHost,
     ollamaModel,
     ollamaVisionModel,
-    anthropicModel: String(formData.get('anthropicModel') || '').trim() || 'claude-sonnet-4-5-20250929',
+    anthropicModel,
     // Not a secret (a workspace id, not a key), so it is stored directly rather than through the
     // "only overwrite when typed" path below — writing the trimmed value every save lets the user
     // clear it by emptying the field.
-    anthropicWorkspaceId: String(formData.get('anthropicWorkspaceId') || '').trim(),
+    anthropicWorkspaceId,
     openaiModel: String(formData.get('openaiModel') || '').trim(),
     geminiModel: String(formData.get('geminiModel') || '').trim(),
     openrouterModel: String(formData.get('openrouterModel') || '').trim(),
@@ -240,7 +263,8 @@ export async function saveAiConfig(formData: FormData): Promise<{ ok: boolean }>
 export async function fetchProviderModels(
   provider: string,
   key?: string,
-  baseUrl?: string
+  baseUrl?: string,
+  workspaceId?: string
 ): Promise<{ ok: boolean; models?: FetchedModel[]; error?: string }> {
   await requireAdmin();
   const cfg = await getAiConfig();
@@ -257,17 +281,28 @@ export async function fetchProviderModels(
   const r2 = (n: number) => Math.round(n * 100) / 100;
 
   try {
-    let entries: { id: string; live?: { in: number; out: number } }[] = [];
+    let entries: { id: string; live?: { in: number; out: number }; name?: string; created?: string; vision?: boolean }[] = [];
 
     if (provider === 'anthropic') {
       if (!k) return { ok: false, error: 'Enter or save an Anthropic key first' };
-      const res = await fetch('https://api.anthropic.com/v1/models?limit=200', {
-        headers: { 'x-api-key': k, 'anthropic-version': '2023-06-01' },
-        signal: sig(),
-      });
-      if (!res.ok) return { ok: false, error: `Anthropic HTTP ${res.status}` };
-      const d = (await res.json()) as { data?: { id: string }[] };
-      entries = (d.data || []).map((m) => ({ id: m.id }));
+      // #359: the Models API lists what this key can call today, newest first. Keep its names,
+      // dates and capabilities instead of guessing them from the id, send the workspace header
+      // identity-linked keys need, and follow the pages.
+      const ws = (workspaceId ?? cfg.anthropicWorkspaceId ?? '').trim();
+      const headers: Record<string, string> = { 'x-api-key': k, 'anthropic-version': '2023-06-01', ...(ws ? { 'anthropic-workspace-id': ws } : {}) };
+      type ApiModel = { id: string; display_name?: string; created_at?: string; capabilities?: { image_input?: { supported?: boolean } } | null };
+      let after = '';
+      for (let page = 0; page < 5; page++) {
+        const res = await fetch(`https://api.anthropic.com/v1/models?limit=1000${after ? `&after_id=${encodeURIComponent(after)}` : ''}`, { headers, signal: sig() });
+        if (!res.ok) return { ok: false, error: `Anthropic HTTP ${res.status}` };
+        const d = (await res.json()) as { data?: ApiModel[]; has_more?: boolean; last_id?: string | null };
+        for (const m of d.data || []) {
+          if (modelLifecycle(m.id).status === 'retired') continue;
+          entries.push({ id: m.id, name: m.display_name, created: m.created_at, vision: m.capabilities?.image_input?.supported });
+        }
+        if (!d.has_more || !d.last_id) break;
+        after = d.last_id;
+      }
     } else if (provider === 'openai') {
       if (!k) return { ok: false, error: 'Enter or save an OpenAI key first' };
       const res = await fetch('https://api.openai.com/v1/models', { headers: { Authorization: `Bearer ${k}` }, signal: sig() });
@@ -309,13 +344,26 @@ export async function fetchProviderModels(
       .filter((e) => e.id)
       .map((e) => {
         const price = e.live || priceForModel(e.id);
-        return { id: e.id, in: price?.in ?? null, out: price?.out ?? null, vision: looksVisionModel(e.id), recommended: e.id === rec };
+        return {
+          id: e.id,
+          in: price?.in ?? null,
+          out: price?.out ?? null,
+          vision: e.vision ?? looksVisionModel(e.id),
+          recommended: e.id === rec,
+          ...(e.name ? { name: e.name } : {}),
+        };
       });
-    models.sort((a, b) =>
-      (b.recommended ? 1 : 0) - (a.recommended ? 1 : 0) ||
-      (b.in != null ? 1 : 0) - (a.in != null ? 1 : 0) ||
-      a.id.localeCompare(b.id)
-    );
+    // Anthropic already sends newest first; keep that order (behind the recommended one) rather
+    // than pushing unpriced new models under old priced ones.
+    if (provider === 'anthropic') {
+      models.sort((a, b) => (b.recommended ? 1 : 0) - (a.recommended ? 1 : 0));
+    } else {
+      models.sort((a, b) =>
+        (b.recommended ? 1 : 0) - (a.recommended ? 1 : 0) ||
+        (b.in != null ? 1 : 0) - (a.in != null ? 1 : 0) ||
+        a.id.localeCompare(b.id)
+      );
+    }
     if (!models.length) return { ok: false, error: 'No models returned' };
     return { ok: true, models: models.slice(0, 120) };
   } catch (err) {
@@ -1037,15 +1085,30 @@ export async function setAiConfirmBulk(value: boolean): Promise<{ ok: boolean }>
   return { ok: true };
 }
 
+/** Hide the "your model was replaced" notices in Settings → AI (#359). */
+export async function dismissAiModelNotices(): Promise<{ ok: boolean }> {
+  await requireAdmin();
+  await connectDB();
+  await (await scoped(AppConfig)).updateOne({ key: 'singleton' }, { $set: { aiModelNotices: [] } });
+  revalidatePath('/settings');
+  return { ok: true };
+}
+
 /** Verify the saved Anthropic key + model with a tiny ping. */
-export async function testAnthropic(): Promise<{ ok: boolean; error?: string }> {
+export async function testAnthropic(): Promise<{ ok: boolean; error?: string; scraper?: { model: string; ok: boolean; error?: string } }> {
   await connectDB();
   const doc = await (await scoped(AppConfig)).findOne({ key: 'singleton' }).lean();
   const key = doc?.anthropicApiKey || process.env.ANTHROPIC_API_KEY || '';
-  const model = doc?.anthropicModel || 'claude-sonnet-4-5-20250929';
+  const model = doc?.anthropicModel || CLAUDE_MAIN_DEFAULT;
   const workspaceId = doc?.anthropicWorkspaceId || process.env.ANTHROPIC_WORKSPACE_ID || '';
   if (!key) return { ok: false, error: 'No API key saved yet' };
-  return anthropicTest(key, model, workspaceId);
+  const main = await anthropicTest(key, model, workspaceId);
+  // #359: the price scraper can run on its own model; a retired one there failed silently for
+  // months because only the main model was ever tested.
+  if (doc?.scraperProvider !== 'anthropic') return main;
+  const scraperModel = doc?.scraperModel || model;
+  const scraper = scraperModel === model ? main : await anthropicTest(key, scraperModel, workspaceId);
+  return { ...main, scraper: { model: scraperModel, ok: scraper.ok, error: scraper.error } };
 }
 
 // ─── Editable AI prompts ─────────────────────────────────────────────────────
@@ -1128,7 +1191,25 @@ export type ScraperAiConfig = {
   scope: ScrapeScope;
   ownedIntervalDays: number;
   findLinks: boolean;
+  /** #359: the price scraper's last AI failure (written by services/scraper), or null. */
+  lastAiError: { message: string; model: string; at: string } | null;
 };
+
+/** The scraper's own status document (collection `scraperstatus`, written by services/scraper). */
+async function readScraperAiError(): Promise<ScraperAiConfig['lastAiError']> {
+  try {
+    const conn = await connectDB();
+    const doc = (await conn.connection.db?.collection('scraperstatus').findOne({ key: 'singleton' })) as
+      | { lastAiError?: { message?: string; model?: string; at?: Date | string } | null }
+      | null
+      | undefined;
+    const e = doc?.lastAiError;
+    if (!e?.message) return null;
+    return { message: String(e.message), model: String(e.model || ''), at: new Date(e.at ?? 0).toISOString() };
+  } catch {
+    return null;
+  }
+}
 
 export async function getScraperAi(): Promise<ScraperAiConfig> {
   await connectDB();
@@ -1145,14 +1226,20 @@ export async function getScraperAi(): Promise<ScraperAiConfig> {
     scope: normalizeScrapeScope(doc?.scraperScope),
     ownedIntervalDays: Number.isFinite(days) ? days : DEFAULT_OWNED_INTERVAL_DAYS,
     findLinks: doc?.scraperFindLinks !== false,
+    lastAiError: await readScraperAiError(),
   };
 }
 
-export async function saveScraperAi(formData: FormData): Promise<{ ok: boolean }> {
+export async function saveScraperAi(formData: FormData): Promise<{ ok: boolean; error?: string }> {
   await requireAdmin();
-  await connectDB();
   const provider = String(formData.get('scraperProvider') || 'ollama') === 'anthropic' ? 'anthropic' : 'ollama';
   const model = String(formData.get('scraperModel') || '').trim();
+  if (provider === 'anthropic' && model) {
+    const cfg = await getAiConfig();
+    const problem = await claudeModelProblem(model, cfg.anthropicApiKey, cfg.anthropicWorkspaceId);
+    if (problem) return { ok: false, error: problem };
+  }
+  await connectDB();
   const enabled = String(formData.get('scraperEnabled') || 'true') !== 'false';
   const maxLinks = Math.max(0, Number(formData.get('scraperMaxLinks')) || 0);
   const scope = normalizeScrapeScope(formData.get('scraperScope'));

@@ -41,6 +41,15 @@ describe('priceForModel — case-insensitive', () => {
 });
 
 describe('priceForModel — provider families', () => {
+  it('prices the current Claude generation at list price (#359)', () => {
+    expect(priceForModel('claude-sonnet-5')).toEqual({ in: 2, out: 10 });
+    expect(priceForModel('claude-opus-5')).toEqual({ in: 5, out: 25 });
+    expect(priceForModel('claude-opus-5-5')).toEqual({ in: 4, out: 20 });
+    expect(priceForModel('claude-fable-5-1')).toEqual({ in: 10, out: 50 });
+    expect(priceForModel('claude-opus-4-8')).toEqual({ in: 5, out: 25 });
+    expect(priceForModel('claude-opus-4-5-20251101')).toEqual({ in: 5, out: 25 });
+  });
+
   it('prices Anthropic ids', () => {
     expect(priceForModel('claude-opus-4-20250514')).toEqual({ in: 15, out: 75 });
     expect(priceForModel('claude-sonnet-4-5-20250929')).toEqual({ in: 3, out: 15 });
@@ -97,6 +106,10 @@ describe('looksVisionModel — positive matches', () => {
     expect(looksVisionModel('claude-sonnet-4-5-20250929')).toBe(true);
     expect(looksVisionModel('claude-opus-4-20250514')).toBe(true);
     expect(looksVisionModel('claude-haiku-4-5')).toBe(true);
+    // #359: the current generation reads images too.
+    expect(looksVisionModel('claude-sonnet-5')).toBe(true);
+    expect(looksVisionModel('claude-opus-5-5')).toBe(true);
+    expect(looksVisionModel('claude-fable-5-1')).toBe(true);
     expect(looksVisionModel('gemini-2.0-flash')).toBe(true);
   });
 
@@ -135,7 +148,7 @@ describe('recommendation tables — shape invariants', () => {
   it('scraper recommendation is priced (cheap pick from the static table)', () => {
     const anthropic = SCRAPER_RECOMMEND.anthropic!;
     expect(anthropic.model).toContain('haiku');
-    // "claude-3-5-haiku-latest" resolves to the cheapest Claude in the table.
-    expect(priceForModel(anthropic.model)).toEqual({ in: 0.8, out: 4 });
+    // #359: Haiku 4.5, the low-cost Claude model Anthropic still serves (Haiku 3.5 is retired).
+    expect(priceForModel(anthropic.model)).toEqual({ in: 1, out: 5 });
   });
 });
