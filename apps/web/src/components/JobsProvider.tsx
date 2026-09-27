@@ -3,6 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 import { useRouter } from 'next/navigation';
 import { CheckCircle2, XCircle, Loader2, X, ArrowUpRight } from 'lucide-react';
 import { getActiveJobs, dismissJob, type SerializedJob } from '@/app/jobActions';
+import { useT } from '@/components/LocaleProvider';
 
 // ── Global background-job status ─────────────────────────────────────────────
 // Jobs run SERVER-SIDE (lib/jobRunner) and live in MongoDB. Every device just polls
@@ -94,6 +95,7 @@ function JobsWidget({
   onDismiss: (id: string) => void;
   onOpen: (href: string) => void;
 }) {
+  const t = useT();
   if (jobs.length === 0) return null;
   return (
     <div className="fixed bottom-4 right-4 z-[60] flex flex-col gap-2 w-[300px] max-w-[calc(100vw-2rem)]">
@@ -119,7 +121,7 @@ function JobsWidget({
               </span>
               <span className="flex items-center gap-1 shrink-0">
                 {j.href && (
-                  <button onClick={() => onOpen(j.href)} title="Open" className="text-[color:var(--color-text-faint)] hover:text-[color:var(--color-cyan)]">
+                  <button onClick={() => onOpen(j.href)} title={t('common.open')} aria-label={t('common.open')} className="text-[color:var(--color-text-faint)] hover:text-[color:var(--color-cyan)]">
                     <ArrowUpRight size={13} />
                   </button>
                 )}

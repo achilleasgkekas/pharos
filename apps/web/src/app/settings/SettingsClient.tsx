@@ -5,9 +5,10 @@ import { Activity, Sun, Moon, Sparkles, Database, CreditCard, ExternalLink, Serv
 import { useTheme, type Theme } from '@/components/ThemeProvider';
 import { cur } from '@/lib/money';
 import { cn } from '@/components/ui/cn';
+import { PAGE_MAIN, PageHeader } from '@/components/ui/PageHeader';
 import { controlClass } from '@/components/ui/Input';
 import { Field } from '@/components/ui/Field';
-import { useConfirm } from '@/components/ui/ConfirmDialog';
+import { useConfirm, usePrompt } from '@/components/ui/ConfirmDialog';
 import { saveAiConfig, pullOllamaModel, testAnthropic, saveStore, deleteStore, setAiConfirmBulk, exportData, exportDataEncrypted, importData, importDataEncrypted, verifyBackup, exportCSV, exportInsuranceBundle, exportTaxBundle, saveBudgets, saveBudgetRollover, suggestBudgets, saveAssetAccounts, saveDepreciation, saveCategoryRules, setAiEnabled, setAiFeature, fetchProviderModels } from './actions';
 import { applyCategoryRulesToExisting } from '@/app/expenses/actions';
 import type { CategoryRule } from '@/lib/categoryRules';
@@ -190,12 +191,8 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
   }
 
   return (
-    <main className="max-w-[1400px] mx-auto px-4 py-6 pb-24">
-      <div className="mb-5">
-        <h1 className="text-2xl md:text-3xl font-bold" style={{ fontFamily: 'var(--font-display)' }}>
-          {t('nav.settings')}
-        </h1>
-      </div>
+    <main className={PAGE_MAIN}>
+      <PageHeader title={t('nav.settings')} />
 
       <div className="flex flex-col md:flex-row gap-5">
         {/* Tab navigation — sidebar on desktop, scrollable pills on mobile */}
@@ -3272,6 +3269,7 @@ function BackupRestore() {
   const verifyRef = useRef<HTMLInputElement>(null);
   const [report, setReport] = useState<{ ok: boolean; headline: string; issues: { level: string; message: string }[] } | null>(null);
   const confirm = useConfirm();
+  const prompt = usePrompt();
   const nowYear = new Date().getFullYear();
   const [taxYear, setTaxYear] = useState(nowYear);
 
@@ -3293,27 +3291,26 @@ function BackupRestore() {
         download(json, `pharos-backup-${new Date().toISOString().slice(0, 10)}.json`, 'application/json');
         setMsg(t('set.backupDownloaded'));
       } catch (e) {
-        setMsg(`Export failed: ${(e as Error).message.slice(0, 80)}`);
+        setMsg(t('set.exportFailed', { error: (e as Error).message.slice(0, 80) }));
       }
     });
   }
 
   // P54: passphrase-encrypted export. Passphrase is prompted, used once, never stored.
-  function handleExportEncrypted() {
+  async function handleExportEncrypted() {
     setMsg(null);
-    const pass = window.prompt('Passphrase to encrypt this backup (min 8 chars). You will need it to restore — it is NOT stored anywhere.');
+    const pass = await prompt({ title: t('set.encTitle'), message: t('set.encHelp'), label: t('set.encPassLabel'), type: 'password', minLength: 8 });
     if (pass === null) return; // cancelled
-    if (pass.length < 8) { setMsg('Passphrase must be at least 8 characters.'); return; }
-    const confirmPass = window.prompt('Re-enter the passphrase to confirm.');
+    const confirmPass = await prompt({ title: t('set.encTitle'), label: t('set.encPassAgain'), type: 'password', minLength: 8, confirmLabel: t('set.exportEncrypted') });
     if (confirmPass === null) return;
-    if (confirmPass !== pass) { setMsg('Passphrases did not match.'); return; }
+    if (confirmPass !== pass) { setMsg(t('set.encMismatch')); return; }
     startTransition(async () => {
       try {
         const env = await exportDataEncrypted(pass);
         download(env, `pharos-backup-${new Date().toISOString().slice(0, 10)}.enc.json`, 'application/json');
-        setMsg('Encrypted backup downloaded ✓');
+        setMsg(t('set.encDone'));
       } catch (e) {
-        setMsg(`Encrypted export failed: ${(e as Error).message.slice(0, 80)}`);
+        setMsg(t('set.encFailed', { error: (e as Error).message.slice(0, 80) }));
       }
     });
   }
@@ -3342,7 +3339,7 @@ function BackupRestore() {
     const encrypted = looksEncrypted(text);
     let pass = '';
     if (encrypted) {
-      const entered = window.prompt('This backup is encrypted. Enter its passphrase to restore.');
+      const entered = await prompt({ title: t('set.decTitle'), message: t('set.decHelp'), label: t('set.encPassLabel'), type: 'password', confirmLabel: t('common.restore') });
       if (entered === null) { setMsg(null); return; } // cancelled
       pass = entered;
     }
@@ -3805,6 +3802,7 @@ function UsersManager({ currentUserId }: { currentUserId: string }) {
   const [form, setForm] = useState({ username: '', name: '', password: '', role: 'member' });
   const [error, setError] = useState('');
   const confirm = useConfirm();
+  const prompt = usePrompt();
 
   const reload = () => startTransition(async () => { setUsers(await listUsers()); setLoading(false); });
   useEffect(() => { reload(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
@@ -3828,8 +3826,8 @@ function UsersManager({ currentUserId }: { currentUserId: string }) {
     if (role === u.role) return;
     startTransition(async () => { const r = await setUserRole(u.id, role); if (!r.ok) setError(r.error || t('common.failed')); reload(); });
   }
-  function resetPwd(u: UserRow) {
-    const pwd = window.prompt(t('set.resetPwdPrompt', { name: u.username }));
+  async function resetPwd(u: UserRow) {
+    const pwd = await prompt({ title: t('set.resetPwdTitle'), label: t('set.resetPwdPrompt', { name: u.username }), type: 'password', minLength: 8, confirmLabel: t('common.save') });
     if (!pwd) return;
     startTransition(async () => { const r = await changeUserPassword(u.id, pwd); setError(r.ok ? '' : (r.error || t('common.failed'))); });
   }

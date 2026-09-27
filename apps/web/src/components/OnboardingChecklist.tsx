@@ -3,6 +3,7 @@ import { useState, useTransition } from 'react';
 import Link from 'next/link';
 import { Check, ChevronDown, ChevronUp, X, ArrowRight } from 'lucide-react';
 import { dismissOnboarding } from '@/app/settings/actions';
+import { useT } from '@/components/LocaleProvider';
 
 export type OnboardingStep = {
   key: string;
@@ -32,6 +33,7 @@ export function OnboardingChecklist({
   doneLabel: string;
   steps: OnboardingStep[];
 }) {
+  const t = useT();
   const allDone = steps.every((s) => s.done);
   const [hidden, setHidden] = useState(false);
   const [collapsed, setCollapsed] = useState(allDone);
@@ -80,7 +82,7 @@ export function OnboardingChecklist({
           <button
             type="button"
             onClick={dismiss}
-            aria-label="Dismiss"
+            aria-label={t('common.dismiss')}
             className="shrink-0 text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)] p-1 -m-1"
           >
             <X size={15} />

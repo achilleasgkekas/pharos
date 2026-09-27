@@ -4,11 +4,13 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Sparkles, X, ArrowRight } from 'lucide-react';
 import { dismissAiOnboarding } from '@/app/settings/actions';
+import { useT } from '@/components/LocaleProvider';
 
 /** Dismissible nudge shown app-wide when AI isn't set up. The app works fully
  *  without AI; this just points users to the optional features.
  */
 export function AiOnboardingBanner({ reason }: { reason: 'off' | 'no-provider' }) {
+  const t = useT();
   const pathname = usePathname();
   const [hidden, setHidden] = useState(false);
   const [, start] = useTransition();
@@ -18,10 +20,7 @@ export function AiOnboardingBanner({ reason }: { reason: 'off' | 'no-provider' }
   // where it means nothing (SiteNav renders globally on those now, same as everywhere else).
   if (hidden || pathname.startsWith('/settings') || pathname.startsWith('/admin') || pathname.startsWith('/account')) return null;
 
-  const text =
-    reason === 'off'
-      ? 'AI features are turned off. Turn them on to auto-scan receipts, bills, statements and more.'
-      : 'Add an AI provider to auto-scan receipts, bills and statements, import products and use the assistant. The app works fully without it.';
+  const text = reason === 'off' ? t('aiBanner.off') : t('aiBanner.noProvider');
 
   function dismiss() {
     setHidden(true);
@@ -39,9 +38,9 @@ export function AiOnboardingBanner({ reason }: { reason: 'off' | 'no-provider' }
           href="/settings?tab=ai"
           className="flex items-center gap-1 text-sm font-semibold text-[color:var(--color-accent)] hover:underline shrink-0 whitespace-nowrap"
         >
-          Set up AI <ArrowRight size={14} />
+          {t('aiBanner.setUp')} <ArrowRight size={14} />
         </Link>
-        <button onClick={dismiss} className="text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)] shrink-0" aria-label="Dismiss">
+        <button onClick={dismiss} className="text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)] shrink-0" aria-label={t('common.dismiss')}>
           <X size={15} />
         </button>
       </div>

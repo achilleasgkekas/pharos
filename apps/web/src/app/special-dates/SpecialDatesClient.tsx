@@ -84,7 +84,7 @@ export function SpecialDatesClient({ dates, leadDays }: { dates: SerializedSpeci
       ) : (
         <div className="space-y-2">
           {rows.map(({ d, days, years }) => (
-            <div key={d._id} className={cn('flex items-center gap-3 rounded-xl border bg-[color:var(--color-surface)] p-3 transition-colors', d.archived ? 'border-[color:var(--color-border)] opacity-60' : 'border-[color:var(--color-border)] hover:border-[color:var(--color-border-light)]')}>
+            <div key={d._id} className={cn('flex items-center gap-3 rounded-xl border bg-[color:var(--color-surface)] px-3 py-2.5 transition-colors', d.archived ? 'border-[color:var(--color-border)] opacity-60' : 'border-[color:var(--color-border)] hover:border-[color:var(--color-border-light)]')}>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-semibold text-sm truncate" style={{ fontFamily: 'var(--font-display)' }}>{d.name}</span>

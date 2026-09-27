@@ -125,7 +125,7 @@ export function SearchableSelect({
               </button>
             ))}
             {filtered.length === 0 && !showCustom && (
-              <p className="px-3 py-2 text-xs text-[color:var(--color-text-faint)] italic">No matches</p>
+              <p className="px-3 py-2 text-xs text-[color:var(--color-text-faint)] italic">{t('bar.noMatches')}</p>
             )}
           </div>
         </div>

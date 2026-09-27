@@ -35,8 +35,11 @@ All of these come from `components/ui/PageHeader.tsx`.
   differently on every operating system.
 - When filters hide everything, say so (`ex.emptyFiltered`: "Nothing matches these filters.")
   rather than showing the first-run text.
-- A list row is a bordered `rounded-xl` block on `--color-surface`; a card in a grid is the same
-  block with more padding.
+- A list row is `rounded-xl border bg-[color:var(--color-surface)] px-3 py-2.5`; a card in a
+  grid is `rounded-2xl border bg-[color:var(--color-surface)] p-4`. Both lighten the border to
+  `--color-border-light` on hover.
+- A status chip is `Badge` (`components/ui/Badge`). Its tones (neutral, muted, accent, cyan,
+  gold, purple, red) are theme tokens, so the same status has the same colour on every page.
 
 ## Forms and dialogs
 
@@ -51,6 +54,7 @@ All of these come from `components/ui/PageHeader.tsx`.
 | A dense control in a table row or small popover | `compactControlClass` |
 | Buttons | `Button` with `variant` `primary`, `secondary`, `ghost` or `danger` |
 | "Are you sure?" | `useConfirm()` from `ConfirmDialog`, never `window.confirm()` or `alert()`. Say where the thing goes: "It moves to Trash." |
+| A short typed answer (a name, a passphrase) | `usePrompt()` from `ConfirmDialog`, never `window.prompt()`. `type: 'password'` hides it; `minLength` keeps OK disabled until it is long enough. |
 | An error after an action | An inline line in `--color-red` next to the action, not `alert()`. |
 
 A form ends with the actions on the right: a ghost Cancel, then the primary Save or Add.
@@ -63,7 +67,7 @@ A form ends with the actions on the right: a ghost Cancel, then the primary Save
   status words inside a row can stay lower case ("overdue", "paid").
 - Shared words live under `common.*`: Archive, Show archived ({n}), Hide archived, {n} shown,
   Delete, Cancel, Save, Add, Undo, Remove, Done.
-- Dates go through `formatDate` and money through `formatMoney`, both in the active language.
+- Dates go through `formatDate` and money through `useMoney()` (or `formatMoney` outside React), both in the active language. Never `` `${cur()}${n.toFixed(2)}` ``.
 
 ## Colours
 
@@ -83,6 +87,5 @@ A form ends with the actions on the right: a ghost Cancel, then the primary Save
 ## When the rules do not fit
 
 The test's allowlists name the known exceptions and why: the landing hero, sign-in, setup,
-the error pages, the Settings header (still to move), the command bar's backdrop and a few
-`window.prompt()` calls in Settings. Shrink these lists; do not grow them without saying why
-in the PR.
+the error pages and the command bar's backdrop. Shrink these lists; do not grow them without
+saying why in the PR.

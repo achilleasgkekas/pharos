@@ -1099,8 +1099,8 @@ function ReceiptDetailModal({
             <div className="w-full h-[55vh] md:aspect-[3/4] md:h-auto rounded-xl border border-dashed border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] grid place-items-center text-center px-6">
               <div>
                 <FileText size={34} strokeWidth={1.5} className="mx-auto mb-3 text-[color:var(--color-text-faint)]" />
-                <p className="text-sm font-medium text-[color:var(--color-text-dim)]">No scan file</p>
-                <p className="text-[11px] text-[color:var(--color-text-faint)] mt-1">The original was lost (2026-06 reset). The parsed data is kept — re-upload a scan to attach one.</p>
+                <p className="text-sm font-medium text-[color:var(--color-text-dim)]">{t('rc.noScanFile')}</p>
+                <p className="text-[11px] text-[color:var(--color-text-faint)] mt-1">{t('rc.noScanFileHint')}</p>
               </div>
             </div>
           ) : isImage ? (
