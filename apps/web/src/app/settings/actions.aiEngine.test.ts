@@ -315,10 +315,10 @@ describe('pullOllamaModel', () => {
 });
 
 describe('saveAiConfig', () => {
-  it('falls back to "ollama" for an unrecognized provider', async () => {
+  it('falls back to Claude for an unrecognized provider', async () => {
     await saveAiConfig(formData({ provider: 'made-up-provider' }));
     const [, update] = appConfigUpdateOne.mock.calls[0];
-    expect((update as Record<string, unknown>).$set).toMatchObject({ aiProvider: 'ollama' });
+    expect((update as Record<string, unknown>).$set).toMatchObject({ aiProvider: 'anthropic' });
   });
 
   it('accepts a known provider and strips trailing slashes from host/baseUrl', async () => {
