@@ -113,3 +113,22 @@ export function claudeRateMicros(id: string): ClaudeRateMicros {
     isApproximate: false,
   };
 }
+
+export function rateForModel(id: string): { input: number; output: number; cacheWrite5m: number; cacheRead: number } {
+  const p = claudePrice(id);
+  if (!p) {
+    return {
+      input: 3,
+      output: 15,
+      cacheWrite5m: 3.75,
+      cacheRead: 0.3,
+    };
+  }
+  return {
+    input: p.inputPerMTok,
+    output: p.outputPerMTok,
+    cacheWrite5m: p.cacheWrite5mPerMTok,
+    cacheRead: p.cacheReadPerMTok,
+  };
+}
+
