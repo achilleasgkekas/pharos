@@ -275,7 +275,7 @@ export function ItemsClient({
   const fx: FxCtx = { base: baseCurrency, enabled: multiCurrency };
   const t = useT();
   const cfg = VIEW_CONFIG[view];
-  const viewName = view === 'shopping' ? t('nav.shopping') : t('nav.inventory');
+  const viewName = view === 'shopping' ? t('nav.wishlist') : t('nav.inventory');
   const [filter, setFilter] = useState('');
   const [storeFilter, setStoreFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');

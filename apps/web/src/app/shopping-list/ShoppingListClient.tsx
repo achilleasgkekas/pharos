@@ -12,6 +12,7 @@ import { useT } from '@/components/LocaleProvider';
 import { shrinkImage } from '@/lib/clientImage';
 import { compareNames } from '@/lib/i18n/format';
 import { useLocale } from '@/components/LocaleProvider';
+import { useOpenParam } from '@/components/useOpenParam';
 import {
   addListItem,
   toggleListItem,
@@ -57,6 +58,13 @@ export function ShoppingListClient({ initialItems }: { initialItems: SerializedL
   const [addForm, setAddForm] = useState<Draft>(emptyDraft);
   const [restockItem, setRestockItem] = useState<SerializedListItem | null>(null);
   const [restockDays, setRestockDays] = useState('');
+
+  useOpenParam((id) => {
+    if (id === 'new') {
+      setAddForm(emptyDraft);
+      setShowAdd(true);
+    }
+  });
 
   // E-shop layout state
   const [layout, setLayout] = useState<'grid' | 'list'>('grid');

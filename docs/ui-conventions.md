@@ -77,6 +77,19 @@ A form ends with the actions on the right: a ghost Cancel, then the primary Save
 - For a tint, add an opacity to the token: `bg-[color:var(--color-accent)]/10`. A hex value in
   a class name (`bg-[#00ff8810]`) ignores the light theme and fails the build.
 
+## Navigation and menu structure
+
+Navigation structure is defined centrally in `apps/web/src/lib/nav.ts` and shared across desktop and mobile menus:
+
+- **Desktop**: Sticky top bar provides the logo, AI command bar, direct Home link, 4 dropdown categories (**Money**, **Shopping**, **Home & car**, **Planner**), notification bell, and user account menu.
+- **Account menu**: Holds user profile details, Settings, Jobs, AI history, Trash, language switcher, dark/light theme switch, and sign out.
+- **Mobile (phones)**: Bottom tab bar with 5 primary destinations:
+  - **Home**: (`/`)
+  - **Money**: (`/expenses` and highlights for any Money sub-page)
+  - **Quick Add**: Center action opening a sheet to scan receipts, add expenses, or add to shopping list.
+  - **Calendar**: (`/calendar`)
+  - **More**: Full-height sheet with page search jump-bar, grouped category sections, and account/system tools.
+
 ## Accessibility
 
 - An icon-only button has an `aria-label` (and a `title` for mouse users).

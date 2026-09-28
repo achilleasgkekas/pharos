@@ -62,6 +62,7 @@ import { CURRENCIES } from '@/lib/money';
 import type { SerializedCard } from '@/types';
 import { useT, useLocale, useMoney } from '@/components/LocaleProvider';
 import { SHOPPING_COUNTRIES, SHOPPING_PRESETS } from '@/lib/shoppingRegion';
+import { ForeignShopsEditor } from './ForeignShopsEditor';
 import type { TKey } from '@/lib/i18n';
 import { formatDate, formatTime, formatDateTime, relTime } from '@/lib/i18n/format';
 
@@ -2567,6 +2568,7 @@ function DefaultsManager({ settings }: { settings: AppSettings }) {
   const [lendDays, setLendDays] = useState(String(settings.lendingAlertDays));
   const [claimStaleDays, setClaimStaleDays] = useState(String(settings.staleClaimDays));
   const [syncStaleDays, setSyncStaleDays] = useState(String(settings.syncStaleDays));
+  const confirm = useConfirm();
   const [subscriptionReviewDays, setSubscriptionReviewDays] = useState(String(settings.subscriptionReviewIntervalDays));
   const [autoAdd, setAutoAdd] = useState(settings.autoAddStores);
   const [currency, setCurrency] = useState(settings.currency);
@@ -2574,7 +2576,7 @@ function DefaultsManager({ settings }: { settings: AppSettings }) {
   const [vatRate, setVatRate] = useState(String(settings.defaultVatRate));
   const [returnDays, setReturnDays] = useState(String(settings.defaultReturnWindowDays));
   const [shoppingCountry, setShoppingCountry] = useState(settings.shoppingCountry);
-  const [extraShops, setExtraShops] = useState(settings.shoppingExtraShops.join(', '));
+  const [extraShops, setExtraShops] = useState<string[]>(() => settings.shoppingExtraShops || []);
   const locale = useLocale();
   const countryName = (code: string) => {
     try {
@@ -2584,6 +2586,31 @@ function DefaultsManager({ settings }: { settings: AppSettings }) {
     }
   };
   const [msg, setMsg] = useState<string | null>(null);
+
+  async function handleCountryChange(newCode: string) {
+    const oldPreset = shoppingCountry ? SHOPPING_PRESETS[shoppingCountry]?.extraShops ?? [] : [];
+    const newPreset = newCode ? SHOPPING_PRESETS[newCode]?.extraShops ?? [] : [];
+
+    const isCustomized =
+      extraShops.length > 0 &&
+      (extraShops.length !== oldPreset.length || !extraShops.every((s) => oldPreset.includes(s)));
+
+    setShoppingCountry(newCode);
+
+    if (isCustomized && newCode) {
+      const replace = await confirm({
+        title: t('set.shoppingCountry'),
+        message: t('set.confirmCountryChange', { country: countryName(newCode) }),
+        confirmLabel: t('set.replaceWithPreset'),
+        cancelLabel: t('set.keepCustom'),
+      });
+      if (replace) {
+        setExtraShops([...newPreset]);
+      }
+    } else {
+      setExtraShops([...newPreset]);
+    }
+  }
 
   function save() {
     const fd = new FormData();
@@ -2605,7 +2632,7 @@ function DefaultsManager({ settings }: { settings: AppSettings }) {
     fd.set('defaultVatRate', vatRate);
     fd.set('defaultReturnWindowDays', returnDays);
     fd.set('shoppingCountry', shoppingCountry);
-    fd.set('shoppingExtraShops', extraShops);
+    fd.set('shoppingExtraShops', extraShops.join(', '));
     setMsg(null);
     startTransition(async () => {
       await saveDefaults(fd);
@@ -2655,12 +2682,7 @@ function DefaultsManager({ settings }: { settings: AppSettings }) {
           <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.shoppingCountry')}</span>
           <select
             value={shoppingCountry}
-            onChange={(e) => {
-              const code = e.target.value;
-              setShoppingCountry(code);
-              // Start from the country's usual cross-border shops; the user edits from there.
-              setExtraShops((SHOPPING_PRESETS[code]?.extraShops ?? []).join(', '));
-            }}
+            onChange={(e) => handleCountryChange(e.target.value)}
             className={controlClass}
           >
             <option value="">{t('set.shoppingCountryAny')}</option>
@@ -2674,11 +2696,14 @@ function DefaultsManager({ settings }: { settings: AppSettings }) {
           </select>
         </label>
         {shoppingCountry && (
-          <label className="block">
-            <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.shoppingExtraShops')}</span>
-            <input value={extraShops} onChange={(e) => setExtraShops(e.target.value)} placeholder="amazon.de" className={controlClass} />
-            <span className="block mt-1 text-[11px] text-[color:var(--color-text-faint)]">{t('set.shoppingExtraShopsHint')}</span>
-          </label>
+          <div className="sm:col-span-2">
+            <ForeignShopsEditor
+              country={shoppingCountry}
+              countryLabel={countryName(shoppingCountry)}
+              shops={extraShops}
+              onChange={setExtraShops}
+            />
+          </div>
         )}
         <label className="block">
           <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.trialAlert')}</span>
