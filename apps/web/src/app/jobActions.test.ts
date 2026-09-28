@@ -85,7 +85,9 @@ vi.mock('@/models/Job', () => ({
     countDocuments: jobCountDocuments,
   },
 }));
+vi.mock('@/models/AiRun', () => ({ AiRun: { aggregate: vi.fn(async () => []) } }));
 vi.mock('@/lib/jobRunner', () => ({ ensureProcessor: ensureProcessorMock }));
+vi.mock('@/lib/aiRun', () => ({ getJobAiStats: vi.fn(async () => undefined) }));
 vi.mock('@/lib/aiConfig', () => ({ getAiConfig: getAiConfigMock }));
 vi.mock('@/lib/aiFeatures.server', () => ({ isFeatureEnabled: isFeatureEnabledMock }));
 vi.mock('@/models/AppConfig', () => ({

@@ -79,6 +79,8 @@ const {
 
 vi.mock('@/lib/aiConfig', () => ({ getAiConfig: getAiConfigMock }));
 vi.mock('@/lib/aiFeatures.server', () => ({ isFeatureEnabled: isFeatureEnabledMock }));
+vi.mock('@/lib/aiBudget', () => ({ assertAiBudget: vi.fn(async () => {}), recordAiSpend: vi.fn(async () => {}) }));
+vi.mock('@/lib/aiRun', () => ({ recordAiRun: vi.fn(async () => {}), getJobAiStats: vi.fn(async () => undefined) }));
 vi.mock('@/lib/anthropic', () => ({ anthropicRaw: anthropicRawMock }));
 vi.mock('./aiTools', () => ({
   TOOLS: TOOLS_FIXTURE,

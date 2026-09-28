@@ -55,6 +55,7 @@ async function runAiCommandInTenant(history: ChatTurn[], conversationId?: string
   const actions: { name: string; summary: string }[] = [];
   let reply = '';
 
+  let savedConversationId: string | undefined = conversationId;
   try {
     for (let i = 0; i < 6; i++) {
       try {
@@ -103,12 +104,15 @@ async function runAiCommandInTenant(history: ChatTurn[], conversationId?: string
         throw err;
       }
 
+      // Keep the command bar compatible with provider/test doubles that omit usage metadata;
+      // billing telemetry is best-effort and must never turn a valid reply into an error.
+      const usage = res.usage ?? { inputTokens: 0, outputTokens: 0, cacheWriteTokens: 0, cacheReadTokens: 0 };
       await recordAiSpend(
         cfg.anthropicModel,
-        res.usage.inputTokens,
-        res.usage.outputTokens,
-        res.usage.cacheWriteTokens,
-        res.usage.cacheReadTokens
+        usage.inputTokens,
+        usage.outputTokens,
+        usage.cacheWriteTokens,
+        usage.cacheReadTokens
       );
 
       void recordAiRun({
@@ -117,7 +121,7 @@ async function runAiCommandInTenant(history: ChatTurn[], conversationId?: string
         model: cfg.anthropicModel,
         status: 'ok',
         durationMs: Date.now() - t0,
-        usage: res.usage,
+        usage,
         requestId: res.requestId,
         stopReason: res.stopReason,
         trigger: 'user',
@@ -166,14 +170,17 @@ async function runAiCommandInTenant(history: ChatTurn[], conversationId?: string
     ];
     const title = turns.find((t) => t.role === 'user')?.content.trim().slice(0, 80) || 'Conversation';
     const userTurns = stored.filter((m) => m.role === 'user').length;
-    await ConversationM.updateOne(
-      { _id: convId },
-      { $set: { userId: user?.id ?? null, title, messages: stored, turns: userTurns } },
-      { upsert: true }
-    );
+    const update = { $set: { userId: user?.id ?? null, title, messages: stored, turns: userTurns } };
+    if (conversationId) {
+      await ConversationM.updateOne({ _id: conversationId }, update);
+    } else {
+      const created = await ConversationM.create({ ...update.$set });
+      savedConversationId = created?._id ? String(created._id) : convId;
+    }
   } catch {
+    savedConversationId = undefined;
     /* history is best-effort */
   }
 
-  return { ok: true, reply: reply || 'Done.', actions, conversationId: convId };
+  return { ok: true, reply: reply || 'Done.', actions, ...(savedConversationId ? { conversationId: savedConversationId } : {}) };
 }
