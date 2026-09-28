@@ -18,10 +18,10 @@ describe('matchStore — exact name match', () => {
     expect(matchStore('\tPublic\n')).toBe('Public');
   });
 
-  it('matches a Greek store name (lowercasing preserves Greek letters)', () => {
-    expect(matchStore('Κωτσόβολος')).toBe('Κωτσόβολος');
-    expect(matchStore('κωτσόβολος')).toBe('Κωτσόβολος');
-    expect(matchStore('Πλαίσιο')).toBe('Πλαίσιο');
+  it('normalizes Greek store names to English canonical names', () => {
+    expect(matchStore('Κωτσόβολος')).toBe('Kotsovolos');
+    expect(matchStore('κωτσόβολος')).toBe('Kotsovolos');
+    expect(matchStore('Πλαίσιο')).toBe('Plaisio');
   });
 });
 
@@ -34,15 +34,15 @@ describe('matchStore — exact alias match', () => {
   });
 
   it('resolves a Greek alias to the canonical (Latin or Greek) name', () => {
-    expect(matchStore('kotsovolos')).toBe('Κωτσόβολος');
+    expect(matchStore('kotsovolos')).toBe('Kotsovolos');
     expect(matchStore('γερμανος')).toBe('Germanos');
-    expect(matchStore('plaisio')).toBe('Πλαίσιο');
+    expect(matchStore('plaisio')).toBe('Plaisio');
   });
 
   it('resolves a domain-style alias', () => {
     expect(matchStore('amazon.de')).toBe('Amazon');
     expect(matchStore('eu.store.ui.com')).toBe('EU Store (Ubiquiti)');
-    expect(matchStore('plaisio.gr')).toBe('Πλαίσιο');
+    expect(matchStore('plaisio.gr')).toBe('Plaisio');
   });
 });
 
@@ -56,7 +56,7 @@ describe('matchStore — substring matching (length-guarded)', () => {
     // q = "mediamar" (8 chars) is a substring of alias "mediamarkt"
     expect(matchStore('mediamar')).toBe('MediaMarkt');
     // q = "kotsovolo" is a substring of alias "kotsovolos"
-    expect(matchStore('kotsovolo')).toBe('Κωτσόβολος');
+    expect(matchStore('kotsovolo')).toBe('Kotsovolos');
   });
 
   it('does NOT substring-match short aliases (< 4 chars) to avoid noise', () => {

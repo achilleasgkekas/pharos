@@ -1023,7 +1023,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
               style={{ fontFamily: 'var(--font-mono)' }}
             />
             <p className="mt-1 text-[10px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
-              Optional. Organization admin key (starts with sk-ant-admin-) used to pull live billed usage from Anthropic's Cost Report API.
+              Optional. Organization admin key (starts with sk-ant-admin-) used to pull live billed usage from Anthropic&apos;s Cost Report API.
             </p>
           </Field>
           <div className="flex items-center gap-2">

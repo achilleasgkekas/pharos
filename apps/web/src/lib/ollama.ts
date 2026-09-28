@@ -404,7 +404,7 @@ Schema:
 
 Rules:
 - store: ALWAYS identify it — this is critical. Look at the logo, the largest text at the top, the website/domain, the tax id (VAT no. / ΑΦΜ / USt-IdNr / SIRET), the products' brand, and any footer URL. Prefer the commercial brand over the legal entity (drop suffixes like "Ltd"/"Inc"/"GmbH"/"SARL"/"SA"/"Srl"/"ΑΕ"/"ΕΠΕ"/"ΜΟΝ. ΙΚΕ").
-- Return a name from this KNOWN list ONLY when that store's own brand, logo, or website domain is ACTUALLY printed on the receipt: ${STORE_NAMES.join(', ')}. (e.g. a kotsovolos.gr footer → "Κωτσόβολος".)
+- Return a name from this KNOWN list ONLY when that store's own brand, logo, or website domain is ACTUALLY printed on the receipt: ${STORE_NAMES.join(', ')}. (e.g. a kotsovolos.gr footer → "Kotsovolos".)
 - CRITICAL — do NOT GUESS. If the printed company/legal name (often a Greek ΑΦΜ-registered name like "ΚΑΠΕΤΑΝΟΠΟΥΛΟΣ ΔΑΝΙΗΛΙΔΟΥ") is not one you can confidently tie to a brand above, return THAT printed name VERBATIM. Never substitute a different well-known store you were not actually shown — the app maps legal names to brands itself.
 - Never leave store empty. If truly unknown, return the most prominent name printed at the top.
 - warrantyMonths: only if the receipt explicitly states a warranty period (e.g. "2 years warranty", "Εγγύηση 24 μήνες", "24 Monate Garantie", "garantie 2 ans"); otherwise 0.

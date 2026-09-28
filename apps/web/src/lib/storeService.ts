@@ -7,6 +7,14 @@ import { currentTenant } from './tenancy/current';
 
 export type StoreLite = { _id?: string; name: string; aliases: string[]; url?: string; auto?: boolean; returnWindowDays?: number | null };
 
+// Canonical names were historically stored in Greek for these two curated stores. Keep the
+// Greek spellings as aliases, but migrate the display name so seeded data, AI output and URL
+// imports are English too (#366).
+const LEGACY_CANONICAL_NAMES: Record<string, string> = {
+  'Κωτσόβολος': 'Kotsovolos',
+  'Πλαίσιο': 'Plaisio',
+};
+
 // Cache keyed by tenant. Default/self-hosted tenant uses the '' key → identical behaviour
 // and TTL to the old single-slot cache; SaaS tenants each get their own slot so one tenant's
 // store list never leaks into another's.
@@ -38,6 +46,20 @@ export async function getStores(): Promise<StoreLite[]> {
       /* race / duplicate on concurrent seed */
     }
     docs = await StoreModel.find().sort({ name: 1 }).lean();
+  } else {
+    // Best-effort, idempotent migration for installations seeded before the English canonical
+    // names were introduced. A failure leaves the old names usable through their aliases.
+    for (const [from, to] of Object.entries(LEGACY_CANONICAL_NAMES)) {
+      try {
+        await StoreModel.updateMany(
+          { name: from },
+          { $set: { name: to }, $addToSet: { aliases: from.toLowerCase() } },
+        );
+      } catch {
+        /* migration is cosmetic; do not block opening Settings or receipt forms */
+      }
+    }
+    if (Object.keys(LEGACY_CANONICAL_NAMES).length) docs = await StoreModel.find().sort({ name: 1 }).lean();
   }
   const v: StoreLite[] = docs.map((d) => ({
     _id: String(d._id),
