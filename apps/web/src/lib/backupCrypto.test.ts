@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { encryptBackup, decryptBackup, isEncryptedBackup, BACKUP_ENC_APP } from './backupCrypto';
 
-const PLAIN = JSON.stringify({ app: 'homepage', version: 1, collections: { items: [{ _id: 'a', title: 'NAS' }] } });
+const PLAIN = JSON.stringify({ app: 'homepage', version: 1, collections: { items: [{ _id: 'a', title: 'Synology-NAS-Storage' }] } });
 const PASS = 'correct horse battery';
 
 describe('encrypt → decrypt round-trip', () => {
@@ -17,7 +17,7 @@ describe('encrypt → decrypt round-trip', () => {
     expect(o).toHaveProperty('salt');
     expect(o).toHaveProperty('iv');
     expect(o).toHaveProperty('tag');
-    expect(env).not.toContain('NAS'); // the payload is not readable
+    expect(env).not.toContain('Synology-NAS-Storage'); // the payload is not readable
   });
 
   it('uses a fresh salt+iv each time (same input → different ciphertext)', () => {
