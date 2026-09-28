@@ -23,7 +23,7 @@ const SHOWCASE_MODS = [
   { icon: 'package', title: 'Inventory', count: '214 items', color: 'var(--accent)' },
   { icon: 'receipt', title: 'Receipts', count: '3 to verify', color: 'var(--cyan)' },
   { icon: 'file', title: 'Bills', count: '2 due this week', color: 'var(--gold)' },
-  { icon: 'car', title: 'Vehicles', count: 'ΚΤΕΟ in 12 days', color: 'var(--red)' },
+  { icon: 'car', title: 'Vehicles', count: 'Inspection in 12 days', color: 'var(--red)' },
   { icon: 'idcard', title: 'Documents', count: 'Passport: 5 months', color: 'var(--purple)' },
   { icon: 'calendar', title: 'Calendar', count: '9 events ahead', color: 'var(--cyan)' },
 ];
@@ -40,9 +40,9 @@ const FEATURES = [
 ];
 
 const AI_FIELDS = [
-  { k: 'Store', v: 'Plaisio' },
+  { k: 'Store', v: 'Northwind Market' },
   { k: 'Date', v: '14/09/2026' },
-  { k: 'VAT 24%', v: '€45.63' },
+  { k: 'Tax', v: '€45.63' },
   { k: 'Total', v: '€235.76', color: 'var(--accent)' },
 ];
 
@@ -53,7 +53,7 @@ const AI_LINES = [
 ];
 
 const AI_NOTES = [
-  { icon: 'server', label: 'Local Ollama or your own key' },
+  { icon: 'sparkles', label: 'Claude with your own key' },
   { icon: 'unlock', label: 'Switch it off per feature' },
   { icon: 'check', label: 'Every workflow works without it' },
 ];

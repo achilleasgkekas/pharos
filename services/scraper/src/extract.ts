@@ -22,7 +22,7 @@ Price priority (use the first that applies):
 2. else the schema.org JSON-LD "offers" price — but if it is net/ex-VAT (valueAddedTaxIncluded:false), use the VAT-included price shown on the page instead.
 3. else the price next to the MAIN product — IGNORE related/accessory products listed elsewhere.
 Rules:
-- The price the customer PAYS now, VAT/sales-tax included, after any discount (not list/strikethrough). Prefer the tax-included figure ("incl. VAT", "με ΦΠΑ", "inkl. MwSt", "TTC"); ignore the net/ex-tax price ("excl. VAT", "χωρίς ΦΠΑ", "HT").
+- The price the customer PAYS now, VAT/sales-tax included, after any discount (not list/strikethrough). Prefer the tax-included figure ("incl. VAT", "tax included", "inkl. MwSt", "TTC"); ignore the net/ex-tax price ("excl. VAT", "tax excluded", "HT").
 - The decimal separator may be a comma (EU "1.234,56 €" = 1234.56) or a dot (US/UK "1,234.56"). Always output a dot decimal.
 - If out of stock or no price is shown, price = null and inStock = false.
 - Do not invent a price. JSON only, no markdown.`;

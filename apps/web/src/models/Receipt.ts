@@ -11,7 +11,7 @@ const LineItemSchema = new Schema(
     refinedName: { type: String, default: '' }, // AI-normalized proper product name
     qty: { type: Number, default: 1 },
     price: { type: Number, default: 0 }, // gross unit price (with VAT)
-    vatRate: { type: Number, default: 24 }, // per-item VAT % (GR: 24 / 13 / 6 / 0)
+    vatRate: { type: Number, default: 0 }, // per-item tax rate; users choose the local default during setup
     // P64: optional spend category for THIS line (from the expense taxonomy). Empty =
     // untagged, exactly the pre-P64 behaviour. Distinct from Item.category (only the few
     // lines promoted to tracked inventory) and from Expense.category (one tag for a whole
@@ -28,7 +28,7 @@ const ReceiptSchema = new Schema(
     date: { type: Date, required: true, index: true },
     total: { type: Number, required: true }, // gross, with VAT
     subtotal: { type: Number, default: 0 }, // net, without VAT
-    vatAmount: { type: Number, default: 0 }, // VAT / ΦΠΑ amount
+    vatAmount: { type: Number, default: 0 }, // VAT amount
     warrantyMonths: { type: Number, default: 24 }, // GR default 2 years
     // Multi-currency (P9, see lib/fx.ts). INVARIANT: `total` (and with it `subtotal`,
     // `vatAmount` and the line-item prices, which reports and the item library read)
@@ -50,11 +50,11 @@ const ReceiptSchema = new Schema(
     thumbPath: { type: String, default: '' }, // rendered 1st-page JPEG for PDF list cards
     fileSize: { type: Number, default: 0 },
 
-    rawAiResponse: { type: String, default: '' }, // για debugging
+    rawAiResponse: { type: String, default: '' }, // retained for debugging
     aiModel: { type: String, default: '' },
     aiParsedAt: { type: Date, default: null },
 
-    verified: { type: Boolean, default: false }, // user έλεγξε το AI parsing
+    verified: { type: Boolean, default: false }, // user verified the AI parsing
     // Not a real receipt (shipping/order email, marketing, etc.) — hidden from the
     // list by default and never counted as "failed" / a re-scan candidate.
     archived: { type: Boolean, default: false, index: true },

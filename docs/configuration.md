@@ -33,16 +33,16 @@ Configure this under **Settings → AI**.
 
 | Provider     | Kind        | Needs                                   |
 |--------------|-------------|-----------------------------------------|
-| `ollama`     | Local       | An Ollama server URL + a model name     |
 | `anthropic`  | Cloud       | Anthropic (Claude) API key + model      |
 | `openai`     | Cloud       | OpenAI API key + model                  |
 | `gemini`     | Cloud       | Google Gemini API key + model           |
 | `openrouter` | Cloud       | OpenRouter API key + model              |
 | `custom`     | Cloud/Local | Any OpenAI-compatible base URL + model  |
+| `ollama`     | Local       | An Ollama server URL + a model name     |
 
 The setup wizard recommends `anthropic` with `claude-sonnet-5` for new installations.
-`ollama` remains supported as a local, private, zero-cost provider. Cloud API keys
-are stored server-side only and are never sent to the browser.
+Ollama remains available as an advanced local provider. Cloud API keys are stored
+server-side only and are never sent to the browser.
 
 ### Local (Ollama)
 
@@ -91,9 +91,9 @@ in `apps/web/src/lib/claudeModels.ts` (with a copy for the scraper in
 [model deprecations](https://platform.claude.com/docs/en/about-claude/model-deprecations)
 page.
 
-> **Fail-safe:** if the selected provider is half-configured (e.g. `anthropic`
-> chosen but no key, or `custom` chosen without a base URL/model), Pharos falls
-> back to `ollama` rather than erroring.
+> **Fail-safe:** if the selected provider is half-configured (for example,
+> `anthropic` without a key), Pharos reports that AI is not set up and uses the
+> manual workflow. It does not silently call another provider.
 
 ### Cost guard
 
@@ -257,7 +257,7 @@ and the fallback for any missing string.
 | Code | Language    |
 |------|-------------|
 | `en` | English     |
-| `el` | Ελληνικά    |
+| `el` | Greek       |
 | `es` | Español     |
 | `fr` | Français    |
 | `de` | Deutsch     |

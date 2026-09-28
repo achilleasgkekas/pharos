@@ -106,7 +106,7 @@ Highlights:
 - **Shopping country.** Pick the country you shop in (Settings → General, or the
   setup wizard) and price searches only look at shops that sell there: the
   country's own shops plus the foreign shops you add (Amazon.de by default for
-  most of the EU). A Newegg price for someone in Greece is dropped before it costs
+  most of the EU). A price from an unavailable region is dropped before it costs
   a page fetch. Existing store links outside your market get a **"not in your
   market"** badge and are left out of deal checks.
 - **Maintenance.** Give an owned item an interval (for example "clean the filter
@@ -161,7 +161,7 @@ product, and AI extracts the name.
 Add any product from any e-shop to your inventory or shopping list in one click,
 without leaving the webpage. **How it works:** Visit Settings → Storage & backup →
 **Bookmarklet**. You'll see a "Add to Pharos" link (drag it to your bookmarks bar)
-and a copy-paste code fallback. Then, while browsing an e-shop (Amazon, Skroutz,
+and a copy-paste code fallback. Then, while browsing an e-shop (Amazon or another regional shop,
 Ubiquiti, AliExpress, etc.), click the bookmarklet. A small popup opens on top of
 the page, auto-previews the current product, and AI extracts: title, price, store,
 specs, and category. You see the preview and choose: **Add to Shopping** (for
@@ -390,8 +390,7 @@ Highlights:
 
 ## Bills & payables
 
-A tracker (`/bills`) for the bills you pay **by hand**, such as electricity (ΔΕΗ),
-telephone (ΟΤΕ), or building fees (κοινόχρηστα). This is distinct from
+A tracker (`/bills`) for the bills you pay **by hand**, such as electricity, telephone, or building fees. This is distinct from
 Subscriptions (an **automatic** recurring charge) and from the Calendar (which only
 **projects** the future): a bill has a lifecycle you follow, "is it due?, did I
 pay it?, was it forgotten?".
@@ -451,7 +450,7 @@ Track cars and motorbikes (`/vehicles`): name, plate, make, model, year and spac
 - **Service log.** What was done, the garage, the cost and the odometer.
 - **Running cost.** Fuel spent, service spent and cost per km, worked out from
   the logs. Nothing is stored, so correcting an old entry fixes every figure.
-- **Renewal dates.** MOT / inspection (ΚΤΕΟ), insurance, road tax and the
+- **Renewal dates.** MOT / inspection, insurance, road tax and the
   emissions card show as badges (orange when due soon, red when overdue) and raise
   alerts using the same lead time as Documents.
 - **Also log as expense.** A fill lands in Expenses under `fuel` and a service
@@ -464,7 +463,7 @@ Coupons and discount codes (`/vouchers`). Payment cards live in Settings → Mon
 
 Discount codes and promotional offers: title, code, store, discount %/amount,
 expiry date, URL, and notes. **AI fill** reads a pasted message or a screenshot
-and extracts the fields (for example "15% off Skroutz code SUMMER15 until
+and extracts the fields (for example "15% off code SUMMER15 until
 31/12/2026 min 50 euros"). Expiring coupons surface in the Calendar and can
 trigger notifications; archive or delete expired ones.
 
@@ -620,7 +619,7 @@ Inventory / Shopping can be converted into tasks.
 
 A conversational command bar (in the navbar) lets you type natural-language
 requests such as "add a YouTube subscription", "log expense OTE 84 euros", "mark
-the ΔΕΗ bill as paid", or "show me this month's stats". It is a tool-using agent
+the utility bill as paid", or "show me this month's stats". It is a tool-using agent
 over the app's actions: it can add expenses / income / subscriptions / tasks /
 items / shopping-list lines, log a price, search everything, edit or delete
 existing records, and answer overview questions. If a request is ambiguous it

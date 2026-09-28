@@ -393,7 +393,7 @@ Schema:
   "date": "YYYY-MM-DD",
   "total": <number, GROSS amount paid, with VAT>,
   "subtotal": <number, NET amount without VAT, 0 if not shown>,
-  "vatAmount": <number, the VAT/ΦΠΑ amount, 0 if not shown>,
+  "vatAmount": <number, the VAT/sales tax amount, 0 if not shown>,
   "warrantyMonths": <number, warranty in months IF printed on the receipt, else 0>,
   "currency": "EUR" | "USD" | "GBP",
   "paymentMethod": "Mastercard 1234" | "Cash" | "VISA" etc,
@@ -403,17 +403,17 @@ Schema:
 }
 
 Rules:
-- store: ALWAYS identify it — this is critical. Look at the logo, the largest text at the top, the website/domain, the tax id (VAT no. / ΑΦΜ / USt-IdNr / SIRET), the products' brand, and any footer URL. Prefer the commercial brand over the legal entity (drop suffixes like "Ltd"/"Inc"/"GmbH"/"SARL"/"SA"/"Srl"/"ΑΕ"/"ΕΠΕ"/"ΜΟΝ. ΙΚΕ").
-- Return a name from this KNOWN list ONLY when that store's own brand, logo, or website domain is ACTUALLY printed on the receipt: ${STORE_NAMES.join(', ')}. (e.g. a kotsovolos.gr footer → "Kotsovolos".)
-- CRITICAL — do NOT GUESS. If the printed company/legal name (often a Greek ΑΦΜ-registered name like "ΚΑΠΕΤΑΝΟΠΟΥΛΟΣ ΔΑΝΙΗΛΙΔΟΥ") is not one you can confidently tie to a brand above, return THAT printed name VERBATIM. Never substitute a different well-known store you were not actually shown — the app maps legal names to brands itself.
+- store: ALWAYS identify it — this is critical. Look at the logo, the largest text at the top, the website/domain, the tax id (VAT no. / tax ID / tax ID / business ID), the products' brand, and any footer URL. Prefer the commercial brand over the legal entity (drop suffixes like "Ltd"/"Inc"/"GmbH"/"SARL"/"SA"/"Srl"/"Ltd/Inc").
+- Return a name from this KNOWN list ONLY when that store's own brand, logo, or website domain is ACTUALLY printed on the receipt: ${STORE_NAMES.join(', ')}. (e.g. a store-domain footer → the matching store name.)
+- CRITICAL — do NOT GUESS. If the printed company/legal name (often a Greek tax ID-registered name like "LOCAL BUSINESS NAME") is not one you can confidently tie to a brand above, return THAT printed name VERBATIM. Never substitute a different well-known store you were not actually shown — the app maps legal names to brands itself.
 - Never leave store empty. If truly unknown, return the most prominent name printed at the top.
-- warrantyMonths: only if the receipt explicitly states a warranty period (e.g. "2 years warranty", "Εγγύηση 24 μήνες", "24 Monate Garantie", "garantie 2 ans"); otherwise 0.
-- date: CRITICAL — always find it. Scan the WHOLE image (usually top or top-right, near the document number) for a date label ("Date", "ΗΜΕΡΟΜΗΝΙΑ"/"ΗΜ. ΕΚΔΟΣΗΣ", "Datum", "Fecha", "Data") or a bare date pattern. Output it as YYYY-MM-DD. Read the YEAR digits carefully (e.g. 23/09/2025 → "2025-09-23", NOT 2018 or 2026). Only leave it empty if no date is printed anywhere.
+- warrantyMonths: only if the receipt explicitly states a warranty period (e.g. "2 years warranty", "24-month warranty", "24 Monate Garantie", "garantie 2 ans"); otherwise 0.
+- date: CRITICAL — always find it. Scan the WHOLE image (usually top or top-right, near the document number) for a date label ("Date", "date label"/"date label", "Datum", "Fecha", "Data") or a bare date pattern. Output it as YYYY-MM-DD. Read the YEAR digits carefully (e.g. 23/09/2025 → "2025-09-23", NOT 2018 or 2026). Only leave it empty if no date is printed anywhere.
 - Date order: most of the world is DAY-FIRST (DD/MM/YYYY — all of Europe, including Greece); the US is MONTH-FIRST (MM/DD/YYYY). If the first group is >12 it must be the day. e.g. a European "03/04/2026" = 3 April → "2026-04-03".
 - Numbers: the decimal separator may be a comma (most of Europe: "12,50" = 12.50) or a dot (US/UK). The thousands separator is the other one ("1.234,56" = 1234.56). Always output a dot decimal.
-- total = grand total paid, VAT included ("Total", "ΣΥΝΟΛΟ"/"ΤΕΛΙΚΟ ΣΥΝΟΛΟ", "Gesamt", "Totale", "Total TTC"). subtotal = net / before tax ("Subtotal", "Net", "ΚΑΘΑΡΗ ΑΞΙΑ", "Netto", "HT"). vatAmount = the sales tax ("VAT"/"Tax", "ΦΠΑ", "MwSt"/"USt", "TVA", "IVA").
+- total = grand total paid, VAT included ("Total", "total label", "Gesamt", "Totale", "Total TTC"). subtotal = net / before tax ("Subtotal", "Net", "net amount", "Netto", "HT"). vatAmount = the sales tax ("VAT"/"Tax", "sales tax", "MwSt"/"USt", "TVA", "IVA").
 - If subtotal/vat not shown but a VAT rate is (e.g. 24%): subtotal = total/(1+rate), vatAmount = total - subtotal.
-- vatRate: per-item VAT/sales-tax rate as a number. Rates vary by country (Greece 24/13/6, Germany 19/7, France 20/10/5.5, UK 20, US varies). A Greek receipt may print a VAT category letter (Α=24, Β=13, Γ=6). Use the rate shown; if none is shown, use 24.
+- vatRate: per-item VAT/sales-tax rate as a number. Rates vary by country (Greece 24/13/6, Germany 19/7, France 20/10/5.5, UK 20, US varies). A Greek receipt may print a VAT category letter (country-specific tax bands). Use the rate shown; if none is shown, use the configured default tax rate or 0.
 - refinedName: expand the abbreviated receipt text into the FULL canonical product name as found on retail/manufacturer sites. Example: "WD BLUE SN570 250" → "WD Blue SN570 250GB NVMe SSD"; "RTX5080 GAM OC" → "NVIDIA GeForce RTX 5080 Gaming OC". Keep brand + model + key spec. If it is a generic item (coffee, milk), keep it simple.
 - If a field is unreadable, use empty string or 0`;
 
@@ -427,7 +427,7 @@ export async function parseReceipt(
 }> {
   const { json, raw, model } = await runVisionJSON(
     (await getPromptOverride('receipt')) ?? RECEIPT_SYSTEM_PROMPT,
-    'Extract the receipt data as JSON. Be sure to find the purchase DATE (search the top of the receipt for a date label like "Date" / "ΗΜΕΡΟΜΗΝΙΑ" / "Datum" or a DD/MM/YYYY pattern) and read its year digits exactly.',
+    'Extract the receipt data as JSON. Be sure to find the purchase DATE (search the top of the receipt for a date label like "Date" / "date label" / "Datum" or a DD/MM/YYYY pattern) and read its year digits exactly.',
     [imageBase64],
     { ...opts, feature: opts?.feature ?? 'receipts' }
   );
@@ -490,29 +490,29 @@ Schema:
   "last4": "the last 4 digits of the card number",
   "period": "YYYY-MM that the statement covers",
   "statementDate": "YYYY-MM-DD",
-  "dueDate": "YYYY-MM-DD payment due date (Payment due / λήξη)",
-  "totalAmount": <number, the CURRENT balance you owe now (New balance / ΝΕΟ ΥΠΟΛΟΙΠΟ / ΠΛΗΡΩΤΕΟ ΠΟΣΟ), NOT the previous balance>,
-  "minimumPayment": <number, minimum payment due / ελάχιστη καταβολή>,
+  "dueDate": "YYYY-MM-DD payment due date (Payment due / due date)",
+  "totalAmount": <number, the CURRENT balance you owe now (New balance / new balance / amount due), NOT the previous balance>,
+  "minimumPayment": <number, minimum payment due / minimum payment>,
   "transactions": [
     {"date":"YYYY-MM-DD","description":"merchant","amount":<number>,"currentInstallment":<n?>,"totalInstallments":<n?>}
   ]
 }
 
 Rules:
-- card: the BANK + card network only (e.g. "Chase Visa", "Barclays Mastercard", "Πειραιώς Mastercard", "Alpha Bank Visa"). NEVER use the cardholder's personal name (the ALL-CAPS holder name on the statement is the holder, not the card). If the bank is unclear, use just the network ("Mastercard"/"Visa").
-- totalAmount: the CURRENT amount owed now — "New balance" / "Total amount due" / "ΝΕΟ ΥΠΟΛΟΙΠΟ" / "ΣΥΝΟΛΙΚΗ ΟΦΕΙΛΗ" / "ΠΛΗΡΩΤΕΟ ΠΟΣΟ" / "Neuer Saldo". NEVER the "Previous balance" / "ΠΡΟΗΓΟΥΜΕΝΟ ΥΠΟΛΟΙΠΟ". These appear close together — pick the NEW/current one.
+- card: the BANK + card network only (e.g. "Chase Visa", "Barclays Mastercard", "Example Bank Mastercard", "Example Bank Visa"). NEVER use the cardholder's personal name (the ALL-CAPS holder name on the statement is the holder, not the card). If the bank is unclear, use just the network ("Mastercard"/"Visa").
+- totalAmount: the CURRENT amount owed now — "New balance" / "Total amount due" / "new balance" / "total amount due" / "amount due" / "Neuer Saldo". NEVER the "Previous balance" / "previous balance". These appear close together — pick the NEW/current one.
 - Date order: most countries are DAY-FIRST (DD/MM/YYYY — all of Europe, incl. Greece): "03/04/2026" = 3 April 2026 → "2026-04-03" (NOT 4 March). The US is MONTH-FIRST. If the first group is >12 it must be the day. Read the YEAR exactly; do NOT assume the previous year.
-- statementDate: the issue date of THIS / the newest statement — "Statement date" / "ΗΜΕΡΟΜΗΝΙΑ ΕΚΔΟΣΗΣ". A statement header usually shows TWO dates side by side: the current issue date and, next to it, the PREVIOUS statement's date ("Previous statement" / "ΠΡΟΗΓΟΥΜΕΝΗ ΕΚΔΟΣΗ"). ALWAYS pick the LATER/more-recent of the two — that is the current issue date. NEVER the previous/earlier one.
+- statementDate: the issue date of THIS / the newest statement — "Statement date" / "date label". A statement header usually shows TWO dates side by side: the current issue date and, next to it, the PREVIOUS statement's date ("Previous statement" / "previous statement"). ALWAYS pick the LATER/more-recent of the two — that is the current issue date. NEVER the previous/earlier one.
 - period: the month the statement covers, derived from the CURRENT statementDate (the later date). Same year as statementDate.
 - last4: the final 4 digits of the card number (often shown as ****1234 or XXXX 1234).
 - Decimals: a comma may be the decimal separator (EU: "1.234,56" = 1234.56) or a dot (US/UK). Always output a dot decimal.
-- Installments — CRITICAL: the installment counter may appear as "Installment 3 of 12" / "Instalment 3/12" / "Rate 3/12" / "ΔΟΣΗ 3/12", OR (common in Greece) encoded INLINE in the merchant text as "NN/MM" right after the store name with NO keyword. Extract it. Examples:
-    "PLAISIO 09/12   39,47"      → {"description":"PLAISIO","amount":39.47,"currentInstallment":9,"totalInstallments":12}
+- Installments — CRITICAL: the installment counter may appear as "Installment 3 of 12" / "Instalment 3/12" / "Rate 3/12" / "installment 3/12", OR (common in Greece) encoded INLINE in the merchant text as "NN/MM" right after the store name with NO keyword. Extract it. Examples:
+    "STORE 09/12   39,47"      → {"description":"STORE","amount":39.47,"currentInstallment":9,"totalInstallments":12}
     "AMAZON 03/36   25,25"       → {"description":"AMAZON","amount":25.25,"currentInstallment":3,"totalInstallments":36}
     "STORE 03/04   48,33"        → {"description":"STORE","amount":48.33,"currentInstallment":3,"totalInstallments":4}
     "Installment 3 of 12"        → currentInstallment:3, totalInstallments:12
   Strip the "NN/MM" out of "description" (keep only the merchant). Do NOT confuse it with a date: a full DD/MM/YYYY (with a 4-digit year) at the START of the line is the transaction date; a short NN/MM (MM a small count like 04, 06, 12, 24, 36) at the END of the merchant text is the installment counter. Statement lines often start with two dates (purchase date, then posting date) — use the posting (second/later) date as "date".
-- Purchases are POSITIVE amounts. Payments/credits ("Payment"/"Credit"/"Refund", "ΠΛΗΡΩΜΗ"/"ΠΙΣΤΩΣΗ") are NEGATIVE — a negative total means you overpaid (credit balance).
+- Purchases are POSITIVE amounts. Payments/credits ("Payment"/"Credit"/"Refund", "payment/credit") are NEGATIVE — a negative total means you overpaid (credit balance).
 - Include every transaction line you can read`;
 
 export async function parseStatementText(
@@ -574,11 +574,11 @@ Price priority (use the first that applies):
 2. else the schema.org JSON-LD offers price — BUT if that figure is net/ex-VAT (valueAddedTaxIncluded:false), use the VAT-included price shown on the page instead.
 3. else the price shown next to the MAIN product — IGNORE prices of related/accessory products listed elsewhere on the page.
 Rules:
-- Always the price the customer actually PAYS, VAT/sales-tax included. Prefer the tax-included figure ("incl. VAT", "με ΦΠΑ"/"Περιλαμβάνει ΦΠΑ", "inkl. MwSt", "TTC"); do NOT use the net/ex-tax price ("excl. VAT", "χωρίς ΦΠΑ", "HT", "Netto"). Never the list/strikethrough price.
+- Always the price the customer actually PAYS, VAT/sales-tax included. Prefer the tax-included figure ("incl. VAT", "tax included", "inkl. MwSt", "TTC"); do NOT use the net/ex-tax price ("excl. VAT", "tax excluded", "HT", "Netto"). Never the list/strikethrough price.
 - Decimals: a comma may be the decimal separator (EU: "1.234,56" = 1234.56) or a dot (US/UK). Always output a dot decimal.
 - currency: report ONLY a code you can actually see next to the price (a symbol counts: "$" on a US shop = USD, "CA$"/"C$" = CAD, "A$" = AUD, "£" = GBP, "€" = EUR, "CHF" = CHF). Never guess it from the site's country or language. Output "" when the page shows no currency at all.
 - title: clean product name only (brand + model + key spec). Strip store suffixes like " - Ubiquiti Store", " | Amazon", " - Newegg".
-- category: output EXACTLY ONE word from the list (not a list). Pick the closest for a home-lab / networking / computing context.`;
+- category: output EXACTLY ONE word from the list (not a list). Pick the closest for a household inventory context.`;
 
 export async function parseProductFromPage(
   page: {
@@ -682,8 +682,8 @@ Given a subscription name, return its typical details for an individual/personal
   "notes": "short note, e.g. what the plan includes"
 }
 Rules:
-- amount = the standard price of the most common personal plan (default to EUR pricing unless another currency is implied); pick the billingCycle that price refers to (usually monthly).
-- If you are unsure of the exact price, give your best estimate and mention it in notes.
+- amount = the standard price of the most common personal plan (use the user's configured currency unless another currency is explicitly shown); pick the billingCycle that price refers to (usually monthly).
+- If you are unsure of the exact price, leave amount empty when the price is uncertain and ask the user to confirm.
 - category: pick exactly ONE from the list.`;
 
 export async function suggestSubscription(
@@ -767,7 +767,7 @@ You parse a bill, invoice, utility statement, rent receipt, or payslip into ONE 
   "recurringCycle": "monthly" | "quarterly" | "yearly" | ""
 }
 Rules:
-- vendor: the issuing company / payer. Utility bill → the provider (e.g. "ΔΕΗ"/"PPC", "EYDAP", "Vodafone", "British Gas"). Payslip → the employer. Rent → the landlord. Fuel → the station/brand. Be consistent so the SAME provider always gets the SAME name (this groups a recurring series).
+- vendor: the issuing company / payer. Utility bill → the provider (e.g. "Electric Co."/"PPC", "Water Co.", "Vodafone", "British Gas"). Payslip → the employer. Rent → the landlord. Fuel → the station/brand. Be consistent so the SAME provider always gets the SAME name (this groups a recurring series).
 - kind: a payslip / salary / wages / pension = "income"; everything else (bills, invoices, fuel, rent, taxes) = "expense".
 - amount: the total payable / amount paid, tax included. Decimal comma or dot → output a dot decimal ("1.234,56" = 1234.56).
 - date: DAY-FIRST in most of the world (DD/MM/YYYY — all of Europe), MONTH-FIRST in the US. If the first group is >12 it is the day. Output YYYY-MM-DD.

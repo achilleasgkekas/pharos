@@ -2298,7 +2298,7 @@ components:
         deleted: { type: boolean }
     SplitEntry:
       type: object
-      description: 'One other person who owes you part of the expense (P35). Your own portion is implicit: amount − Σ share.'
+      description: 'One other person who owes you part of the expense (P35). Your own portion is implicit: amount minus the share total.'
       properties:
         name: { type: string, description: 'Free-form name, not an app account.' }
         share: { type: number }

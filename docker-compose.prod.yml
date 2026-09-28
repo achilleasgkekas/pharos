@@ -22,11 +22,6 @@ services:
       - "3000:3000"
     environment:
       MONGO_URI: mongodb://${MONGO_USER:-admin}:${MONGO_PASS:-changeme}@mongo:27017/homepage?authSource=admin
-      # Ollama runs NATIVE on the host — reach it via the host gateway.
-      OLLAMA_HOST: ${OLLAMA_HOST:-http://host.docker.internal:11434}
-      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5vl:7b}
-      OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE:-30m}
-      OLLAMA_NUM_CTX: ${OLLAMA_NUM_CTX:-8192}
       SOLVER_URL: ${SOLVER_URL:-http://flaresolverr:8191}
       SEARXNG_URL: ${SEARXNG_URL:-http://searxng:8080}
       STORAGE_ROOT: /storage

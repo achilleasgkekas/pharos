@@ -68,33 +68,33 @@ function buildEn(now: Date): SampleData {
 
 function buildEl(now: Date): SampleData {
   const items: Record<string, unknown>[] = [
-    { title: 'Ασύρματα Ακουστικά', category: 'audio', status: 'installed', specs: 'Bluetooth 5.3, ακύρωση θορύβου', currentPrice: 129, purchasedPrice: 129, purchasedFrom: 'Skroutz', purchasedAt: monthsAgo(now, 2), warrantyUntil: daysFromNow(now, 500), tags: ['audio', 'sample'], isSample: true },
-    { title: 'Γραφείο Standing Desk', category: 'other', status: 'received', specs: 'Ηλεκτρικό ύψος, 140x70εκ', currentPrice: 349, purchasedPrice: 349, purchasedFrom: 'ΙΚΕΑ', purchasedAt: monthsAgo(now, 4), tags: ['sample'], isSample: true },
+    { title: 'Wireless Headphones', category: 'audio', status: 'installed', specs: 'Bluetooth 5.3, active noise cancellation', currentPrice: 129, purchasedPrice: 129, purchasedFrom: 'Northwind Market', purchasedAt: monthsAgo(now, 2), warrantyUntil: daysFromNow(now, 500), tags: ['audio', 'sample'], isSample: true },
+    { title: 'Standing Desk', category: 'other', status: 'received', specs: 'Electric height adjustment, 140x70 cm', currentPrice: 349, purchasedPrice: 349, purchasedFrom: 'Home Supply Co.', purchasedAt: monthsAgo(now, 4), tags: ['sample'], isSample: true },
     { title: 'Air Fryer', category: 'other', status: 'installed', specs: '5.5L, digital display', currentPrice: 89, purchasedPrice: 79, purchasedFrom: 'Kotsovolos', purchasedAt: monthsAgo(now, 1), tags: ['sample'], isSample: true },
-    { title: 'Μηχανικό Πληκτρολόγιο', category: 'peripheral', status: 'researching', specs: 'Hot-swap, 75% layout', currentPrice: 149, targetPrice: 110, tags: ['sample'], isSample: true },
-    { title: 'Ρομποτική Σκούπα', category: 'other', status: 'decided', specs: 'LIDAR χαρτογράφηση, βάση αυτοαδειάσματος', currentPrice: 399, targetPrice: 320, tags: ['sample'], isSample: true },
-    { title: 'Φορητή Οθόνη', category: 'video', status: 'ordered', specs: '15.6" 1080p USB-C', currentPrice: 219, tags: ['sample'], isSample: true },
+    { title: 'Mechanical Keyboard', category: 'peripheral', status: 'researching', specs: 'Hot-swap, 75% layout', currentPrice: 149, targetPrice: 110, tags: ['sample'], isSample: true },
+    { title: 'Robot Vacuum', category: 'other', status: 'decided', specs: 'LiDAR mapping, self-emptying dock', currentPrice: 399, targetPrice: 320, tags: ['sample'], isSample: true },
+    { title: 'Portable Monitor', category: 'video', status: 'ordered', specs: '15.6" 1080p USB-C', currentPrice: 219, tags: ['sample'], isSample: true },
   ];
 
   const receipts: Record<string, unknown>[] = [
-    { store: 'Skroutz', date: monthsAgo(now, 2), total: 129, subtotal: 104.03, vatAmount: 24.97, paymentMethod: 'card', filePath: '', lineItems: [{ name: 'Ασύρματα Ακουστικά', qty: 1, price: 129, vatRate: 24 }], verified: true, isSample: true },
-    { store: 'ΙΚΕΑ', date: monthsAgo(now, 4), total: 349, subtotal: 281.45, vatAmount: 67.55, paymentMethod: 'card', filePath: '', lineItems: [{ name: 'Γραφείο Standing Desk', qty: 1, price: 349, vatRate: 24 }], verified: true, isSample: true },
-    { store: 'Carrefour', date: daysAgo(now, 10), total: 62.4, subtotal: 50.32, vatAmount: 12.08, paymentMethod: 'card', filePath: '', lineItems: [{ name: 'Ψώνια σούπερ μάρκετ', qty: 1, price: 62.4, vatRate: 24 }], verified: true, isSample: true },
-    { store: 'Public', date: daysAgo(now, 20), total: 34.9, subtotal: 28.15, vatAmount: 6.75, paymentMethod: 'cash', filePath: '', lineItems: [{ name: 'Καλώδιο USB-C', qty: 2, price: 17.45, vatRate: 24 }], verified: false, isSample: true },
+    { store: 'Northwind Market', date: monthsAgo(now, 2), total: 129, subtotal: 129, vatAmount: 0, paymentMethod: 'card', filePath: '', lineItems: [{ name: 'Wireless Headphones', qty: 1, price: 129, vatRate: 0 }], verified: true, isSample: true },
+    { store: 'Home Supply Co.', date: monthsAgo(now, 4), total: 349, subtotal: 349, vatAmount: 0, paymentMethod: 'card', filePath: '', lineItems: [{ name: 'Standing Desk', qty: 1, price: 349, vatRate: 0 }], verified: true, isSample: true },
+    { store: 'City Market', date: daysAgo(now, 10), total: 62.4, subtotal: 62.4, vatAmount: 0, paymentMethod: 'card', filePath: '', lineItems: [{ name: 'Weekly groceries', qty: 1, price: 62.4, vatRate: 0 }], verified: true, isSample: true },
+    { store: 'Tech Outlet', date: daysAgo(now, 20), total: 34.9, subtotal: 34.9, vatAmount: 0, paymentMethod: 'cash', filePath: '', lineItems: [{ name: 'USB-C cable', qty: 2, price: 17.45, vatRate: 0 }], verified: false, isSample: true },
   ];
 
   const expenses: Record<string, unknown>[] = [];
   for (let m = 2; m >= 0; m--) {
     const d = monthsAgo(now, m);
-    expenses.push({ kind: 'expense', vendor: 'Ιδιοκτήτης', vendorKey: 'idioktitis', category: 'rent', amount: 650, date: d, period: period(d), recurring: true, recurringCycle: 'monthly', verified: true, isSample: true });
-    expenses.push({ kind: 'expense', vendor: 'ΔΕΗ', vendorKey: 'dei', category: 'utilities', amount: [45.2, 58.9, 51.3][2 - m], date: d, period: period(d), recurring: true, recurringCycle: 'monthly', verified: true, isSample: true });
+    expenses.push({ kind: 'expense', vendor: 'Property Manager', vendorKey: 'property-manager', category: 'rent', amount: 650, date: d, period: period(d), recurring: true, recurringCycle: 'monthly', verified: true, isSample: true });
+    expenses.push({ kind: 'expense', vendor: 'Electric Co.', vendorKey: 'electric-co', category: 'utilities', amount: [45.2, 58.9, 51.3][2 - m], date: d, period: period(d), recurring: true, recurringCycle: 'monthly', verified: true, isSample: true });
   }
   for (let m = 1; m >= 0; m--) {
     const d = monthsAgo(now, m);
-    expenses.push({ kind: 'income', vendor: 'Εργοδότης ΑΕ', vendorKey: 'ergodotis', category: 'salary', amount: 2200, date: d, period: period(d), recurring: true, recurringCycle: 'monthly', verified: true, isSample: true });
+    expenses.push({ kind: 'income', vendor: 'Employer Inc.', vendorKey: 'employer-inc', category: 'salary', amount: 2200, date: d, period: period(d), recurring: true, recurringCycle: 'monthly', verified: true, isSample: true });
   }
-  expenses.push({ kind: 'expense', vendor: 'Πρατήριο Καυσίμων', vendorKey: 'pratirio', category: 'fuel', amount: 55, date: daysAgo(now, 5), period: period(daysAgo(now, 5)), verified: true, isSample: true });
-  expenses.push({ kind: 'expense', vendor: 'Σούπερ Μάρκετ', vendorKey: 'supermarket', category: 'groceries', amount: 78.2, date: daysAgo(now, 3), period: period(daysAgo(now, 3)), verified: true, isSample: true });
+  expenses.push({ kind: 'expense', vendor: 'Fuel Station', vendorKey: 'fuel-station', category: 'fuel', amount: 55, date: daysAgo(now, 5), period: period(daysAgo(now, 5)), verified: true, isSample: true });
+  expenses.push({ kind: 'expense', vendor: 'City Market', vendorKey: 'city-market', category: 'groceries', amount: 78.2, date: daysAgo(now, 3), period: period(daysAgo(now, 3)), verified: true, isSample: true });
 
   const subscriptions: Record<string, unknown>[] = [
     { name: 'Netflix', provider: 'Netflix', category: 'streaming', amount: 13.99, billingCycle: 'monthly', startDate: monthsAgo(now, 6), nextRenewal: daysFromNow(now, 12), isSample: true },

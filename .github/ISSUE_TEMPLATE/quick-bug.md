@@ -1,29 +1,29 @@
 ---
-name: "⚡ Γρήγορο bug (Αχιλλέας)"
-about: "Για τον owner — γράψε ό,τι είδες, τα υπόλοιπα τα βρίσκει το triage"
+name: "⚡ Quick bug report"
+about: "Describe what you saw; triage will handle the rest"
 title: ''
 labels: bug, needs-triage
 assignees: ''
 ---
 
-**Τι είδα**
-<!-- Μία-δύο γραμμές φτάνουν. Γράψε το όπως θα το έλεγες. -->
+**What happened**
+<!-- A sentence or two is enough. -->
 
 
-**Πού**
-<!-- Άφησε μόνο αυτό που ισχύει -->
+**Where**
+<!-- Leave only what applies. -->
 - [ ] self-hosted (https://pharos.example.com)
 - [ ] SaaS (app.ph-aros.com)
-- [ ] δεν ξέρω / και στα δύο
+- [ ] not sure / both
 
-**Πόσο επείγει**
-<!-- Αν δεν βάλεις τίποτα, το triage θα το κρίνει μόνο του -->
-- [ ] p0 — χαλασμένο ή χάνονται δεδομένα
-- [ ] p1 — με εμποδίζει
-- [ ] p2 — ενοχλητικό
-- [ ] p3 — όποτε υπάρχει χρόνος
+**Priority**
+<!-- If you leave this blank, triage will decide. -->
+- [ ] p0 — broken or data loss
+- [ ] p1 — blocking work
+- [ ] p2 — inconvenient
+- [ ] p3 — whenever possible
 
 <!--
-Τα παρακάτω είναι προαιρετικά — μη χάνεις χρόνο αν δεν τα έχεις πρόχειρα.
-Screenshot: σύρε το εδώ μέσα.
+The following are optional — do not spend time finding them.
+Screenshot: drag it here.
 -->

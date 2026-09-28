@@ -38,7 +38,7 @@ export function SetupWizard() {
 
   // Step 2 state
   const [currency, setCurrency] = useState('EUR');
-  const [vat, setVat] = useState('24');
+  const [vat, setVat] = useState('0');
   // Shopping country (#319): null until the user picks, and until then the browser's region
   // (el-GR → Greece) is the suggestion. Read through useSyncExternalStore so the server render
   // ('' = anywhere) and the client agree during hydration.

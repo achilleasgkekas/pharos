@@ -168,7 +168,7 @@ the same plan even when they appear in different monthly statements.
 so files and references are kept for a lossless restore. See **Trash**.
 
 **Store resolution.** Normalising a raw store name (lowercase, accents stripped,
-Greek→Latin, domain/legal-suffix removed) so that variants ("iStorm",
+local-script to Latin, domain/legal-suffix removed) so that variants ("iStorm",
 "istorm.gr", "i-Storm") map to one store. Powers duplicate-store merging and
 **auto-add stores**.
 
@@ -188,7 +188,7 @@ receipt being **archived**. See [Features → Trash](features.md#trash-soft-dele
 
 ## V
 
-**vendorKey.** A normalised form of a vendor name (Greek→Latin, lowercased) used
+**vendorKey.** A normalised form of a vendor name (local-script to Latin, lowercased) used
 to group recurring expense/income records into a **series**, so a monthly utility
 bill from the same provider is recognised as a continuation.
 
