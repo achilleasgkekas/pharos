@@ -648,6 +648,20 @@ without speech recognition (Firefox) and when Pharos is opened over plain `http`
 on a non-localhost address, because browsers only grant the microphone to secure
 origins.
 
+### AI cost tracking, model pricing & run history
+
+Pharos provides fine-grained observability and budget safeguards for cloud AI:
+
+- **Per-model pricing table (#360)**: Exact token rates for input, output, prompt cache write, and prompt cache read across all supported Claude models (including Claude 3.5 Haiku, Sonnet 3.5, Sonnet 3.7, and Opus). Prompt cache hits (read tokens) are automatically priced at 90% discount. Accurate cost estimates are displayed before running bulk operations (e.g. AI-filling items or bulk re-scanning receipts) and on store price searches.
+- **Run history & telemetry (#362)**: Every AI call across the application—including document parsers (receipts, statements, cards, expenses), web scraper jobs, vision OCR, background workers, and conversational turns—is recorded in the `AiRun` collection with exact token counts, calculated costs, durations, and request IDs. Runs are retained with a 365-day MongoDB TTL index and excluded from JSON exports to keep backups lean.
+  - The `/history` page includes a dedicated **AI Runs** tab with preset date ranges (Today, 7 days, 30 days, Month to date, Custom date range), feature and status filters, daily spend breakdown, runs table, an inspector drawer with run metadata and error diagnosis, and a one-click CSV export.
+  - Background jobs on `/jobs` show aggregated AI costs, token counts, and call tallies on bulk job runs.
+- **Live spend & balance (#361)**:
+  - **Real-time spend card**: Settings → AI features a live-updating spend dashboard displaying today's and month-to-date spend, token breakdowns, and monthly spend cap progress.
+  - **Timezone-aware periods**: Configurable spend timezone aligns daily and monthly billing cycles with local midnight boundaries instead of standard UTC.
+  - **Anthropic Admin API integration**: By providing an optional Anthropic Admin Key (`sk-ant-admin...`), Pharos queries Anthropic's Organization Cost Report API to compare local tracked spend against actual Anthropic invoice billing.
+  - **Hard monthly spend cap**: Enforces a monthly spend ceiling that gracefully blocks new cloud AI calls when reached while keeping local Ollama models fully functional.
+
 ## Search
 
 Global search across items, receipts, statements, tasks, subscriptions,

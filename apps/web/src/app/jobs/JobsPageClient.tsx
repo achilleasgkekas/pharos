@@ -2,7 +2,7 @@
 import { useEffect, useState, useTransition } from 'react';
 import Link from 'next/link';
 import {
-  Activity, UploadCloud, ScanLine, Sparkles, Loader2, CheckCircle2, XCircle, X, RefreshCw, Settings,
+  Activity, UploadCloud, ScanLine, Sparkles, Loader2, CheckCircle2, XCircle, X, RefreshCw, Settings, Zap,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -163,6 +163,14 @@ export function JobsPageClient({
                     <span className="text-[color:var(--color-text-dim)] truncate">{j.lastLabel}{j.lastDetail ? ` — ${j.lastDetail}` : ''}</span>
                   </div>
                 )}
+                {j.aiStats && j.aiStats.runs > 0 && (
+                  <div className="flex items-center gap-1.5 mt-1.5 text-[10px] text-[color:var(--color-accent)] font-mono">
+                    <Zap size={11} className="shrink-0" />
+                    <span>
+                      ${(j.aiStats.costMicros / 1_000_000).toFixed(4)} USD · {j.aiStats.tokens.toLocaleString()} tokens ({j.aiStats.runs} AI calls)
+                    </span>
+                  </div>
+                )}
               </div>
             );
           })}
@@ -207,6 +215,15 @@ function JobDetailView({ d }: { d: JobDetail }) {
         <Stat label={t('jobs.ok')} value={d.ok} tone="ok" />
         {d.status === 'running' ? <Stat label={t('jobs.done')} value={d.done} /> : <Stat label={t('jobs.failed')} value={failed} tone={failed ? 'bad' : undefined} />}
       </div>
+
+      {d.aiStats && d.aiStats.runs > 0 && (
+        <div className="flex items-center gap-2 p-2.5 rounded-xl border border-[color:var(--color-accent)]/30 bg-[color:var(--color-accent)]/10 text-xs text-[color:var(--color-accent)] font-mono">
+          <Zap size={14} className="shrink-0" />
+          <span>
+            AI Telemetry: ${(d.aiStats.costMicros / 1_000_000).toFixed(4)} USD · {d.aiStats.tokens.toLocaleString()} tokens across {d.aiStats.runs} AI calls
+          </span>
+        </div>
+      )}
 
       {d.error && <p className="text-xs text-[color:var(--color-red)] bg-[color:var(--color-red)]/10 rounded-lg px-3 py-2 break-words">{d.error}</p>}
 

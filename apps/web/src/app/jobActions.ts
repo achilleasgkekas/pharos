@@ -119,13 +119,47 @@ export async function enqueueOnedriveSync(): Promise<{ ok: boolean; error?: stri
   return { ok: true, count: manifest.items.length };
 }
 
-export type JobRow = SerializedJob & { createdAt: string; finishedAt: string | null };
+import { AiRun } from '@/models/AiRun';
+import { getJobAiStats } from '@/lib/aiRun';
+
+export type JobAiStats = { costMicros: number; tokens: number; runs: number };
+export type JobRow = SerializedJob & { createdAt: string; finishedAt: string | null; aiStats?: JobAiStats };
 
 /** All recent jobs (running first, then newest) — the full /jobs page view. */
 export async function getJobs(): Promise<JobRow[]> {
   await connectDB();
   void ensureProcessor(); // self-heal a running job after a server restart
   const jobs = await Job.find({}).sort({ createdAt: -1 }).limit(60).lean();
+  const jobIds = jobs.map((j) => String(j._id));
+
+  const statsMap = new Map<string, JobAiStats>();
+  try {
+    const AiRunModel = await withRequestTenant(() => currentModel(AiRun));
+    const aiStatsRaw = await AiRunModel.aggregate([
+      { $match: { jobId: { $in: jobIds } } },
+      {
+        $group: {
+          _id: '$jobId',
+          costMicros: { $sum: '$costMicros' },
+          inputTokens: { $sum: '$usage.inputTokens' },
+          outputTokens: { $sum: '$usage.outputTokens' },
+          runs: { $sum: 1 },
+        },
+      },
+    ]);
+    for (const s of aiStatsRaw) {
+      if (s._id) {
+        statsMap.set(String(s._id), {
+          costMicros: Number(s.costMicros) || 0,
+          tokens: (Number(s.inputTokens) || 0) + (Number(s.outputTokens) || 0),
+          runs: Number(s.runs) || 0,
+        });
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+
   const rows: JobRow[] = jobs.map((j) => ({
     _id: String(j._id),
     kind: j.kind,
@@ -142,6 +176,7 @@ export async function getJobs(): Promise<JobRow[]> {
     error: j.error ?? '',
     createdAt: (j as { createdAt: Date }).createdAt.toISOString(),
     finishedAt: j.finishedAt ? (j.finishedAt as Date).toISOString() : null,
+    aiStats: statsMap.get(String(j._id)),
   }));
   const rank = (s: string) => (s === 'running' ? 0 : 1);
   return rows.sort((a, b) => rank(a.status) - rank(b.status) || (a.createdAt < b.createdAt ? 1 : -1));
@@ -155,6 +190,7 @@ export async function getJobDetail(id: string): Promise<JobDetail | null> {
   await connectDB();
   const j = await Job.findById(id).lean();
   if (!j) return null;
+  const aiStats = await getJobAiStats(id).catch(() => undefined);
   return {
     _id: String(j._id),
     kind: j.kind,
@@ -175,6 +211,7 @@ export async function getJobDetail(id: string): Promise<JobDetail | null> {
     itemCount: (j.itemIds ?? []).length,
     useOcr: j.useOcr ?? false,
     results: (j.results ?? []).map((r) => ({ label: String(r.label ?? ''), ok: !!r.ok, detail: String(r.detail ?? '') })),
+    aiStats: aiStats?.runs ? aiStats : undefined,
   };
 }
 

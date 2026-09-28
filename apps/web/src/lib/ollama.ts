@@ -6,8 +6,19 @@ import { resolveStore } from './storeService';
 import { getAiConfig, scraperConfig } from './aiConfig';
 import { anthropicJSON } from './anthropic';
 import { openaiCompatJSON, geminiJSON } from './aiProviders';
-import { getPromptOverride } from './prompts';
+import { ENGLISH_OUTPUT_RULE, getPromptOverride } from './prompts';
 import { assertAiBudget, recordAiSpend } from './aiBudget';
+import { recordAiRun } from './aiRun';
+import type { AiFeatureKey } from './aiFeatures';
+
+export type AiRunMeta = {
+  feature?: AiFeatureKey | 'scraperPrice' | 'test';
+  record?: { type: string; id: string };
+  trigger?: 'user' | 'job' | 'cron' | 'email' | 'api';
+  jobId?: string;
+  userId?: string;
+  numCtx?: number;
+};
 
 const OLLAMA_HOST = process.env.OLLAMA_HOST ?? 'http://localhost:11434';
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL ?? 'qwen2.5vl:7b';
@@ -51,7 +62,19 @@ async function cloudJSON(
   system: string,
   user: string,
   imagesBase64?: string[]
-): Promise<{ json: unknown; raw: string; model: string; usage?: { inputTokens: number; outputTokens: number } } | null> {
+): Promise<{
+  json: unknown;
+  raw: string;
+  model: string;
+  usage?: {
+    inputTokens: number;
+    outputTokens: number;
+    cacheWriteTokens?: number;
+    cacheReadTokens?: number;
+  };
+  requestId?: string;
+  stopReason?: string;
+} | null> {
   switch (cfg.provider) {
     case 'anthropic':
       return anthropicJSON({ apiKey: cfg.anthropicApiKey, workspaceId: cfg.anthropicWorkspaceId, model: cfg.anthropicModel, system, user, imagesBase64 });
@@ -71,74 +94,251 @@ async function cloudJSON(
 export async function runVisionJSON(
   systemPrompt: string,
   userPrompt: string,
-  imagesBase64: string[]
+  imagesBase64: string[],
+  opts?: AiRunMeta
 ): Promise<{ json: unknown; raw: string; model: string }> {
   const cfg = await getAiConfig();
-  // Master switch off → never hit a provider. Call sites gate per-feature first and
-  // give friendly messages; this is the last-resort guard so nothing slips through.
-  if (!cfg.aiEnabled) throw new Error('AI is turned off');
-  // Spend cap: block a CLOUD call once this month's estimated AI spend reaches the configured
-  // budget. Local Ollama is free, so it is never gated.
-  if (cfg.provider !== 'ollama') await assertAiBudget();
-  const cloud = await cloudJSON(cfg, systemPrompt, userPrompt, imagesBase64);
-  if (cloud) {
-    await recordAiSpend(cloud.model, cloud.usage?.inputTokens ?? 0, cloud.usage?.outputTokens ?? 0);
-    return cloud;
+  const feature = opts?.feature ?? 'receipts';
+  const provider = cfg.provider;
+  const targetModel = provider === 'ollama' ? cfg.ollamaVisionModel : (provider === 'anthropic' ? cfg.anthropicModel : 'cloud');
+
+  // Master switch off → never hit a provider.
+  if (!cfg.aiEnabled) {
+    void recordAiRun({
+      feature,
+      provider,
+      model: targetModel,
+      status: 'blocked',
+      durationMs: 0,
+      error: 'AI is turned off',
+      trigger: opts?.trigger,
+      record: opts?.record,
+      jobId: opts?.jobId,
+      userId: opts?.userId,
+    });
+    throw new Error('AI is turned off');
   }
-  // Vision tasks must run on a vision-capable model, not the active text model.
-  const visionModel = cfg.ollamaVisionModel;
-  const response = await clientFor(cfg.ollamaHost).chat({
-    model: visionModel,
-    keep_alive: KEEP_ALIVE,
-    format: 'json',
-    options: { temperature: 0.1, num_ctx: NUM_CTX },
-    messages: [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: userPrompt, images: imagesBase64 },
-    ],
-  });
-  const raw = response.message.content;
-  const result = { json: JSON.parse(stripFences(raw)), raw, model: visionModel };
-  return result;
+
+  // Spend cap: block a CLOUD call once this month's estimated AI spend reaches the configured budget.
+  if (cfg.provider !== 'ollama') {
+    try {
+      await assertAiBudget();
+    } catch (err) {
+      void recordAiRun({
+        feature,
+        provider,
+        model: targetModel,
+        status: 'blocked',
+        durationMs: 0,
+        error: (err as Error).message,
+        trigger: opts?.trigger,
+        record: opts?.record,
+        jobId: opts?.jobId,
+        userId: opts?.userId,
+      });
+      throw err;
+    }
+  }
+
+  const t0 = Date.now();
+  try {
+    const cloud = await cloudJSON(cfg, systemPrompt, userPrompt, imagesBase64);
+    if (cloud) {
+      await recordAiSpend(
+        cloud.model,
+        cloud.usage?.inputTokens ?? 0,
+        cloud.usage?.outputTokens ?? 0,
+        cloud.usage?.cacheWriteTokens ?? 0,
+        cloud.usage?.cacheReadTokens ?? 0
+      );
+      void recordAiRun({
+        feature,
+        provider: cfg.provider,
+        model: cloud.model,
+        status: 'ok',
+        durationMs: Date.now() - t0,
+        usage: cloud.usage,
+        requestId: cloud.requestId,
+        stopReason: cloud.stopReason,
+        trigger: opts?.trigger,
+        record: opts?.record,
+        jobId: opts?.jobId,
+        userId: opts?.userId,
+      });
+      return cloud;
+    }
+
+    // Vision tasks must run on a vision-capable model, not the active text model.
+    const visionModel = cfg.ollamaVisionModel;
+    const response = await clientFor(cfg.ollamaHost).chat({
+      model: visionModel,
+      keep_alive: KEEP_ALIVE,
+      format: 'json',
+      options: { temperature: 0.1, num_ctx: NUM_CTX },
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt, images: imagesBase64 },
+      ],
+    });
+    const raw = response.message.content;
+    const result = { json: JSON.parse(stripFences(raw)), raw, model: visionModel };
+    void recordAiRun({
+      feature,
+      provider: 'ollama',
+      model: visionModel,
+      status: 'ok',
+      durationMs: Date.now() - t0,
+      usage: {
+        inputTokens: response.prompt_eval_count ?? 0,
+        outputTokens: response.eval_count ?? 0,
+      },
+      trigger: opts?.trigger,
+      record: opts?.record,
+      jobId: opts?.jobId,
+      userId: opts?.userId,
+    });
+    return result;
+  } catch (err) {
+    void recordAiRun({
+      feature,
+      provider: cfg.provider,
+      model: targetModel,
+      status: 'error',
+      durationMs: Date.now() - t0,
+      error: (err as Error).message,
+      trigger: opts?.trigger,
+      record: opts?.record,
+      jobId: opts?.jobId,
+      userId: opts?.userId,
+    });
+    throw err;
+  }
 }
 
-/** Run a text-only prompt and return parsed JSON. `numCtx` lets long inputs (e.g.
- *  multi-page statements) use a bigger local context window so transactions at the
- *  end aren't truncated away. */
+/** Run a text-only prompt and return parsed JSON. */
 async function runTextJSONWith(
   cfg: Awaited<ReturnType<typeof getAiConfig>>,
   systemPrompt: string,
   userPrompt: string,
-  opts?: { numCtx?: number }
+  opts?: AiRunMeta
 ): Promise<{ json: unknown; raw: string; model: string }> {
-  if (!cfg.aiEnabled) throw new Error('AI is turned off');
-  // Spend cap: block a CLOUD call once this month's estimated AI spend reaches the configured
-  // budget. Local Ollama is free, so it is never gated.
-  if (cfg.provider !== 'ollama') await assertAiBudget();
-  const cloud = await cloudJSON(cfg, systemPrompt, userPrompt);
-  if (cloud) {
-    await recordAiSpend(cloud.model, cloud.usage?.inputTokens ?? 0, cloud.usage?.outputTokens ?? 0);
-    return cloud;
+  const feature = opts?.feature ?? 'statements';
+  const provider = cfg.provider;
+  const targetModel = provider === 'ollama' ? cfg.ollamaModel : (provider === 'anthropic' ? cfg.anthropicModel : 'cloud');
+
+  if (!cfg.aiEnabled) {
+    void recordAiRun({
+      feature,
+      provider,
+      model: targetModel,
+      status: 'blocked',
+      durationMs: 0,
+      error: 'AI is turned off',
+      trigger: opts?.trigger,
+      record: opts?.record,
+      jobId: opts?.jobId,
+      userId: opts?.userId,
+    });
+    throw new Error('AI is turned off');
   }
-  const response = await clientFor(cfg.ollamaHost).chat({
-    model: cfg.ollamaModel,
-    keep_alive: KEEP_ALIVE,
-    format: 'json',
-    options: { temperature: 0.1, num_ctx: opts?.numCtx ?? NUM_CTX },
-    messages: [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: userPrompt },
-    ],
-  });
-  const raw = response.message.content;
-  const result = { json: JSON.parse(stripFences(raw)), raw, model: cfg.ollamaModel };
-  return result;
+
+  if (cfg.provider !== 'ollama') {
+    try {
+      await assertAiBudget();
+    } catch (err) {
+      void recordAiRun({
+        feature,
+        provider,
+        model: targetModel,
+        status: 'blocked',
+        durationMs: 0,
+        error: (err as Error).message,
+        trigger: opts?.trigger,
+        record: opts?.record,
+        jobId: opts?.jobId,
+        userId: opts?.userId,
+      });
+      throw err;
+    }
+  }
+
+  const t0 = Date.now();
+  try {
+    const cloud = await cloudJSON(cfg, systemPrompt, userPrompt);
+    if (cloud) {
+      await recordAiSpend(
+        cloud.model,
+        cloud.usage?.inputTokens ?? 0,
+        cloud.usage?.outputTokens ?? 0,
+        cloud.usage?.cacheWriteTokens ?? 0,
+        cloud.usage?.cacheReadTokens ?? 0
+      );
+      void recordAiRun({
+        feature,
+        provider: cfg.provider,
+        model: cloud.model,
+        status: 'ok',
+        durationMs: Date.now() - t0,
+        usage: cloud.usage,
+        requestId: cloud.requestId,
+        stopReason: cloud.stopReason,
+        trigger: opts?.trigger,
+        record: opts?.record,
+        jobId: opts?.jobId,
+        userId: opts?.userId,
+      });
+      return cloud;
+    }
+
+    const response = await clientFor(cfg.ollamaHost).chat({
+      model: cfg.ollamaModel,
+      keep_alive: KEEP_ALIVE,
+      format: 'json',
+      options: { temperature: 0.1, num_ctx: opts?.numCtx ?? NUM_CTX },
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+    });
+    const raw = response.message.content;
+    const result = { json: JSON.parse(stripFences(raw)), raw, model: cfg.ollamaModel };
+    void recordAiRun({
+      feature,
+      provider: 'ollama',
+      model: cfg.ollamaModel,
+      status: 'ok',
+      durationMs: Date.now() - t0,
+      usage: {
+        inputTokens: response.prompt_eval_count ?? 0,
+        outputTokens: response.eval_count ?? 0,
+      },
+      trigger: opts?.trigger,
+      record: opts?.record,
+      jobId: opts?.jobId,
+      userId: opts?.userId,
+    });
+    return result;
+  } catch (err) {
+    void recordAiRun({
+      feature,
+      provider: cfg.provider,
+      model: targetModel,
+      status: 'error',
+      durationMs: Date.now() - t0,
+      error: (err as Error).message,
+      trigger: opts?.trigger,
+      record: opts?.record,
+      jobId: opts?.jobId,
+      userId: opts?.userId,
+    });
+    throw err;
+  }
 }
 
 export async function runTextJSON(
   systemPrompt: string,
   userPrompt: string,
-  opts?: { numCtx?: number }
+  opts?: AiRunMeta
 ): Promise<{ json: unknown; raw: string; model: string }> {
   return runTextJSONWith(await getAiConfig(), systemPrompt, userPrompt, opts);
 }
@@ -149,9 +349,12 @@ export async function runTextJSON(
 export async function runScraperTextJSON(
   systemPrompt: string,
   userPrompt: string,
-  opts?: { numCtx?: number }
+  opts?: AiRunMeta
 ): Promise<{ json: unknown; raw: string; model: string }> {
-  return runTextJSONWith(scraperConfig(await getAiConfig()), systemPrompt, userPrompt, opts);
+  return runTextJSONWith(scraperConfig(await getAiConfig()), systemPrompt, userPrompt, {
+    ...opts,
+    feature: opts?.feature ?? 'scraperPrice',
+  });
 }
 
 // ─── Receipt parsing ────────────────────────────────────────────────────────
@@ -180,7 +383,8 @@ export const ParsedReceiptSchema = z.object({
 
 export type ParsedReceipt = z.infer<typeof ParsedReceiptSchema>;
 
-export const RECEIPT_SYSTEM_PROMPT = `You are a receipt parser. Extract structured data from receipt images.
+export const RECEIPT_SYSTEM_PROMPT = `${ENGLISH_OUTPUT_RULE}
+You are a receipt parser. Extract structured data from receipt images.
 Receipts may be in ANY language (English, Greek, German, French, Italian, Spanish, ...). Return ONLY valid JSON, no markdown, no explanation.
 
 Schema:
@@ -213,7 +417,10 @@ Rules:
 - refinedName: expand the abbreviated receipt text into the FULL canonical product name as found on retail/manufacturer sites. Example: "WD BLUE SN570 250" → "WD Blue SN570 250GB NVMe SSD"; "RTX5080 GAM OC" → "NVIDIA GeForce RTX 5080 Gaming OC". Keep brand + model + key spec. If it is a generic item (coffee, milk), keep it simple.
 - If a field is unreadable, use empty string or 0`;
 
-export async function parseReceipt(imageBase64: string): Promise<{
+export async function parseReceipt(
+  imageBase64: string,
+  opts?: AiRunMeta
+): Promise<{
   parsed: ParsedReceipt;
   raw: string;
   model: string;
@@ -221,7 +428,8 @@ export async function parseReceipt(imageBase64: string): Promise<{
   const { json, raw, model } = await runVisionJSON(
     (await getPromptOverride('receipt')) ?? RECEIPT_SYSTEM_PROMPT,
     'Extract the receipt data as JSON. Be sure to find the purchase DATE (search the top of the receipt for a date label like "Date" / "ΗΜΕΡΟΜΗΝΙΑ" / "Datum" or a DD/MM/YYYY pattern) and read its year digits exactly.',
-    [imageBase64]
+    [imageBase64],
+    { ...opts, feature: opts?.feature ?? 'receipts' }
   );
   const parsed = ParsedReceiptSchema.parse(json);
   parsed.store = await resolveStore(parsed.store);
@@ -229,14 +437,18 @@ export async function parseReceipt(imageBase64: string): Promise<{
 }
 
 /** Parse a receipt from extracted PDF text (digital / e-receipts). */
-export async function parseReceiptText(text: string): Promise<{
+export async function parseReceiptText(
+  text: string,
+  opts?: AiRunMeta
+): Promise<{
   parsed: ParsedReceipt;
   raw: string;
   model: string;
 }> {
   const { json, raw, model } = await runTextJSON(
     (await getPromptOverride('receipt')) ?? RECEIPT_SYSTEM_PROMPT,
-    `Extract the receipt data as JSON from this text:\n\n${text}`
+    `Extract the receipt data as JSON from this text:\n\n${text}`,
+    { ...opts, feature: opts?.feature ?? 'receipts' }
   );
   const parsed = ParsedReceiptSchema.parse(json);
   parsed.store = await resolveStore(parsed.store);
@@ -268,7 +480,8 @@ export const ParsedStatementSchema = z.object({
 
 export type ParsedStatement = z.infer<typeof ParsedStatementSchema>;
 
-export const STATEMENT_SYSTEM_PROMPT = `You parse credit-card statements in ANY language (English, Greek, German, French, ...).
+export const STATEMENT_SYSTEM_PROMPT = `${ENGLISH_OUTPUT_RULE}
+You parse credit-card statements in ANY language (English, Greek, German, French, ...).
 Return ONLY valid JSON, no markdown.
 
 Schema:
@@ -302,7 +515,10 @@ Rules:
 - Purchases are POSITIVE amounts. Payments/credits ("Payment"/"Credit"/"Refund", "ΠΛΗΡΩΜΗ"/"ΠΙΣΤΩΣΗ") are NEGATIVE — a negative total means you overpaid (credit balance).
 - Include every transaction line you can read`;
 
-export async function parseStatementText(text: string): Promise<{
+export async function parseStatementText(
+  text: string,
+  opts?: AiRunMeta
+): Promise<{
   parsed: ParsedStatement;
   raw: string;
   model: string;
@@ -310,7 +526,7 @@ export async function parseStatementText(text: string): Promise<{
   const { json, raw, model } = await runTextJSON(
     (await getPromptOverride('statement')) ?? STATEMENT_SYSTEM_PROMPT,
     `Parse this credit-card statement into JSON:\n\n${text}`,
-    { numCtx: 16384 } // statements can be multi-page — don't truncate later installments
+    { ...opts, feature: opts?.feature ?? 'statements', numCtx: opts?.numCtx ?? 16384 } // statements can be multi-page — don't truncate later installments
   );
   const parsed = ParsedStatementSchema.parse(json);
   return { parsed, raw, model };
@@ -342,7 +558,8 @@ export const ParsedProductSchema = z.object({
 
 export type ParsedProduct = z.infer<typeof ParsedProductSchema>;
 
-export const PRODUCT_PROMPT = `You extract structured product data from an e-commerce product page. Return ONLY JSON:
+export const PRODUCT_PROMPT = `${ENGLISH_OUTPUT_RULE}
+You extract structured product data from an e-commerce product page. Return ONLY JSON:
 {
   "title": "full canonical product name (brand + model + key spec), WITHOUT the store/site suffix",
   "price": <current selling price as a number, no currency symbol>,
@@ -363,12 +580,15 @@ Rules:
 - title: clean product name only (brand + model + key spec). Strip store suffixes like " - Ubiquiti Store", " | Amazon", " - Newegg".
 - category: output EXACTLY ONE word from the list (not a list). Pick the closest for a home-lab / networking / computing context.`;
 
-export async function parseProductFromPage(page: {
-  url: string;
-  title: string;
-  jsonLd: string;
-  text: string;
-}): Promise<{ parsed: ParsedProduct; raw: string; model: string }> {
+export async function parseProductFromPage(
+  page: {
+    url: string;
+    title: string;
+    jsonLd: string;
+    text: string;
+  },
+  opts?: AiRunMeta
+): Promise<{ parsed: ParsedProduct; raw: string; model: string }> {
   const host = (() => {
     try {
       return new URL(page.url).hostname;
@@ -379,7 +599,11 @@ export async function parseProductFromPage(page: {
   const content = `Site: ${host}\nPage title: ${page.title}\n\nJSON-LD:\n${page.jsonLd || '(none)'}\n\nVisible text:\n${page.text}`;
   // Product/price extraction uses the SEPARATE scraper model (cheaper/local), not the main
   // provider — so the 6h price cron and per-item price checks don't bill at the heavy model's rate.
-  const { json, raw, model } = await runScraperTextJSON((await getPromptOverride('product')) ?? PRODUCT_PROMPT, content);
+  const { json, raw, model } = await runScraperTextJSON(
+    (await getPromptOverride('product')) ?? PRODUCT_PROMPT,
+    content,
+    { ...opts, feature: opts?.feature ?? 'itemsImport' }
+  );
   const parsed = ParsedProductSchema.parse(json);
   if (!parsed.store && host) parsed.store = host.replace(/^www\./, '');
   return { parsed, raw, model };
@@ -397,7 +621,8 @@ export const ParsedCardSchema = z.object({
 
 export type ParsedCard = z.infer<typeof ParsedCardSchema>;
 
-export const CARD_PROMPT = `You read a photo of a payment card. Return ONLY JSON:
+export const CARD_PROMPT = `${ENGLISH_OUTPUT_RULE}
+You read a photo of a payment card. Return ONLY JSON:
 {
   "name": "a short name like 'Mastercard' or bank + network if visible",
   "last4": "ONLY the LAST 4 digits of the card number",
@@ -410,14 +635,18 @@ Rules:
 - type: detect from the Visa / Mastercard / Amex / Maestro logo.
 - kind: look for the word CREDIT or DEBIT on the card; if not visible, use "credit".`;
 
-export async function parseCardImage(imageBase64: string): Promise<{
+export async function parseCardImage(
+  imageBase64: string,
+  opts?: AiRunMeta
+): Promise<{
   parsed: ParsedCard;
   model: string;
 }> {
   const { json, model } = await runVisionJSON(
     (await getPromptOverride('card')) ?? CARD_PROMPT,
     'Extract the card data as JSON.',
-    [imageBase64]
+    [imageBase64],
+    { ...opts, feature: opts?.feature ?? 'cards' }
   );
   return { parsed: ParsedCardSchema.parse(json), model };
 }
@@ -440,7 +669,8 @@ export const ParsedSubscriptionSchema = z.object({
 
 export type ParsedSubscription = z.infer<typeof ParsedSubscriptionSchema>;
 
-export const SUBSCRIPTION_PROMPT = `You know common subscription services (YouTube Premium, Netflix, Spotify, iCloud+, ChatGPT Plus, Xbox Game Pass, etc.).
+export const SUBSCRIPTION_PROMPT = `${ENGLISH_OUTPUT_RULE}
+You know common subscription services (YouTube Premium, Netflix, Spotify, iCloud+, ChatGPT Plus, Xbox Game Pass, etc.).
 Given a subscription name, return its typical details for an individual/personal plan. Return ONLY JSON:
 {
   "provider": "the company behind it (e.g. Google, Apple, Netflix)",
@@ -456,30 +686,37 @@ Rules:
 - If you are unsure of the exact price, give your best estimate and mention it in notes.
 - category: pick exactly ONE from the list.`;
 
-export async function suggestSubscription(name: string): Promise<{
+export async function suggestSubscription(
+  name: string,
+  opts?: AiRunMeta
+): Promise<{
   parsed: ParsedSubscription;
   model: string;
 }> {
   const { json, model } = await runTextJSON(
     (await getPromptOverride('subscription')) ?? SUBSCRIPTION_PROMPT,
-    `Subscription: ${name}`
+    `Subscription: ${name}`,
+    { ...opts, feature: opts?.feature ?? 'subscriptions' }
   );
   return { parsed: ParsedSubscriptionSchema.parse(json), model };
 }
 
 // ─── Transaction auto-categorization ────────────────────────────────────────
 
-export const CATEGORY_PROMPT = `Categorize each transaction into ONE of:
+export const CATEGORY_PROMPT = `${ENGLISH_OUTPUT_RULE}
+Categorize each transaction into ONE of:
 groceries, electronics, dining, transport, utilities, subscriptions, health, entertainment, travel, installment, other.
 Return ONLY JSON: {"categories": ["<category>", ...]} in the SAME order as the input list.`;
 
 export async function categorizeTransactions(
-  descriptions: string[]
+  descriptions: string[],
+  opts?: AiRunMeta
 ): Promise<string[]> {
   if (descriptions.length === 0) return [];
   const { json } = await runTextJSON(
     (await getPromptOverride('category')) ?? CATEGORY_PROMPT,
-    JSON.stringify(descriptions)
+    JSON.stringify(descriptions),
+    { ...opts, feature: opts?.feature ?? 'statementCategorize' }
   );
   const parsed = z.object({ categories: z.array(z.string()) }).safeParse(json);
   return parsed.success ? parsed.data.categories : [];
@@ -516,7 +753,8 @@ export const ParsedExpenseSchema = z.object({
 
 export type ParsedExpense = z.infer<typeof ParsedExpenseSchema>;
 
-export const EXPENSE_PROMPT = `You parse a bill, invoice, utility statement, rent receipt, or payslip into ONE income/expense record. Documents may be in ANY language. Return ONLY JSON, no markdown:
+export const EXPENSE_PROMPT = `${ENGLISH_OUTPUT_RULE}
+You parse a bill, invoice, utility statement, rent receipt, or payslip into ONE income/expense record. Documents may be in ANY language. Return ONLY JSON, no markdown:
 {
   "kind": "income" | "expense",
   "vendor": "the issuing organization or payer",
@@ -536,19 +774,27 @@ Rules:
 - recurringCycle: set it only if the document clearly is a periodic bill (monthly electricity, monthly rent, monthly salary); otherwise "".
 - category: pick exactly ONE from the list.`;
 
-export async function parseExpenseText(text: string): Promise<{ parsed: ParsedExpense; raw: string; model: string }> {
+export async function parseExpenseText(
+  text: string,
+  opts?: AiRunMeta
+): Promise<{ parsed: ParsedExpense; raw: string; model: string }> {
   const { json, raw, model } = await runTextJSON(
     (await getPromptOverride('expense')) ?? EXPENSE_PROMPT,
-    `Extract the income/expense data as JSON from this document text:\n\n${text}`
+    `Extract the income/expense data as JSON from this document text:\n\n${text}`,
+    { ...opts, feature: opts?.feature ?? 'expenses' }
   );
   return { parsed: ParsedExpenseSchema.parse(json), raw, model };
 }
 
-export async function parseExpenseImage(imageBase64: string): Promise<{ parsed: ParsedExpense; raw: string; model: string }> {
+export async function parseExpenseImage(
+  imageBase64: string,
+  opts?: AiRunMeta
+): Promise<{ parsed: ParsedExpense; raw: string; model: string }> {
   const { json, raw, model } = await runVisionJSON(
     (await getPromptOverride('expense')) ?? EXPENSE_PROMPT,
     'Extract the income/expense data as JSON. Identify the vendor/payer, the total amount, and the date.',
-    [imageBase64]
+    [imageBase64],
+    { ...opts, feature: opts?.feature ?? 'expenses' }
   );
   return { parsed: ParsedExpenseSchema.parse(json), raw, model };
 }
@@ -566,7 +812,8 @@ export const ParsedVoucherSchema = z.object({
 });
 export type ParsedVoucher = z.infer<typeof ParsedVoucherSchema>;
 
-export const VOUCHER_PROMPT = `You read a discount voucher / coupon / promo code (from pasted text or an image). Documents may be in ANY language. Return ONLY JSON, no markdown:
+export const VOUCHER_PROMPT = `${ENGLISH_OUTPUT_RULE}
+You read a discount voucher / coupon / promo code (from pasted text or an image). Documents may be in ANY language. Return ONLY JSON, no markdown:
 {
   "title": "short label, e.g. '10% off at Skroutz'",
   "code": "the promo/coupon code, e.g. SAVE10 (empty if the voucher has no code)",
@@ -582,19 +829,27 @@ Rules:
 - dates are DAY-FIRST in most of the world (Europe): "31/12/2026" → "2026-12-31". Output YYYY-MM-DD.
 - discount: keep it short ("10%", "€5", "free shipping"); put any conditions in notes instead.`;
 
-export async function parseVoucherText(text: string): Promise<{ parsed: ParsedVoucher; raw: string; model: string }> {
+export async function parseVoucherText(
+  text: string,
+  opts?: AiRunMeta
+): Promise<{ parsed: ParsedVoucher; raw: string; model: string }> {
   const { json, raw, model } = await runTextJSON(
     (await getPromptOverride('voucher')) ?? VOUCHER_PROMPT,
-    `Extract the voucher data as JSON from this text:\n\n${text}`
+    `Extract the voucher data as JSON from this text:\n\n${text}`,
+    { ...opts, feature: opts?.feature ?? 'vouchers' }
   );
   return { parsed: ParsedVoucherSchema.parse(json), raw, model };
 }
 
-export async function parseVoucherImage(imageBase64: string): Promise<{ parsed: ParsedVoucher; raw: string; model: string }> {
+export async function parseVoucherImage(
+  imageBase64: string,
+  opts?: AiRunMeta
+): Promise<{ parsed: ParsedVoucher; raw: string; model: string }> {
   const { json, raw, model } = await runVisionJSON(
     (await getPromptOverride('voucher')) ?? VOUCHER_PROMPT,
     'Extract the voucher/coupon data as JSON. Find the code, the store, the discount value and any expiry date.',
-    [imageBase64]
+    [imageBase64],
+    { ...opts, feature: opts?.feature ?? 'vouchers' }
   );
   return { parsed: ParsedVoucherSchema.parse(json), raw, model };
 }
@@ -610,7 +865,8 @@ export const ParsedProductPhotoSchema = z.object({
 });
 export type ParsedProductPhoto = z.infer<typeof ParsedProductPhotoSchema>;
 
-export const PRODUCT_PHOTO_PROMPT = `You look at a PHOTO of a physical product — its packaging, label, box or the item on a shelf. The text may be in ANY language. Return ONLY JSON, no markdown:
+export const PRODUCT_PHOTO_PROMPT = `${ENGLISH_OUTPUT_RULE}
+You look at a PHOTO of a physical product — its packaging, label, box or the item on a shelf. The text may be in ANY language. Return ONLY JSON, no markdown:
 {
   "name": "the concise product name a shopper would write on a list, e.g. 'Olive oil' / 'AA batteries' / 'Greek yoghurt'",
   "brand": "the brand if clearly printed (empty otherwise)",
@@ -619,15 +875,19 @@ export const PRODUCT_PHOTO_PROMPT = `You look at a PHOTO of a physical product �
   "notes": "anything else useful, e.g. flavour/variant (empty otherwise)"
 }
 Rules:
-- name: short and shopping-list friendly (a generic name + variant), NOT the full marketing text. Prefer the local language of the label.
+- name: short and shopping-list friendly (a generic name + variant), NOT the full marketing text. Use English unless the product's proper brand/name has no English form.
 - category: pick the single best fit from the list above.
 - if you can't read a clear product, return empty strings.`;
 
-export async function parseProductPhoto(imageBase64: string): Promise<{ parsed: ParsedProductPhoto; raw: string; model: string }> {
+export async function parseProductPhoto(
+  imageBase64: string,
+  opts?: AiRunMeta
+): Promise<{ parsed: ParsedProductPhoto; raw: string; model: string }> {
   const { json, raw, model } = await runVisionJSON(
     (await getPromptOverride('productPhoto')) ?? PRODUCT_PHOTO_PROMPT,
     'Identify the product in this photo for a shopping list. Return the name, brand, category, quantity and notes as JSON.',
-    [imageBase64]
+    [imageBase64],
+    { ...opts, feature: opts?.feature ?? 'productPhoto' }
   );
   return { parsed: ParsedProductPhotoSchema.parse(json), raw, model };
 }

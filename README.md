@@ -29,8 +29,8 @@ individual user accounts. AI is optional: every core workflow has a manual path.
 - **Household accounts**: a first-run wizard creates the administrator; add
   members and read-only viewers from Settings. One private hub, one login each.
 - **Optional AI document reading**: drop in a receipt photo or statement PDF and
-  AI extracts the store, date, totals, VAT, line items and installment plans. Use a
-  local Ollama model or your own cloud key, or switch AI off per feature or entirely.
+  Claude extracts the store, date, totals, VAT, line items and installment plans. Use
+  Claude or another cloud provider, keep Ollama local, or switch AI off per feature.
 - **Inventory & shopping**: what you own and what you want, with multi-store price
   tracking, target-price deal alerts and price history, limited to the shops in
   your shopping country if you like.
@@ -56,7 +56,8 @@ Screenshots are being prepared using demonstration data.
 ## Install with Docker Compose
 
 You need Docker with the Compose plugin, Git and OpenSSL. The default stack runs
-the web application, MongoDB and SearXNG. Ollama is separate and optional.
+the web application, MongoDB and SearXNG. AI is configured in the first-run wizard;
+Claude is the recommended default and Ollama remains available for local inference.
 
 ```sh
 git clone https://github.com/achilleasgkekas/pharos.git
@@ -112,10 +113,11 @@ when updating an existing installation.
 
 ## Optional AI
 
-Pharos works without AI or any provider key. To enable local AI, run Ollama on
-your own host, install a suitable model and configure it in Settings → AI. Ollama
-uses no cloud API key; the default Docker configuration reaches the host at
-`host.docker.internal:11434`.
+Pharos works without AI or any provider key. The first-run wizard recommends Claude
+with `claude-sonnet-5` for document extraction. Documents processed by Claude are
+sent to Anthropic. For private, zero-cost inference, run Ollama on your own host,
+install a suitable vision model and choose Ollama in Settings → AI; the default
+Docker configuration reaches the host at `host.docker.internal:11434`.
 
 You may instead connect a supported cloud provider using your own key. Documents
 processed by a cloud provider are sent to that provider. The application offers

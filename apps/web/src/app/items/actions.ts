@@ -729,7 +729,10 @@ function productMatchesItem(
   return tokens.some((t) => hay.includes(t));
 }
 
-export async function aiFillItem(itemId: string): Promise<{
+export async function aiFillItem(
+  itemId: string,
+  opts?: { jobId?: string }
+): Promise<{
   ok: boolean;
   checked: number;
   filled: string[];
@@ -788,7 +791,12 @@ export async function aiFillItem(itemId: string): Promise<{
     let pageCurrency = '';
     try {
       const page = await fetchPageText(t.url);
-      parsed = (await parseProductFromPage(page)).parsed;
+      parsed = (await parseProductFromPage(page, {
+        feature: 'itemsImport',
+        record: { type: 'item', id: itemId },
+        jobId: opts?.jobId,
+        trigger: opts?.jobId ? 'job' : 'user',
+      })).parsed;
       pageCurrency = pageCurrencyOf(page, parsed);
     } catch {
       continue; // skip pages that fail (bot-protection, 404, AI hiccup)

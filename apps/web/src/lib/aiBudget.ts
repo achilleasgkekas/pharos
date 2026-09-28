@@ -27,9 +27,44 @@ export class AiBudgetExceededError extends Error {
   }
 }
 
-/** Calendar-month key "YYYY-MM" in UTC — the ledger resets when this changes. */
-export function budgetPeriod(now: Date = new Date()): string {
+/** Calendar-month key "YYYY-MM" in UTC (or specified timezone) — the ledger resets when this changes. */
+export function budgetPeriod(now: Date = new Date(), timeZone?: string): string {
+  if (timeZone) {
+    try {
+      const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone,
+        year: 'numeric',
+        month: '2-digit',
+      }).formatToParts(now);
+      const year = parts.find((p) => p.type === 'year')?.value;
+      const month = parts.find((p) => p.type === 'month')?.value;
+      if (year && month) return `${year}-${month}`;
+    } catch {
+      // Fallback on invalid timeZone name
+    }
+  }
   return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
+/** Calendar-day key "YYYY-MM-DD" in UTC (or specified timezone). */
+export function dayPeriod(now: Date = new Date(), timeZone?: string): string {
+  if (timeZone) {
+    try {
+      const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).formatToParts(now);
+      const year = parts.find((p) => p.type === 'year')?.value;
+      const month = parts.find((p) => p.type === 'month')?.value;
+      const day = parts.find((p) => p.type === 'day')?.value;
+      if (year && month && day) return `${year}-${month}-${day}`;
+    } catch {
+      // Fallback
+    }
+  }
+  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}-${String(now.getUTCDate()).padStart(2, '0')}`;
 }
 
 export type AiBudgetStatus = {
@@ -41,37 +76,46 @@ export type AiBudgetStatus = {
 
 /** Read the self-hosted budget status. A stored period other than the current month reads as
  *  spent: 0 (implicit monthly rollover — the counter is only rewritten on the next spend). */
-export async function getAiBudgetStatus(): Promise<AiBudgetStatus> {
-  const period = budgetPeriod();
+export async function getAiBudgetStatus(timeZone?: string): Promise<AiBudgetStatus> {
   try {
     await connectDB();
     const doc = (await AppConfig.findOne({ key: 'singleton' })
-      .select('aiMonthlyBudget aiSpendPeriod aiSpendMicros')
-      .lean()) as { aiMonthlyBudget?: number; aiSpendPeriod?: string; aiSpendMicros?: number } | null;
+      .select('aiMonthlyBudget aiSpendPeriod aiSpendMicros timezone')
+      .lean()) as { aiMonthlyBudget?: number; aiSpendPeriod?: string; aiSpendMicros?: number; timezone?: string } | null;
+    const tz = timeZone || doc?.timezone || undefined;
+    const period = budgetPeriod(new Date(), tz);
     const budget = Math.max(0, Number(doc?.aiMonthlyBudget) || 0);
     const spentMicros = doc?.aiSpendPeriod === period ? Math.max(0, Number(doc?.aiSpendMicros) || 0) : 0;
     const spent = spentMicros / MICROS;
     return { budget, spent, period, capped: budget > 0 && spent >= budget };
   } catch {
+    const period = budgetPeriod(new Date(), timeZone);
     return { budget: 0, spent: 0, period, capped: false };
   }
 }
 
 /** Gate a CLOUD AI call on the self-hosted monthly cap. No-op in SaaS mode (per-tenant quota
  *  handles it there). Throws AiBudgetExceededError when this month is already at/over the cap. */
-export async function assertAiBudget(): Promise<void> {
+export async function assertAiBudget(timeZone?: string): Promise<void> {
   if (saasMode()) return;
-  const s = await getAiBudgetStatus();
+  const s = await getAiBudgetStatus(timeZone);
   if (s.capped) throw new AiBudgetExceededError(s.budget, s.spent);
 }
 
 /** Add one cloud call's estimated cost to this month's ledger. No-op in SaaS; never throws —
  *  a ledger write must not break the AI response the user already received. */
-export async function recordAiSpend(model: string, inputTokens: number, outputTokens: number): Promise<void> {
+export async function recordAiSpend(
+  model: string,
+  inputTokens: number,
+  outputTokens: number,
+  cacheWriteTokens: number = 0,
+  cacheReadTokens: number = 0,
+  timeZone?: string
+): Promise<void> {
   if (saasMode()) return;
-  const micros = callCostMicros(model, inputTokens, outputTokens);
+  const micros = callCostMicros(model, inputTokens, outputTokens, cacheWriteTokens, cacheReadTokens);
   if (micros <= 0) return;
-  const period = budgetPeriod();
+  const period = budgetPeriod(new Date(), timeZone);
   try {
     await connectDB();
     // Same month → increment atomically. No match means the stored period is stale (or unset),

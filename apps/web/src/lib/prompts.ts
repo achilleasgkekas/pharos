@@ -5,10 +5,17 @@ import { currentTenant } from './tenancy/current';
 
 export type PromptKey = 'receipt' | 'statement' | 'product' | 'card' | 'subscription' | 'category' | 'expense' | 'voucher' | 'productPhoto' | 'scraperPrice';
 
+/** Shared output contract for the built-in prompts (#364/#366). Proper names, merchant names,
+ * URLs, codes and explicitly raw printed text remain unchanged; explanatory/free-text fields are
+ * English so records stay consistent across deployments and source-document languages. */
+export const ENGLISH_OUTPUT_RULE =
+  'Language: write every descriptive/free-text output field in English. Preserve proper names, merchant and product brand names, URLs, codes, and fields explicitly described as raw printed text.';
+
 /** Default scraper price-extraction prompt. KEEP IN SYNC with the scraper's own copy at
  *  services/scraper/src/extract.ts (PROMPT). Shown here so Settings can display/reset it;
  *  the scraper reads any override from AppConfig.prompts.scraperPrice at runtime. */
-export const DEFAULT_SCRAPER_PRICE_PROMPT = `You extract the CURRENT selling price of a product from a shop page.
+export const DEFAULT_SCRAPER_PRICE_PROMPT = `${ENGLISH_OUTPUT_RULE}
+You extract the CURRENT selling price of a product from a shop page.
 Return ONLY JSON: {"price": <number or null>, "currency": "EUR", "inStock": <bool>}.
 Price priority (use the first that applies):
 1. A "PRODUCT PRICE (from the page's price markup): …" line, if present, IS the price.

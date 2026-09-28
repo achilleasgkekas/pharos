@@ -11,6 +11,7 @@ import { CURRENCIES } from '@/lib/money';
 import { useT, useLocale } from '@/components/LocaleProvider';
 import { SHOPPING_COUNTRIES, countryFromLanguageTag } from '@/lib/shoppingRegion';
 import { CLAUDE_MAIN_DEFAULT } from '@/lib/claudeModels';
+import { claudePrice, formatModelPrice } from '@/lib/claudePricing';
 
 const STEPS = ['Account', 'Basics', 'AI', 'Done'];
 
@@ -19,12 +20,12 @@ const SELECT_CLS =
 
 type Provider = 'ollama' | 'anthropic' | 'openai' | 'gemini' | 'openrouter' | 'custom';
 const PROVIDERS: { id: Provider; label: string; needsKey: boolean; modelHint: string }[] = [
-  { id: 'ollama', label: 'Ollama (local, free)', needsKey: false, modelHint: 'qwen2.5vl:7b' },
   { id: 'anthropic', label: 'Anthropic (Claude)', needsKey: true, modelHint: CLAUDE_MAIN_DEFAULT },
   { id: 'openai', label: 'OpenAI', needsKey: true, modelHint: 'gpt-4o-mini' },
   { id: 'gemini', label: 'Google Gemini', needsKey: true, modelHint: 'gemini-2.0-flash' },
   { id: 'openrouter', label: 'OpenRouter', needsKey: true, modelHint: 'openai/gpt-4o-mini' },
   { id: 'custom', label: 'Custom (OpenAI-compatible)', needsKey: false, modelHint: 'model-name' },
+  { id: 'ollama', label: 'Ollama (local, free)', needsKey: false, modelHint: 'qwen2.5vl:7b' },
 ];
 
 export function SetupWizard() {
@@ -58,7 +59,7 @@ export function SetupWizard() {
   };
 
   // Step 3 state
-  const [provider, setProvider] = useState<Provider>('ollama');
+  const [provider, setProvider] = useState<Provider>('anthropic');
   const [apiKey, setApiKey] = useState('');
   const [model, setModel] = useState('');
   const [host, setHost] = useState('');
@@ -250,6 +251,12 @@ export function SetupWizard() {
                 <Input value={apiKey} onChange={(e) => setApiKey(e.target.value)} type="password" icon={<Lock size={15} />} placeholder={t('setup.apiKey')} />
               )}
               <Input value={model} onChange={(e) => setModel(e.target.value)} placeholder={t('setup.modelHint', { hint: meta.modelHint })} />
+              {provider === 'anthropic' && (
+                <p className="text-[11px] text-[color:var(--color-text-faint)]">
+                  Recommended: <span className="font-mono text-[color:var(--color-text-dim)]">{CLAUDE_MAIN_DEFAULT}</span>
+                  {claudePrice(CLAUDE_MAIN_DEFAULT) && ` · ${formatModelPrice(claudePrice(CLAUDE_MAIN_DEFAULT)!)}`}
+                </p>
+              )}
               {error && <p className="text-xs text-[color:var(--color-red)]">{error}</p>}
               <div className="flex gap-2 mt-2">
                 <Button variant="ghost" size="md" onClick={skipAi} disabled={pending}>

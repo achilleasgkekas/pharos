@@ -68,3 +68,59 @@ export async function clearConversations(): Promise<{ ok: boolean }> {
   revalidatePath('/history');
   return { ok: true };
 }
+
+import { getAiRuns, type AiRunFilter, type SerializedAiRun, type AiRunSummary } from '@/lib/aiRun';
+
+export async function getAiRunsAction(filters: AiRunFilter = {}) {
+  return withRequestTenant(() => getAiRuns(filters));
+}
+
+export async function exportRunsCsvAction(filters: AiRunFilter = {}): Promise<string> {
+  return withRequestTenant(async () => {
+    const { runs } = await getAiRuns({ ...filters, limit: 1000 });
+    const header = [
+      'Timestamp',
+      'Feature',
+      'Provider',
+      'Model',
+      'Status',
+      'Duration (ms)',
+      'Input Tokens',
+      'Output Tokens',
+      'Cache Write Tokens',
+      'Cache Read Tokens',
+      'Cost (USD)',
+      'Trigger',
+      'Request ID',
+      'Stop Reason',
+      'Error',
+    ].join(',');
+
+    const escapeCsv = (str: string | null | undefined) => {
+      if (!str) return '""';
+      const s = String(str).replace(/"/g, '""');
+      return `"${s}"`;
+    };
+
+    const rows = runs.map((r) => [
+      r.at,
+      r.feature,
+      r.provider,
+      r.model,
+      r.status,
+      r.durationMs,
+      r.usage.inputTokens,
+      r.usage.outputTokens,
+      r.usage.cacheWriteTokens,
+      r.usage.cacheReadTokens,
+      (r.costMicros / 1_000_000).toFixed(6),
+      r.trigger,
+      escapeCsv(r.requestId),
+      escapeCsv(r.stopReason),
+      escapeCsv(r.error),
+    ].join(','));
+
+    return [header, ...rows].join('\n');
+  });
+}
+

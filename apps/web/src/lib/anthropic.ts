@@ -53,6 +53,13 @@ type ContentBlock =
   | { type: 'text'; text: string }
   | { type: 'image'; source: { type: 'base64'; media_type: ImageMedia; data: string } };
 
+export type AnthropicUsage = {
+  inputTokens: number;
+  outputTokens: number;
+  cacheWriteTokens: number;
+  cacheReadTokens: number;
+};
+
 /**
  * Single-shot Claude call that returns parsed JSON. Throws with a clear message
  * on transport / auth / JSON errors so callers can surface it.
@@ -64,7 +71,14 @@ export async function anthropicJSON(opts: {
   system: string;
   user: string;
   imagesBase64?: string[];
-}): Promise<{ json: unknown; raw: string; model: string; usage: { inputTokens: number; outputTokens: number } }> {
+}): Promise<{
+  json: unknown;
+  raw: string;
+  model: string;
+  usage: AnthropicUsage;
+  requestId?: string;
+  stopReason?: string;
+}> {
   const content: ContentBlock[] = [];
   for (const img of opts.imagesBase64 ?? []) {
     content.push({ type: 'image', source: { type: 'base64', media_type: mediaTypeOf(img), data: img } });
@@ -85,6 +99,8 @@ export async function anthropicJSON(opts: {
     signal: AbortSignal.timeout(90000),
   });
 
+  const requestId = res.headers.get('request-id') || undefined;
+
   if (!res.ok) {
     let detail = '';
     try {
@@ -98,7 +114,13 @@ export async function anthropicJSON(opts: {
 
   const data = (await res.json()) as {
     content?: { type: string; text?: string }[];
-    usage?: { input_tokens?: number; output_tokens?: number };
+    usage?: {
+      input_tokens?: number;
+      output_tokens?: number;
+      cache_creation_input_tokens?: number;
+      cache_read_input_tokens?: number;
+    };
+    stop_reason?: string;
   };
   const raw = (data.content?.find((b) => b.type === 'text')?.text ?? '').trim();
   if (!raw) throw new Error('Anthropic returned an empty response');
@@ -106,7 +128,14 @@ export async function anthropicJSON(opts: {
     json: JSON.parse(stripFences(raw)),
     raw,
     model: opts.model,
-    usage: { inputTokens: data.usage?.input_tokens ?? 0, outputTokens: data.usage?.output_tokens ?? 0 },
+    usage: {
+      inputTokens: data.usage?.input_tokens ?? 0,
+      outputTokens: data.usage?.output_tokens ?? 0,
+      cacheWriteTokens: data.usage?.cache_creation_input_tokens ?? 0,
+      cacheReadTokens: data.usage?.cache_read_input_tokens ?? 0,
+    },
+    requestId,
+    stopReason: data.stop_reason ?? undefined,
   };
 }
 
@@ -128,7 +157,12 @@ export async function anthropicRaw(opts: {
   tools?: AnthropicTool[];
   messages: AnthropicMessage[];
   maxTokens?: number;
-}): Promise<{ content: AnthropicBlock[]; stopReason: string }> {
+}): Promise<{
+  content: AnthropicBlock[];
+  stopReason: string;
+  usage: AnthropicUsage;
+  requestId?: string;
+}> {
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: anthropicHeaders(opts.apiKey, opts.workspaceId),
@@ -141,6 +175,7 @@ export async function anthropicRaw(opts: {
     }),
     signal: AbortSignal.timeout(60000),
   });
+  const requestId = res.headers.get('request-id') || undefined;
   if (!res.ok) {
     let detail = '';
     try {
@@ -150,8 +185,27 @@ export async function anthropicRaw(opts: {
     }
     throw new Error(`Anthropic ${res.status}: ${redactKey(detail, opts.apiKey)}`);
   }
-  const data = (await res.json()) as { content?: AnthropicBlock[]; stop_reason?: string };
-  return { content: data.content ?? [], stopReason: data.stop_reason ?? 'end_turn' };
+  const data = (await res.json()) as {
+    content?: AnthropicBlock[];
+    stop_reason?: string;
+    usage?: {
+      input_tokens?: number;
+      output_tokens?: number;
+      cache_creation_input_tokens?: number;
+      cache_read_input_tokens?: number;
+    };
+  };
+  return {
+    content: data.content ?? [],
+    stopReason: data.stop_reason ?? 'end_turn',
+    usage: {
+      inputTokens: data.usage?.input_tokens ?? 0,
+      outputTokens: data.usage?.output_tokens ?? 0,
+      cacheWriteTokens: data.usage?.cache_creation_input_tokens ?? 0,
+      cacheReadTokens: data.usage?.cache_read_input_tokens ?? 0,
+    },
+    requestId,
+  };
 }
 
 /**
@@ -177,12 +231,15 @@ export async function anthropicModelCheck(
   }
 }
 
+import { recordAiRun } from './aiRun';
+
 /** Lightweight credential check used by the settings "Test" button. */
 export async function anthropicTest(
   apiKey: string,
   model: string,
   workspaceId?: string,
 ): Promise<{ ok: boolean; error?: string }> {
+  const t0 = Date.now();
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -194,15 +251,56 @@ export async function anthropicTest(
       }),
       signal: AbortSignal.timeout(20000),
     });
-    if (res.ok) return { ok: true };
+    const requestId = res.headers.get('request-id') || undefined;
+    if (res.ok) {
+      let usage: { inputTokens: number; outputTokens: number } | undefined;
+      try {
+        const data = (await res.json()) as { usage?: { input_tokens?: number; output_tokens?: number } };
+        usage = {
+          inputTokens: data.usage?.input_tokens ?? 0,
+          outputTokens: data.usage?.output_tokens ?? 0,
+        };
+      } catch {
+        /* ignore */
+      }
+      void recordAiRun({
+        feature: 'test',
+        provider: 'anthropic',
+        model,
+        status: 'ok',
+        durationMs: Date.now() - t0,
+        usage,
+        requestId,
+      });
+      return { ok: true };
+    }
     let detail = '';
     try {
       detail = (await res.json())?.error?.message ?? '';
     } catch {
       /* ignore */
     }
-    return { ok: false, error: `HTTP ${res.status}${detail ? ` · ${detail}` : ''}` };
+    const errMsg = `HTTP ${res.status}${detail ? ` · ${detail}` : ''}`;
+    void recordAiRun({
+      feature: 'test',
+      provider: 'anthropic',
+      model,
+      status: 'error',
+      error: errMsg,
+      durationMs: Date.now() - t0,
+      requestId,
+    });
+    return { ok: false, error: errMsg };
   } catch (err) {
-    return { ok: false, error: (err as Error).message };
+    const errMsg = (err as Error).message;
+    void recordAiRun({
+      feature: 'test',
+      provider: 'anthropic',
+      model,
+      status: 'error',
+      error: errMsg,
+      durationMs: Date.now() - t0,
+    });
+    return { ok: false, error: errMsg };
   }
 }

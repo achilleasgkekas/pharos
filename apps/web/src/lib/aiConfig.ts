@@ -20,6 +20,8 @@ export type AiConfig = {
   // request names the workspace via the `anthropic-workspace-id` header. Blank for the common
   // case of a plain workspace key. Format: `wrkspc_…`.
   anthropicWorkspaceId: string;
+  anthropicAdminKey?: string;
+  timezone?: string;
   openaiApiKey: string;
   openaiModel: string;
   geminiApiKey: string;
@@ -94,6 +96,8 @@ export async function getAiConfig(): Promise<AiConfig> {
     anthropicApiKey?: string;
     anthropicModel?: string;
     anthropicWorkspaceId?: string;
+    anthropicAdminKey?: string;
+    timezone?: string;
     openaiApiKey?: string;
     openaiModel?: string;
     geminiApiKey?: string;
@@ -129,13 +133,18 @@ export async function getAiConfig(): Promise<AiConfig> {
   const ollamaVisionModel =
     doc?.ollamaVisionModel || (isVisionModel(ollamaModel) ? ollamaModel : visionDefault);
   const v: AiConfig = {
-    provider: (doc?.aiProvider as AiProvider) || 'ollama',
+    // Claude is the recommended path for new installs. Existing documents that explicitly
+    // saved Ollama (or another provider) remain unchanged; Ollama is still the local fallback
+    // when a cloud provider has no key.
+    provider: (doc?.aiProvider as AiProvider) || 'anthropic',
     ollamaHost: (doc?.ollamaHost || process.env.OLLAMA_HOST || 'http://localhost:11434').trim().replace(/\/$/, ''),
     ollamaModel,
     ollamaVisionModel,
     anthropicApiKey: doc?.anthropicApiKey || process.env.ANTHROPIC_API_KEY || '',
     anthropicModel: doc?.anthropicModel || CLAUDE_MAIN_DEFAULT,
     anthropicWorkspaceId: doc?.anthropicWorkspaceId || process.env.ANTHROPIC_WORKSPACE_ID || '',
+    anthropicAdminKey: doc?.anthropicAdminKey || process.env.ANTHROPIC_ADMIN_KEY || '',
+    timezone: doc?.timezone || process.env.TZ || 'UTC',
     openaiApiKey: doc?.openaiApiKey || process.env.OPENAI_API_KEY || '',
     openaiModel: doc?.openaiModel || 'gpt-4o-mini',
     geminiApiKey: doc?.geminiApiKey || process.env.GEMINI_API_KEY || '',

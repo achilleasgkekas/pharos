@@ -26,6 +26,7 @@ import { OpenInOneDriveButton } from '@/components/OpenInOneDriveButton';
 import { QuickVerify } from './QuickVerify';
 import { useJobs } from '@/components/JobsProvider';
 import { enqueueRescanReceipts, getBulkAiGuard } from '@/app/jobActions';
+import { estimateTaskCost } from '@/lib/claudePricing';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { NO_SPACE, matchesSpace, spaceFilterOptions } from '@/lib/spaceFilter';
 import { useLocale, useT } from '@/components/LocaleProvider';
@@ -152,11 +153,13 @@ export function ReceiptsClient({
     // Cost guard: confirm before starting a (possibly paid) bulk AI job.
     const g = await getBulkAiGuard();
     if (g.confirm) {
+      const unitCost = estimateTaskCost(g.model, 'receipt');
+      const totalCost = (failedReceipts.length * unitCost).toFixed(2);
       const ok = await confirm({
         title: t('rc.rescanConfirm', { n: failedReceipts.length }),
         message:
           g.provider === 'anthropic'
-            ? t('rc.rescanConfirmCloud', { model: g.model, cost: (failedReceipts.length * 0.02).toFixed(2) })
+            ? t('rc.rescanConfirmCloud', { model: g.model, cost: totalCost })
             : t('rc.rescanConfirmLocal', { model: g.model }),
         confirmLabel: t('common.confirm'),
       });

@@ -71,6 +71,7 @@ import { SavedViews } from '@/components/ui/SavedViews';
 import { linkPlanToItem, unlinkPlanByKey } from '../statements/actions';
 import { ItemDuplicatesModal, MergeItemsPicker } from './ItemDuplicatesModal';
 import { PriceSearchPanel } from '@/components/PriceSearchPanel';
+import { estimateTaskCost, formatTaskCost } from '@/lib/claudePricing';
 
 const CATEGORIES = [
   { value: 'network', label: 'Network' },
@@ -421,11 +422,14 @@ export function ItemsClient({
     // Cost guard: confirm before starting a (possibly paid) bulk AI job.
     const g = await getBulkAiGuard();
     if (g.confirm) {
+      const unitCost = estimateTaskCost(g.model, 'itemFill');
+      const totalCost = (sel.length * unitCost).toFixed(2);
+      const unitStr = formatTaskCost(unitCost);
       const ok = await confirm({
         title: `Run AI on ${sel.length} item${sel.length === 1 ? '' : 's'}?`,
         message:
           g.provider === 'anthropic'
-            ? `Cloud · ${g.model}. Rough cost ~$${(sel.length * 0.02).toFixed(2)} (≈$0.02/item). Starts a background job.`
+            ? `Cloud · ${g.model}. Rough cost ~$${totalCost} (≈${unitStr}/item). Starts a background job.`
             : `Local · ${g.model}. Free, but slow. Starts a background job.`,
         confirmLabel: 'Run AI',
       });

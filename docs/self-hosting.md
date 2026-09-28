@@ -100,7 +100,10 @@ openssl rand -base64 24   # → MONGO_PASS
 
 ### Optional — AI providers
 
-The app defaults to **local Ollama** (private, zero-cost). Cloud AI providers are optional; only configure if you want to use them. Keys are stored server-side and never sent to the browser.
+The setup wizard recommends **Anthropic Claude** (`claude-sonnet-5`) for document
+extraction. Cloud keys are stored server-side and never sent to the browser. Ollama
+remains available as a private, zero-cost local provider for existing installations
+and users who choose it.
 
 | Variable | Purpose |
 |---|---|
