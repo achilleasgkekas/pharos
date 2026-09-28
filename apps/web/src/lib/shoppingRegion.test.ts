@@ -7,6 +7,7 @@ import {
   normalizeShopHost,
   normalizeShopList,
   normalizeShoppingCountry,
+  addShopToList,
   rankByMarket,
   SHOPPING_PRESETS,
 } from './shoppingRegion';
@@ -36,6 +37,34 @@ describe('normalizeShopList', () => {
     const many = Array.from({ length: 30 }, (_, i) => `shop${i}.de`);
     expect(normalizeShopList(many)).toHaveLength(20);
     expect(normalizeShopList(undefined)).toEqual([]);
+  });
+});
+
+describe('addShopToList (#358)', () => {
+  it('adds and normalizes a domain or URL', () => {
+    const res = addShopToList(['amazon.de'], 'https://www.eBay.co.uk/itm/123');
+    expect(res).toEqual({
+      ok: true,
+      host: 'ebay.co.uk',
+      shops: ['amazon.de', 'ebay.co.uk'],
+    });
+  });
+
+  it('rejects invalid inputs', () => {
+    expect(addShopToList(['amazon.de'], 'not a domain')).toEqual({ ok: false, error: 'invalid' });
+    expect(addShopToList(['amazon.de'], '')).toEqual({ ok: false, error: 'invalid' });
+  });
+
+  it('rejects duplicates', () => {
+    expect(addShopToList(['amazon.de'], 'https://amazon.de/product')).toEqual({
+      ok: false,
+      error: 'duplicate',
+    });
+  });
+
+  it('rejects when 20 shop limit is reached', () => {
+    const twentyShops = Array.from({ length: 20 }, (_, i) => `shop${i}.com`);
+    expect(addShopToList(twentyShops, 'newshop.de')).toEqual({ ok: false, error: 'limit' });
   });
 });
 

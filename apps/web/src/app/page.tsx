@@ -207,7 +207,7 @@ export default async function HomePage() {
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <NavCard href="/items" title={t('nav.inventory')} count={stats.ownedCount} description={t('home.dInventory')} open={t('home.open')} color="cyan" icon={<Package size={20} />} />
-          <NavCard href="/shopping" title={t('nav.shopping')} count={stats.shoppingCount} description={t('home.dShopping')} open={t('home.open')} color="gold" icon={<ShoppingCart size={20} />} />
+          <NavCard href="/shopping" title={t('nav.wishlist')} count={stats.shoppingCount} description={t('home.dShopping')} open={t('home.open')} color="gold" icon={<ShoppingCart size={20} />} />
           <NavCard href="/shopping-list" title={t('nav.shoppingList')} count={stats.shoppingListCount} description={t('home.dShoppingList')} open={t('home.open')} color="accent" icon={<ShoppingBasket size={20} />} />
           <NavCard href="/receipts" title={t('nav.receipts')} count={stats.receiptCount} description={t('home.dReceipts')} open={t('home.open')} color="purple" icon={<ReceiptIcon size={20} />} />
           <NavCard href="/expenses" title={t('nav.expenses')} count={null} description={t('home.dExpenses')} open={t('home.open')} color="gold" icon={<Wallet size={20} />} />

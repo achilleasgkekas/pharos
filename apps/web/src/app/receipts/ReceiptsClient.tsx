@@ -266,8 +266,12 @@ export function ReceiptsClient({
     });
   }, [receipts, storeFilter, statusFilter, search, sortBy, dateFrom, dateTo, rangeInvalid, categoryFilter, paymentFilter, spaceFilter]);
 
-  // Deep-link from global search
+  // Deep-link from global search or quick add
   useOpenParam((id) => {
+    if (id === 'new') {
+      setTimeout(() => fileInputRef.current?.click(), 50);
+      return;
+    }
     const found = receipts.find((r) => r._id === id);
     if (found) setSelected(found);
   });

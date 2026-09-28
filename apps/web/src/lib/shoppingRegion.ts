@@ -82,6 +82,22 @@ export function normalizeShopList(raw: unknown): string[] {
   return out;
 }
 
+export type AddShopResult =
+  | { ok: true; host: string; shops: string[] }
+  | { ok: false; error: 'invalid' | 'duplicate' | 'limit' };
+
+/**
+ * Add a user-entered shop to the list: normalises URL/domain, rejects invalid,
+ * duplicates, and caps at 20.
+ */
+export function addShopToList(shops: string[], input: string): AddShopResult {
+  const host = normalizeShopHost(input);
+  if (!host) return { ok: false, error: 'invalid' };
+  if (shops.includes(host)) return { ok: false, error: 'duplicate' };
+  if (shops.length >= 20) return { ok: false, error: 'limit' };
+  return { ok: true, host, shops: [...shops, host] };
+}
+
 /** A stored country code, or '' (off) for anything without a preset. */
 export function normalizeShoppingCountry(raw: unknown): string {
   const c = String(raw ?? '').trim().toUpperCase();

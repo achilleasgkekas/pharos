@@ -25,15 +25,15 @@ subscriptions, upcoming bills/renewals), recent activity, and module shortcuts.
 
 ## Contents
 
-| 🏠 Own & buy | 💶 Money | 📅 Life admin | 🧰 Everywhere |
-| --- | --- | --- | --- |
-| [Accounts & household](#accounts--household) | [Expenses & Income](#expenses--income) | [Utilities](#utilities-meter-readings) | [AI command bar](#ai-command-bar--history) |
-| [Inventory & Shopping](#inventory--shopping-items) | [Statements & installments](#statements--installments) | [Vehicles](#vehicles) | [Search](#search) |
-| [Shopping list](#shopping-list) | [Subscriptions](#subscriptions) | [Documents](#documents) | [Notifications](#notifications) |
-| [Receipts](#receipts) | [Bills & payables](#bills--payables) | [Special dates](#special-dates) | [Backup & restore](#backup--restore-json) |
-| | [Vouchers](#vouchers) | [Calendar](#calendar) | [Trash](#trash-soft-delete) |
-| | [Save (savings forecast)](#save-savings-forecast) | [Tasks](#tasks) | [Settings](#settings) |
-| | [Reports](#reports) | | |
+| 💶 Money | 🛍️ Shopping | 🏠 Home & car | 📅 Planner | 👤 Account & Everywhere |
+| --- | --- | --- | --- | --- |
+| [Expenses & Income](#expenses--income) | [Shopping list](#shopping-list) | [Inventory](#inventory--shopping-items) | [Calendar](#calendar) | [Settings & Users](#accounts--household) |
+| [Receipts](#receipts) | [Wishlist & tracking](#inventory--shopping-items) | [Utilities](#utilities-meter-readings) | [Tasks](#tasks) | [AI command bar](#ai-command-bar--history) |
+| [Bills & payables](#bills--payables) | [Vouchers](#vouchers) | [Vehicles](#vehicles) | [Special dates](#special-dates) | [Jobs & AI history](#ai-command-bar--history) |
+| [Subscriptions](#subscriptions) | | [Documents](#documents) | | [Search](#search) |
+| [Cards & installments](#statements--installments) | | | | [Notifications](#notifications) |
+| [Savings](#save-savings-forecast) | | | | [Backup & restore](#backup--restore-json) |
+| [Reports](#reports) | | | | [Trash](#trash-soft-delete) |
 
 ---
 

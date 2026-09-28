@@ -104,6 +104,10 @@ export function ExpensesClient({ kind, expenses, cards, vendors, ollamaUp, categ
   const [applyingBulk, startBulkEdit] = useTransition();
 
   useOpenParam((id) => {
+    if (id === 'new') {
+      setCreating(true);
+      return;
+    }
     const found = expenses.find((e) => e._id === id);
     if (found) setSelected(found);
   });
