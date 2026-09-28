@@ -4,7 +4,7 @@
 
 # Documentation
 
-**Everything you need to run PHAROS (Φάρος) on your own server and get the most out of it.**
+**Everything you need to run PHAROS on your own server and get the most out of it.**
 
 *Inventory · receipts · expenses · bills · subscriptions · statements · utilities · vehicles · documents, with optional AI.*
 

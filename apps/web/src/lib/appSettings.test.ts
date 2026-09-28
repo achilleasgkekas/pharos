@@ -70,7 +70,7 @@ describe('normalizeSettings', () => {
       ntfyEnabled: false,
       currency: 'EUR',
       multiCurrency: false,
-      defaultVatRate: 24,
+      defaultVatRate: 0,
       defaultReturnWindowDays: 14,
       shoppingCountry: '',
       shoppingExtraShops: [],

@@ -36,10 +36,10 @@ export function resolveTaxonomy(key: TaxonomyKey, overrides: Record<string, unkn
 }
 
 // ── Spaces / ledgers (P34) ────────────────────────────────────────────────
-// A per-property / per-context ledger tag (e.g. "Σπίτι", "Εξοχικό", "Δουλειά")
+// A per-property / per-context ledger tag (for example, "Home" or "Work")
 // so money data can be split by space. UNLIKE the category taxonomies above,
 // spaces default to EMPTY (the feature stays dormant until the user names a
-// space), keep their original casing (Greek proper nouns), and never force an
+// space), keep their original casing, and never force an
 // "other" bucket. Empty space = "unassigned / all".
 export const DEFAULT_SPACES: string[] = [];
 const MAX_SPACES = 24;
@@ -47,17 +47,16 @@ const MAX_SPACES = 24;
 // ── Tax categories (P8) ───────────────────────────────────────────────────
 // Suggested labels for the "tax category" free-text field, shown as options in a
 // SearchableSelect (allowCustom) — NOT an enforced taxonomy like the categories
-// above (every country's deduction rules differ, and this app has no per-country
-// setting). GR-flavoured since that's the primary user base; free text otherwise.
+// above. Every country's deduction rules differ, so users can add their own label.
 export const TAX_CATEGORY_PRESETS: string[] = [
-  'Ιατρικά έξοδα',
-  'Δωρεές',
-  'Τόκοι στεγαστικού δανείου',
-  'Ενοίκιο (φοιτητές/παιδιά)',
-  'Ασφάλιστρα ζωής',
-  'Δαπάνες αναπηρίας',
-  'Επαγγελματικά έξοδα',
-  'Άλλο',
+  'Medical expenses',
+  'Donations',
+  'Mortgage interest',
+  'Education and childcare',
+  'Life insurance',
+  'Disability expenses',
+  'Professional expenses',
+  'Other',
 ];
 
 /** Clean a user-entered spaces list: trim, drop empties, dedupe case-insensitively

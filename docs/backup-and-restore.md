@@ -225,7 +225,7 @@ tax filing. Three kinds are available, downloaded as `pharos-<kind>-YYYY-MM-DD.c
 | `expenses` | Kind, Vendor, Category, Amount, Date, Period, Recurring, Verified |
 | `items` | Title, Category, Status, Current price, Paid, Bought from, Serial, Location, Warranty until |
 
-Files are UTF-8 with a BOM (so Excel opens Greek/accented text correctly) and are
+Files are UTF-8 with a BOM (so Excel opens accented text correctly) and are
 CSV-injection guarded (a leading `=`, `+`, `-`, `@` in a value is prefixed with
 `'` so a spreadsheet does not evaluate it as a formula). CSV is for reading, not
 for restoring — there is no CSV import.

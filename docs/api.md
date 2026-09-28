@@ -266,7 +266,7 @@ Each plan in the `GET /statements/plans` response is:
       "key": "quest-online|473.88|2026-04",
       "signature": "quest-online|473.88|2026-04",
       "label": "QUEST ONLINE",
-      "card": "Εθνική Mastercard",
+      "card": "Northwind Mastercard",
       "perAmount": 39.49,
       "totalInstallments": 12,
       "paidInstallments": 3,

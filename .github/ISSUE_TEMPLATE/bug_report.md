@@ -19,7 +19,7 @@ What you expected to happen instead.
 
 **Environment**
 - Deployment: Docker / local `npm run dev`
-- AI provider: none / Ollama / Anthropic / OpenAI / Gemini / OpenRouter / custom
+- AI provider: none / Anthropic (Claude) / OpenAI / Ollama / Gemini / OpenRouter / custom
 - Browser + OS:
 
 **Logs / screenshots**
