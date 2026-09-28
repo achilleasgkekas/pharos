@@ -169,6 +169,7 @@ What it deliberately does **not** include:
 - **Logins** (`User`) — password hashes.
 - **Binary files** — only the paths are stored, not the receipt/PDF/photo bytes.
 - **Transient/regenerable state** — background jobs, notification instances,
+  operational AI run telemetry (`AiRun`, kept on a TTL index),
   and the legacy `Phase` model from the original tracker import.
 
 ### Verify a backup before you need it

@@ -14,6 +14,7 @@ import { getAppSettings } from '@/lib/appSettings';
 import { getStores } from '@/lib/storeService';
 import { SettingsClient } from './SettingsClient';
 import { listOllamaModels, getPromptsForEditor, getScraperAi, getStorageInfo, getListsForEditor, getImapInfo } from './actions';
+import { getRecentAiRuns } from '@/lib/aiRun';
 import { requireUser } from '@/lib/auth';
 import type { SerializedCard } from '@/types';
 
@@ -63,7 +64,7 @@ async function getInfo() {
     imap,
     ai: {
       // What the user picked (may differ from effective if no key yet)
-      selectedProvider: ((doc?.aiProvider as string) || 'ollama') as 'ollama' | 'anthropic' | 'openai' | 'gemini' | 'openrouter' | 'custom',
+      selectedProvider: ((doc?.aiProvider as string) || 'anthropic') as 'ollama' | 'anthropic' | 'openai' | 'gemini' | 'openrouter' | 'custom',
       effectiveProvider: cfg.provider,
       ollamaHost: cfg.ollamaHost,
       ollamaModel: cfg.ollamaModel,
@@ -81,6 +82,9 @@ async function getInfo() {
       customModel: cfg.customModel,
       hasCustomKey: !!cfg.customApiKey,
       confirmBulk: doc?.aiConfirmBulk !== false, // cost guard, default ON
+      hasAdminKey: !!(doc?.anthropicAdminKey || process.env.ANTHROPIC_ADMIN_KEY),
+      timezone: cfg.timezone || 'UTC',
+      recentRuns: await getRecentAiRuns(5),
       // Self-hosted AI spend cap + this month's running spend (both in `currency`); 0 = no cap.
       monthlyBudget: aiBudget.budget,
       spentThisMonth: aiBudget.spent,

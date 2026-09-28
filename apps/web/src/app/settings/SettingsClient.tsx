@@ -1,7 +1,8 @@
 'use client';
 import { useState, useTransition, useRef, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Activity, Sun, Moon, Sparkles, Database, CreditCard, ExternalLink, Server, Cloud, Download, Upload, Loader2, Check, Store as StoreIcon, Pencil, Trash2, Plus, X, Copy, ShieldCheck, SlidersHorizontal, Bell, MessageSquareCode, RotateCcw, ChevronDown, Globe, HardDrive, FolderTree, RefreshCw, Plug, Users, UserPlus, KeyRound, Star, Landmark, TrendingUp, TrendingDown, CalendarPlus, Tags, MapPin, FlaskConical, Webhook, Mail, Bookmark, LogOut, History } from 'lucide-react';
+import Link from 'next/link';
+import { Activity, Sun, Moon, Sparkles, Database, CreditCard, ExternalLink, Server, Cloud, Download, Upload, Loader2, Check, Store as StoreIcon, Pencil, Trash2, Plus, X, Copy, ShieldCheck, SlidersHorizontal, Bell, MessageSquareCode, RotateCcw, ChevronDown, Globe, HardDrive, FolderTree, RefreshCw, Plug, Users, UserPlus, KeyRound, Star, Landmark, TrendingUp, TrendingDown, CalendarPlus, Tags, MapPin, FlaskConical, Webhook, Mail, Bookmark, LogOut, History, Zap } from 'lucide-react';
 import { useTheme, type Theme } from '@/components/ThemeProvider';
 import { cur } from '@/lib/money';
 import { cn } from '@/components/ui/cn';
@@ -9,12 +10,14 @@ import { PAGE_MAIN, PageHeader } from '@/components/ui/PageHeader';
 import { controlClass } from '@/components/ui/Input';
 import { Field } from '@/components/ui/Field';
 import { useConfirm, usePrompt } from '@/components/ui/ConfirmDialog';
-import { saveAiConfig, pullOllamaModel, testAnthropic, saveStore, deleteStore, setAiConfirmBulk, exportData, exportDataEncrypted, importData, importDataEncrypted, verifyBackup, exportCSV, exportInsuranceBundle, exportTaxBundle, saveBudgets, saveBudgetRollover, suggestBudgets, saveAssetAccounts, saveDepreciation, saveCategoryRules, setAiEnabled, setAiFeature, fetchProviderModels, dismissAiModelNotices } from './actions';
+import { saveAiConfig, pullOllamaModel, testAnthropic, saveStore, deleteStore, setAiConfirmBulk, exportData, exportDataEncrypted, importData, importDataEncrypted, verifyBackup, exportCSV, exportInsuranceBundle, exportTaxBundle, saveBudgets, saveBudgetRollover, suggestBudgets, saveAssetAccounts, saveDepreciation, saveCategoryRules, setAiEnabled, setAiFeature, fetchProviderModels, dismissAiModelNotices, getLiveAiSpendAction, type LiveAiSpendData } from './actions';
 import { applyCategoryRulesToExisting } from '@/app/expenses/actions';
 import type { CategoryRule } from '@/lib/categoryRules';
+import type { SerializedAiRun } from '@/lib/aiRun';
 import { AI_FEATURES } from '@/lib/aiFeatures';
 import { PROVIDER_RECOMMEND, SCRAPER_RECOMMEND, type FetchedModel } from '@/lib/aiModels';
 import { CLAUDE_SUGGESTIONS, CLAUDE_SCRAPER_SUGGESTIONS, modelLifecycle } from '@/lib/claudeModels';
+import { claudePrice, formatCacheTooltip, formatModelPrice, taskCostSummary, PRICING_VERIFIED_AT, PRICING_SOURCE_URL } from '@/lib/claudePricing';
 import { StoreDuplicatesModal } from './StoreDuplicatesModal';
 import { YnabImportModal } from './YnabImportModal';
 import type { StoreLite } from '@/lib/storeService';
@@ -60,7 +63,7 @@ import type { SerializedCard } from '@/types';
 import { useT, useLocale, useMoney } from '@/components/LocaleProvider';
 import { SHOPPING_COUNTRIES, SHOPPING_PRESETS } from '@/lib/shoppingRegion';
 import type { TKey } from '@/lib/i18n';
-import { formatDate, formatTime, formatDateTime } from '@/lib/i18n/format';
+import { formatDate, formatTime, formatDateTime, relTime } from '@/lib/i18n/format';
 
 type ProviderId = 'ollama' | 'anthropic' | 'openai' | 'gemini' | 'openrouter' | 'custom';
 
@@ -83,6 +86,9 @@ type AiInfo = {
   customModel: string;
   hasCustomKey: boolean;
   confirmBulk: boolean;
+  hasAdminKey?: boolean;
+  timezone?: string;
+  recentRuns?: SerializedAiRun[];
   monthlyBudget: number; // self-hosted AI spend cap in `currency`/month; 0 = no cap
   spentThisMonth: number; // this month's estimated AI spend, same currency
   currency: string;
@@ -508,10 +514,33 @@ function ModelPicker({
 
   // #359: say so when the typed or saved Claude model is retired or on its way out.
   const life = provider === 'anthropic' ? modelLifecycle(model) : ({ status: 'active' } as const);
+  const currentClaudePrice = provider === 'anthropic' ? claudePrice(model) : null;
 
   return (
     <Field label={t('set.modelField')}>
       <input value={model} onChange={(e) => onModel(e.target.value)} className={controlClass} style={{ fontFamily: 'var(--font-mono)' }} />
+      {provider === 'anthropic' && (
+        currentClaudePrice ? (
+          <div className="mt-1.5 space-y-0.5">
+            <div className="flex flex-wrap items-center gap-x-2 text-[11px] text-[color:var(--color-text-dim)]" style={{ fontFamily: 'var(--font-mono)' }}>
+              <span>{currentClaudePrice.name} · {formatModelPrice(currentClaudePrice)}</span>
+              <span title={formatCacheTooltip(currentClaudePrice)} className="text-[10px] text-[color:var(--color-text-faint)] cursor-help underline decoration-dotted">
+                (cache rates)
+              </span>
+            </div>
+            <p className="text-[10px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
+              {taskCostSummary(model)}
+            </p>
+          </div>
+        ) : (
+          <div className="mt-1.5 flex items-center gap-2 text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
+            <span>Price unknown</span>
+            <a href={PRICING_SOURCE_URL} target="_blank" rel="noreferrer" className="text-[color:var(--color-accent)] underline underline-offset-2">
+              Claude pricing
+            </a>
+          </div>
+        )
+      )}
       {life.status !== 'active' && (
         <p className={cn('text-[11px] mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1', life.status === 'retired' ? 'text-[color:var(--color-red)]' : 'text-[color:var(--color-gold)]')}>
           <span>{life.status === 'retired' ? t('set.modelRetired', { date: life.retiredOn }) : t('set.modelDeprecated')}</span>
@@ -552,24 +581,30 @@ function ModelPicker({
       {models ? (
         <>
           <div className="mt-2 max-h-60 overflow-auto rounded-lg border border-[color:var(--color-border)] divide-y divide-[color:var(--color-border)]">
-            {models.map((m) => (
-              <button
-                key={m.id}
-                type="button"
-                onClick={() => onModel(m.id)}
-                className={cn('w-full flex items-center gap-2 px-2.5 py-1.5 text-left transition-colors hover:bg-[color:var(--color-surface-2)]', model === m.id && 'bg-[color:var(--color-surface-2)]')}
-              >
-                {m.recommended && <Star size={11} className="text-[color:var(--color-accent)] shrink-0" />}
-                <span className="text-[11px] min-w-0 flex-1 truncate" style={{ fontFamily: 'var(--font-mono)' }} title={m.name}>
-                  {m.id}
-                  {m.name && <span className="ml-1.5 text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-sans)' }}>{m.name}</span>}
-                </span>
-                {m.vision && <span className="text-[9px] px-1 py-0.5 rounded bg-[color:var(--color-surface-3)] text-[color:var(--color-text-faint)] shrink-0">vision</span>}
-                <span className="text-[10px] text-[color:var(--color-text-dim)] shrink-0 tabular-nums" style={{ fontFamily: 'var(--font-mono)' }}>
-                  {m.in == null ? '—' : m.in === 0 && m.out === 0 ? 'free' : `$${m.in}/$${m.out}`}
-                </span>
-              </button>
-            ))}
+            {models.map((m) => {
+              const cacheTooltip = m.cacheWrite5m != null
+                ? `Cache: $${m.cacheWrite5m} (5m) / $${m.cacheWrite1h} (1h) · Cache read: $${m.cacheRead} per 1M tokens`
+                : undefined;
+              return (
+                <button
+                  key={m.id}
+                  type="button"
+                  title={cacheTooltip}
+                  onClick={() => onModel(m.id)}
+                  className={cn('w-full flex items-center gap-2 px-2.5 py-1.5 text-left transition-colors hover:bg-[color:var(--color-surface-2)]', model === m.id && 'bg-[color:var(--color-surface-2)]')}
+                >
+                  {m.recommended && <Star size={11} className="text-[color:var(--color-accent)] shrink-0" />}
+                  <span className="text-[11px] min-w-0 flex-1 truncate" style={{ fontFamily: 'var(--font-mono)' }} title={m.name}>
+                    {m.id}
+                    {m.name && <span className="ml-1.5 text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-sans)' }}>{m.name}</span>}
+                  </span>
+                  {m.vision && <span className="text-[9px] px-1 py-0.5 rounded bg-[color:var(--color-surface-3)] text-[color:var(--color-text-faint)] shrink-0">vision</span>}
+                  <span className="text-[10px] text-[color:var(--color-text-dim)] shrink-0 tabular-nums" style={{ fontFamily: 'var(--font-mono)' }}>
+                    {m.in == null ? '—' : m.in === 0 && m.out === 0 ? 'free' : `$${m.in}/$${m.out}`}
+                  </span>
+                </button>
+              );
+            })}
           </div>
           <p className="text-[9px] text-[color:var(--color-text-faint)] mt-1" style={{ fontFamily: 'var(--font-mono)' }}>
             {t('set.tokenPricing')}
@@ -578,13 +613,32 @@ function ModelPicker({
       ) : (
         suggestions.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mt-2">
-            {suggestions.map((m) => (
-              <button key={m} type="button" onClick={() => onModel(m)} className="text-[10px] px-2 py-1 rounded-md bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] hover:border-[color:var(--color-accent)] transition-colors" style={{ fontFamily: 'var(--font-mono)' }}>
-                {m}
-              </button>
-            ))}
+            {suggestions.map((m) => {
+              const p = provider === 'anthropic' ? claudePrice(m) : null;
+              return (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => onModel(m)}
+                  title={p ? formatCacheTooltip(p) : undefined}
+                  className="text-[10px] px-2 py-1 rounded-md bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] hover:border-[color:var(--color-accent)] transition-colors flex items-center gap-1.5"
+                  style={{ fontFamily: 'var(--font-mono)' }}
+                >
+                  <span>{m}</span>
+                  {p && <span className="text-[color:var(--color-text-dim)]">${p.inputPerMTok}/${p.outputPerMTok}</span>}
+                </button>
+              );
+            })}
           </div>
         )
+      )}
+      {provider === 'anthropic' && (
+        <p className="text-[9px] text-[color:var(--color-text-faint)] mt-2">
+          Prices as of {PRICING_VERIFIED_AT} ·{' '}
+          <a href={PRICING_SOURCE_URL} target="_blank" rel="noreferrer" className="underline underline-offset-2 hover:text-[color:var(--color-accent)]">
+            Anthropic pricing
+          </a>
+        </p>
       )}
       {hint && <p className="text-[10px] text-[color:var(--color-text-faint)] mt-1.5" style={{ fontFamily: 'var(--font-mono)' }}>{hint}</p>}
     </Field>
@@ -636,6 +690,7 @@ function CloudKeyModel({
 
 function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
   const t = useT();
+  const locale = useLocale();
   const [pending, startTransition] = useTransition();
   const [provider, setProvider] = useState<ProviderId>(ai.selectedProvider);
   const [ollamaHost, setOllamaHost] = useState(ai.ollamaHost);
@@ -644,6 +699,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
   const [anthropicModel, setAnthropicModel] = useState(ai.anthropicModel);
   const [anthropicWorkspaceId, setAnthropicWorkspaceId] = useState(ai.anthropicWorkspaceId);
   const [apiKey, setApiKey] = useState('');
+  const [adminKey, setAdminKey] = useState('');
   const [openaiModel, setOpenaiModel] = useState(ai.openaiModel);
   const [openaiKey, setOpenaiKey] = useState('');
   const [geminiModel, setGeminiModel] = useState(ai.geminiModel);
@@ -659,6 +715,23 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
   const [testFailed, setTestFailed] = useState(false);
   const [confirmBulk, setConfirmBulk] = useState(ai.confirmBulk);
   const [monthlyBudget, setMonthlyBudget] = useState(ai.monthlyBudget ? String(ai.monthlyBudget) : '');
+  const [timezone, setTimezone] = useState(ai.timezone || '');
+  const [liveSpend, setLiveSpend] = useState<LiveAiSpendData | null>(null);
+  const [refreshingLive, setRefreshingLive] = useState(false);
+
+  function fetchLiveSpend() {
+    setRefreshingLive(true);
+    getLiveAiSpendAction()
+      .then((data) => setLiveSpend(data))
+      .catch(() => {})
+      .finally(() => setRefreshingLive(false));
+  }
+
+  useEffect(() => {
+    fetchLiveSpend();
+    const interval = setInterval(fetchLiveSpend, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   function save() {
     const fd = new FormData();
@@ -674,7 +747,9 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
     fd.set('customBaseUrl', customBaseUrl.trim());
     fd.set('customModel', customModel.trim());
     fd.set('aiMonthlyBudget', String(Number(monthlyBudget) || 0));
+    fd.set('timezone', timezone.trim());
     if (apiKey.trim()) fd.set('anthropicApiKey', apiKey.trim());
+    if (adminKey.trim()) fd.set('anthropicAdminKey', adminKey.trim());
     if (openaiKey.trim()) fd.set('openaiApiKey', openaiKey.trim());
     if (geminiKey.trim()) fd.set('geminiApiKey', geminiKey.trim());
     if (openrouterKey.trim()) fd.set('openrouterApiKey', openrouterKey.trim());
@@ -696,11 +771,13 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
         return;
       }
       setApiKey('');
+      setAdminKey('');
       setOpenaiKey('');
       setGeminiKey('');
       setOpenrouterKey('');
       setCustomKey('');
       setMsg(t('common.savedOk'));
+      fetchLiveSpend();
       setTimeout(() => setMsg(null), 2500);
     });
   }
@@ -933,6 +1010,22 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
               {t('set.anthropicWorkspaceIdHint')}
             </p>
           </Field>
+          <Field label={`Anthropic Admin API Key ${ai.hasAdminKey ? '(saved)' : ''}`}>
+            <input
+              type="password"
+              value={adminKey}
+              onChange={(e) => setAdminKey(e.target.value)}
+              placeholder={ai.hasAdminKey ? '••••••••••••  (saved)' : 'sk-ant-admin-...'}
+              autoComplete="new-password"
+              data-1p-ignore
+              data-lpignore="true"
+              className={controlClass}
+              style={{ fontFamily: 'var(--font-mono)' }}
+            />
+            <p className="mt-1 text-[10px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
+              Optional. Organization admin key (starts with sk-ant-admin-) used to pull live billed usage from Anthropic&apos;s Cost Report API.
+            </p>
+          </Field>
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -1066,28 +1159,230 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
       </div>
 
 
-      <div className="pt-3 border-t border-[color:var(--color-border)] mt-1">
-        <Field label={t('set.aiBudget')}>
-          <input
-            type="number"
-            min="0"
-            step="1"
-            inputMode="decimal"
-            value={monthlyBudget}
-            onChange={(e) => setMonthlyBudget(e.target.value)}
-            placeholder="0"
-            className={controlClass}
-            style={{ fontFamily: 'var(--font-mono)' }}
-          />
-        </Field>
-        <p className="text-[10px] text-[color:var(--color-text-faint)] mt-1">{t('set.aiBudgetHint')}</p>
-        <p className="text-[11px] mt-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
-          {t('set.aiSpentThisMonth')}:{' '}
-          <span className={ai.monthlyBudget > 0 && ai.spentThisMonth >= ai.monthlyBudget ? 'text-[color:var(--color-red)]' : 'text-[color:var(--color-text)]'}>
-            {ai.spentThisMonth.toFixed(2)} {ai.currency}
-          </span>
-          {ai.monthlyBudget > 0 ? ` / ${ai.monthlyBudget.toFixed(2)} ${ai.currency}` : ` · ${t('set.aiBudgetNoCap')}`}
-        </p>
+      <div className="pt-3 border-t border-[color:var(--color-border)] mt-1 space-y-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <Field label={t('set.aiBudget')}>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                inputMode="decimal"
+                value={monthlyBudget}
+                onChange={(e) => setMonthlyBudget(e.target.value)}
+                placeholder="0"
+                className={controlClass}
+                style={{ fontFamily: 'var(--font-mono)' }}
+              />
+            </Field>
+            <p className="text-[10px] text-[color:var(--color-text-faint)] mt-1">{t('set.aiBudgetHint')}</p>
+          </div>
+          <div>
+            <Field label="Spend Timezone">
+              <input
+                type="text"
+                value={timezone}
+                onChange={(e) => setTimezone(e.target.value)}
+                placeholder={typeof window !== 'undefined' ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'UTC'}
+                className={controlClass}
+                style={{ fontFamily: 'var(--font-mono)' }}
+              />
+            </Field>
+            <div className="flex items-center justify-between mt-1">
+              <p className="text-[10px] text-[color:var(--color-text-faint)]">
+                Determines daily and monthly billing cycle boundaries.
+              </p>
+              {!timezone && typeof window !== 'undefined' && (
+                <button
+                  type="button"
+                  onClick={() => setTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone)}
+                  className="text-[10px] text-[color:var(--color-accent)] hover:underline shrink-0"
+                >
+                  Use browser timezone
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Live AI Spend & Run History Card (#361, #362) */}
+        <div className="rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface-1)] p-4 space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Zap size={16} className="text-[color:var(--color-accent)]" />
+              <h4 className="text-sm font-semibold text-[color:var(--color-text)]">Live AI Spend & Usage</h4>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-[color:var(--color-text-faint)]">
+              <span style={{ fontFamily: 'var(--font-mono)' }}>TZ: {timezone || (typeof window !== 'undefined' ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'UTC')}</span>
+              <button
+                type="button"
+                onClick={fetchLiveSpend}
+                disabled={refreshingLive}
+                className="p-1 rounded hover:bg-[color:var(--color-surface-2)] text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] transition-colors"
+                title="Refresh live spend"
+              >
+                <RefreshCw size={13} className={cn(refreshingLive && 'animate-spin')} />
+              </button>
+            </div>
+          </div>
+
+          {/* Spend Metrics Grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="p-3 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)]">
+              <div className="text-[10px] font-medium text-[color:var(--color-text-dim)] uppercase tracking-wider">Today</div>
+              <div className="text-base font-semibold text-[color:var(--color-text)] mt-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
+                ${((liveSpend?.today.costMicros ?? 0) / 1_000_000).toFixed(4)}
+              </div>
+              <div className="text-[10px] text-[color:var(--color-text-faint)] mt-0.5">
+                {liveSpend?.today.count ?? 0} calls
+              </div>
+            </div>
+
+            <div className="p-3 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)]">
+              <div className="text-[10px] font-medium text-[color:var(--color-text-dim)] uppercase tracking-wider">This Month (MTD)</div>
+              <div className="text-base font-semibold text-[color:var(--color-text)] mt-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
+                ${((liveSpend?.month.costMicros ?? (ai.spentThisMonth * 1_000_000)) / 1_000_000).toFixed(4)}
+              </div>
+              <div className="text-[10px] text-[color:var(--color-text-faint)] mt-0.5">
+                {liveSpend?.month.count ?? 0} calls
+              </div>
+            </div>
+
+            <div className="p-3 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)]">
+              <div className="text-[10px] font-medium text-[color:var(--color-text-dim)] uppercase tracking-wider">Month Tokens</div>
+              <div className="text-base font-semibold text-[color:var(--color-text)] mt-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
+                {liveSpend ? `${(((liveSpend.month.inputTokens + liveSpend.month.outputTokens) / 1000).toFixed(1))}k` : '0k'}
+              </div>
+              <div className="text-[10px] text-[color:var(--color-text-faint)] mt-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
+                in: {liveSpend ? (liveSpend.month.inputTokens / 1000).toFixed(1) : 0}k · out: {liveSpend ? (liveSpend.month.outputTokens / 1000).toFixed(1) : 0}k
+              </div>
+            </div>
+
+            <div className="p-3 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)]">
+              <div className="text-[10px] font-medium text-[color:var(--color-text-dim)] uppercase tracking-wider">Prompt Cache</div>
+              <div className="text-base font-semibold text-[color:var(--color-text)] mt-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
+                {liveSpend ? `${(((liveSpend.month.cacheReadTokens + liveSpend.month.cacheWriteTokens) / 1000).toFixed(1))}k` : '0k'}
+              </div>
+              <div className="text-[10px] text-[color:var(--color-text-faint)] mt-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
+                read: {liveSpend ? (liveSpend.month.cacheReadTokens / 1000).toFixed(1) : 0}k (90% off)
+              </div>
+            </div>
+          </div>
+
+          {/* Budget Progress Bar */}
+          {ai.monthlyBudget > 0 && (
+            <div className="space-y-1.5 pt-1">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-[color:var(--color-text-dim)]">Monthly Cap Usage</span>
+                <span className="font-semibold" style={{ fontFamily: 'var(--font-mono)' }}>
+                  ${((liveSpend?.month.costMicros ?? (ai.spentThisMonth * 1_000_000)) / 1_000_000).toFixed(2)} / ${Number(monthlyBudget || ai.monthlyBudget).toFixed(2)} USD
+                  {' '}({liveSpend?.budget.pct ?? Math.round((ai.spentThisMonth / ai.monthlyBudget) * 100)}%)
+                </span>
+              </div>
+              <div className="w-full h-2 rounded-full bg-[color:var(--color-surface-3)] overflow-hidden">
+                <div
+                  className={cn(
+                    'h-full transition-all duration-300',
+                    (liveSpend?.budget.pct ?? 0) >= 100
+                      ? 'bg-[color:var(--color-red)]'
+                      : (liveSpend?.budget.pct ?? 0) >= 80
+                      ? 'bg-[color:var(--color-gold)]'
+                      : 'bg-[color:var(--color-accent)]'
+                  )}
+                  style={{ width: `${Math.min(100, liveSpend?.budget.pct ?? 0)}%` }}
+                />
+              </div>
+              {(liveSpend?.budget.capped || (liveSpend?.budget.pct ?? 0) >= 100) && (
+                <p className="text-[11px] text-[color:var(--color-red)] font-medium">
+                  ⚠ AI spend cap reached. Additional cloud AI requests are blocked until budget is increased or resets next month.
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Anthropic Admin API Billed Comparison (if available or configured) */}
+          {liveSpend?.adminBilled && (
+            <div className="rounded-lg bg-[color:var(--color-surface-2)]/60 border border-[color:var(--color-border)] p-3 text-xs space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="font-medium text-[color:var(--color-text)] flex items-center gap-1.5">
+                  <Cloud size={13} className="text-[color:var(--color-cyan)]" /> Anthropic Admin API Cost Report
+                </span>
+                {liveSpend.adminBilled.ok ? (
+                  <span className="text-[color:var(--color-accent)] font-semibold" style={{ fontFamily: 'var(--font-mono)' }}>
+                    ${liveSpend.adminBilled.billedDollars.toFixed(2)} USD (Billed MTD)
+                  </span>
+                ) : (
+                  <span className="text-[color:var(--color-red)] text-[11px]">
+                    {liveSpend.adminBilled.error || 'Check Admin API Key'}
+                  </span>
+                )}
+              </div>
+              {liveSpend.adminBilled.ok && (
+                <p className="text-[11px] text-[color:var(--color-text-faint)]">
+                  Local tracked: ${((liveSpend.month.costMicros) / 1_000_000).toFixed(2)} USD · Variance:{' '}
+                  ${Math.abs(liveSpend.adminBilled.billedDollars - (liveSpend.month.costMicros / 1_000_000)).toFixed(2)} USD
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Last 5 Calls (#362, #361) */}
+          <div className="space-y-2 pt-2 border-t border-[color:var(--color-border)]">
+            <div className="flex items-center justify-between">
+              <h5 className="text-xs font-semibold text-[color:var(--color-text-dim)] uppercase tracking-wider">
+                Recent AI Calls (Last 5)
+              </h5>
+              <Link
+                href="/history?tab=runs"
+                className="text-xs text-[color:var(--color-accent)] hover:underline flex items-center gap-1"
+              >
+                View full run history →
+              </Link>
+            </div>
+
+            {(liveSpend?.last5Runs ?? ai.recentRuns ?? []).length === 0 ? (
+              <p className="text-xs text-[color:var(--color-text-faint)] py-2 text-center">
+                No AI runs recorded yet.
+              </p>
+            ) : (
+              <div className="divide-y divide-[color:var(--color-border)]/50 border border-[color:var(--color-border)] rounded-lg overflow-hidden bg-[color:var(--color-surface-2)]/30">
+                {(liveSpend?.last5Runs ?? ai.recentRuns ?? []).map((run) => (
+                  <div key={run._id} className="flex items-center justify-between p-2.5 text-xs hover:bg-[color:var(--color-surface-2)]/60 transition-colors">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span
+                        className={cn(
+                          'w-2 h-2 rounded-full shrink-0',
+                          run.status === 'ok'
+                            ? 'bg-[color:var(--color-accent)]'
+                            : run.status === 'blocked'
+                            ? 'bg-[color:var(--color-gold)]'
+                            : 'bg-[color:var(--color-red)]'
+                        )}
+                      />
+                      <span className="font-medium text-[color:var(--color-text)] truncate">
+                        {run.feature}
+                      </span>
+                      <span className="text-[color:var(--color-text-faint)] font-mono text-[10px] hidden sm:inline truncate max-w-[120px]">
+                        {run.model}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0 font-mono text-[11px]">
+                      <span className="text-[color:var(--color-text-dim)]">
+                        {((run.usage.inputTokens + run.usage.outputTokens) / 1000).toFixed(1)}k tok
+                      </span>
+                      <span className="font-semibold text-[color:var(--color-text)] w-14 text-right">
+                        ${(run.costMicros / 1_000_000).toFixed(4)}
+                      </span>
+                      <span className="text-[10px] text-[color:var(--color-text-faint)] w-16 text-right">
+                        {relTime(new Date(run.at).toISOString(), t)}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Save */}

@@ -11,6 +11,7 @@ import { getBulkAiGuard } from '@/app/jobActions';
 import { searchItemPriceCandidates, addPriceLinks, type PriceCandidate } from '@/app/items/actions';
 import type { SerializedItem } from '@/types';
 import { useT } from '@/components/LocaleProvider';
+import { estimateTaskCost, formatTaskCost } from '@/lib/claudePricing';
 import { EmptyState } from '@/components/ui/EmptyState';
 
 function linkHost(url: string): string {
@@ -53,11 +54,14 @@ export function PriceSearchPanel({
     // Cost guard — this fires up to 5 page-fetches + AI calls.
     const g = await getBulkAiGuard();
     if (g.confirm) {
+      const unitCost = estimateTaskCost(g.model, 'priceSearch');
+      const totalCost = (5 * unitCost).toFixed(2);
+      const unitStr = formatTaskCost(unitCost);
       const ok = await confirm({
         title: 'Search prices online?',
         message:
           g.provider === 'anthropic'
-            ? `Reads up to 5 shops with ${g.model}. Rough cost ~$0.10 (≈$0.02/shop).`
+            ? `Reads up to 5 shops with ${g.model}. Rough cost ~$${totalCost} (≈${unitStr}/shop).`
             : `Reads up to 5 shops with ${g.model}. Local — free but slow.`,
         confirmLabel: 'Search',
       });

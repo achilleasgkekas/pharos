@@ -10,7 +10,17 @@ export async function anthropicPriceJSON(opts: {
   model: string;
   system: string;
   user: string;
-}): Promise<unknown> {
+}): Promise<{
+  json: unknown;
+  usage: {
+    inputTokens: number;
+    outputTokens: number;
+    cacheWriteTokens: number;
+    cacheReadTokens: number;
+  };
+  requestId?: string;
+  stopReason?: string;
+}> {
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -30,11 +40,31 @@ export async function anthropicPriceJSON(opts: {
     const body = await res.text().catch(() => '');
     throw new Error(`Anthropic HTTP ${res.status}: ${body.slice(0, 200)}`);
   }
-  const data = (await res.json()) as { content?: { type: string; text?: string }[] };
+  const requestId = res.headers.get('request-id') ?? res.headers.get('x-request-id') ?? undefined;
+  const data = (await res.json()) as {
+    content?: { type: string; text?: string }[];
+    usage?: {
+      input_tokens?: number;
+      output_tokens?: number;
+      cache_creation_input_tokens?: number;
+      cache_read_input_tokens?: number;
+    };
+    stop_reason?: string;
+  };
   const text = (data.content ?? [])
     .filter((c) => c.type === 'text')
     .map((c) => c.text ?? '')
     .join('')
     .trim();
-  return JSON.parse(stripFences(text));
+  return {
+    json: JSON.parse(stripFences(text)),
+    usage: {
+      inputTokens: data.usage?.input_tokens ?? 0,
+      outputTokens: data.usage?.output_tokens ?? 0,
+      cacheWriteTokens: data.usage?.cache_creation_input_tokens ?? 0,
+      cacheReadTokens: data.usage?.cache_read_input_tokens ?? 0,
+    },
+    requestId,
+    stopReason: data.stop_reason ?? undefined,
+  };
 }

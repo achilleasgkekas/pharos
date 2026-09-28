@@ -14,7 +14,8 @@ const PriceSchema = z.object({
 });
 export type ExtractedPrice = z.infer<typeof PriceSchema>;
 
-const PROMPT = `You extract the CURRENT selling price of a product from a shop page.
+const PROMPT = `Language: write descriptive output in English. Preserve proper names, merchant/product names, URLs and codes.
+You extract the CURRENT selling price of a product from a shop page.
 Return ONLY JSON: {"price": <number or null>, "currency": "EUR", "inStock": <bool>}.
 Price priority (use the first that applies):
 1. A "PRODUCT PRICE (from the page's price markup): …" line, if present, IS the price.
@@ -38,9 +39,49 @@ export class AiCallError extends Error {
   }
 }
 
+import { connect, AiRun } from './db.js';
+import { rateForModel, PRICE_VERSION } from './claudePricing.js';
+
+export type ExtractPriceMeta = {
+  record?: { type: string; id: string };
+  trigger?: 'user' | 'job' | 'cron' | 'email' | 'api';
+};
+
+async function recordAiRunSafe(run: {
+  feature: string;
+  provider: string;
+  model: string;
+  status: 'ok' | 'error' | 'blocked';
+  durationMs: number;
+  error?: string;
+  usage?: {
+    inputTokens: number;
+    outputTokens: number;
+    cacheWriteTokens?: number;
+    cacheReadTokens?: number;
+  };
+  costMicros?: number;
+  requestId?: string;
+  stopReason?: string;
+  trigger?: 'user' | 'job' | 'cron' | 'email' | 'api';
+  record?: { type: string; id: string };
+}): Promise<void> {
+  try {
+    await connect();
+    const expiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
+    await AiRun.create({
+      ...run,
+      priceVersion: PRICE_VERSION,
+      expiresAt,
+    });
+  } catch {
+    /* never break scraper operations on run history write errors */
+  }
+}
+
 /** Ask the configured model (Ollama or Anthropic) for the current price on a page.
  *  Provider, model and the prompt are read from the shared AppConfig (Settings). */
-export async function extractPrice(page: ScrapedPage): Promise<ExtractedPrice> {
+export async function extractPrice(page: ScrapedPage, meta?: ExtractPriceMeta): Promise<ExtractedPrice> {
   const ai = await getScraperAiConfig({ ollamaModel: config.ollamaModel });
   const system = ai.pricePrompt ?? PROMPT;
   const content = [
@@ -51,28 +92,94 @@ export async function extractPrice(page: ScrapedPage): Promise<ExtractedPrice> {
     .filter(Boolean)
     .join('\n\n');
 
+  const t0 = Date.now();
+  const trigger = meta?.trigger ?? 'cron';
+
   if (ai.provider === 'anthropic' && ai.anthropicApiKey) {
-    let json: unknown;
+    let res;
     try {
-      json = await anthropicPriceJSON({ apiKey: ai.anthropicApiKey, model: ai.model, system, user: content });
+      res = await anthropicPriceJSON({ apiKey: ai.anthropicApiKey, model: ai.model, system, user: content });
     } catch (err) {
+      void recordAiRunSafe({
+        feature: 'scraperPrice',
+        provider: 'anthropic',
+        model: ai.model,
+        status: 'error',
+        durationMs: Date.now() - t0,
+        error: (err as Error).message,
+        trigger,
+        record: meta?.record,
+      });
       throw new AiCallError((err as Error).message, ai.model);
     }
-    return PriceSchema.parse(json);
+
+    const rate = rateForModel(ai.model);
+    const costMicros = Math.round(
+      ((res.usage.inputTokens * rate.input +
+        res.usage.outputTokens * rate.output +
+        (res.usage.cacheWriteTokens ?? 0) * (rate.cacheWrite5m ?? 0) +
+        (res.usage.cacheReadTokens ?? 0) * (rate.cacheRead ?? 0)) /
+        1_000_000) *
+        1_000_000
+    );
+
+    void recordAiRunSafe({
+      feature: 'scraperPrice',
+      provider: 'anthropic',
+      model: ai.model,
+      status: 'ok',
+      durationMs: Date.now() - t0,
+      usage: res.usage,
+      costMicros,
+      requestId: res.requestId,
+      stopReason: res.stopReason,
+      trigger,
+      record: meta?.record,
+    });
+
+    return PriceSchema.parse(res.json);
   }
 
-  const res = await ollama.chat({
-    model: ai.model,
-    format: 'json',
-    keep_alive: '30m',
-    options: { temperature: 0, num_ctx: config.numCtx },
-    messages: [
-      { role: 'system', content: system },
-      { role: 'user', content },
-    ],
-  });
-  const raw = res.message.content;
-  return PriceSchema.parse(JSON.parse(stripFences(raw)));
+  try {
+    const res = await ollama.chat({
+      model: ai.model,
+      format: 'json',
+      keep_alive: '30m',
+      options: { temperature: 0, num_ctx: config.numCtx },
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content },
+      ],
+    });
+    const raw = res.message.content;
+    void recordAiRunSafe({
+      feature: 'scraperPrice',
+      provider: 'ollama',
+      model: ai.model,
+      status: 'ok',
+      durationMs: Date.now() - t0,
+      usage: {
+        inputTokens: res.prompt_eval_count ?? 0,
+        outputTokens: res.eval_count ?? 0,
+      },
+      costMicros: 0,
+      trigger,
+      record: meta?.record,
+    });
+    return PriceSchema.parse(JSON.parse(stripFences(raw)));
+  } catch (err) {
+    void recordAiRunSafe({
+      feature: 'scraperPrice',
+      provider: 'ollama',
+      model: ai.model,
+      status: 'error',
+      durationMs: Date.now() - t0,
+      error: (err as Error).message,
+      trigger,
+      record: meta?.record,
+    });
+    throw err;
+  }
 }
 
 /** Is the given Ollama model installed and reachable? (model defaults to env config). */

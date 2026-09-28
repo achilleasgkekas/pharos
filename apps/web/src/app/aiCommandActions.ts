@@ -9,6 +9,9 @@ import { assertCanWrite, getCurrentUser } from '@/lib/auth';
 import { Conversation } from '@/models/Conversation';
 import { withRequestTenant } from '@/lib/tenancy/request';
 import { currentModel } from '@/lib/tenancy/connection';
+import { assertAiBudget, recordAiSpend } from '@/lib/aiBudget';
+import { recordAiRun } from '@/lib/aiRun';
+import { Types } from 'mongoose';
 
 export type AiCommandResult = {
   ok: boolean;
@@ -45,13 +48,89 @@ async function runAiCommandInTenant(history: ChatTurn[], conversationId?: string
     return { ok: false, reply: '', actions: [], error: 'The command bar needs the Anthropic provider. Add an API key in Settings → AI.' };
   }
 
+  const user = await getCurrentUser().catch(() => null);
+  const convId = conversationId || new Types.ObjectId().toString();
+
   const messages: AnthropicMessage[] = turns.map((t) => ({ role: t.role, content: t.content }));
   const actions: { name: string; summary: string }[] = [];
   let reply = '';
 
+  let savedConversationId: string | undefined = conversationId;
   try {
     for (let i = 0; i < 6; i++) {
-      const { content } = await anthropicRaw({ apiKey: cfg.anthropicApiKey, workspaceId: cfg.anthropicWorkspaceId, model: cfg.anthropicModel, system: `${SYSTEM}\nToday is ${today()}.`, tools: TOOLS, messages, maxTokens: 1024 });
+      try {
+        await assertAiBudget();
+      } catch (err) {
+        void recordAiRun({
+          feature: 'commandBar',
+          provider: 'anthropic',
+          model: cfg.anthropicModel,
+          status: 'blocked',
+          durationMs: 0,
+          error: (err as Error).message,
+          trigger: 'user',
+          userId: user?.id,
+          conversationId: convId,
+          turn: i + 1,
+        });
+        throw err;
+      }
+
+      const t0 = Date.now();
+      let res;
+      try {
+        res = await anthropicRaw({
+          apiKey: cfg.anthropicApiKey,
+          workspaceId: cfg.anthropicWorkspaceId,
+          model: cfg.anthropicModel,
+          system: `${SYSTEM}\nToday is ${today()}.`,
+          tools: TOOLS,
+          messages,
+          maxTokens: 1024,
+        });
+      } catch (err) {
+        void recordAiRun({
+          feature: 'commandBar',
+          provider: 'anthropic',
+          model: cfg.anthropicModel,
+          status: 'error',
+          durationMs: Date.now() - t0,
+          error: (err as Error).message,
+          trigger: 'user',
+          userId: user?.id,
+          conversationId: convId,
+          turn: i + 1,
+        });
+        throw err;
+      }
+
+      // Keep the command bar compatible with provider/test doubles that omit usage metadata;
+      // billing telemetry is best-effort and must never turn a valid reply into an error.
+      const usage = res.usage ?? { inputTokens: 0, outputTokens: 0, cacheWriteTokens: 0, cacheReadTokens: 0 };
+      await recordAiSpend(
+        cfg.anthropicModel,
+        usage.inputTokens,
+        usage.outputTokens,
+        usage.cacheWriteTokens,
+        usage.cacheReadTokens
+      );
+
+      void recordAiRun({
+        feature: 'commandBar',
+        provider: 'anthropic',
+        model: cfg.anthropicModel,
+        status: 'ok',
+        durationMs: Date.now() - t0,
+        usage,
+        requestId: res.requestId,
+        stopReason: res.stopReason,
+        trigger: 'user',
+        userId: user?.id,
+        conversationId: convId,
+        turn: i + 1,
+      });
+
+      const { content } = res;
       const toolUses = content.filter((b): b is Extract<AnthropicBlock, { type: 'tool_use' }> => b.type === 'tool_use');
       const textOut = content
         .filter((b): b is Extract<AnthropicBlock, { type: 'text' }> => b.type === 'text')
@@ -82,26 +161,26 @@ async function runAiCommandInTenant(history: ChatTurn[], conversationId?: string
   }
 
   // Persist to the conversation history (best-effort — a DB hiccup must not eat the reply).
-  let convId = conversationId;
   try {
     await connectDB();
     const ConversationM = await currentModel(Conversation);
-    const user = await getCurrentUser();
     const stored = [
       ...turns.map((t) => ({ role: t.role, content: t.content })),
       { role: 'assistant' as const, content: reply || 'Done.', actions },
     ];
     const title = turns.find((t) => t.role === 'user')?.content.trim().slice(0, 80) || 'Conversation';
     const userTurns = stored.filter((m) => m.role === 'user').length;
-    if (convId) {
-      await ConversationM.updateOne({ _id: convId }, { $set: { messages: stored, title, turns: userTurns } });
+    const update = { $set: { userId: user?.id ?? null, title, messages: stored, turns: userTurns } };
+    if (conversationId) {
+      await ConversationM.updateOne({ _id: conversationId }, update);
     } else {
-      const doc = await ConversationM.create({ userId: user?.id ?? null, title, messages: stored, turns: userTurns });
-      convId = String(doc._id);
+      const created = await ConversationM.create({ ...update.$set });
+      savedConversationId = created?._id ? String(created._id) : convId;
     }
   } catch {
+    savedConversationId = undefined;
     /* history is best-effort */
   }
 
-  return { ok: true, reply: reply || 'Done.', actions, conversationId: convId };
+  return { ok: true, reply: reply || 'Done.', actions, ...(savedConversationId ? { conversationId: savedConversationId } : {}) };
 }

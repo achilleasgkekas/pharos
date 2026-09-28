@@ -5,7 +5,7 @@ import { Item as ItemModel } from '@/models/Item';
 import { withRequestTenant } from '@/lib/tenancy/request';
 import { currentModel } from '@/lib/tenancy/connection';
 import { saveFile, deleteFile, readFile } from '@/lib/storage';
-import { parseReceipt, parseReceiptText } from '@/lib/ollama';
+import { parseReceipt, parseReceiptText, type AiRunMeta } from '@/lib/ollama';
 import { isFeatureEnabled } from '@/lib/aiFeatures.server';
 import { extractPdfText, looksLikeScannedPdf } from '@/lib/pdf';
 import { ocrImage, looksLikeUsableOcr } from '@/lib/ocr';
@@ -87,11 +87,11 @@ type ParseOut = { parsed: Awaited<ReturnType<typeof parseReceipt>>['parsed'] | n
  * - Image           → OCR-first → TEXT model, vision fallback.
  * mode: 'auto' (smart default) · 'ocr' (force OCR) · 'no-ocr' (embedded text / vision).
  */
-async function runReceiptParse(bytes: Buffer, ext: string, isPdf: boolean, mode: ParseMode): Promise<ParseOut> {
+async function runReceiptParse(bytes: Buffer, ext: string, isPdf: boolean, mode: ParseMode, opts?: AiRunMeta): Promise<ParseOut> {
   try {
     // Email order-confirmation body (.html) → strip to text → TEXT model.
     if (ext === 'html' || ext === 'htm') {
-      const r = await parseReceiptText(htmlReceiptToText(bytes.toString('utf8')));
+      const r = opts ? await parseReceiptText(htmlReceiptToText(bytes.toString('utf8')), opts) : await parseReceiptText(htmlReceiptToText(bytes.toString('utf8')));
       return { parsed: r.parsed, raw: r.raw, model: `email-body+${r.model}` };
     }
     if (isPdf) {
@@ -99,35 +99,35 @@ async function runReceiptParse(bytes: Buffer, ext: string, isPdf: boolean, mode:
       const scanned = looksLikeScannedPdf(text);
       // Text PDF (and not forced-OCR): the embedded text is the cleanest source.
       if (!scanned && mode !== 'ocr') {
-        const r = await parseReceiptText(text);
+        const r = opts ? await parseReceiptText(text, opts) : await parseReceiptText(text);
         return { parsed: r.parsed, raw: r.raw, model: r.model };
       }
       // Scanned/image PDF, or forced OCR → rasterize page 1 at high res.
       const img = await pdfFirstPageJpeg(bytes, 1654);
       if (!img) return { parsed: null, raw: '', model: '', aiError: 'Could not rasterize the PDF' };
       if (mode === 'no-ocr') {
-        const r = await parseReceipt(img.toString('base64')); // vision on the page image
+        const r = opts ? await parseReceipt(img.toString('base64'), opts) : await parseReceipt(img.toString('base64')); // vision on the page image
         return { parsed: r.parsed, raw: r.raw, model: `vision-pdf+${r.model}` };
       }
       const ocrText = await ocrImage(img, 'jpg');
       if (looksLikeUsableOcr(ocrText)) {
-        const r = await parseReceiptText(ocrText);
+        const r = opts ? await parseReceiptText(ocrText, opts) : await parseReceiptText(ocrText);
         return { parsed: r.parsed, raw: r.raw, model: `ocr-pdf+${r.model}` };
       }
-      const r = await parseReceipt(img.toString('base64')); // OCR empty → vision fallback
+      const r = opts ? await parseReceipt(img.toString('base64'), opts) : await parseReceipt(img.toString('base64')); // OCR empty → vision fallback
       return { parsed: r.parsed, raw: r.raw, model: `vision-pdf+${r.model}` };
     }
     // Image receipt
     if (mode === 'no-ocr') {
-      const r = await parseReceipt(bytes.toString('base64'));
+      const r = opts ? await parseReceipt(bytes.toString('base64'), opts) : await parseReceipt(bytes.toString('base64'));
       return { parsed: r.parsed, raw: r.raw, model: r.model };
     }
     const ocrText = await ocrImage(bytes, ext);
     if (looksLikeUsableOcr(ocrText)) {
-      const r = await parseReceiptText(ocrText);
+      const r = opts ? await parseReceiptText(ocrText, opts) : await parseReceiptText(ocrText);
       return { parsed: r.parsed, raw: r.raw, model: `ocr+${r.model}` };
     }
-    const r = await parseReceipt(bytes.toString('base64')); // OCR empty → vision
+    const r = opts ? await parseReceipt(bytes.toString('base64'), opts) : await parseReceipt(bytes.toString('base64')); // OCR empty → vision
     return { parsed: r.parsed, raw: r.raw, model: r.model };
   } catch (err) {
     const msg = (err as Error).message || String(err);
@@ -391,14 +391,22 @@ export type RescanResult = {
  * otherwise uses embedded PDF text or the vision model. Resets `verified` so the
  * user re-checks the fresh result. Used from the receipt detail + bulk re-scan.
  */
-export async function rescanReceipt(id: string, useOcr: boolean): Promise<RescanResult> {
+export async function rescanReceipt(
+  id: string,
+  useOcr: boolean,
+  opts?: { jobId?: string }
+): Promise<RescanResult> {
   await assertCanWrite();
-  return withRequestTenant(() => rescanReceiptOne(id, useOcr));
+  return withRequestTenant(() => rescanReceiptOne(id, useOcr, opts));
 }
 
 /** Internal: assumes the tenant context is already established (called inside a
  *  `withRequestTenant` by both `rescanReceipt` and `rescanReceiptsBulk`). */
-async function rescanReceiptOne(id: string, useOcr: boolean): Promise<RescanResult> {
+async function rescanReceiptOne(
+  id: string,
+  useOcr: boolean,
+  opts?: { jobId?: string }
+): Promise<RescanResult> {
   await connectDB();
   const Receipt = await currentModel(ReceiptModel);
   const receipt = await Receipt.findById(id);
@@ -413,7 +421,18 @@ async function rescanReceiptOne(id: string, useOcr: boolean): Promise<RescanResu
 
   const ext = receipt.filePath.split('.').pop()?.toLowerCase() || 'jpg';
   const isPdf = /pdf/i.test(receipt.fileType) || ext === 'pdf';
-  const { parsed, raw, model, aiError } = await runReceiptParse(bytes, ext, isPdf, useOcr ? 'ocr' : 'no-ocr');
+  const { parsed, raw, model, aiError } = await runReceiptParse(
+    bytes,
+    ext,
+    isPdf,
+    useOcr ? 'ocr' : 'no-ocr',
+    {
+      feature: 'receipts',
+      record: { type: 'receipt', id },
+      jobId: opts?.jobId,
+      trigger: opts?.jobId ? 'job' : 'user',
+    }
+  );
 
   if (parsed) {
     const settings = await getAppSettings();

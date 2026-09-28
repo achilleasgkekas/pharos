@@ -7,7 +7,6 @@ import { CLAUDE_MAIN_DEFAULT, CLAUDE_SCRAPER_DEFAULT } from './claudeModels';
 
 export type AiProviderId = 'ollama' | 'anthropic' | 'openai' | 'gemini' | 'openrouter' | 'custom';
 
-/** A fetched model with optional cost (USD per 1M tokens) + flags. */
 export type FetchedModel = {
   id: string;
   in: number | null; // input $/1M
@@ -16,6 +15,9 @@ export type FetchedModel = {
   recommended: boolean;
   /** Human-readable name when the provider gives one (Anthropic's `display_name`). */
   name?: string;
+  cacheWrite5m?: number | null;
+  cacheWrite1h?: number | null;
+  cacheRead?: number | null;
 };
 
 /** Recommended model per provider + a one-line reason (vision-capable, sensible default). */
@@ -31,27 +33,12 @@ export const SCRAPER_RECOMMEND: Partial<Record<AiProviderId, { model: string; re
   anthropic: { model: CLAUDE_SCRAPER_DEFAULT, reason: 'The low-cost Claude model, plenty for plain price extraction' },
 };
 
-// Approx public list prices, USD per 1M tokens. Matched by substring; the LONGEST
-// matching key wins (so "gpt-4o-mini" beats "gpt-4o").
-const PRICING: { match: string; in: number; out: number }[] = [
-  // Anthropic (list prices checked 2026-09-27). The recommended models must have a price
-  // here (#359); the full per-model table with cache rates is #360.
-  { match: 'claude-fable-5', in: 10, out: 50 },
-  { match: 'claude-opus-5', in: 5, out: 25 },
-  { match: 'claude-opus-5-5', in: 4, out: 20 },
-  { match: 'claude-sonnet-5', in: 2, out: 10 },
-  { match: 'claude-opus-4-5', in: 5, out: 25 },
-  { match: 'claude-opus-4-6', in: 5, out: 25 },
-  { match: 'claude-opus-4-7', in: 5, out: 25 },
-  { match: 'claude-opus-4-8', in: 5, out: 25 },
-  { match: 'claude-opus-4', in: 15, out: 75 },
-  { match: 'claude-3-opus', in: 15, out: 75 },
-  { match: 'claude-sonnet-4', in: 3, out: 15 },
-  { match: 'claude-3-7-sonnet', in: 3, out: 15 },
-  { match: 'claude-3-5-sonnet', in: 3, out: 15 },
-  { match: 'claude-haiku-4', in: 1, out: 5 },
-  { match: 'claude-3-5-haiku', in: 0.8, out: 4 },
-  { match: 'claude-3-haiku', in: 0.25, out: 1.25 },
+import { claudePrice } from './claudePricing';
+
+// Approx public list prices for non-Claude providers, USD per 1M tokens.
+// Claude models use the single canonical pricing table in lib/claudePricing.ts (#360).
+// Matched by substring; the LONGEST matching key wins (so "gpt-4o-mini" beats "gpt-4o").
+const NON_CLAUDE_PRICING: { match: string; in: number; out: number }[] = [
   // OpenAI
   { match: 'gpt-4o-mini', in: 0.15, out: 0.6 },
   { match: 'gpt-4o', in: 2.5, out: 10 },
@@ -68,12 +55,16 @@ const PRICING: { match: string; in: number; out: number }[] = [
   { match: 'gemini-1.5-flash', in: 0.075, out: 0.3 },
 ];
 
-/** Look up approximate pricing for a model id from the static table (null if unknown). */
+/** Look up approximate pricing for a model id (null if unknown). */
 export function priceForModel(id: string): { in: number; out: number } | null {
-  const lid = id.toLowerCase();
+  const lid = (id || '').toLowerCase().trim();
+  if (lid.startsWith('claude-')) {
+    const cp = claudePrice(lid);
+    return cp ? { in: cp.inputPerMTok, out: cp.outputPerMTok } : null;
+  }
   let best: { in: number; out: number } | null = null;
   let bestLen = 0;
-  for (const p of PRICING) {
+  for (const p of NON_CLAUDE_PRICING) {
     if (lid.includes(p.match) && p.match.length > bestLen) {
       best = { in: p.in, out: p.out };
       bestLen = p.match.length;

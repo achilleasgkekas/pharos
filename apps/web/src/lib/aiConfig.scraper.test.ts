@@ -21,6 +21,8 @@ function base(overrides: Partial<AiConfig> = {}): AiConfig {
     anthropicApiKey: 'sk-ant-xxx',
     anthropicModel: 'claude-sonnet-4-5-20250929',
     anthropicWorkspaceId: '',
+    anthropicAdminKey: '',
+    timezone: 'UTC',
     openaiApiKey: '', openaiModel: '', geminiApiKey: '', geminiModel: '',
     openrouterApiKey: '', openrouterModel: '', customBaseUrl: '', customApiKey: '', customModel: '',
     aiEnabled: true, aiFeatures: {}, aiOnboardingDismissed: false,

@@ -52,7 +52,7 @@ async function runJobLoop(
     await Job.updateOne({ _id: id }, { $set: { current: label } });
     let res: { ok: boolean; detail: string };
     try {
-      res = await withTimeout(runOne(kind, itemIds[i], useOcr, label), PER_ITEM_TIMEOUT, {
+      res = await withTimeout(runOne(kind, itemIds[i], useOcr, label, id), PER_ITEM_TIMEOUT, {
         ok: false,
         detail: 'timed out',
       });
@@ -86,7 +86,13 @@ function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
   return Promise.race([p.finally(() => clearTimeout(timer)), timeout]);
 }
 
-async function runOne(kind: string, id: string, useOcr: boolean, label: string): Promise<{ ok: boolean; detail: string }> {
+async function runOne(
+  kind: string,
+  id: string,
+  useOcr: boolean,
+  label: string,
+  jobId?: string
+): Promise<{ ok: boolean; detail: string }> {
   if (kind === 'sync-onedrive') {
     // id = local filePath, label = remote rel path. Reuse the batch uploader for one file.
     const r = await syncOnedriveBatch([{ filePath: id, rel: label }]);
@@ -95,7 +101,7 @@ async function runOne(kind: string, id: string, useOcr: boolean, label: string):
     return { ok: false, detail: (r.errors[0] || 'upload failed').slice(0, 300) };
   }
   if (kind === 'rescan-receipts') {
-    const r = await rescanReceipt(id, useOcr);
+    const r = await rescanReceipt(id, useOcr, { jobId });
     const ok = !!(r.ok && r.receipt && ((r.receipt.total ?? 0) > 0 || (r.receipt.lineItems?.length ?? 0) > 0));
     return {
       ok,
@@ -103,7 +109,7 @@ async function runOne(kind: string, id: string, useOcr: boolean, label: string):
     };
   }
   if (kind === 'ai-fill-items') {
-    const r = await aiFillItem(id);
+    const r = await aiFillItem(id, { jobId });
     return {
       ok: !!(r.ok && r.filled.length > 0),
       detail: (r.filled?.length ? r.filled.join(', ') : r.error || '—').slice(0, 300),

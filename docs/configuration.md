@@ -40,8 +40,9 @@ Configure this under **Settings → AI**.
 | `openrouter` | Cloud       | OpenRouter API key + model              |
 | `custom`     | Cloud/Local | Any OpenAI-compatible base URL + model  |
 
-The default provider is `ollama` (local, private, zero cost). Cloud API keys are
-stored server-side only and are never sent to the browser.
+The setup wizard recommends `anthropic` with `claude-sonnet-5` for new installations.
+`ollama` remains supported as a local, private, zero-cost provider. Cloud API keys
+are stored server-side only and are never sent to the browser.
 
 ### Local (Ollama)
 

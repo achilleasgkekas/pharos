@@ -64,7 +64,10 @@ export async function runOnce(): Promise<{ items: number; checks: number; update
       stats.checks++;
       try {
         const page = await fetchPageText(link.url!);
-        const { price, currency, inStock } = await extractPrice(page);
+        const { price, currency, inStock } = await extractPrice(page, {
+          record: { type: 'item', id: String(item._id) },
+          trigger: 'cron',
+        });
         if (price != null && price > 0) {
           note = '';
           item.priceHistory.push({

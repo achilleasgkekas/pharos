@@ -10,7 +10,7 @@ import { Schema, model, models, type Model, type InferSchemaType } from 'mongoos
 const AppConfigSchema = new Schema(
   {
     key: { type: String, default: 'singleton', unique: true },
-    aiProvider: { type: String, enum: ['ollama', 'anthropic'], default: 'ollama' },
+    aiProvider: { type: String, enum: ['ollama', 'anthropic'], default: 'anthropic' },
     ollamaHost: { type: String, default: '' }, // Ollama server URL (same machine or remote); '' → OLLAMA_HOST env
     ollamaModel: { type: String, default: '' }, // text tasks; '' → OLLAMA_MODEL env
     // Image tasks (receipts, card scan) need a vision model — kept separate so the
@@ -25,6 +25,7 @@ const AppConfigSchema = new Schema(
       default: [],
     },
     anthropicWorkspaceId: { type: String, default: '' }, // for identity-linked keys → anthropic-workspace-id header; not a secret
+    anthropicAdminKey: { type: String, default: '' }, // optional Admin API key for cost reports & credit balances (#361)
 
     // Cost guard: confirm (with a rough cost estimate) before starting a BULK AI job.
     // On by default so cloud (Anthropic) runs never start by accident.
@@ -67,6 +68,7 @@ const AppConfigSchema = new Schema(
     subscriptionReviewIntervalDays: { type: Number, default: 0 }, // P57 behavioural nudge; 0 = opt-out
     autoAddStores: { type: Boolean, default: true }, // auto-add unknown receipt stores to the list
     currency: { type: String, default: 'EUR' }, // display currency symbol (ISO 4217 code)
+    timezone: { type: String, default: 'UTC' }, // app timezone for day/month boundaries (#361)
     // Multi-currency (P9), opt-in per deployment so single-currency users see no extra
     // fields. When on, an expense/income entry may record the currency it was printed in
     // plus an FX rate; `amount` stays in the base `currency` above (see lib/fx.ts).

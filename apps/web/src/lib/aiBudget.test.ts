@@ -19,7 +19,7 @@ vi.mock('@/models/AppConfig', () => ({
 }));
 vi.mock('./tenancy/saasMode', () => ({ saasMode: saasModeMock }));
 
-import { budgetPeriod, getAiBudgetStatus, assertAiBudget, recordAiSpend, AiBudgetExceededError } from './aiBudget';
+import { budgetPeriod, dayPeriod, getAiBudgetStatus, assertAiBudget, recordAiSpend, AiBudgetExceededError } from './aiBudget';
 
 const THIS_MONTH = budgetPeriod();
 
@@ -30,10 +30,20 @@ beforeEach(() => {
   updateOne.mockResolvedValue({ matchedCount: 1 });
 });
 
-describe('budgetPeriod', () => {
-  it('is a UTC YYYY-MM key', () => {
+describe('budgetPeriod & dayPeriod', () => {
+  it('is a UTC YYYY-MM key by default', () => {
     expect(budgetPeriod(new Date('2026-09-06T23:30:00Z'))).toBe('2026-09');
     expect(budgetPeriod(new Date('2026-01-01T00:00:00Z'))).toBe('2026-01');
+  });
+
+  it('respects timezone boundary when supplied', () => {
+    // 2026-09-30 22:30:00 UTC is 2026-10-01 01:30:00 in Europe/Athens (UTC+3)
+    const lateSept = new Date('2026-09-30T22:30:00Z');
+    expect(budgetPeriod(lateSept, 'UTC')).toBe('2026-09');
+    expect(budgetPeriod(lateSept, 'Europe/Athens')).toBe('2026-10');
+
+    expect(dayPeriod(lateSept, 'UTC')).toBe('2026-09-30');
+    expect(dayPeriod(lateSept, 'Europe/Athens')).toBe('2026-10-01');
   });
 });
 

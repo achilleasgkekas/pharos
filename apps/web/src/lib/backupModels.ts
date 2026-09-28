@@ -91,6 +91,8 @@ export const BACKUP_EXCLUDED: Record<string, string> = {
   Phase: 'Legacy setup-phases model from the original tracker import; no UI imports it any more.',
   ScrapedPrice:
     'Global scraped-price cache (shared, not per-tenant); pure derived data that regenerates on the next scrape, and per-tenant restore does not apply to it.',
+  AiRun:
+    'Operational run telemetry with TTL retention; transient diagnostic logs, not core user financial data.',
   PushSubscription:
     'Web-push endpoint + keys, one per browser/device (P102). Device-bound and short-lived — a restored subscription points at a push endpoint that no longer exists, and each device re-establishes its own by toggling browser push back on.',
 };

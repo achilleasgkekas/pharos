@@ -70,7 +70,7 @@ function buildEl(now: Date): SampleData {
   const items: Record<string, unknown>[] = [
     { title: 'Ασύρματα Ακουστικά', category: 'audio', status: 'installed', specs: 'Bluetooth 5.3, ακύρωση θορύβου', currentPrice: 129, purchasedPrice: 129, purchasedFrom: 'Skroutz', purchasedAt: monthsAgo(now, 2), warrantyUntil: daysFromNow(now, 500), tags: ['audio', 'sample'], isSample: true },
     { title: 'Γραφείο Standing Desk', category: 'other', status: 'received', specs: 'Ηλεκτρικό ύψος, 140x70εκ', currentPrice: 349, purchasedPrice: 349, purchasedFrom: 'ΙΚΕΑ', purchasedAt: monthsAgo(now, 4), tags: ['sample'], isSample: true },
-    { title: 'Φριτέζα Αέρος', category: 'other', status: 'installed', specs: '5.5L, ψηφιακή οθόνη', currentPrice: 89, purchasedPrice: 79, purchasedFrom: 'Κωτσόβολος', purchasedAt: monthsAgo(now, 1), tags: ['sample'], isSample: true },
+    { title: 'Air Fryer', category: 'other', status: 'installed', specs: '5.5L, digital display', currentPrice: 89, purchasedPrice: 79, purchasedFrom: 'Kotsovolos', purchasedAt: monthsAgo(now, 1), tags: ['sample'], isSample: true },
     { title: 'Μηχανικό Πληκτρολόγιο', category: 'peripheral', status: 'researching', specs: 'Hot-swap, 75% layout', currentPrice: 149, targetPrice: 110, tags: ['sample'], isSample: true },
     { title: 'Ρομποτική Σκούπα', category: 'other', status: 'decided', specs: 'LIDAR χαρτογράφηση, βάση αυτοαδειάσματος', currentPrice: 399, targetPrice: 320, tags: ['sample'], isSample: true },
     { title: 'Φορητή Οθόνη', category: 'video', status: 'ordered', specs: '15.6" 1080p USB-C', currentPrice: 219, tags: ['sample'], isSample: true },

@@ -63,6 +63,7 @@ import { resolveCategoryRules } from '@/lib/categoryRules';
 import { detectPriceHikes, type HikeEntry } from '@/lib/priceHike';
 import { anthropicTest, anthropicModelCheck } from '@/lib/anthropic';
 import { CLAUDE_MAIN_DEFAULT, modelLifecycle } from '@/lib/claudeModels';
+import { claudePrice } from '@/lib/claudePricing';
 import { getAppSettings, invalidateAppSettingsForRequest } from '@/lib/appSettings';
 import { assertCanWrite, requireAdmin } from '@/lib/auth';
 import { AI_FEATURE_KEYS, type AiFeatureKey } from '@/lib/aiFeatures';
@@ -209,8 +210,8 @@ async function claudeModelProblem(model: string, key: string, workspaceId: strin
 export async function saveAiConfig(formData: FormData): Promise<{ ok: boolean; error?: string }> {
   await requireAdmin();
   const PROVIDERS = ['ollama', 'anthropic', 'openai', 'gemini', 'openrouter', 'custom'];
-  const rawProvider = String(formData.get('provider') || 'ollama');
-  const provider = PROVIDERS.includes(rawProvider) ? rawProvider : 'ollama';
+  const rawProvider = String(formData.get('provider') || 'anthropic');
+  const provider = PROVIDERS.includes(rawProvider) ? rawProvider : 'anthropic';
   const ollamaHost = String(formData.get('ollamaHost') || '').trim().replace(/\/$/, '');
   const ollamaModel = String(formData.get('ollamaModel') || '').trim();
   const ollamaVisionModel = String(formData.get('ollamaVisionModel') || '').trim();
@@ -244,8 +245,12 @@ export async function saveAiConfig(formData: FormData): Promise<{ ok: boolean; e
     // ledger (aiSpendPeriod/aiSpendMicros) is written by lib/aiBudget.ts, never from the form.
     aiMonthlyBudget: Math.max(0, Number(formData.get('aiMonthlyBudget')) || 0),
   };
+  if (formData.has('timezone')) {
+    const tz = String(formData.get('timezone') || '').trim();
+    if (tz) update.timezone = tz;
+  }
   // Keys: only overwrite when a new one is typed (blank = keep the existing one).
-  for (const k of ['anthropicApiKey', 'openaiApiKey', 'geminiApiKey', 'openrouterApiKey', 'customApiKey'] as const) {
+  for (const k of ['anthropicApiKey', 'anthropicAdminKey', 'openaiApiKey', 'geminiApiKey', 'openrouterApiKey', 'customApiKey'] as const) {
     const v = String(formData.get(k) || '').trim();
     if (v) update[k] = v;
   }
@@ -255,6 +260,141 @@ export async function saveAiConfig(formData: FormData): Promise<{ ok: boolean; e
   invalidateOllamaHealth(); // model/provider changed → re-probe on next render
   revalidatePath('/settings');
   return { ok: true };
+}
+
+import { getAiBudgetStatus, budgetPeriod, dayPeriod } from '@/lib/aiBudget';
+import { getRecentAiRuns, type SerializedAiRun } from '@/lib/aiRun';
+import { getAnthropicMonthlyBilled } from '@/lib/anthropicAdmin';
+import { AiRun } from '@/models/AiRun';
+
+export type LiveAiSpendData = {
+  today: { costMicros: number; count: number };
+  month: {
+    costMicros: number;
+    count: number;
+    inputTokens: number;
+    outputTokens: number;
+    cacheWriteTokens: number;
+    cacheReadTokens: number;
+  };
+  budget: {
+    budgetDollars: number;
+    spentDollars: number;
+    capped: boolean;
+    pct: number;
+  };
+  last5Runs: SerializedAiRun[];
+  adminBilled?: {
+    billedDollars: number;
+    ok: boolean;
+    error?: string;
+  };
+  hasAdminKey: boolean;
+  currency: string;
+};
+
+export async function getLiveAiSpendAction(): Promise<LiveAiSpendData> {
+  await connectDB();
+  return withRequestTenant(async () => {
+    const [cfg, budgetStatus, recentRuns] = await Promise.all([
+      getAiConfig(),
+      getAiBudgetStatus(),
+      getRecentAiRuns(5),
+    ]);
+
+    const tz = cfg.timezone || 'UTC';
+    const now = new Date();
+    const todayStr = dayPeriod(now, tz);
+    const monthStr = budgetPeriod(now, tz);
+
+    const AiRunModel = await currentModel(AiRun);
+
+    let todayCost = 0;
+    let todayCount = 0;
+    let monthCost = 0;
+    let monthCount = 0;
+    let monthIn = 0;
+    let monthOut = 0;
+    let monthCw = 0;
+    let monthCr = 0;
+
+    try {
+      const runs = await AiRunModel.find({
+        at: { $gte: new Date(Date.now() - 35 * 24 * 60 * 60 * 1000) },
+      }).lean();
+
+      for (const r of runs) {
+        const atDate = r.at instanceof Date ? r.at : new Date(r.at);
+        const rDay = dayPeriod(atDate, tz);
+        const rMonth = budgetPeriod(atDate, tz);
+        const cost = Number(r.costMicros) || 0;
+        const inTok = Number(r.usage?.inputTokens) || 0;
+        const outTok = Number(r.usage?.outputTokens) || 0;
+        const cwTok = Number(r.usage?.cacheWriteTokens) || 0;
+        const crTok = Number(r.usage?.cacheReadTokens) || 0;
+
+        if (rDay === todayStr) {
+          todayCost += cost;
+          todayCount++;
+        }
+        if (rMonth === monthStr) {
+          monthCost += cost;
+          monthCount++;
+          monthIn += inTok;
+          monthOut += outTok;
+          monthCw += cwTok;
+          monthCr += crTok;
+        }
+      }
+    } catch {
+      /* fallback */
+    }
+
+    let adminBilled: { billedDollars: number; ok: boolean; error?: string } | undefined = undefined;
+    if (cfg.anthropicAdminKey) {
+      try {
+        const res = await getAnthropicMonthlyBilled(cfg.anthropicAdminKey, tz);
+        adminBilled = {
+          billedDollars: res.billedDollars,
+          ok: res.ok,
+          error: res.error,
+        };
+      } catch (err) {
+        adminBilled = {
+          billedDollars: 0,
+          ok: false,
+          error: (err as Error).message,
+        };
+      }
+    }
+
+    const pct =
+      budgetStatus.budget > 0
+        ? Math.min(100, Math.round((budgetStatus.spent / budgetStatus.budget) * 100))
+        : 0;
+
+    return {
+      today: { costMicros: todayCost, count: todayCount },
+      month: {
+        costMicros: monthCost,
+        count: monthCount,
+        inputTokens: monthIn,
+        outputTokens: monthOut,
+        cacheWriteTokens: monthCw,
+        cacheReadTokens: monthCr,
+      },
+      budget: {
+        budgetDollars: budgetStatus.budget,
+        spentDollars: budgetStatus.spent,
+        capped: budgetStatus.capped,
+        pct,
+      },
+      last5Runs: recentRuns,
+      adminBilled,
+      hasAdminKey: !!cfg.anthropicAdminKey,
+      currency: 'USD',
+    };
+  });
 }
 
 /** Fetch the available models from a provider's API (using the typed or saved key),
@@ -344,6 +484,7 @@ export async function fetchProviderModels(
       .filter((e) => e.id)
       .map((e) => {
         const price = e.live || priceForModel(e.id);
+        const cp = provider === 'anthropic' ? claudePrice(e.id) : null;
         return {
           id: e.id,
           in: price?.in ?? null,
@@ -351,6 +492,9 @@ export async function fetchProviderModels(
           vision: e.vision ?? looksVisionModel(e.id),
           recommended: e.id === rec,
           ...(e.name ? { name: e.name } : {}),
+          cacheWrite5m: cp?.cacheWrite5mPerMTok ?? null,
+          cacheWrite1h: cp?.cacheWrite1hPerMTok ?? null,
+          cacheRead: cp?.cacheReadPerMTok ?? null,
         };
       });
     // Anthropic already sends newest first; keep that order (behind the recommended one) rather

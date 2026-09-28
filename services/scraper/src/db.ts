@@ -34,6 +34,42 @@ export type ScraperItem = InferSchemaType<typeof ItemSchema> & { _id: mongoose.T
 
 export const Item = model('Item', ItemSchema);
 
+const AiRunSchema = new Schema(
+  {
+    at: { type: Date, default: Date.now, index: true },
+    durationMs: { type: Number, default: 0 },
+    feature: { type: String, required: true, index: true },
+    provider: { type: String, required: true, index: true },
+    model: { type: String, required: true, index: true },
+    status: { type: String, enum: ['ok', 'error', 'blocked'], required: true, index: true },
+    error: { type: String },
+    usage: {
+      inputTokens: { type: Number, default: 0 },
+      outputTokens: { type: Number, default: 0 },
+      cacheWriteTokens: { type: Number, default: 0 },
+      cacheReadTokens: { type: Number, default: 0 },
+    },
+    costMicros: { type: Number, default: 0, index: true },
+    currency: { type: String, default: 'USD' },
+    priceVersion: { type: Number, default: 1 },
+    requestId: { type: String },
+    stopReason: { type: String },
+    trigger: { type: String, enum: ['user', 'job', 'cron', 'email', 'api'], default: 'cron', index: true },
+    userId: { type: Schema.Types.ObjectId, ref: 'User', default: null, index: true },
+    jobId: { type: String, default: null, index: true },
+    record: {
+      type: { type: String },
+      id: { type: String },
+    },
+    conversationId: { type: String, default: null, index: true },
+    turn: { type: Number },
+    expiresAt: { type: Date, required: true },
+  },
+  { collection: 'ai_runs' }
+);
+
+export const AiRun = model('AiRun', AiRunSchema);
+
 export async function connect(): Promise<void> {
   if (mongoose.connection.readyState === 1) return;
   await mongoose.connect(config.mongoUri);
