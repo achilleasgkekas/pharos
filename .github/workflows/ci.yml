@@ -128,7 +128,8 @@ jobs:
       # on the run page to be worked down, then this becomes a gate.
       - name: Dead code report (knip)
         run: |
-          { echo '### Unused code (knip, report-only)'; echo '```'; npx --yes knip@5.88.1 --no-progress --reporter compact || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          npm ci --ignore-scripts --prefix ../../scripts/ci/npm
+          { echo '### Unused code (knip, report-only)'; echo '```'; ../../scripts/ci/npm/node_modules/.bin/knip --no-progress --reporter compact || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
       - run: npm run build
         env:
           # Placeholders so the build never reads a real secret; these are only
@@ -187,8 +188,7 @@ jobs:
           NEXT_SERVER_ACTIONS_ENCRYPTION_KEY: ci-placeholder-encryption-key-000000
       - name: Browser smoke test (setup + every page)
         run: |
-          npm install --no-save playwright@1.63.0 @axe-core/playwright@4.13.0
-          npx playwright install --with-deps chromium
+          node_modules/.bin/playwright install --with-deps chromium
           node e2e/smoke.mjs
         env:
           BASE_URL: http://127.0.0.1:3000
@@ -266,12 +266,9 @@ jobs:
           node-version: 24
       - name: Browser smoke test against the compose stack
         run: |
-          mkdir -p "$RUNNER_TEMP/e2e" && cp apps/web/e2e/smoke.mjs "$RUNNER_TEMP/e2e/"
-          cd "$RUNNER_TEMP/e2e"
-          npm init -y > /dev/null
-          npm install --no-audit --no-fund playwright@1.63.0
-          npx playwright install --with-deps chromium
-          node smoke.mjs
+          npm ci --ignore-scripts --prefix apps/web
+          apps/web/node_modules/.bin/playwright install --with-deps chromium
+          node apps/web/e2e/smoke.mjs
         env:
           BASE_URL: http://127.0.0.1:3000
       - name: Compose logs
@@ -299,15 +296,19 @@ jobs:
         with:
           persist-credentials: false
       - run: python3 scripts/check-doc-links.py
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24
+      - run: npm ci --ignore-scripts --prefix scripts/ci/npm
       # The OpenAPI document must be valid OpenAPI 3.1 (the route tests only compare its paths
       # and fields with the code, not its structure). Warnings (e.g. missing operationId) do
       # not fail the job.
       - name: OpenAPI lint (redocly)
-        run: npx --yes @redocly/cli@2.54.3 lint docs/openapi.yaml --format=github-actions
+        run: scripts/ci/npm/node_modules/.bin/redocly lint docs/openapi.yaml --format=github-actions
       # Structure that breaks rendering (config: .markdownlint-cli2.yaml) and misspellings in the
       # docs and the English UI copy (config: _typos.toml).
       - name: markdownlint
-        run: npx --yes markdownlint-cli2@0.18.1 "**/*.md"
+        run: scripts/ci/npm/node_modules/.bin/markdownlint-cli2 "**/*.md"
       - name: Spelling (typos)
         run: |
           python3 scripts/ci/install-tool.py typos
@@ -326,11 +327,14 @@ jobs:
         run: |
           python3 scripts/ci/install-tool.py actionlint
           ./actionlint -color
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with: { python-version: "3.12" }
       # zizmor: workflow security lint (template injection, over-broad permissions, unpinned
       # third-party actions, credential persistence). Policy in .github/zizmor.yml.
       - name: zizmor
         run: |
-          pipx run zizmor==1.30.1 --offline --config .github/zizmor.yml --min-severity medium \
+          pip install --quiet --require-hashes -r scripts/ci/zizmor-requirements.txt
+          zizmor --offline --config .github/zizmor.yml --min-severity medium \
             --format github .github/workflows
 
   # One check to mark as required in branch protection / the merge queue. It runs on every PR
@@ -350,7 +354,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with: { python-version: "3.12" }
-      - run: pip install --quiet semgrep==1.178.0
+      - run: pip install --quiet --require-hashes -r scripts/ci/semgrep-requirements.txt
       - name: Block security findings
         run: |
           semgrep scan --error --metrics=off --severity ERROR --severity WARNING \
