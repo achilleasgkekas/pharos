@@ -21,7 +21,7 @@ export type HealthLevel = 'ok' | 'warn' | 'down' | 'unknown';
 /** One measured number in a check's row. `key` is an i18n key; `value` is already formatted. */
 export type HealthMetric = { key: string; value: string };
 
-export type HealthCheckId = 'database' | 'disk' | 'ai' | 'jobs' | 'sync' | 'cron';
+export type HealthCheckId = 'database' | 'disk' | 'ai' | 'search' | 'browser' | 'scraper' | 'jobs' | 'sync' | 'cron';
 
 export type HealthCheck = {
   id: HealthCheckId;
@@ -82,14 +82,68 @@ export function aiLevel(input: { enabled: boolean; ready: boolean }): HealthLeve
   return input.ready ? 'ok' : 'warn';
 }
 
-export function jobsLevel(input: { stuck: number; failed: number }): HealthLevel {
+export function searchLevel(input: {
+  configured: boolean;
+  reachable: boolean;
+  functional?: boolean | null;
+  error?: string;
+  latencyMs?: number;
+}): HealthLevel {
+  if (!input.configured) return 'unknown';
+  if (!input.reachable) return 'down';
+  if (input.functional === false) return 'warn';
+  if (input.error) return 'down';
+  if (input.latencyMs != null && input.latencyMs > 2500) return 'warn';
+  return 'ok';
+}
+
+export function browserLevel(input: {
+  configured: boolean;
+  reachable: boolean;
+  functional?: boolean | null;
+  error?: string;
+  latencyMs?: number;
+}): HealthLevel {
+  if (!input.configured) return 'unknown';
+  if (!input.reachable) return 'down';
+  if (input.functional === false) return 'warn';
+  if (input.error) return 'down';
+  if (input.latencyMs != null && input.latencyMs > 2500) return 'warn';
+  return 'ok';
+}
+
+export function scraperLevel(input: {
+  enabled: boolean;
+  lastRunAt?: string | null;
+  heartbeatAt?: string | null;
+  lastError?: string | null;
+  now: number;
+  staleHours?: number;
+}): HealthLevel {
+  if (!input.enabled) return 'unknown';
+  if (!input.lastRunAt && !input.heartbeatAt) return 'unknown';
+  if (input.lastError) return 'warn';
+  const staleHours = input.staleHours ?? CRON_STALE_HOURS;
+  const lastActive = input.lastRunAt || input.heartbeatAt;
+  if (lastActive) {
+    const t = new Date(lastActive).getTime();
+    if (!Number.isFinite(t) || input.now - t > staleHours * 3600 * 1000) {
+      return 'warn';
+    }
+  }
+  return 'ok';
+}
+
+export function jobsLevel(input: { stuck: number; failed: number; error?: string; unmeasured?: boolean }): HealthLevel {
+  if (input.unmeasured) return 'unknown';
+  if (input.error) return 'down';
   if (input.stuck > 0) return 'warn';
   return input.failed > 0 ? 'warn' : 'ok';
 }
 
-export function syncLevel(input: { backend: string; reachable?: boolean | null; stale: boolean }): HealthLevel {
+export function syncLevel(input: { backend: string; reachable?: boolean | null; stale: boolean; error?: string }): HealthLevel {
   if (!input.backend || input.backend === 'local') return 'unknown'; // no mirror configured
-  if (input.reachable === false) return 'down';
+  if (input.reachable === false || input.error) return 'down';
   return input.stale ? 'warn' : 'ok';
 }
 
@@ -105,7 +159,8 @@ export type CronBeat = { name: string; lastRunAt: string | null };
  * CRON_STALE_HOURS flips the check to `warn` — that's the silent-crontab-death signal.
  * All measured beats fresh → `ok`.
  */
-export function cronLevel(beats: CronBeat[], now: number): HealthLevel {
+export function cronLevel(beats: CronBeat[], now: number, error?: string): HealthLevel {
+  if (error) return 'down';
   const ran = beats.filter((b) => b.lastRunAt);
   if (ran.length === 0) return 'unknown';
   const staleMs = CRON_STALE_HOURS * 3600 * 1000;
@@ -148,3 +203,19 @@ export function formatMs(ms: number | null | undefined): string {
   if (ms == null || !Number.isFinite(ms) || ms < 0) return '—';
   return ms >= 1000 ? `${(ms / 1000).toFixed(1)} s` : `${Math.round(ms)} ms`;
 }
+
+/** Redact internal credentials and query secrets from endpoint URLs displayed in diagnostics. */
+export function redactEndpoint(rawUrl: string): string {
+  if (!rawUrl) return '';
+  try {
+    const u = new URL(rawUrl);
+    u.username = '';
+    u.password = '';
+    u.search = '';
+    u.hash = '';
+    return u.toString().replace(/\/+$/, '');
+  } catch {
+    return rawUrl.replace(/\/\/[^@]+@/, '//').replace(/\/+$/, '');
+  }
+}
+

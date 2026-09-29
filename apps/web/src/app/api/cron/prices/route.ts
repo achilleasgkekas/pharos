@@ -3,6 +3,7 @@ import { withWriteAuthorization } from '@/lib/writeAuthorization';
 import { checkCronAuth } from '@/lib/cronAuth';
 import { runPriceScrape } from '@/app/items/actions';
 import { recordCronRun } from '@/lib/cronHeartbeat';
+import { recordScraperPass } from '@/lib/scraperStatus';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -34,9 +35,22 @@ export async function POST(req: Request) {
   try {
     const result = await withWriteAuthorization('member', () => runPriceScrape());
     await recordCronRun('prices'); // heartbeat for the System-status "Scheduled tasks" check
+    await recordScraperPass({
+      schedule: '0 */6 * * *',
+      stats: {
+        items: result.scanned,
+        checks: result.linksChecked,
+        updates: result.itemsChanged,
+        alerts: result.drops,
+      },
+    });
     return NextResponse.json(result); // already { ok: true, scanned, itemsChanged, ... }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
+    await recordScraperPass({
+      schedule: '0 */6 * * *',
+      error: message.slice(0, 300),
+    });
     return NextResponse.json({ ok: false, error: message.slice(0, 300) }, { status: 500 });
   }
 }
