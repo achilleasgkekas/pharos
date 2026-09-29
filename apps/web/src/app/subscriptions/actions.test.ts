@@ -505,3 +505,9 @@ describe('trackDiscoveredSubscription — currency (P9)', () => {
     expect(subCreate.mock.calls[0][0].currency).toBe('USD');
   });
 });
+
+// Business-logic tests use an authorized caller; auth failures are tested in writeGuard.behaviour.test.ts.
+vi.mock('@/lib/auth', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/auth')>()),
+  assertCanWrite: vi.fn(async () => {}),
+}));

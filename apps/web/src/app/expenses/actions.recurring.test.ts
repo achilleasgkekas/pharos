@@ -386,3 +386,9 @@ describe('generateDueRecurring — recurringFrom cutoff (#298)', () => {
     expect(res).toEqual({ created: 3 }); // Jan, Feb, Mar 2026
   });
 });
+
+// Business-logic tests use an authorized caller; auth failures are tested in writeGuard.behaviour.test.ts.
+vi.mock('@/lib/auth', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/auth')>()),
+  assertCanWrite: vi.fn(async () => {}),
+}));

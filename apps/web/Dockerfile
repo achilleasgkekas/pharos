@@ -1,6 +1,6 @@
 # ─── Multi-stage build for Next.js 15 standalone ───────────────────────────
 
-FROM node:24-alpine AS base
+FROM node:24-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1 AS base
 # libc6-compat for some native deps under Alpine
 RUN apk add --no-cache libc6-compat
 
@@ -51,9 +51,9 @@ WORKDIR /app
 # the pure-JS smb2 lib it negotiates SMB3, so it works with SMB3-only NAS shares.
 RUN apk add --no-cache poppler-utils tesseract-ocr tesseract-ocr-data-eng samba-client wget ca-certificates \
   && wget -q -O /usr/share/tessdata/ell.traineddata \
-     https://raw.githubusercontent.com/tesseract-ocr/tessdata_best/main/ell.traineddata \
+     https://raw.githubusercontent.com/tesseract-ocr/tessdata_best/e12c65a915945e4c28e237a9b52bc4a8f39a0cec/ell.traineddata \
   && wget -q -O /usr/share/tessdata/osd.traineddata \
-     https://raw.githubusercontent.com/tesseract-ocr/tessdata/main/osd.traineddata
+     https://raw.githubusercontent.com/tesseract-ocr/tessdata/ced78752cc61322fb554c280d13360b35b8684e4/osd.traineddata
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000

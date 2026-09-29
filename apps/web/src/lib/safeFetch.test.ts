@@ -5,7 +5,7 @@ const { assertPublicUrlMock } = vi.hoisted(() => ({
     if (new URL(url).hostname === '169.254.169.254') throw new Error('Private address not allowed');
   }),
 }));
-vi.mock('./ssrf', () => ({ assertPublicUrl: assertPublicUrlMock }));
+vi.mock('./ssrf', () => ({ assertPublicUrl: assertPublicUrlMock, publicLookup: vi.fn() }));
 
 import { safeFetch } from './safeFetch';
 

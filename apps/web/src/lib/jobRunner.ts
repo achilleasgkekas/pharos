@@ -1,3 +1,4 @@
+import { withWriteAuthorization } from './writeAuthorization';
 import { cur } from "@/lib/money";
 import { connectDB } from '@/lib/db';
 import { Job } from '@/models/Job';
@@ -24,7 +25,7 @@ export async function ensureProcessor(): Promise<void> {
     const id = String(job._id);
     if (active.has(id)) continue;
     active.add(id);
-    void runJobLoop(id, job.kind, job.useOcr, job.itemIds ?? [], job.labels ?? [], job.done ?? 0)
+    void withWriteAuthorization('member', () => runJobLoop(id, job.kind, job.useOcr, job.itemIds ?? [], job.labels ?? [], job.done ?? 0))
       .catch(async (e) => {
         await Job.updateOne(
           { _id: id },

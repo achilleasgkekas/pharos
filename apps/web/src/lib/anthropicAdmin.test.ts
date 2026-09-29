@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   fetchAnthropicCostReport,
-  getAnthropicMonthlyBilled,
   estimateCreditBalance,
 } from './anthropicAdmin';
 

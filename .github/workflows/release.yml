@@ -14,26 +14,36 @@ on:
     tags: ['v*.*.*']
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   publish:
-    name: Build & push web image
+    name: Validate, scan & publish web image
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write # required to push to GHCR
+      actions: read
+      packages: write
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-
-      - name: Log in to GHCR
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      # metadata-action lowercases the image name and derives semver tags.
+          fetch-depth: 0
+      - name: Require green CI and supply-chain checks for this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main
+          for workflow in ci.yml supply-chain.yml; do
+            conclusion=$(gh run list --workflow "$workflow" --commit "$GITHUB_SHA" --branch main --event push --limit 1 --json conclusion --jq '.[0].conclusion // "missing"')
+            test "$conclusion" = success || { echo "$workflow is not green for $GITHUB_SHA ($conclusion)"; exit 1; }
+          done
       - name: Derive tags
         id: meta
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
@@ -45,35 +55,43 @@ jobs:
             type=semver,pattern={{major}}
             type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
             type=raw,value=edge,enable=${{ github.event_name == 'workflow_dispatch' }}
-
-      # Dev runs on Apple Silicon (arm64); prod target (Proxmox/x86) is amd64.
       - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
-
-      - name: Build & push
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
-        with:
-          context: ./apps/web
-          file: ./apps/web/Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: true
-          # Stamp the image with the version it is being published as, so the running
-          # app can tell the user which release they are on and whether a newer one
-          # exists (P40). A manual (edge) run has no semver, so it stays `dev`.
-          build-args: |
-            APP_VERSION=${{ steps.meta.outputs.version || 'dev' }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      # Report-only container scan of what was just published (the PR build already blocks on
-      # fixable CRITICAL findings). HIGH and CRITICAL with a fix available go on the run page.
-      - name: Trivy (image scan)
+      - name: Build and scan both architectures before publishing anything
         env:
-          IMAGE: ${{ fromJSON(steps.meta.outputs.json).tags[0] }}
+          APP_VERSION: ${{ steps.meta.outputs.version || 'dev' }}
         run: |
-          curl -sSfL https://github.com/aquasecurity/trivy/releases/download/v0.74.0/trivy_0.74.0_Linux-64bit.tar.gz | tar xz trivy
-          ./trivy image --quiet --scanners vuln --ignore-unfixed --severity HIGH,CRITICAL \
-            --format table --output trivy.txt "$IMAGE"
-          { echo "### Trivy: $IMAGE"; echo '```'; cat trivy.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          python3 scripts/ci/install-tool.py trivy
+          for arch in amd64 arm64; do
+            docker buildx build --platform "linux/$arch" --load \
+              --build-arg "APP_VERSION=$APP_VERSION" \
+              --tag "pharos-release:$arch" apps/web
+            ./trivy image --quiet --scanners vuln --ignore-unfixed --severity HIGH,CRITICAL \
+              --format table --output "trivy-$arch.txt" "pharos-release:$arch"
+            { echo "### Trivy: $arch"; echo '```'; cat "trivy-$arch.txt"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+            ./trivy image --quiet --scanners vuln --ignore-unfixed --severity CRITICAL \
+              --exit-code 1 "pharos-release:$arch"
+          done
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish the exact images that passed scanning
+        env:
+          TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY,,}"
+          for arch in amd64 arm64; do
+            staging="$image:build-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-$arch"
+            docker tag "pharos-release:$arch" "$staging"
+            docker push "$staging"
+          done
+          args=()
+          while IFS= read -r tag; do
+            [ -z "$tag" ] || args+=(--tag "$tag")
+          done <<< "$TAGS"
+          docker buildx imagetools create "${args[@]}" \
+            "$image:build-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-amd64" \
+            "$image:build-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-arm64"

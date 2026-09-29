@@ -130,7 +130,7 @@ vi.mock('@/lib/webhooks', () => ({
   generateWebhookSecret: vi.fn(() => 'generated-secret'),
   WEBHOOK_EVENTS: [],
 }));
-vi.mock('@/lib/ssrf', () => ({ assertPublicUrl: vi.fn(async () => {}) }));
+vi.mock('@/lib/ssrf', () => ({ publicLookup: vi.fn(), assertPublicUrl: vi.fn(async () => {}) }));
 vi.mock('next/cache', () => ({ revalidatePath: (...args: unknown[]) => revalidatePathMock(...args) }));
 // Tenancy seam mocked FLAT (same as the sibling slices): getDeliveryLogs itself never
 // touches scoped()/AppConfig directly, it delegates entirely to the (mocked) lib

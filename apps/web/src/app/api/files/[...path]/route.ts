@@ -1,7 +1,8 @@
 import { readFile } from '@/lib/storage';
 import { recacheByPath } from '@/lib/mirror';
 import { NextRequest, NextResponse } from 'next/server';
-import { SESSION_COOKIE, verifySession } from '@/lib/session';
+import { SESSION_COOKIE } from '@/lib/session';
+import { validateSessionToken } from '@/lib/sessionUser';
 import { apiTenant, bearerUser } from '@/lib/apiAuth';
 import { withTenant } from '@/lib/tenancy/current';
 
@@ -24,7 +25,7 @@ const CONTENT_TYPES: Record<string, string> = {
 /** Files require a valid self-hosted session or API token. */
 async function authorizedForCurrentTenant(req: NextRequest): Promise<boolean> {
   if (await bearerUser(req)) return true;
-  return Boolean(await verifySession(req.cookies.get(SESSION_COOKIE)?.value));
+  return Boolean(await validateSessionToken(req.cookies.get(SESSION_COOKIE)?.value));
 }
 
 export async function GET(

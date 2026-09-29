@@ -46,3 +46,24 @@ Pharos is designed as a private, self-hosted household hub. Core security layers
 - **Injection Defenses**: Database operations use strict Mongoose schemas with sanitized keys, and CSV exports neutralize formula injection prefixes (`=`, `+`, `-`, `@`).
 - **Network Isolation**: When deployed via Docker Compose, database (`mongo`), search (`searxng`), and background workers are isolated within internal container bridge networks and do not expose unauthenticated ports to public interfaces.
 - **Telemetry & Privacy**: Pharos contains zero mandatory third-party tracking, ads, or analytics beacons.
+
+## Session and deployment hardening
+
+Session tokens carry an explicit type and are checked against the current user and
+revocation epoch. Upgrading from the older token format signs existing browser
+sessions out once; API tokens are unaffected. A database outage denies browser
+session access until the database recovers.
+
+The production Compose file binds port 3000 to `127.0.0.1` and defaults to secure
+cookies. Serve it through an HTTPS reverse proxy. For an intentional HTTP-only
+LAN or WireGuard deployment, set `AUTH_COOKIE_SECURE=false` and set
+`WEB_BIND_ADDRESS` to the specific interface address. Do not expose that HTTP
+listener to the internet. `MONGO_PASS` is required: there is no default database
+password. Changing this variable does not rotate an existing MongoDB user's
+password; rotate the database credential separately before updating the client.
+
+CI tool archives are verified against `scripts/ci/tool-downloads.json`. When
+updating a tool, verify the upstream release and update its URL and checksum in
+the same review. Release publication requires green CI and supply-chain runs for
+the exact commit, then scans both container architectures before publishing. Fixable critical vulnerabilities block publication; high
+severity findings remain visible in the release report for triage.

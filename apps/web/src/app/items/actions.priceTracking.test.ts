@@ -92,7 +92,7 @@ vi.mock('@/lib/scrapedPriceCache', () => ({
 vi.mock('@/lib/aiFeatures.server', () => ({ isFeatureEnabled: isFeatureEnabledMock }));
 vi.mock('@/lib/search', () => ({ searchWeb: searchWebMock, searchImages: vi.fn() }));
 vi.mock('@/lib/storage', () => ({ saveFile: vi.fn(), deleteFile: vi.fn() }));
-vi.mock('@/lib/ssrf', () => ({ assertPublicUrl: vi.fn(async () => {}) }));
+vi.mock('@/lib/ssrf', () => ({ publicLookup: vi.fn(), assertPublicUrl: vi.fn(async () => {}) }));
 vi.mock('@/lib/revalidate', () => ({ safeRevalidate: vi.fn() }));
 vi.mock('@/lib/appSettings', () => ({ getAppSettings: vi.fn(async () => ({ currency: 'EUR' })) }));
 vi.mock('next/cache', () => ({ revalidatePath: (p: string) => revalidatePathMock(p) }));
@@ -496,3 +496,9 @@ describe('searchItemPriceCandidates: shopping country (#319)', () => {
     expect(fetchPageTextMock).not.toHaveBeenCalled();
   });
 });
+
+// Business-logic tests use an authorized caller; auth failures are tested in writeGuard.behaviour.test.ts.
+vi.mock('@/lib/auth', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/auth')>()),
+  assertCanWrite: vi.fn(async () => {}),
+}));

@@ -12,7 +12,7 @@ vi.mock('node:dns/promises', () => ({
 }));
 
 import { lookup } from 'node:dns/promises';
-import { assertPublicUrl } from './ssrf';
+import { assertPublicUrl, publicLookup } from './ssrf';
 
 const mockLookup = vi.mocked(lookup);
 
@@ -168,5 +168,51 @@ describe('assertPublicUrl — hostname resolution (mocked DNS)', () => {
     await expect(assertPublicUrl('http://nxdomain.example/')).rejects.toThrow(
       'Host did not resolve',
     );
+  });
+});
+
+describe('connection-time DNS validation', () => {
+  it('rejects a private DNS answer even after a public preflight succeeded', async () => {
+    mockLookup.mockResolvedValueOnce([{ address: '93.184.216.34', family: 4 }] as never);
+    await assertPublicUrl('https://rebind.example/path');
+    mockLookup.mockResolvedValueOnce([{ address: '127.0.0.1', family: 4 }] as never);
+    const callback = vi.fn();
+    publicLookup('rebind.example', { all: true }, callback);
+    await vi.waitFor(() => expect(callback).toHaveBeenCalled());
+    expect(callback.mock.calls[0][0]).toBeInstanceOf(Error);
+    expect(callback.mock.calls[0][1]).toBe('');
+  });
+  it('passes only checked addresses to the socket, including the all-addresses API', async () => {
+    const addresses = [{ address: '93.184.216.34', family: 4 }];
+    mockLookup.mockResolvedValueOnce(addresses as never);
+    const callback = vi.fn();
+    publicLookup('public.example', { all: true }, callback);
+    await vi.waitFor(() => expect(callback).toHaveBeenCalledWith(null, addresses));
+  });
+});
+
+describe('connection-time DNS errors and address families', () => {
+  it('returns the checked single address when all-address mode is not requested', async () => {
+    mockLookup.mockResolvedValueOnce([{ address: '93.184.216.34', family: 4 }] as never);
+    const callback = vi.fn();
+    publicLookup('public.example', { family: 4 }, callback);
+    await vi.waitFor(() => expect(callback).toHaveBeenCalledWith(null, '93.184.216.34', 4));
+  });
+  it('rejects empty DNS answers and unavailable requested families', async () => {
+    for (const addresses of [[], [{ address: '93.184.216.34', family: 4 }]]) {
+      mockLookup.mockResolvedValueOnce(addresses as never);
+      const callback = vi.fn();
+      publicLookup('public.example', { family: 6 }, callback);
+      await vi.waitFor(() => expect(callback).toHaveBeenCalled());
+      expect(callback.mock.calls[0][0]).toBeInstanceOf(Error);
+      expect(callback.mock.calls[0][1]).toBe('');
+    }
+  });
+  it('propagates DNS errors to the connector instead of falling back to unchecked lookup', async () => {
+    const error = new Error('DNS unavailable');
+    mockLookup.mockRejectedValueOnce(error);
+    const callback = vi.fn();
+    publicLookup('public.example', {}, callback);
+    await vi.waitFor(() => expect(callback).toHaveBeenCalledWith(error, '', 0));
   });
 });

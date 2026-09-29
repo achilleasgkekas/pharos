@@ -48,7 +48,7 @@ vi.mock('@/lib/ollama', () => ({ parseProductFromPage: vi.fn() }));
 vi.mock('@/lib/aiFeatures.server', () => ({ isFeatureEnabled: vi.fn(async () => true) }));
 vi.mock('@/lib/search', () => ({ searchWeb: vi.fn(), searchImages: vi.fn() }));
 vi.mock('@/lib/storage', () => ({ saveFile: saveFileMock, deleteFile: deleteFileMock }));
-vi.mock('@/lib/ssrf', () => ({ assertPublicUrl: vi.fn(async () => {}) }));
+vi.mock('@/lib/ssrf', () => ({ publicLookup: vi.fn(), assertPublicUrl: vi.fn(async () => {}) }));
 vi.mock('@/lib/revalidate', () => ({ safeRevalidate: vi.fn() }));
 vi.mock('@/lib/appSettings', () => ({ getAppSettings: vi.fn(async () => ({ currency: 'EUR' })) }));
 vi.mock('next/cache', () => ({ revalidatePath: (p: string) => revalidatePathMock(p) }));
@@ -302,3 +302,9 @@ describe('deleteItemAttachment', () => {
     expect(r).toEqual({ ok: true, attachments: [] });
   });
 });
+
+// Business-logic tests use an authorized caller; auth failures are tested in writeGuard.behaviour.test.ts.
+vi.mock('@/lib/auth', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/auth')>()),
+  assertCanWrite: vi.fn(async () => {}),
+}));

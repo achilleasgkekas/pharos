@@ -98,3 +98,9 @@ describe('paymentSplits field (pre-P62 behaviour is the default)', () => {
     expect(setOf().vendor).toBe('IKEA');
   });
 });
+
+// Business-logic fixture; access denial is tested in writeGuard.behaviour.test.ts.
+vi.mock('@/lib/auth', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/auth')>()),
+  assertCanWrite: vi.fn(async () => {}),
+}));

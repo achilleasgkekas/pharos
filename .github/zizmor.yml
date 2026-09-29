@@ -1,10 +1,6 @@
-# zizmor (workflow security lint, run by CI's "Workflow lint" job).
+# Require immutable action revisions, including GitHub-owned actions.
 rules:
   unpinned-uses:
     config:
       policies:
-        # First-party actions ride their major tag (Dependabot keeps them current);
-        # third-party actions must be pinned to a commit SHA, like release.yml does.
-        "actions/*": ref-pin
-        "github/*": ref-pin
         "*": hash-pin

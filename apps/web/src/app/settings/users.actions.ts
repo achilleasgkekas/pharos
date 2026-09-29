@@ -73,7 +73,7 @@ export async function setUserRole(id: string, role: Role): Promise<{ ok: boolean
   if (target.role === 'admin' && next !== 'admin' && (await User.countDocuments({ role: 'admin' })) <= 1) {
     return { ok: false, error: 'Cannot demote the last admin.' };
   }
-  await User.updateOne({ _id: id }, { $set: { role: next } });
+  await User.updateOne({ _id: id }, { $set: { role: next }, $inc: { sessionEpoch: 1 } });
   revalidatePath('/settings');
   return { ok: true };
 }

@@ -29,7 +29,7 @@ vi.mock('@/lib/ollama', () => ({ parseProductFromPage: vi.fn() }));
 vi.mock('@/lib/aiFeatures.server', () => ({ isFeatureEnabled: vi.fn(async () => true) }));
 vi.mock('@/lib/search', () => ({ searchWeb: vi.fn(), searchImages: vi.fn() }));
 vi.mock('@/lib/storage', () => ({ saveFile: vi.fn(), deleteFile: vi.fn() }));
-vi.mock('@/lib/ssrf', () => ({ assertPublicUrl: vi.fn(async () => {}) }));
+vi.mock('@/lib/ssrf', () => ({ publicLookup: vi.fn(), assertPublicUrl: vi.fn(async () => {}) }));
 vi.mock('@/lib/revalidate', () => ({ safeRevalidate: vi.fn() }));
 vi.mock('@/lib/appSettings', () => ({ getAppSettings: vi.fn(async () => ({ currency: 'EUR' })) }));
 vi.mock('@/app/expenses/actions', () => ({ addExpense: addExpenseMock }));
@@ -132,3 +132,9 @@ describe('logSaleAsIncome', () => {
     expect((res as any).item).toEqual(JSON.parse(JSON.stringify(updatedDoc)));
   });
 });
+
+// Business-logic fixture; access denial is tested in writeGuard.behaviour.test.ts.
+vi.mock('@/lib/auth', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/auth')>()),
+  assertCanWrite: vi.fn(async () => {}),
+}));

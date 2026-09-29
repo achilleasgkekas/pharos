@@ -166,7 +166,7 @@ describe('verifySession', () => {
 
   it('null when the token was signed with a different secret', async () => {
     const foreign = new TextEncoder().encode('a-totally-different-secret-16+');
-    const token = await new SignJWT({ role: 'admin', name: 'A' })
+    const token = await new SignJWT({ typ: 'session', role: 'admin', name: 'A' })
       .setProtectedHeader({ alg: 'HS256' })
       .setSubject('u')
       .setIssuedAt()
@@ -177,7 +177,7 @@ describe('verifySession', () => {
 
   it('null on an expired token', async () => {
     const secret = new TextEncoder().encode(SECRET);
-    const token = await new SignJWT({ role: 'admin', name: 'A' })
+    const token = await new SignJWT({ typ: 'session', role: 'admin', name: 'A' })
       .setProtectedHeader({ alg: 'HS256' })
       .setSubject('u')
       .setIssuedAt(Math.floor(Date.now() / 1000) - 7200)
@@ -188,7 +188,7 @@ describe('verifySession', () => {
 
   it('null when the token carries no subject', async () => {
     const secret = new TextEncoder().encode(SECRET);
-    const token = await new SignJWT({ role: 'admin', name: 'A' })
+    const token = await new SignJWT({ typ: 'session', role: 'admin', name: 'A' })
       .setProtectedHeader({ alg: 'HS256' })
       .setIssuedAt()
       .setExpirationTime('12h')
@@ -201,7 +201,7 @@ describe('verifySession', () => {
   // that is precisely how the viewer hole below survived: the test agreed with the bug.
   it('defaults an unknown / missing role to viewer (never silently admin, never a writer)', async () => {
     const secret = new TextEncoder().encode(SECRET);
-    const token = await new SignJWT({ role: 'superuser', name: 'A' })
+    const token = await new SignJWT({ typ: 'session', role: 'superuser', name: 'A' })
       .setProtectedHeader({ alg: 'HS256' })
       .setSubject('u')
       .setIssuedAt()
@@ -229,7 +229,7 @@ describe('verifySession', () => {
 
   it('tolerates a missing name (empty string, not undefined)', async () => {
     const secret = new TextEncoder().encode(SECRET);
-    const token = await new SignJWT({ role: 'member' })
+    const token = await new SignJWT({ typ: 'session', role: 'member' })
       .setProtectedHeader({ alg: 'HS256' })
       .setSubject('u')
       .setIssuedAt()
@@ -317,13 +317,7 @@ describe('sign → verify pending-MFA roundtrip', () => {
 
   it('a pending token is REJECTED by verifySession (the real session verifier), so it can never grant a session by itself', async () => {
     const pendingToken = await signMfaPendingToken('user-123');
-    // verifySession defaults an unrecognised/missing role claim to 'member' and still returns
-    // claims — the point here is narrower: the pending token was never meant to authenticate
-    // anything on its own, and this pins that verifySession does not special-case its shape.
-    const claims = await verifySession(pendingToken);
-    expect(claims?.sub).toBe('user-123'); // same JWT library/secret, so the subject IS readable —
-    // demonstrating exactly why a distinct COOKIE NAME (not just claim shape) is the real guard:
-    // middleware only ever reads SESSION_COOKIE, and this token is never stored under that name.
+    expect(await verifySession(pendingToken)).toBeNull();
   });
 });
 

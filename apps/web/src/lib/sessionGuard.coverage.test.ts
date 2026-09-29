@@ -24,8 +24,8 @@ import { join } from 'node:path';
  * it its own way. See `runNtfyTest` in lib/notify.ts for the shape.
  *
  * What is deliberately NOT flagged:
- *  - `assertCanWrite()`, which documents and handles the no-session case by returning
- *    (viewers on API paths are already blocked by `withAuth` on the HTTP method), and
+ *  - `assertCanWrite()`, which reads the explicit authorization established by withAuth
+ *    (including the bearer role) without requiring a cookie, and
  *  - bare `getCurrentUser()`, which returns null rather than throwing.
  * Only the two redirecting helpers break a Bearer request.
  *

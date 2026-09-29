@@ -205,7 +205,7 @@ vi.mock('@/lib/webhooks', () => ({
     { type: 'price.drop', label: 'Price drop / deal hit', hint: '' },
   ],
 }));
-vi.mock('@/lib/ssrf', () => ({ assertPublicUrl: vi.fn(async () => {}) }));
+vi.mock('@/lib/ssrf', () => ({ publicLookup: vi.fn(), assertPublicUrl: vi.fn(async () => {}) }));
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 // Tenancy seam mocked FLAT: settings actions now reach every model through `scoped()`, which is
 // withRequestTenant + currentModel. These tests are about what the actions DO, so the seam is a

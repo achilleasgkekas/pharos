@@ -52,6 +52,7 @@ export const SCOPING_EXEMPT_FILES: Record<string, string> = {
   'app/settings/calendarFeedActions.ts': 'User identity: sets the calendar-feed token on the User record.',
   'app/settings/mcpActions.ts': 'User identity: sets the MCP/API token on the User record.',
   'app/api/calendar.ics/route.ts': 'User identity, self-host only: resolves a User by calendar token; returns 404 in SaaS mode before any DB access (#121).',
+  'lib/sessionUser.ts': 'User identity: validates self-host session revocation and current roles on the base connection.',
   'lib/userMfaStore.ts': 'User identity: self-host User MFA secret store (base connection).',
 
   // — 3. Global-by-design / self-host-only (no per-tenant scoping applies) —

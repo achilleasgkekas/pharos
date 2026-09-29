@@ -13,7 +13,7 @@ services:
       # ever want it LAN-restricted, front it with an authenticated reverse proxy.
       - "3000:3000"
     environment:
-      MONGO_URI: mongodb://${MONGO_USER:-admin}:${MONGO_PASS:-changeme}@mongo:27017/homepage?authSource=admin
+      MONGO_URI: mongodb://${MONGO_USER:-admin}:${MONGO_PASS:?set MONGO_PASS in .env}@mongo:27017/homepage?authSource=admin
       # FlareSolverr (headless Chromium) for Cloudflare-protected shops like Skroutz
       SOLVER_URL: ${SOLVER_URL:-http://flaresolverr:8191}
       # Optional error reporting (lib/errorReporting.ts). Empty ⇒ off, nothing is sent anywhere.
@@ -48,7 +48,7 @@ services:
         condition: service_started
 
   mongo:
-    image: mongo:7
+    image: mongo:7@sha256:9854f7139445d766a9523571d6f047530c45547460ffcf8259eb2bf4264632ca
     container_name: homepage-mongo
     restart: unless-stopped
     ports:
@@ -58,7 +58,7 @@ services:
       - "127.0.0.1:27017:27017"
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-admin}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASS:-changeme}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASS:?set MONGO_PASS in .env}
       MONGO_INITDB_DATABASE: homepage
     volumes:
       - mongo-data:/data/db
@@ -71,7 +71,7 @@ services:
 
   # DB admin UI. Opt-in: `docker compose --profile tools up -d mongo-express` → :8081
   mongo-express:
-    image: mongo-express:1.0.2
+    image: mongo-express:1.0.2@sha256:1b23d7976f0210dbec74045c209e52fbb26d29b2e873d6c6fa3d3f0ae32c2a64
     container_name: homepage-mongo-ui
     restart: unless-stopped
     profiles: ["tools"]
@@ -80,8 +80,8 @@ services:
       - "127.0.0.1:8081:8081"
     environment:
       ME_CONFIG_MONGODB_ADMINUSERNAME: ${MONGO_USER:-admin}
-      ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGO_PASS:-changeme}
-      ME_CONFIG_MONGODB_URL: mongodb://${MONGO_USER:-admin}:${MONGO_PASS:-changeme}@mongo:27017/
+      ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGO_PASS:?set MONGO_PASS in .env}
+      ME_CONFIG_MONGODB_URL: mongodb://${MONGO_USER:-admin}:${MONGO_PASS:?set MONGO_PASS in .env}@mongo:27017/
       ME_CONFIG_BASICAUTH_USERNAME: ${ME_USER:-admin}
       ME_CONFIG_BASICAUTH_PASSWORD: ${ME_PASS:-changeme}
     depends_on:
@@ -95,7 +95,7 @@ services:
   flaresolverr:
     # 21hsmw fork has working arm64 images; the upstream ghcr image crash-loops on
     # Apple Silicon ("Xvfb display did not open"). Pulls amd64 elsewhere fine.
-    image: 21hsmw/flaresolverr:nodriver
+    image: 21hsmw/flaresolverr:nodriver@sha256:dca8cda5852b04e6142752fc044c9845eb536353ea6f8b7bb58b4ff9419538fa
     container_name: homepage-flaresolverr
     restart: unless-stopped
     profiles: ["scraper"]
@@ -110,7 +110,7 @@ services:
   # Self-hosted metasearch (web + image). Used for "AI fill without a link" and
   # finding product photos. Local, privacy-first, no API key. Reached at :8888.
   searxng:
-    image: searxng/searxng:latest
+    image: searxng/searxng:latest@sha256:eb2a404db174d33a04cd9f2e519bcae2ca722a58923510652cc1314be94e8e63
     container_name: homepage-searxng
     restart: unless-stopped
     ports:
@@ -133,7 +133,7 @@ services:
     restart: unless-stopped
     profiles: ["scraper"]
     environment:
-      MONGO_URI: mongodb://${MONGO_USER:-admin}:${MONGO_PASS:-changeme}@mongo:27017/homepage?authSource=admin
+      MONGO_URI: mongodb://${MONGO_USER:-admin}:${MONGO_PASS:?set MONGO_PASS in .env}@mongo:27017/homepage?authSource=admin
       SOLVER_URL: ${SOLVER_URL:-http://flaresolverr:8191}
       SCRAPER_CRON: ${SCRAPER_CRON:-0 */6 * * *}
       PRICE_DROP_ALERT_PCT: ${PRICE_DROP_ALERT_PCT:-10}

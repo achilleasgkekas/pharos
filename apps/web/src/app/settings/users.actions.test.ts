@@ -301,7 +301,7 @@ describe('setUserRole', () => {
     userCountDocuments.mockResolvedValue(1);
     const r = await setUserRole('u2', 'admin');
     expect(r).toEqual({ ok: true });
-    expect(userUpdateOne).toHaveBeenCalledWith({ _id: 'u2' }, { $set: { role: 'admin' } });
+    expect(userUpdateOne).toHaveBeenCalledWith({ _id: 'u2' }, { $set: { role: 'admin' }, $inc: { sessionEpoch: 1 } });
   });
 
   it('allows demoting an admin when others remain, and revalidates', async () => {
@@ -309,7 +309,7 @@ describe('setUserRole', () => {
     userCountDocuments.mockResolvedValue(2);
     const r = await setUserRole('u2', 'viewer');
     expect(r).toEqual({ ok: true });
-    expect(userUpdateOne).toHaveBeenCalledWith({ _id: 'u2' }, { $set: { role: 'viewer' } });
+    expect(userUpdateOne).toHaveBeenCalledWith({ _id: 'u2' }, { $set: { role: 'viewer' }, $inc: { sessionEpoch: 1 } });
     expect(revalidatePathMock).toHaveBeenCalledWith('/settings');
   });
 });

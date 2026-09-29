@@ -378,3 +378,9 @@ describe('store correction teaches an alias (P60, #13)', () => {
     expect(learnStoreAliasMock).toHaveBeenCalledWith('TL Computers', 'TechLamb');
   });
 });
+
+// Business-logic tests use an authorized caller; auth failures are tested in writeGuard.behaviour.test.ts.
+vi.mock('@/lib/auth', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/auth')>()),
+  assertCanWrite: vi.fn(async () => {}),
+}));

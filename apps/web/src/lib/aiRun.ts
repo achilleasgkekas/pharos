@@ -4,7 +4,7 @@
 // Never throws: failures to log must never break user actions.
 
 import { connectDB } from './db';
-import { AiRun, type AiRunDoc } from '@/models/AiRun';
+import { AiRun } from '@/models/AiRun';
 import { callCostMicros } from './aiPricing';
 import { PRICE_VERSION } from './claudePricing';
 import { redactKey } from './anthropic';
