@@ -9,6 +9,7 @@ import {
   normalizeShoppingCountry,
   addShopToList,
   rankByMarket,
+  canonicalProductUrl,
   SHOPPING_PRESETS,
 } from './shoppingRegion';
 
@@ -169,3 +170,61 @@ describe('isInMarket', () => {
     expect(isInMarket('https://www.newegg.com/p/1', GR)).toBe(false);
   });
 });
+
+describe('canonicalProductUrl (#391, #392)', () => {
+  it('canonicalizes Amazon URLs by ASIN and drops tracking parameters', () => {
+    expect(canonicalProductUrl('https://www.amazon.de/Some-Title-Slug/dp/B08N5WRWNW/ref=sr_1_1?tag=mydealz-21'))
+      .toBe('https://amazon.de/dp/B08N5WRWNW');
+    expect(canonicalProductUrl('https://amazon.de/gp/product/B08N5WRWNW?utm_source=google'))
+      .toBe('https://amazon.de/dp/B08N5WRWNW');
+  });
+
+  it('cleans Skroutz and BestPrice query parameters while keeping product path', () => {
+    expect(canonicalProductUrl('https://www.skroutz.gr/s/44759080/Samsung-990-PRO-1TB.html?from=sku_spec&keyphrase=samsung'))
+      .toBe('https://skroutz.gr/s/44759080/Samsung-990-PRO-1TB.html');
+    expect(canonicalProductUrl('https://www.bestprice.gr/item/2148003180/product.html?seq=1'))
+      .toBe('https://bestprice.gr/item/2148003180/product.html');
+  });
+
+  it('strips tracking parameters but preserves genuine product/variant query parameters', () => {
+    // id=1 and id=2 remain distinct
+    const u1 = canonicalProductUrl('https://example.com/product?id=1&utm_source=google&srsltid=123');
+    const u2 = canonicalProductUrl('https://example.com/product?id=2&fbclid=abc');
+    expect(u1).toBe('https://example.com/product?id=1');
+    expect(u2).toBe('https://example.com/product?id=2');
+    expect(u1).not.toBe(u2);
+
+    // Other product identifiers (sku, variant, color) are preserved
+    expect(canonicalProductUrl('https://store.gr/p?sku=XYZ-123&utm_medium=cpc&ref=affiliate'))
+      .toBe('https://store.gr/p?sku=XYZ-123');
+  });
+
+  it('sorts remaining query parameters deterministically', () => {
+    const a = canonicalProductUrl('https://shop.gr/item?size=L&color=red');
+    const b = canonicalProductUrl('https://shop.gr/item?color=red&size=L');
+    expect(a).toBe('https://shop.gr/item?color=red&size=L');
+    expect(a).toBe(b);
+  });
+
+  it('strips hash fragments and trailing slashes while preserving path casing', () => {
+    expect(canonicalProductUrl('https://store.com/Products/Detail/AbCd123/#reviews'))
+      .toBe('https://store.com/Products/Detail/AbCd123');
+  });
+
+  it('rankByMarket drops tracking-parameter duplicate variants of the same product', () => {
+    const out = rankByMarket(
+      [
+        { url: 'https://www.amazon.de/dp/B08N5WRWNW?ref=sr_1_1' },
+        { url: 'https://amazon.de/dp/B08N5WRWNW?tag=deal-21' },
+        { url: 'https://www.skroutz.gr/s/44759080/Samsung-990-PRO-1TB.html?from=search' },
+        { url: 'https://skroutz.gr/s/44759080/Samsung-990-PRO-1TB.html?from=sku_spec' },
+      ],
+      GR
+    );
+    expect(out).toHaveLength(2);
+    // Skroutz is local (rank 0), Amazon is abroad (rank 1)
+    expect(canonicalProductUrl(out[0].url)).toBe('https://skroutz.gr/s/44759080/Samsung-990-PRO-1TB.html');
+    expect(canonicalProductUrl(out[1].url)).toBe('https://amazon.de/dp/B08N5WRWNW');
+  });
+});
+

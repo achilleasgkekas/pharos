@@ -1,10 +1,12 @@
 import { runTextJSON } from '@/lib/ollama';
+import { SHOPPING_PRESETS } from '@/lib/shoppingRegion';
 
 export type StoreTarget = {
   name: string;
   domain: string;
   searchUrl: string;
   reason?: string;
+  source?: 'user_configured' | 'user_store' | 'market_default' | 'ai_suggested';
 };
 
 export type StoreRecommendation = {
@@ -21,7 +23,7 @@ export type StoreContextOptions = {
 /**
  * Standard search URL templates for popular merchants when query is given.
  */
-function buildSearchUrl(domain: string, query: string): string {
+export function buildSearchUrl(domain: string, query: string): string {
   const enc = encodeURIComponent(query.trim());
   const d = domain.toLowerCase().replace(/^www\./, '');
 
@@ -45,6 +47,156 @@ function buildSearchUrl(domain: string, query: string): string {
 }
 
 /**
+ * Bilingual (EN / EL) category heuristic classification from query string and hint.
+ */
+export function detectCategoryFromQuery(query: string, hintCategory?: string): string {
+  const q = query.toLowerCase();
+
+  if (hintCategory && hintCategory !== 'other' && hintCategory !== 'general') {
+    return hintCategory;
+  }
+
+  const isPersonalCare = /toothpaste|toothbrush|shampoo|soap|cream|skincare|serum|vitamin|supplement|frezyderm|korres|oral-b|colgate|sensodyne|parodontax|pharmacy|cosmetic|deodorant|perfume|οδοντοκρεμα|οδοντοβουρτσα|σαμπουαν|σαπουνι|κρεμα|βιταμινη|φαρμακειο|καλλυντικα|αρωμα|αποσμητικο/i.test(q);
+  const isElectronics = /ssd|nvme|ram|gpu|cpu|rtx|geforce|radeon|motherboard|ddr\d|intel|amd|ryzen|laptop|monitor|screen|display|keyboard|mouse|headphone|headset|earbud|airpod|iphone|samsung|galaxy|xiaomi|pixel|router|switch|cable|ps5|playstation|xbox|nintendo|δισκος|οθονη|καρτα|επεξεργαστης|πληκτρολογιο|ποντικι|ακουστικα|κινητο|τηλεφωνο/i.test(q);
+  const isTools = /drill|saw|wrench|plier|hammer|bosch|makita|dewalt|stanley|screw|screwdriver|tool|hardware|lawn|mower|δραπανο|τρυπανι|κατσαβιδι|εργαλειο/i.test(q);
+  const isAuto = /tire|tyre|oil|engine|brake|wiper|car|motorcycle|filter|battery|ελαστικα|λαδι|μπαταρια|αυτοκινητο|μηχανη/i.test(q);
+  const isBooks = /book|novel|paperback|hardcover|author|edition|βιβλιο|μυθιστορημα/i.test(q);
+
+  if (isPersonalCare) return 'personal_care';
+  if (isElectronics) return 'electronics';
+  if (isTools) return 'tools';
+  if (isAuto) return 'automotive';
+  if (isBooks) return 'books';
+  return 'general';
+}
+
+/**
+ * Deterministic Store Selection Policy:
+ * Ensures user-configured manual shops and registered stores are authoritative and
+ * deterministically preserved alongside AI category discoveries and market aggregators.
+ */
+export function selectCandidateStores(opts: {
+  query: string;
+  country?: string;
+  detectedCategory: string;
+  aiStores?: StoreTarget[];
+  extraShops?: string[];
+  userStores?: { name: string; url?: string; domain?: string }[];
+}): StoreTarget[] {
+  const query = (opts.query || '').trim();
+  const c = (opts.country || 'GR').toUpperCase();
+  const stores: StoreTarget[] = [];
+  const seenDomains = new Set<string>();
+
+  const add = (
+    name: string,
+    domain: string,
+    reason?: string,
+    source: StoreTarget['source'] = 'market_default',
+    customSearchUrl?: string
+  ) => {
+    const cleanDomain = domain.toLowerCase().replace(/^www\./, '').trim();
+    if (!cleanDomain || seenDomains.has(cleanDomain)) return;
+    seenDomains.add(cleanDomain);
+    stores.push({
+      name,
+      domain: cleanDomain,
+      searchUrl: customSearchUrl && /^https?:\/\//i.test(customSearchUrl)
+        ? customSearchUrl
+        : buildSearchUrl(cleanDomain, query),
+      reason,
+      source,
+    });
+  };
+
+  // 1. Authoritative: user-configured extra shops (Settings -> Defaults)
+  if (opts.extraShops && Array.isArray(opts.extraShops)) {
+    for (const shop of opts.extraShops) {
+      if (shop && typeof shop === 'string') {
+        const clean = shop.trim().toLowerCase().replace(/^www\./, '');
+        if (clean) add(clean, clean, 'Configured custom shop in Settings', 'user_configured');
+      }
+    }
+  }
+
+  // 2. Authoritative: registered user stores from database
+  if (opts.userStores && Array.isArray(opts.userStores)) {
+    for (const st of opts.userStores) {
+      if (st.name) {
+        let d = st.domain;
+        if (!d && st.url) {
+          try {
+            d = new URL(st.url).hostname.replace(/^www\./, '');
+          } catch {
+            // ignore malformed store URL
+          }
+        }
+        if (d) add(st.name, d, 'User registered store in Pharos', 'user_store');
+      }
+    }
+  }
+
+  // 3. AI recommendations (if provided)
+  const hasAiStores = opts.aiStores && Array.isArray(opts.aiStores) && opts.aiStores.length > 0;
+  if (hasAiStores) {
+    for (const s of opts.aiStores!) {
+      if (s.domain) {
+        add(
+          s.name || s.domain,
+          s.domain,
+          s.reason || 'AI category intelligence suggestion',
+          'ai_suggested',
+          s.searchUrl
+        );
+      }
+    }
+  }
+
+  // 4. Country market defaults & category-specific aggregators (when AI is not providing stores)
+  if (!hasAiStores) {
+    if (c === 'GR') {
+      // Primary aggregators for Greece
+      add('Skroutz', 'skroutz.gr', 'General Greek price comparison aggregator', 'market_default');
+      add('BestPrice', 'bestprice.gr', 'Greek price comparison portal', 'market_default');
+
+      // Category-specific stores
+      const cat = opts.detectedCategory;
+      if (cat === 'personal_care') {
+        add('OFarmakopoiosmou', 'ofarmakopoiosmou.gr', 'Major Greek online pharmacy', 'market_default');
+        add('Pharmacy295', 'pharmacy295.gr', 'Greek online health & beauty pharmacy', 'market_default');
+      } else if (cat === 'electronics') {
+        add('Plaisio', 'plaisio.gr', 'Leading Greek technology and computer store', 'market_default');
+        add('e-shop.gr', 'e-shop.gr', 'Greek electronics & hardware retailer', 'market_default');
+        add('Amazon.de', 'amazon.de', 'Ships electronics and PC hardware to Greece', 'market_default');
+      } else if (cat === 'tools') {
+        add('Praktiker', 'praktiker.gr', 'Home improvement and DIY tools', 'market_default');
+        add('Leroy Merlin', 'leroymerlin.gr', 'Hardware, building and tools', 'market_default');
+      } else if (cat === 'automotive') {
+        add('Autodoc', 'autodoc.gr', 'Automotive parts and accessories', 'market_default');
+      } else if (cat === 'books') {
+        add('Politeia', 'politeianet.gr', 'Major Greek book store', 'market_default');
+        add('Public', 'public.gr', 'Books, stationery and media', 'market_default');
+      } else {
+        add('Amazon.de', 'amazon.de', 'International marketplace shipping to Greece', 'market_default');
+      }
+    } else {
+      // Other country presets / defaults
+      const preset = SHOPPING_PRESETS[c];
+      if (preset?.extraShops?.length) {
+        for (const shop of preset.extraShops) {
+          add(shop, shop, `Default regional marketplace for ${c}`, 'market_default');
+        }
+      } else {
+        add('Amazon', 'amazon.de', 'Regional marketplace', 'market_default');
+        add('eBay', 'ebay.com', 'Online marketplace', 'market_default');
+      }
+    }
+  }
+
+  return stores;
+}
+
+/**
  * Robust category-aware fallback when AI is unavailable or offline.
  */
 export function fallbackStoresForQuery(
@@ -52,94 +204,22 @@ export function fallbackStoresForQuery(
   country = 'GR',
   opts: StoreContextOptions = {}
 ): StoreRecommendation {
-  const q = query.toLowerCase();
-  const c = country.toUpperCase();
-  const stores: StoreTarget[] = [];
-  const seenDomains = new Set<string>();
+  const detectedCategory = detectCategoryFromQuery(query, opts.category);
+  const stores = selectCandidateStores({
+    query,
+    country,
+    detectedCategory,
+    extraShops: opts.extraShops,
+    userStores: opts.userStores,
+  });
 
-  const add = (name: string, domain: string, reason?: string) => {
-    const cleanDomain = domain.toLowerCase().replace(/^www\./, '');
-    if (seenDomains.has(cleanDomain)) return;
-    seenDomains.add(cleanDomain);
-    stores.push({
-      name,
-      domain: cleanDomain,
-      searchUrl: buildSearchUrl(cleanDomain, query),
-      reason,
-    });
-  };
-
-  let detectedCategory = 'general';
-
-  // Keyword-based category classification
-  const isPersonalCare = /toothpaste|toothbrush|shampoo|soap|cream|skincare|serum|vitamin|supplement|frezyderm|korres|oral-b|colgate|sensodyne|parodontax|pharmacy|cosmetic|deodorant|perfume/i.test(q);
-  const isElectronics = /ssd|nvme|ram|gpu|cpu|rtx|geforce|radeon|motherboard|ddr\d|intel|amd|ryzen|laptop|monitor|screen|display|keyboard|mouse|headphone|headset|earbud|airpod|iphone|samsung|galaxy|xiaomi|pixel|router|switch|cable|ps5|playstation|xbox|nintendo/i.test(q);
-  const isTools = /drill|saw|wrench|plier|hammer|bosch|makita|dewalt|stanley|screw|screwdriver|tool|hardware|lawn|mower/i.test(q);
-  const isAuto = /tire|tyre|oil|engine|brake|wiper|car|motorcycle|filter|battery/i.test(q);
-  const isBooks = /book|novel|paperback|hardcover|author|edition/i.test(q);
-
-  if (isPersonalCare) detectedCategory = 'personal_care';
-  else if (isElectronics) detectedCategory = 'electronics';
-  else if (isTools) detectedCategory = 'tools';
-  else if (isAuto) detectedCategory = 'automotive';
-  else if (isBooks) detectedCategory = 'books';
-
-  // Include user extraShops with high priority
-  if (opts.extraShops && Array.isArray(opts.extraShops)) {
-    for (const shop of opts.extraShops) {
-      if (shop && typeof shop === 'string') {
-        const clean = shop.trim().toLowerCase().replace(/^www\./, '');
-        if (clean) add(clean, clean, 'Configured custom shop in Settings');
-      }
-    }
-  }
-
-  // Include user registered stores from DB if any
-  if (opts.userStores && Array.isArray(opts.userStores)) {
-    for (const st of opts.userStores) {
-      if (st.name) {
-        const d = st.domain || (st.url ? new URL(st.url).hostname.replace(/^www\./, '') : '');
-        if (d) add(st.name, d, 'User registered store in Pharos');
-      }
-    }
-  }
-
-  if (c === 'GR') {
-    // Skroutz & BestPrice are primary Greek price aggregators covering most retail
-    add('Skroutz', 'skroutz.gr', 'General Greek price comparison aggregator');
-    add('BestPrice', 'bestprice.gr', 'Greek price comparison portal');
-
-    if (detectedCategory === 'personal_care') {
-      add('OFarmakopoiosmou', 'ofarmakopoiosmou.gr', 'Major Greek online pharmacy');
-      add('Pharmacy295', 'pharmacy295.gr', 'Greek online health & beauty pharmacy');
-    } else if (detectedCategory === 'electronics') {
-      add('Plaisio', 'plaisio.gr', 'Leading Greek technology and computer store');
-      add('e-shop.gr', 'e-shop.gr', 'Greek electronics & hardware retailer');
-      add('Amazon.de', 'amazon.de', 'Ships electronics and PC hardware to Greece');
-    } else if (detectedCategory === 'tools') {
-      add('Praktiker', 'praktiker.gr', 'Home improvement and DIY tools');
-      add('Leroy Merlin', 'leroymerlin.gr', 'Hardware, building and tools');
-    } else if (detectedCategory === 'automotive') {
-      add('Autodoc', 'autodoc.gr', 'Automotive parts and accessories');
-    } else if (detectedCategory === 'books') {
-      add('Politeia', 'politeianet.gr', 'Major Greek book store');
-      add('Public', 'public.gr', 'Books, stationery and media');
-    } else {
-      // General fallbacks
-      add('Amazon.de', 'amazon.de', 'International marketplace shipping to Greece');
-    }
-  } else {
-    // International / other country fallbacks
-    add('Amazon', 'amazon.de', 'Regional marketplace');
-    add('eBay', 'ebay.com', 'Online marketplace');
-  }
-
-  return { detectedCategory, stores: stores.slice(0, 6) };
+  return { detectedCategory, stores };
 }
 
 /**
  * Resolve the best candidate stores for a product in a country using AI,
- * falling back gracefully to category heuristics if AI is offline or disabled.
+ * deterministically preserving user-configured manual shops and registered stores,
+ * and falling back gracefully to category heuristics if AI is offline or disabled.
  */
 export async function resolveStoresForProduct(opts: {
   query: string;
@@ -190,34 +270,35 @@ Rules:
         stores?: Array<{ name?: string; domain?: string; searchUrl?: string; reason?: string }>;
       };
 
-      if (Array.isArray(parsed.stores) && parsed.stores.length > 0) {
-        const stores: StoreTarget[] = [];
-        const seen = new Set<string>();
-
+      const aiStores: StoreTarget[] = [];
+      if (Array.isArray(parsed.stores)) {
         for (const s of parsed.stores) {
           if (!s.domain) continue;
           const cleanDomain = s.domain.toLowerCase().replace(/^www\./, '');
-          if (seen.has(cleanDomain)) continue;
-          seen.add(cleanDomain);
-
-          const searchUrl = s.searchUrl && /^https?:\/\//i.test(s.searchUrl)
-            ? s.searchUrl
-            : buildSearchUrl(cleanDomain, query);
-
-          stores.push({
+          aiStores.push({
             name: s.name || cleanDomain,
             domain: cleanDomain,
-            searchUrl,
+            searchUrl: s.searchUrl && /^https?:\/\//i.test(s.searchUrl)
+              ? s.searchUrl
+              : buildSearchUrl(cleanDomain, query),
             reason: s.reason,
+            source: 'ai_suggested',
           });
         }
+      }
 
-        if (stores.length > 0) {
-          return {
-            detectedCategory: parsed.detectedCategory || 'general',
-            stores: stores.slice(0, 5),
-          };
-        }
+      const detectedCategory = parsed.detectedCategory || detectCategoryFromQuery(query, opts.category);
+      const stores = selectCandidateStores({
+        query,
+        country,
+        detectedCategory,
+        aiStores,
+        extraShops: opts.extraShops,
+        userStores: opts.userStores,
+      });
+
+      if (stores.length > 0) {
+        return { detectedCategory, stores };
       }
     }
   } catch {
@@ -230,3 +311,4 @@ Rules:
     userStores: opts.userStores,
   });
 }
+

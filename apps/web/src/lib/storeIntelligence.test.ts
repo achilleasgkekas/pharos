@@ -100,5 +100,61 @@ describe('storeIntelligence', () => {
       expect(res.stores.length).toBeGreaterThan(0);
       expect(res.stores.some((s) => s.domain === 'skroutz.gr')).toBe(true);
     });
+
+    it('deterministically merges user extraShops and userStores even when AI omits them (#391, #392)', async () => {
+      runTextJSONMock.mockResolvedValueOnce({
+        json: {
+          detectedCategory: 'electronics',
+          stores: [
+            {
+              name: 'Plaisio',
+              domain: 'plaisio.gr',
+              searchUrl: 'https://www.plaisio.gr/search?q=RTX+5080',
+            },
+          ],
+        },
+        raw: '{}',
+        model: 'claude-3-5-haiku',
+      });
+
+      const res = await resolveStoresForProduct({
+        query: 'RTX 5080',
+        country: 'GR',
+        extraShops: ['amazon.de', 'computeruniverse.net'],
+        userStores: [{ name: 'Custom Greek Tech', url: 'https://greektech.gr/catalog' }],
+      });
+
+      const domains = res.stores.map((s) => s.domain);
+      // Configured extra shops MUST be present
+      expect(domains).toContain('amazon.de');
+      expect(domains).toContain('computeruniverse.net');
+      // Registered user store MUST be present
+      expect(domains).toContain('greektech.gr');
+      // AI suggestion is present
+      expect(domains).toContain('plaisio.gr');
+    });
+
+    it('classifies Greek unicode queries correctly into categories', () => {
+      const toothpaste = fallbackStoresForQuery('Οδοντόκρεμα Frezyderm', 'GR');
+      expect(toothpaste.detectedCategory).toBe('personal_care');
+      expect(toothpaste.stores.some((s) => s.domain.includes('pharmacy') || s.domain.includes('farmak'))).toBe(true);
+
+      const drill = fallbackStoresForQuery('Κρουστικό δράπανο Bosch', 'GR');
+      expect(drill.detectedCategory).toBe('tools');
+      expect(drill.stores.map((s) => s.domain)).toContain('praktiker.gr');
+
+      const ssd = fallbackStoresForQuery('Δίσκος NVMe 2TB', 'GR');
+      expect(ssd.detectedCategory).toBe('electronics');
+      expect(ssd.stores.map((s) => s.domain)).toContain('plaisio.gr');
+    });
+
+    it('handles non-Greek country configurations (e.g. DE, CY)', () => {
+      const de = fallbackStoresForQuery('SSD 1TB', 'DE', { extraShops: ['alternate.de'] });
+      expect(de.stores.map((s) => s.domain)).toContain('alternate.de');
+
+      const cy = fallbackStoresForQuery('Laptop', 'CY');
+      expect(cy.stores.map((s) => s.domain)).toContain('amazon.de');
+    });
   });
 });
+

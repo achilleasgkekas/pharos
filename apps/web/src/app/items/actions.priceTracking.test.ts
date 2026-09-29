@@ -319,6 +319,49 @@ describe('searchItemPriceCandidates', () => {
     expect(r.candidates[0]).toMatchObject({ price: 0, inStock: false, error: 'Behind Cloudflare — start the price-scraper profile' });
     expect(r.candidates[1].error!.length).toBe(80); // sliced to 80 chars
   });
+
+  it('matches alreadyLinked even with tracking parameter variations (#391, #392)', async () => {
+    itemFindById.mockReturnValue({
+      lean: async () => ({
+        title: 'Widget',
+        links: [{ label: 'Amazon', url: 'https://www.amazon.de/dp/B08N5WRWNW?ref=sr_1_1', price: 100 }],
+      }),
+    } as any);
+    // Candidate has different tracking params (e.g. tag=affiliate)
+    searchWebMock.mockResolvedValue([
+      { title: '', url: 'https://amazon.de/dp/B08N5WRWNW?tag=deal-21&utm_source=google', content: '' },
+    ]);
+    fetchPageTextMock.mockResolvedValue({ url: '', title: 'Widget', jsonLd: '', text: '' });
+    parseProductFromPageMock.mockResolvedValue({ parsed: { title: 'Widget', price: 95, currency: 'EUR', store: 'Amazon' } });
+
+    const r = await searchItemPriceCandidates('i1');
+    expect(r.ok).toBe(true);
+    expect(r.candidates).toHaveLength(1);
+    expect(r.candidates[0].alreadyLinked).toBe(true);
+  });
+
+  it('preserves distinct products that differ only by query parameters (e.g. ?id=1 vs ?id=2) (#391, #392)', async () => {
+    itemFindById.mockReturnValue({
+      lean: async () => ({
+        title: 'Widget',
+        links: [{ label: 'Store', url: 'https://store.gr/item?id=1', price: 50 }],
+      }),
+    } as any);
+    searchWebMock.mockResolvedValue([
+      { title: '', url: 'https://store.gr/item?id=1&utm_medium=cpc', content: '' },
+      { title: '', url: 'https://store.gr/item?id=2', content: '' },
+    ]);
+    fetchPageTextMock.mockResolvedValue({ url: '', title: 'Widget', jsonLd: '', text: '' });
+    parseProductFromPageMock.mockResolvedValue({ parsed: { title: 'Widget', price: 50, currency: 'EUR', store: 'Store' } });
+
+    const r = await searchItemPriceCandidates('i1');
+    expect(r.ok).toBe(true);
+    expect(r.candidates).toHaveLength(2);
+    // id=1 is recognized as already linked
+    expect(r.candidates.find((c) => c.url.includes('id=1'))?.alreadyLinked).toBe(true);
+    // id=2 is recognized as NOT already linked
+    expect(r.candidates.find((c) => c.url.includes('id=2'))?.alreadyLinked).toBe(false);
+  });
 });
 
 describe('addPriceLinks', () => {

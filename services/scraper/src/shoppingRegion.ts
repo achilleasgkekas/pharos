@@ -158,19 +158,135 @@ export function isInMarket(url: string | null | undefined, market: ShoppingMarke
 }
 
 /**
+ * Known marketing, tracking, analytics, and session query parameters to strip.
+ * Everything else (including product/variant identifiers like ?id=, ?pid=, ?sku=, etc.) is preserved.
+ */
+export const TRACKING_QUERY_PARAMS = new Set([
+  'utm_source',
+  'utm_medium',
+  'utm_campaign',
+  'utm_term',
+  'utm_content',
+  'utm_id',
+  'utm_reader',
+  'gclid',
+  'gclsrc',
+  '_gl',
+  'gad_source',
+  'gbraid',
+  'wbraid',
+  'fbclid',
+  'fbc',
+  'fbp',
+  'msclkid',
+  'twclid',
+  'ttclid',
+  'igshid',
+  'li_fat_id',
+  'mc_cid',
+  'mc_eid',
+  'mkt_tok',
+  'srsltid',
+  'ref',
+  'ref_',
+  'tag',
+  'linkcode',
+  'camp',
+  'creative',
+  'source',
+  'affiliate',
+  'aff_id',
+  'partner',
+  'spm',
+  'from',
+  '_',
+  '_t',
+  'timestamp',
+  'cb',
+  'nocache',
+]);
+
+/**
+ * Clean and canonicalize a product or store URL for deterministic comparison, deduplication,
+ * and storage across all search, import, and tracking flows.
+ */
+export function canonicalProductUrl(rawUrl: string): string {
+  if (!rawUrl || typeof rawUrl !== 'string') return '';
+  let u: URL;
+  try {
+    u = new URL(rawUrl.trim());
+  } catch {
+    return rawUrl.trim().toLowerCase();
+  }
+
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') {
+    return rawUrl.trim();
+  }
+
+  const host = u.hostname.toLowerCase().replace(/\.$/, '').replace(/^www\./, '');
+  let pathname = u.pathname;
+
+  // Amazon: canonicalize to /dp/ASIN
+  if (host.includes('amazon.')) {
+    const asinMatch = pathname.match(/\/(?:dp|gp\/product)\/([A-Z0-9]{10})/i);
+    if (asinMatch) {
+      return `https://${host}/dp/${asinMatch[1].toUpperCase()}`;
+    }
+  }
+
+  // Skroutz: strip search / tracking query params, keep path
+  if (host.includes('skroutz.gr') && pathname.startsWith('/s/')) {
+    pathname = pathname.replace(/\/+$/, '');
+    return `https://${host}${pathname}`;
+  }
+
+  // BestPrice: strip query params, keep path
+  if (host.includes('bestprice.gr') && pathname.startsWith('/item/')) {
+    pathname = pathname.replace(/\/+$/, '');
+    return `https://${host}${pathname}`;
+  }
+
+  // Strip trailing slashes from path, but ensure at least '/' if path was empty
+  if (pathname.length > 1) {
+    pathname = pathname.replace(/\/+$/, '');
+  }
+
+  // Clean query parameters
+  const params = new URLSearchParams(u.search);
+  const keysToDelete: string[] = [];
+  for (const key of params.keys()) {
+    if (TRACKING_QUERY_PARAMS.has(key.toLowerCase())) {
+      keysToDelete.push(key);
+    }
+  }
+  for (const k of keysToDelete) {
+    params.delete(k);
+  }
+
+  // Sort remaining parameters deterministically
+  params.sort();
+  const search = params.toString();
+
+  return `https://${host}${pathname}${search ? `?${search}` : ''}`;
+}
+
+/**
  * Keep only in-market results, the country's own shops first, then the foreign ones, each in
- * the order the search returned them. Duplicate URLs are dropped.
+ * the order the search returned them. Duplicate URLs (including tracking-parameter variants)
+ * are dropped.
  */
 export function rankByMarket<T extends { url: string }>(results: T[], market: ShoppingMarket): T[] {
   const seen = new Set<string>();
   const local: T[] = [];
   const abroad: T[] = [];
   for (const r of results) {
-    if (seen.has(r.url)) continue;
-    seen.add(r.url);
+    const canon = canonicalProductUrl(r.url);
+    if (!canon || seen.has(canon)) continue;
+    seen.add(canon);
     const rank = marketRank(r.url, market);
     if (rank === 0) local.push(r);
     else if (rank === 1) abroad.push(r);
   }
   return [...local, ...abroad];
 }
+

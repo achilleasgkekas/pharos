@@ -127,5 +127,46 @@ describe('storeSearch', () => {
       expect(candidates.length).toBe(1);
       expect(candidates[0].store).toBe('Plaisio');
     });
+
+    it('records detailed outcomes and guarantees configured shops are attempted (#391)', async () => {
+      fetchRawHtmlMock.mockImplementation(async (url: string) => {
+        if (url.includes('skroutz.gr')) {
+          return '<a href="/s/1/item.html">Item 1</a><a href="/s/2/item.html">Item 2</a>';
+        }
+        if (url.includes('bestprice.gr')) {
+          return '<html>no links</html>';
+        }
+        if (url.includes('failed.gr')) {
+          throw new Error('503 Service Unavailable');
+        }
+        if (url.includes('amazon.de')) {
+          return '<a href="/dp/B0B9C315N3">Amazon Item</a>';
+        }
+        return '<html></html>';
+      });
+
+      const stores: StoreTarget[] = [
+        { name: 'EmptyStore', domain: 'empty.gr', searchUrl: 'https://www.empty.gr/search?q=item', source: 'market_default' },
+        { name: 'Skroutz', domain: 'skroutz.gr', searchUrl: 'https://www.skroutz.gr/search?keyphrase=item', source: 'market_default' },
+        { name: 'BestPrice', domain: 'bestprice.gr', searchUrl: 'https://www.bestprice.gr/search?q=item', source: 'market_default' },
+        { name: 'FailedStore', domain: 'failed.gr', searchUrl: 'https://www.failed.gr/search?q=item', source: 'market_default' },
+        { name: 'Amazon', domain: 'amazon.de', searchUrl: 'https://www.amazon.de/s?k=item', source: 'user_configured' },
+      ];
+
+      // Set maxTotal = 2: EmptyStore is searched (0 matches), Skroutz returns 2.
+      // BestPrice & FailedStore are market_default so skipped (not_attempted).
+      // Amazon is user_configured, so it MUST also be queried!
+      const candidates = await searchStoreCandidates(stores, 'item', { limitPerStore: 2, maxTotal: 2 });
+      expect(candidates.length).toBe(3); // 2 from Skroutz + 1 from Amazon
+
+      const outcomes = candidates.outcomes;
+      expect(outcomes).toBeDefined();
+      expect(outcomes?.find((o) => o.domain === 'empty.gr')?.status).toBe('no_match');
+      expect(outcomes?.find((o) => o.domain === 'skroutz.gr')?.status).toBe('searched');
+      expect(outcomes?.find((o) => o.domain === 'bestprice.gr')?.status).toBe('not_attempted');
+      expect(outcomes?.find((o) => o.domain === 'failed.gr')?.status).toBe('not_attempted');
+      expect(outcomes?.find((o) => o.domain === 'amazon.de')?.status).toBe('searched');
+    });
   });
 });
+

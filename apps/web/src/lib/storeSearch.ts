@@ -1,4 +1,5 @@
 import { fetchRawHtml, parsePriceNum } from '@/lib/scrape';
+import { canonicalProductUrl } from '@/lib/shoppingRegion';
 import type { StoreTarget } from '@/lib/storeIntelligence';
 
 export type StoreCandidateLink = {
@@ -7,6 +8,19 @@ export type StoreCandidateLink = {
   store: string;
   domain: string;
   price?: number;
+};
+
+export type StoreSearchOutcome = {
+  store: string;
+  domain: string;
+  status: 'searched' | 'no_match' | 'failed' | 'excluded' | 'not_attempted';
+  matchCount?: number;
+  error?: string;
+  reason?: string;
+};
+
+export type StoreCandidatesWithOutcomes = StoreCandidateLink[] & {
+  outcomes?: StoreSearchOutcome[];
 };
 
 /**
@@ -20,6 +34,15 @@ function cleanProductUrl(rawUrl: string, baseUrl: string): string | null {
     const host = u.hostname.toLowerCase().replace(/^www\./, '');
     const pathname = u.pathname;
 
+    // Filter out common non-product pages
+    if (
+      /\/(category|categories|list|collection|search|help|contact|account|cart|checkout|terms|privacy|blog|login|register)\b/i.test(
+        pathname
+      )
+    ) {
+      return null;
+    }
+
     // Amazon: normalize to clean canonical /dp/ASIN
     if (host.includes('amazon.')) {
       const asinMatch = pathname.match(/\/(?:dp|gp\/product)\/([A-Z0-9]{10})/i);
@@ -29,22 +52,22 @@ function cleanProductUrl(rawUrl: string, baseUrl: string): string | null {
       return null;
     }
 
-    // Skroutz: strip tracking search query parameters
+    // Skroutz: only product pages /s/
     if (host.includes('skroutz.gr')) {
       if (!pathname.startsWith('/s/')) return null;
-      return `https://${u.hostname}${pathname}`;
+      return `https://${u.hostname}${pathname.replace(/\/+$/, '')}`;
     }
 
-    // BestPrice: strip query parameters
+    // BestPrice: only product pages /item/
     if (host.includes('bestprice.gr')) {
       if (!pathname.startsWith('/item/')) return null;
-      return `https://${u.hostname}${pathname}`;
+      return `https://${u.hostname}${pathname.replace(/\/+$/, '')}`;
     }
 
-    // Plaisio: strip query parameters like ?srsltid=...
+    // Plaisio: product pages
     if (host.includes('plaisio.gr')) {
       if (!pathname.startsWith('/product/')) return null;
-      return `https://${u.hostname}${pathname}`;
+      return `https://${u.hostname}${pathname.replace(/\/+$/, '')}`;
     }
 
     // e-shop: keep clean path
@@ -53,13 +76,10 @@ function cleanProductUrl(rawUrl: string, baseUrl: string): string | null {
       return u.toString();
     }
 
-    // Generic tracking param strip
-    u.searchParams.delete('srsltid');
-    u.searchParams.delete('utm_source');
-    u.searchParams.delete('utm_medium');
-    u.searchParams.delete('utm_campaign');
-    u.searchParams.delete('ref');
-    return u.toString();
+    // Strip tracking parameters using canonical policy
+    const canon = canonicalProductUrl(u.toString());
+    const canonUrl = new URL(canon);
+    return `https://${u.hostname}${canonUrl.pathname}${canonUrl.search}`;
   } catch {
     return null;
   }
@@ -174,20 +194,44 @@ export function extractCandidateLinksFromHtml(
 
 /**
  * Query multiple stores sequentially with a polite delay and collect top candidate links.
+ * Returns candidate links with store search outcomes attached.
  */
 export async function searchStoreCandidates(
   stores: StoreTarget[],
   query: string,
   opts: { limitPerStore?: number; maxTotal?: number } = {}
-): Promise<StoreCandidateLink[]> {
+): Promise<StoreCandidatesWithOutcomes> {
   const limitPerStore = opts.limitPerStore ?? 2;
   const maxTotal = opts.maxTotal ?? 6;
   const allCandidates: StoreCandidateLink[] = [];
   const seenUrls = new Set<string>();
+  const outcomes: StoreSearchOutcome[] = [];
 
   for (const store of stores) {
-    if (allCandidates.length >= maxTotal) break;
-    if (!store.searchUrl || !/^https?:\/\//i.test(store.searchUrl)) continue;
+    if (!store.searchUrl || !/^https?:\/\//i.test(store.searchUrl)) {
+      outcomes.push({
+        store: store.name || store.domain,
+        domain: store.domain,
+        status: 'not_attempted',
+        reason: store.reason || 'Missing search URL',
+      });
+      continue;
+    }
+
+    // If maxTotal reached and this store is NOT a user_configured shop or registered store, mark not attempted
+    if (
+      allCandidates.length >= maxTotal &&
+      store.source !== 'user_configured' &&
+      store.source !== 'user_store'
+    ) {
+      outcomes.push({
+        store: store.name || store.domain,
+        domain: store.domain,
+        status: 'not_attempted',
+        reason: 'Candidate cap reached by higher-priority stores',
+      });
+      continue;
+    }
 
     try {
       const html = await fetchRawHtml(store.searchUrl);
@@ -195,21 +239,40 @@ export async function searchStoreCandidates(
 
       let addedForStore = 0;
       for (const link of links) {
-        if (addedForStore >= limitPerStore || allCandidates.length >= maxTotal) break;
-        if (seenUrls.has(link.url)) continue;
-        seenUrls.add(link.url);
+        if (addedForStore >= limitPerStore) break;
+        const canon = canonicalProductUrl(link.url);
+        if (seenUrls.has(canon)) continue;
+        seenUrls.add(canon);
 
         allCandidates.push({
           ...link,
+          url: canon,
           store: store.name || link.store,
           domain: store.domain || link.domain,
         });
         addedForStore++;
       }
-    } catch {
-      // Individual store failure (timeout, network) is ignored so other stores succeed
+
+      outcomes.push({
+        store: store.name || store.domain,
+        domain: store.domain,
+        status: addedForStore > 0 ? 'searched' : 'no_match',
+        matchCount: addedForStore,
+        reason: store.reason,
+      });
+    } catch (err) {
+      outcomes.push({
+        store: store.name || store.domain,
+        domain: store.domain,
+        status: 'failed',
+        error: (err as Error).message || String(err),
+        reason: store.reason,
+      });
     }
   }
 
-  return allCandidates;
+  const result = allCandidates as StoreCandidatesWithOutcomes;
+  result.outcomes = outcomes;
+  return result;
 }
+

@@ -52,4 +52,48 @@ describe('searchShops', () => {
     expect(out.map((r) => r.url)).toContain('https://www.skroutz.gr/s/123/rtx.html');
     expect(out.map((r) => r.url)).toContain('https://www.plaisio.gr/product/123');
   });
+
+  it('balances candidate slots so configured extraShops are not starved by domestic results (#391)', async () => {
+    resolveStoresForProductMock.mockResolvedValueOnce({
+      detectedCategory: 'electronics',
+      stores: [],
+    });
+    // Return 8 domestic Greek hits and 2 Amazon.de hits
+    searchWebMock.mockImplementation(async (q: string) => {
+      if (q.includes('site:amazon.de')) {
+        return [
+          hit('https://www.amazon.de/dp/B01'),
+          hit('https://www.amazon.de/dp/B02'),
+        ];
+      }
+      return Array.from({ length: 8 }, (_, i) => hit(`https://www.skroutz.gr/s/${i}`));
+    });
+
+    const out = await searchShops('RTX 5080', marketFor('GR', ['amazon.de']), 8);
+    expect(out).toHaveLength(8);
+    // Configured foreign shop (amazon.de) MUST be in the balanced results!
+    const hosts = out.map((r) => new URL(r.url).hostname);
+    expect(hosts).toContain('www.amazon.de');
+    expect(out.some((r) => r.url.includes('amazon.de/dp/B01'))).toBe(true);
+  });
+
+  it('attaches store search outcomes to the result', async () => {
+    const directMock: any = [
+      { title: 'Item', url: 'https://www.skroutz.gr/s/1', store: 'Skroutz', domain: 'skroutz.gr' },
+    ];
+    directMock.outcomes = [
+      { store: 'Skroutz', domain: 'skroutz.gr', status: 'searched', matchCount: 1 },
+      { store: 'Amazon', domain: 'amazon.de', status: 'no_match', matchCount: 0 },
+    ];
+    resolveStoresForProductMock.mockResolvedValueOnce({
+      detectedCategory: 'electronics',
+      stores: [{ name: 'Skroutz', domain: 'skroutz.gr', searchUrl: 'https://www.skroutz.gr/search' }],
+    });
+    searchStoreCandidatesMock.mockResolvedValueOnce(directMock);
+
+    const out = await searchShops('Item', marketFor('GR', ['amazon.de']), 8);
+    expect(out.outcomes).toBeDefined();
+    expect(out.outcomes?.find((o) => o.domain === 'skroutz.gr')?.status).toBe('searched');
+  });
 });
+
