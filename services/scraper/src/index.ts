@@ -3,6 +3,7 @@ import cron from 'node-cron';
 import { config } from './config.js';
 import { connect } from './db.js';
 import { runOnce } from './run.js';
+import { recordScraperHeartbeat, recordScraperStart, recordScraperPassComplete } from './appConfig.js';
 
 let running = false;
 
@@ -12,16 +13,20 @@ async function tick(): Promise<void> {
     return;
   }
   running = true;
+  await recordScraperStart(config.cron);
   try {
-    await runOnce();
+    const stats = await runOnce();
+    await recordScraperPassComplete({ stats });
   } catch (err) {
     console.error('[cron] pass failed:', err);
+    await recordScraperPassComplete({ error: err instanceof Error ? err.message : String(err) });
   } finally {
     running = false;
   }
 }
 
 await connect();
+await recordScraperHeartbeat(config.cron);
 
 if (!cron.validate(config.cron)) {
   console.error(`[scraper] invalid SCRAPER_CRON "${config.cron}", exiting.`);

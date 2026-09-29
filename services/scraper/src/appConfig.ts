@@ -105,3 +105,43 @@ export async function recordScraperAiStatus(error: { message: string; model: str
     /* status is informational */
   }
 }
+
+export async function recordScraperHeartbeat(schedule?: string): Promise<void> {
+  try {
+    const update: Record<string, unknown> = { heartbeatAt: new Date() };
+    if (schedule) update.schedule = schedule;
+    await StatusModel.updateOne({ key: 'singleton' }, { $set: update }, { upsert: true });
+  } catch {
+    /* status is informational */
+  }
+}
+
+export async function recordScraperStart(schedule?: string): Promise<void> {
+  try {
+    const update: Record<string, unknown> = { lastStartAt: new Date(), heartbeatAt: new Date() };
+    if (schedule) update.schedule = schedule;
+    await StatusModel.updateOne({ key: 'singleton' }, { $set: update }, { upsert: true });
+  } catch {
+    /* status is informational */
+  }
+}
+
+export async function recordScraperPassComplete(params: {
+  stats?: { items: number; checks: number; updates: number; alerts: number };
+  error?: string | null;
+}): Promise<void> {
+  try {
+    const now = new Date();
+    const update: Record<string, unknown> = {
+      lastCompleteAt: now,
+      lastRunAt: now,
+      heartbeatAt: now,
+      lastError: params.error ?? null,
+    };
+    if (params.stats) update.lastStats = params.stats;
+    await StatusModel.updateOne({ key: 'singleton' }, { $set: update }, { upsert: true });
+  } catch {
+    /* status is informational */
+  }
+}
+

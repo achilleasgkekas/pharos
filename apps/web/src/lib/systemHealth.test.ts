@@ -3,6 +3,9 @@ import {
   databaseLevel,
   diskLevel,
   aiLevel,
+  searchLevel,
+  browserLevel,
+  scraperLevel,
   jobsLevel,
   syncLevel,
   cronLevel,
@@ -10,6 +13,7 @@ import {
   isStuck,
   overallLevel,
   formatMs,
+  redactEndpoint,
   DB_PING_WARN_MS,
   DISK_FREE_WARN_BYTES,
   JOB_STUCK_MINUTES,
@@ -69,9 +73,72 @@ describe('aiLevel', () => {
   });
 });
 
+describe('searchLevel', () => {
+  it('is unknown when not configured', () => {
+    expect(searchLevel({ configured: false, reachable: false })).toBe('unknown');
+  });
+  it('is down when unreachable or on connection error', () => {
+    expect(searchLevel({ configured: true, reachable: false })).toBe('down');
+    expect(searchLevel({ configured: true, reachable: false, error: 'ECONNREFUSED' })).toBe('down');
+  });
+  it('warns when reachable but functional query fails', () => {
+    expect(searchLevel({ configured: true, reachable: true, functional: false })).toBe('warn');
+  });
+  it('warns on excessive latency', () => {
+    expect(searchLevel({ configured: true, reachable: true, functional: true, latencyMs: 3000 })).toBe('warn');
+  });
+  it('is ok when reachable and working', () => {
+    expect(searchLevel({ configured: true, reachable: true, functional: true, latencyMs: 150 })).toBe('ok');
+    expect(searchLevel({ configured: true, reachable: true, latencyMs: 200 })).toBe('ok');
+  });
+});
+
+describe('browserLevel', () => {
+  it('is unknown when not configured', () => {
+    expect(browserLevel({ configured: false, reachable: false })).toBe('unknown');
+  });
+  it('is down when unreachable or error', () => {
+    expect(browserLevel({ configured: true, reachable: false })).toBe('down');
+    expect(browserLevel({ configured: true, reachable: false, error: 'ECONNREFUSED' })).toBe('down');
+  });
+  it('warns when reachable but session functional check fails', () => {
+    expect(browserLevel({ configured: true, reachable: true, functional: false })).toBe('warn');
+  });
+  it('is ok when reachable and working', () => {
+    expect(browserLevel({ configured: true, reachable: true, functional: true, latencyMs: 80 })).toBe('ok');
+  });
+});
+
+describe('scraperLevel', () => {
+  const now = Date.now();
+  it('is unknown when scraper is disabled in Settings', () => {
+    expect(scraperLevel({ enabled: false, now })).toBe('unknown');
+  });
+  it('is unknown when no activity was ever recorded', () => {
+    expect(scraperLevel({ enabled: true, lastRunAt: null, heartbeatAt: null, now })).toBe('unknown');
+  });
+  it('warns when last pass failed with an error', () => {
+    expect(scraperLevel({ enabled: true, lastRunAt: new Date(now - 1000).toISOString(), lastError: 'API timeout', now })).toBe('warn');
+  });
+  it('warns when last activity is stale past CRON_STALE_HOURS', () => {
+    const staleDate = new Date(now - (CRON_STALE_HOURS + 1) * 3600 * 1000).toISOString();
+    expect(scraperLevel({ enabled: true, lastRunAt: staleDate, now })).toBe('warn');
+  });
+  it('is ok when recent pass completed without errors', () => {
+    const freshDate = new Date(now - 3600 * 1000).toISOString();
+    expect(scraperLevel({ enabled: true, lastRunAt: freshDate, now })).toBe('ok');
+  });
+});
+
 describe('jobsLevel', () => {
   it('is ok with a clean queue', () => {
     expect(jobsLevel({ stuck: 0, failed: 0 })).toBe('ok');
+  });
+  it('is unknown when unmeasured (e.g. database down)', () => {
+    expect(jobsLevel({ stuck: 0, failed: 0, unmeasured: true })).toBe('unknown');
+  });
+  it('is down when query failed with an error', () => {
+    expect(jobsLevel({ stuck: 0, failed: 0, error: 'Query timeout' })).toBe('down');
   });
   it('warns on a wedged job and on recent failures', () => {
     expect(jobsLevel({ stuck: 1, failed: 0 })).toBe('warn');
@@ -86,6 +153,9 @@ describe('syncLevel', () => {
   });
   it('is down when the live probe failed', () => {
     expect(syncLevel({ backend: 'smb', reachable: false, stale: false })).toBe('down');
+  });
+  it('is down when probe throws an error', () => {
+    expect(syncLevel({ backend: 's3', stale: false, error: 'Connection refused' })).toBe('down');
   });
   it('warns when the mirror has fallen behind', () => {
     expect(syncLevel({ backend: 'onedrive', reachable: true, stale: true })).toBe('warn');
@@ -153,6 +223,9 @@ describe('cronLevel', () => {
   it('treats an unparseable timestamp as stale (warn), never as fresh', () => {
     expect(cronLevel([{ name: 'alerts', lastRunAt: 'not-a-date' }], now)).toBe('warn');
   });
+  it('is down when error is present', () => {
+    expect(cronLevel([], now, 'Database connection rejected')).toBe('down');
+  });
 });
 
 describe('formatMs', () => {
@@ -166,3 +239,12 @@ describe('formatMs', () => {
     expect(formatMs(-1)).toBe('—');
   });
 });
+
+describe('redactEndpoint', () => {
+  it('strips credentials and query parameters from endpoint URLs', () => {
+    expect(redactEndpoint('http://admin:secret123@my-searxng.internal:8080/search?q=foo#hash')).toBe('http://my-searxng.internal:8080/search');
+    expect(redactEndpoint('http://flaresolverr:8191/')).toBe('http://flaresolverr:8191');
+    expect(redactEndpoint('')).toBe('');
+  });
+});
+

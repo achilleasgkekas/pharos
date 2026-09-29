@@ -1,6 +1,23 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
-import { Activity, AlertTriangle, CheckCircle2, CircleSlash, Database, HardDrive, Loader2, RefreshCw, Sparkles, Cloud, ListChecks, Clock, XCircle } from 'lucide-react';
+import {
+  Activity,
+  AlertTriangle,
+  Bot,
+  CheckCircle2,
+  CircleSlash,
+  Clock,
+  Cloud,
+  Database,
+  Globe,
+  HardDrive,
+  ListChecks,
+  Loader2,
+  RefreshCw,
+  Search,
+  Sparkles,
+  XCircle,
+} from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import { useLocale, useT } from '@/components/LocaleProvider';
 import type { TKey } from '@/lib/i18n';
@@ -9,12 +26,10 @@ import { getSystemHealth } from './healthActions';
 import { formatDate, formatTime } from '@/lib/i18n/format';
 
 /**
- * P77 — Settings → System status. A read-only traffic-light grid over the checks the app
- * already performs, so troubleshooting starts here instead of in `docker logs`.
+ * P77 & #390 — Settings → System status. Read-only service readiness & diagnostics.
  *
- * Loads on mount (fast checks only, like UpdateChecker) so the tab never blocks on IO.
- * "Test connections" re-runs it with the live remote-storage probe, which is the one part
- * that can take seconds and therefore stays a deliberate press.
+ * Loads on mount with fast reachability checks. "Test connections" runs live functional
+ * probes on search, browser, and remote storage backends.
  */
 
 const LEVEL_STYLE: Record<HealthLevel, { dot: string; text: string; border: string; icon: React.ReactNode; key: TKey }> = {
@@ -48,13 +63,16 @@ const LEVEL_STYLE: Record<HealthLevel, { dot: string; text: string; border: stri
   },
 };
 
-const CHECK_META: Record<HealthCheckId, { icon: React.ReactNode; key: TKey }> = {
-  database: { icon: <Database size={15} />, key: 'sys.checkDatabase' },
-  disk: { icon: <HardDrive size={15} />, key: 'sys.checkDisk' },
-  ai: { icon: <Sparkles size={15} />, key: 'sys.checkAi' },
-  jobs: { icon: <ListChecks size={15} />, key: 'sys.checkJobs' },
-  sync: { icon: <Cloud size={15} />, key: 'sys.checkSync' },
-  cron: { icon: <Clock size={15} />, key: 'sys.checkCron' },
+const CHECK_META: Record<HealthCheckId, { icon: React.ReactNode; key: TKey; featureKey: TKey }> = {
+  database: { icon: <Database size={15} />, key: 'sys.checkDatabase', featureKey: 'sys.featDatabase' },
+  disk: { icon: <HardDrive size={15} />, key: 'sys.checkDisk', featureKey: 'sys.featDisk' },
+  ai: { icon: <Sparkles size={15} />, key: 'sys.checkAi', featureKey: 'sys.featAi' },
+  search: { icon: <Search size={15} />, key: 'sys.checkSearch', featureKey: 'sys.featSearch' },
+  browser: { icon: <Globe size={15} />, key: 'sys.checkBrowser', featureKey: 'sys.featBrowser' },
+  scraper: { icon: <Bot size={15} />, key: 'sys.checkScraper', featureKey: 'sys.featScraper' },
+  jobs: { icon: <ListChecks size={15} />, key: 'sys.checkJobs', featureKey: 'sys.featJobs' },
+  sync: { icon: <Cloud size={15} />, key: 'sys.checkSync', featureKey: 'sys.featSync' },
+  cron: { icon: <Clock size={15} />, key: 'sys.checkCron', featureKey: 'sys.featCron' },
 };
 
 export function SystemHealthPanel() {
@@ -74,8 +92,21 @@ export function SystemHealthPanel() {
   }, [t]);
 
   useEffect(() => {
-    run(false);
-  }, [run]);
+    let cancelled = false;
+    getSystemHealth(false)
+      .then((res) => {
+        if (!cancelled) setHealth(res);
+      })
+      .catch(() => {
+        if (!cancelled) setError(t('sys.error'));
+      })
+      .finally(() => {
+        if (!cancelled) setBusy('idle');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [t]);
 
   const overall = health?.overall ?? 'unknown';
   const style = LEVEL_STYLE[overall];
@@ -117,7 +148,7 @@ export function SystemHealthPanel() {
 
       {error && <p className="text-xs text-[color:var(--color-red)]">{error}</p>}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {(health?.checks ?? []).map((c) => (
           <CheckCard key={c.id} check={c} />
         ))}
@@ -133,31 +164,41 @@ function CheckCard({ check }: { check: HealthCheck }) {
   const t = useT();
   const style = LEVEL_STYLE[check.level];
   const meta = CHECK_META[check.id];
-  // Values come from the server already formatted; only the labels are translated.
   return (
-    <div className={cn('rounded-xl border bg-[color:var(--color-surface-2)] p-3', style.border)}>
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 text-sm font-semibold">
-          <span className="text-[color:var(--color-text-dim)]">{meta.icon}</span>
-          {t(meta.key)}
+    <div className={cn('rounded-xl border bg-[color:var(--color-surface-2)] p-3 flex flex-col justify-between', style.border)}>
+      <div>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 text-sm font-semibold truncate">
+            <span className="text-[color:var(--color-text-dim)] shrink-0">{meta.icon}</span>
+            <span className="truncate">{t(meta.key)}</span>
+          </div>
+          <span className={cn('flex items-center gap-1 text-[11px] font-semibold uppercase shrink-0', style.text)} style={{ fontFamily: 'var(--font-mono)' }}>
+            {style.icon}
+            {t(style.key)}
+          </span>
         </div>
-        <span className={cn('flex items-center gap-1 text-[11px] font-semibold uppercase', style.text)} style={{ fontFamily: 'var(--font-mono)' }}>
-          {style.icon}
-          {t(style.key)}
-        </span>
+
+        <p className="mt-1 text-[11px] text-[color:var(--color-text-faint)] leading-snug">{t(meta.featureKey)}</p>
+        <p className="mt-1.5 text-xs text-[color:var(--color-text-dim)] font-medium">{t(check.noteKey as TKey, check.noteVars)}</p>
       </div>
 
-      <p className="mt-1.5 text-xs text-[color:var(--color-text-dim)]">{t(check.noteKey as TKey, check.noteVars)}</p>
-
-      <dl className="mt-2.5 grid grid-cols-2 gap-x-3 gap-y-1">
-        {check.metrics.map((m) => (
-          <div key={m.key} className="flex items-baseline justify-between gap-2 min-w-0">
-            <dt className="text-[10px] uppercase tracking-wide text-[color:var(--color-text-faint)] truncate">{t(m.key as TKey)}</dt>
-            <dd className="text-xs font-medium truncate" style={{ fontFamily: 'var(--font-mono)' }}>
-              {m.key === 'sys.mLastSync' ? (m.value ? formatDate(m.value, locale) : t('sys.never')) : m.value || '—'}
-            </dd>
-          </div>
-        ))}
+      <dl className="mt-2.5 pt-2 border-t border-[color:var(--color-border)]/50 grid grid-cols-2 gap-x-3 gap-y-1">
+        {check.metrics.map((m) => {
+          let val = m.value;
+          if (val.startsWith('sys.')) {
+            val = t(val as TKey);
+          } else if (m.key === 'sys.mLastSync' || m.key === 'sys.mLastPass') {
+            val = val && val !== '—' ? formatDate(val, locale) : t('sys.never');
+          }
+          return (
+            <div key={m.key} className="flex items-baseline justify-between gap-2 min-w-0">
+              <dt className="text-[10px] uppercase tracking-wide text-[color:var(--color-text-faint)] truncate">{t(m.key as TKey)}</dt>
+              <dd className="text-xs font-medium truncate" style={{ fontFamily: 'var(--font-mono)' }} title={val}>
+                {val || '—'}
+              </dd>
+            </div>
+          );
+        })}
       </dl>
     </div>
   );
