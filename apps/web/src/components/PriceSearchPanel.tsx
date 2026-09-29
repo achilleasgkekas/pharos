@@ -10,6 +10,7 @@ import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { getBulkAiGuard } from '@/app/jobActions';
 import { searchItemPriceCandidates, addPriceLinks, type PriceCandidate } from '@/app/items/actions';
 import type { SerializedItem } from '@/types';
+import type { StoreSearchOutcome } from '@/lib/storeSearch';
 import { useT } from '@/components/LocaleProvider';
 import { estimateTaskCost, formatTaskCost } from '@/lib/claudePricing';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -50,6 +51,7 @@ export function PriceSearchPanel({
   const [directUrl, setDirectUrl] = useState('');
   const [addingDirect, setAddingDirect] = useState(false);
   const [directError, setDirectError] = useState<string | null>(null);
+  const [outcomes, setOutcomes] = useState<StoreSearchOutcome[] | null>(null);
   const [, startTransition] = useTransition();
 
   function addDirectLink() {
@@ -94,9 +96,13 @@ export function PriceSearchPanel({
     }
     setSearching(true);
     setCandidates(null);
+    setOutcomes(null);
     setPicked(new Set());
     const r = await searchItemPriceCandidates(item._id, query.trim());
     setSearching(false);
+    if (r.storeOutcomes) {
+      setOutcomes(r.storeOutcomes);
+    }
     if (!r.ok) {
       setError(r.error ?? 'Search failed');
       return;
@@ -178,6 +184,34 @@ export function PriceSearchPanel({
           <p className="text-xs text-[color:var(--color-red)]" style={{ fontFamily: 'var(--font-mono)' }}>
             {error}
           </p>
+        )}
+
+        {outcomes && outcomes.length > 0 && !searching && (
+          <div className="flex flex-wrap items-center gap-1.5 pt-1 text-[11px] text-[color:var(--color-text-faint)]">
+            <span className="font-medium">Stores checked:</span>
+            {outcomes.map((o) => (
+              <span
+                key={o.domain}
+                className={cn(
+                  'px-1.5 py-0.5 rounded border text-[10px] inline-flex items-center gap-1',
+                  o.status === 'searched' && (o.matchCount ?? 0) > 0
+                    ? 'border-[color:var(--color-green)]/30 text-[color:var(--color-green)] bg-[color:var(--color-green)]/5'
+                    : o.status === 'failed'
+                      ? 'border-[color:var(--color-red)]/30 text-[color:var(--color-red)] bg-[color:var(--color-red)]/5'
+                      : 'border-[color:var(--color-border)] text-[color:var(--color-text-faint)] bg-[color:var(--color-surface-2)]'
+                )}
+                title={o.error || o.reason || o.status}
+              >
+                {o.store}
+                {o.status === 'searched' && typeof o.matchCount === 'number' && (
+                  <span className="opacity-70">({o.matchCount})</span>
+                )}
+                {o.status === 'no_match' && <span className="opacity-70">(0)</span>}
+                {o.status === 'failed' && <span className="opacity-70">(failed)</span>}
+                {o.status === 'not_attempted' && <span className="opacity-70">(skipped)</span>}
+              </span>
+            ))}
+          </div>
         )}
 
         {candidates && !searching && (

@@ -15,7 +15,8 @@ import { getParsedProductForUrl } from '@/lib/scrapedPriceCache';
 import { isFeatureEnabled } from '@/lib/aiFeatures.server';
 import { searchWeb, searchImages } from '@/lib/search';
 import { searchShops } from '@/lib/shopSearch';
-import { marketFor } from '@/lib/shoppingRegion';
+import { marketFor, canonicalProductUrl, marketRank } from '@/lib/shoppingRegion';
+import type { StoreSearchOutcome } from '@/lib/storeSearch';
 import { type ItemView } from '@/lib/itemStatus';
 import { saveFile, deleteFile } from '@/lib/storage';
 import { selectForScrape, selectForLinkSearch, normalizeScrapeScope, DEFAULT_OWNED_INTERVAL_DAYS } from '@/lib/scrapeOrder';
@@ -1110,14 +1111,9 @@ function pageCurrencyOf(page: { currency?: string }, parsed: { currency?: string
   return normalizeCurrency(page.currency) || normalizeCurrency(parsed.currency);
 }
 
-/** Normalize a URL (host + path, no www/query/trailing slash) for matching. */
+/** Normalize a product URL using canonicalProductUrl for matching and deduplication (#391, #392). */
 function normUrl(u: string): string {
-  try {
-    const url = new URL(u);
-    return (url.hostname.replace(/^www\./, '') + url.pathname).replace(/\/+$/, '').toLowerCase();
-  } catch {
-    return (u || '').toLowerCase().trim();
-  }
+  return canonicalProductUrl(u);
 }
 
 /** Normalize a product title for fuzzy matching. */
@@ -1830,7 +1826,12 @@ export type PriceCandidate = {
 export async function searchItemPriceCandidates(
   itemId: string,
   queryOverride?: string
-): Promise<{ ok: boolean; candidates: PriceCandidate[]; error?: string }> {
+): Promise<{
+  ok: boolean;
+  candidates: PriceCandidate[];
+  error?: string;
+  storeOutcomes?: StoreSearchOutcome[];
+}> {
   return withRequestTenant(async () => {
   if (!(await isFeatureEnabled('itemsImport'))) return { ok: false, candidates: [], error: 'Product AI is turned off.' };
   await connectDB();
@@ -1851,14 +1852,35 @@ export async function searchItemPriceCandidates(
 
   const market = await shoppingMarket();
   const results = await searchShops(q, market, 8, { userStores, category: item.category });
-  const urls = results
+  const rawUrls = results
     .map((r) => r.url)
     .filter((u) => /^https?:\/\//i.test(u) && !/youtube|facebook|reddit|pinterest|instagram|tiktok|wikipedia/i.test(u))
-    .filter((u, i, arr) => arr.findIndex((x) => normUrl(x) === normUrl(u)) === i) // dedup
-    .slice(0, 5); // cap AI cost
+    .filter((u, i, arr) => arr.findIndex((x) => normUrl(x) === normUrl(u)) === i); // dedup
+
+  let urls: string[];
+  if (market && market.extraShops.length > 0 && rawUrls.length > 5) {
+    // Separate local and abroad URLs to ensure configured foreign shops are not starved
+    const localUrls = rawUrls.filter((u) => marketRank(u, market) === 0);
+    const abroadUrls = rawUrls.filter((u) => marketRank(u, market) === 1);
+    if (localUrls.length > 0 && abroadUrls.length > 0) {
+      const abroadCap = Math.min(2, abroadUrls.length);
+      const localCap = 5 - abroadCap;
+      urls = [...localUrls.slice(0, localCap), ...abroadUrls.slice(0, abroadCap)];
+    } else {
+      urls = rawUrls.slice(0, 5);
+    }
+  } else {
+    urls = rawUrls.slice(0, 5); // cap AI cost
+  }
+
   if (urls.length === 0 && market) {
     // Say so rather than fall back to shops the user cannot buy from (#319).
-    return { ok: false, candidates: [], error: `No shop found in ${market.country} or in the shops that ship there. Add one under Settings → Defaults.` };
+    return {
+      ok: false,
+      candidates: [],
+      error: `No shop found in ${market.country} or in the shops that ship there. Add one under Settings → Defaults.`,
+      storeOutcomes: results.outcomes,
+    };
   }
 
   const linked = new Set(
@@ -1904,7 +1926,7 @@ export async function searchItemPriceCandidates(
     return 0;
   });
 
-  return { ok: true, candidates };
+  return { ok: true, candidates, storeOutcomes: results.outcomes };
   });
 }
 
