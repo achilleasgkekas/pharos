@@ -2,7 +2,7 @@
 import { useState, useTransition, useRef, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Activity, Sun, Moon, Sparkles, Database, CreditCard, ExternalLink, Server, Cloud, Download, Upload, Loader2, Check, Store as StoreIcon, Pencil, Trash2, Plus, X, Copy, ShieldCheck, SlidersHorizontal, Bell, MessageSquareCode, RotateCcw, ChevronDown, Globe, HardDrive, FolderTree, RefreshCw, Plug, Users, UserPlus, KeyRound, Star, Landmark, TrendingUp, TrendingDown, CalendarPlus, Tags, MapPin, FlaskConical, Webhook, Mail, Bookmark, LogOut, History, Zap } from 'lucide-react';
+import { Activity, Sun, Moon, Sparkles, Database, CreditCard, ExternalLink, Server, Cloud, Download, Upload, Loader2, Check, Store as StoreIcon, Pencil, Trash2, Plus, X, Copy, ShieldCheck, SlidersHorizontal, Bell, MessageSquareCode, RotateCcw, ChevronDown, Globe, HardDrive, FolderTree, RefreshCw, Plug, Users, UserPlus, KeyRound, Star, Landmark, TrendingUp, TrendingDown, CalendarPlus, Tags, MapPin, FlaskConical, Webhook, Mail, Bookmark, LogOut, History, Zap, Coins } from 'lucide-react';
 import { useTheme, type Theme } from '@/components/ThemeProvider';
 import { cur } from '@/lib/money';
 import { cn } from '@/components/ui/cn';
@@ -88,6 +88,7 @@ type AiInfo = {
   hasCustomKey: boolean;
   confirmBulk: boolean;
   hasAdminKey?: boolean;
+  anthropicPrepaidCredits?: number;
   timezone?: string;
   recentRuns?: SerializedAiRun[];
   monthlyBudget: number; // self-hosted AI spend cap in `currency`/month; 0 = no cap
@@ -716,6 +717,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
   const [testFailed, setTestFailed] = useState(false);
   const [confirmBulk, setConfirmBulk] = useState(ai.confirmBulk);
   const [monthlyBudget, setMonthlyBudget] = useState(ai.monthlyBudget ? String(ai.monthlyBudget) : '');
+  const [prepaidCredits, setPrepaidCredits] = useState(ai.anthropicPrepaidCredits ? String(ai.anthropicPrepaidCredits) : '');
   const [timezone, setTimezone] = useState(ai.timezone || '');
   const [liveSpend, setLiveSpend] = useState<LiveAiSpendData | null>(null);
   const [refreshingLive, setRefreshingLive] = useState(false);
@@ -748,6 +750,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
     fd.set('customBaseUrl', customBaseUrl.trim());
     fd.set('customModel', customModel.trim());
     fd.set('aiMonthlyBudget', String(Number(monthlyBudget) || 0));
+    fd.set('anthropicPrepaidCredits', String(Number(prepaidCredits) || 0));
     fd.set('timezone', timezone.trim());
     if (apiKey.trim()) fd.set('anthropicApiKey', apiKey.trim());
     if (adminKey.trim()) fd.set('anthropicAdminKey', adminKey.trim());
@@ -1027,6 +1030,21 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
               Optional. Organization admin key (starts with sk-ant-admin-) used to pull live billed usage from Anthropic&apos;s Cost Report API.
             </p>
           </Field>
+          <Field label={t('set.aiPrepaidCredits')}>
+            <input
+              type="number"
+              min="0"
+              step="any"
+              value={prepaidCredits}
+              onChange={(e) => setPrepaidCredits(e.target.value)}
+              placeholder="0.00"
+              className={controlClass}
+              style={{ fontFamily: 'var(--font-mono)' }}
+            />
+            <p className="mt-1 text-[10px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
+              {t('set.aiPrepaidCreditsHelp')}
+            </p>
+          </Field>
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -1234,6 +1252,9 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
               <div className="text-base font-semibold text-[color:var(--color-text)] mt-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
                 ${((liveSpend?.today.costMicros ?? 0) / 1_000_000).toFixed(4)}
               </div>
+              <div className="text-[10px] text-[color:var(--color-accent)] mt-0.5 font-mono">
+                ~€{(((liveSpend?.today.costMicros ?? 0) / 1_000_000) * (liveSpend?.fxRateEur ?? 0.92)).toFixed(4)}
+              </div>
               <div className="text-[10px] text-[color:var(--color-text-faint)] mt-0.5">
                 {liveSpend?.today.count ?? 0} calls
               </div>
@@ -1243,6 +1264,9 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
               <div className="text-[10px] font-medium text-[color:var(--color-text-dim)] uppercase tracking-wider">This Month (MTD)</div>
               <div className="text-base font-semibold text-[color:var(--color-text)] mt-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
                 ${((liveSpend?.month.costMicros ?? (ai.spentThisMonth * 1_000_000)) / 1_000_000).toFixed(4)}
+              </div>
+              <div className="text-[10px] text-[color:var(--color-accent)] mt-0.5 font-mono">
+                ~€{(((liveSpend?.month.costMicros ?? (ai.spentThisMonth * 1_000_000)) / 1_000_000) * (liveSpend?.fxRateEur ?? 0.92)).toFixed(4)}
               </div>
               <div className="text-[10px] text-[color:var(--color-text-faint)] mt-0.5">
                 {liveSpend?.month.count ?? 0} calls
@@ -1298,6 +1322,49 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
                   ⚠ AI spend cap reached. Additional cloud AI requests are blocked until budget is increased or resets next month.
                 </p>
               )}
+            </div>
+          )}
+
+          {/* Anthropic Available Balance (#377) */}
+          {liveSpend?.balance && liveSpend.balance.prepaidCredits > 0 && (
+            <div className="rounded-lg bg-[color:var(--color-surface-2)]/80 border border-[color:var(--color-border)] p-3 text-xs space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-medium text-[color:var(--color-text)] flex items-center gap-1.5">
+                  <Coins size={14} className="text-amber-500" /> {t('set.aiAvailableBalance')}
+                </span>
+                <div className="flex items-center gap-2">
+                  {liveSpend.balance.lowBalance && (
+                    <span className="px-2 py-0.5 rounded text-[10px] font-semibold uppercase bg-red-500/15 text-red-600 dark:text-red-400">
+                      {t('set.aiLowBalance')}
+                    </span>
+                  )}
+                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-[color:var(--color-accent)]/15 text-[color:var(--color-accent)]">
+                    {t('set.aiRemaining', { pct: liveSpend.balance.pctRemaining })}
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-baseline justify-between pt-0.5">
+                <div>
+                  <span className="text-xl font-bold font-mono text-[color:var(--color-text)]">
+                    ${liveSpend.balance.remainingBalance.toFixed(2)}
+                  </span>
+                  <span className="text-xs text-[color:var(--color-accent)] font-mono ml-2">
+                    (~€{(liveSpend.balance.remainingBalance * (liveSpend.fxRateEur || 0.92)).toFixed(2)})
+                  </span>
+                </div>
+                <div className="text-[11px] text-[color:var(--color-text-faint)] font-mono">
+                  of ${liveSpend.balance.prepaidCredits.toFixed(2)} prepaid
+                </div>
+              </div>
+              <div className="w-full h-1.5 rounded-full bg-[color:var(--color-surface-3)] overflow-hidden">
+                <div
+                  className={cn(
+                    'h-full transition-all duration-300',
+                    liveSpend.balance.lowBalance ? 'bg-red-500' : 'bg-emerald-500'
+                  )}
+                  style={{ width: `${liveSpend.balance.pctRemaining}%` }}
+                />
+              </div>
             </div>
           )}
 

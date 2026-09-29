@@ -83,6 +83,7 @@ async function getInfo() {
       hasCustomKey: !!cfg.customApiKey,
       confirmBulk: doc?.aiConfirmBulk !== false, // cost guard, default ON
       hasAdminKey: !!(doc?.anthropicAdminKey || process.env.ANTHROPIC_ADMIN_KEY),
+      anthropicPrepaidCredits: Number(doc?.anthropicPrepaidCredits) || 0,
       timezone: cfg.timezone || 'UTC',
       recentRuns: await getRecentAiRuns(5),
       // Self-hosted AI spend cap + this month's running spend (both in `currency`); 0 = no cap.

@@ -62,12 +62,35 @@ const FEATURE_LABELS: Record<string, string> = {
   test: 'Test probe',
 };
 
-function formatCostUsd(micros: number): string {
-  if (micros === 0) return '$0.00';
+function formatCost(
+  micros: number,
+  currency: string = 'EUR',
+  fxRate: number = 0.92
+): { primary: string; usd: string } {
+  if (micros === 0) {
+    const sym = currency === 'EUR' ? '€' : currency === 'USD' ? '$' : `${currency} `;
+    return { primary: `${sym}0.00`, usd: '$0.00' };
+  }
   const dollars = micros / 1_000_000;
-  if (dollars < 0.0001) return '<$0.0001';
-  if (dollars < 0.01) return `$${dollars.toFixed(4)}`;
-  return `$${dollars.toFixed(2)}`;
+  const sym = currency === 'EUR' ? '€' : currency === 'USD' ? '$' : `${currency} `;
+  const usd =
+    dollars < 0.0001
+      ? '<$0.0001'
+      : dollars < 0.01
+      ? `$${dollars.toFixed(4)}`
+      : `$${dollars.toFixed(2)}`;
+
+  if (currency === 'USD' || fxRate === 1) {
+    return { primary: usd, usd };
+  }
+
+  const localVal = dollars * fxRate;
+  let primary: string;
+  if (localVal < 0.0001) primary = `<${sym}0.0001`;
+  else if (localVal < 0.01) primary = `${sym}${localVal.toFixed(4)}`;
+  else primary = `${sym}${localVal.toFixed(2)}`;
+
+  return { primary, usd };
 }
 
 function getDatePresetRange(preset: string): { from?: string; to?: string } {
@@ -100,6 +123,8 @@ function getDatePresetRange(preset: string): { from?: string; to?: string } {
 export function HistoryClient({
   conversations,
   initialRunsData,
+  currency = 'EUR',
+  fxRate = 0.92,
 }: {
   conversations: ConversationRow[];
   initialRunsData?: {
@@ -108,6 +133,8 @@ export function HistoryClient({
     summary: AiRunSummary;
     dailyCosts: { date: string; costMicros: number; count: number }[];
   };
+  currency?: string;
+  fxRate?: number;
 }) {
   const router = useRouter();
   const confirm = useConfirm();
@@ -134,6 +161,8 @@ export function HistoryClient({
   const [selectedRun, setSelectedRun] = useState<SerializedAiRun | null>(null);
   const [exporting, setExporting] = useState(false);
   const [copiedId, setCopiedId] = useState(false);
+  const [copiedPrompt, setCopiedPrompt] = useState(false);
+  const [copiedOutput, setCopiedOutput] = useState(false);
 
   // Extract distinct models from returned runs for quick filter dropdown
   const modelOptions = useMemo(() => {
@@ -311,11 +340,16 @@ export function HistoryClient({
             </div>
             <div className="rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-3.5">
               <div className="text-[11px] uppercase tracking-wider font-semibold text-[color:var(--color-text-dim)] mb-1">
-                Total Spend (USD)
+                Total Spend ({currency})
               </div>
               <div className="text-2xl font-bold font-mono text-[color:var(--color-accent)]">
-                {formatCostUsd(runsData.summary.totalCostMicros)}
+                {formatCost(runsData.summary.totalCostMicros, currency, fxRate).primary}
               </div>
+              {currency !== 'USD' && (
+                <div className="text-[11px] text-[color:var(--color-text-faint)] font-mono mt-0.5">
+                  {formatCost(runsData.summary.totalCostMicros, currency, fxRate).usd}
+                </div>
+              )}
             </div>
             <div className="rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-3.5">
               <div className="text-[11px] uppercase tracking-wider font-semibold text-[color:var(--color-text-dim)] mb-1">
@@ -361,7 +395,7 @@ export function HistoryClient({
                       {/* Tooltip */}
                       <div className="pointer-events-none absolute bottom-full mb-1.5 hidden group-hover:flex flex-col items-center z-10">
                         <div className="rounded bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] px-2 py-1 text-[10px] whitespace-nowrap shadow-lg">
-                          <span className="font-semibold">{d.date}</span>: {formatCostUsd(d.costMicros)} ({d.count} calls)
+                          <span className="font-semibold">{d.date}</span>: {formatCost(d.costMicros, currency, fxRate).primary} ({d.count} calls)
                         </div>
                       </div>
                     </div>
@@ -530,7 +564,7 @@ export function HistoryClient({
                       <th className="py-2.5 px-3">Feature</th>
                       <th className="py-2.5 px-3">Model</th>
                       <th className="py-2.5 px-3">Tokens</th>
-                      <th className="py-2.5 px-3 text-right">Cost</th>
+                      <th className="py-2.5 px-3 text-right">Cost ({currency})</th>
                       <th className="py-2.5 px-3 text-right">Duration</th>
                     </tr>
                   </thead>
@@ -581,7 +615,12 @@ export function HistoryClient({
                             )}
                           </td>
                           <td className="py-2.5 px-3 whitespace-nowrap text-right font-mono font-medium text-[color:var(--color-accent)]">
-                            {formatCostUsd(r.costMicros)}
+                            <div>{formatCost(r.costMicros, currency, fxRate).primary}</div>
+                            {currency !== 'USD' && (
+                              <div className="text-[10px] text-[color:var(--color-text-faint)] font-normal">
+                                {formatCost(r.costMicros, currency, fxRate).usd}
+                              </div>
+                            )}
                           </td>
                           <td className="py-2.5 px-3 whitespace-nowrap text-right font-mono text-[11px] text-[color:var(--color-text-dim)]">
                             {r.durationMs >= 1000 ? `${(r.durationMs / 1000).toFixed(1)}s` : `${r.durationMs}ms`}
@@ -622,11 +661,16 @@ export function HistoryClient({
                 <div className="grid grid-cols-3 gap-3 p-3 rounded-xl bg-[color:var(--color-surface-2)]">
                   <div>
                     <div className="text-[10px] uppercase font-semibold text-[color:var(--color-text-dim)]">
-                      Cost
+                      Cost ({currency})
                     </div>
                     <div className="text-lg font-bold font-mono text-[color:var(--color-accent)]">
-                      {formatCostUsd(selectedRun.costMicros)}
+                      {formatCost(selectedRun.costMicros, currency, fxRate).primary}
                     </div>
+                    {currency !== 'USD' && (
+                      <div className="text-xs text-[color:var(--color-text-faint)] font-mono">
+                        {formatCost(selectedRun.costMicros, currency, fxRate).usd}
+                      </div>
+                    )}
                   </div>
                   <div>
                     <div className="text-[10px] uppercase font-semibold text-[color:var(--color-text-dim)]">
@@ -756,6 +800,73 @@ export function HistoryClient({
                     </pre>
                   </div>
                 )}
+
+                {/* Prompt & Output Inspector */}
+                <div className="space-y-4 border-t border-[color:var(--color-border)] pt-4">
+                  {/* Prompt */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold uppercase tracking-wider text-[color:var(--color-text-dim)]">
+                        {t('hist.prompt')}
+                      </span>
+                      {selectedRun.prompt && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            void navigator.clipboard.writeText(selectedRun.prompt || '');
+                            setCopiedPrompt(true);
+                            setTimeout(() => setCopiedPrompt(false), 2000);
+                          }}
+                          className="flex items-center gap-1 text-[11px] text-[color:var(--color-accent)] hover:underline"
+                        >
+                          {copiedPrompt ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
+                          <span>{copiedPrompt ? t('hist.copied') : t('hist.copyPrompt')}</span>
+                        </button>
+                      )}
+                    </div>
+                    {selectedRun.prompt ? (
+                      <pre className="p-3 rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] text-[color:var(--color-text)] font-mono text-xs overflow-x-auto whitespace-pre-wrap max-h-52">
+                        {selectedRun.prompt}
+                      </pre>
+                    ) : (
+                      <div className="text-xs text-[color:var(--color-text-dim)] italic p-2 rounded bg-[color:var(--color-surface-2)]">
+                        {t('hist.noPrompt')}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Output */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold uppercase tracking-wider text-[color:var(--color-text-dim)]">
+                        {t('hist.output')}
+                      </span>
+                      {selectedRun.output && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            void navigator.clipboard.writeText(selectedRun.output || '');
+                            setCopiedOutput(true);
+                            setTimeout(() => setCopiedOutput(false), 2000);
+                          }}
+                          className="flex items-center gap-1 text-[11px] text-[color:var(--color-accent)] hover:underline"
+                        >
+                          {copiedOutput ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
+                          <span>{copiedOutput ? t('hist.copied') : t('hist.copyOutput')}</span>
+                        </button>
+                      )}
+                    </div>
+                    {selectedRun.output ? (
+                      <pre className="p-3 rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] text-[color:var(--color-text)] font-mono text-xs overflow-x-auto whitespace-pre-wrap max-h-52">
+                        {selectedRun.output}
+                      </pre>
+                    ) : (
+                      <div className="text-xs text-[color:var(--color-text-dim)] italic p-2 rounded bg-[color:var(--color-surface-2)]">
+                        {t('hist.noOutput')}
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             </Modal>
           )}
