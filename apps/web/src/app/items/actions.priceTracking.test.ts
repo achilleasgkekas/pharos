@@ -264,6 +264,20 @@ describe('searchItemPriceCandidates', () => {
     expect(r.candidates).toEqual([]);
   });
 
+  it('matches Greek and non-ASCII product titles in relevance guard', async () => {
+    itemFindById.mockReturnValue({
+      lean: async () => ({ title: 'Οδοντόκρεμα Sensodyne Whitening', links: [] }),
+    } as any);
+    searchWebMock.mockResolvedValue([{ title: '', url: 'https://shop.gr/product/1', content: '' }]);
+    fetchPageTextMock.mockResolvedValue({ url: '', title: '', jsonLd: '', text: '' });
+    parseProductFromPageMock.mockResolvedValue({
+      parsed: { title: 'Οδοντόκρεμα Sensodyne 75ml', price: 4.5, currency: 'EUR', store: 'Pharmacy' },
+    });
+    const r = await searchItemPriceCandidates('i1');
+    expect(r.candidates).toHaveLength(1);
+    expect(r.candidates[0].price).toBe(4.5);
+  });
+
   it('builds a candidate from a matching page, falling back store to the host and marking alreadyLinked', async () => {
     itemFindById.mockReturnValue({
       lean: async () => ({

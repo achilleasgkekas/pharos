@@ -6,6 +6,7 @@ import { AppConfig as AppConfigModel } from '@/models/AppConfig';
 import { Receipt as ReceiptModel } from '@/models/Receipt';
 import { Statement as StatementModel } from '@/models/Statement';
 import { Task as TaskModel } from '@/models/Task';
+import { Store as StoreModel } from '@/models/Store';
 import { withRequestTenant } from '@/lib/tenancy/request';
 import { currentModel } from '@/lib/tenancy/connection';
 import { fetchPageText } from '@/lib/scrape';
@@ -715,7 +716,7 @@ function productMatchesItem(
   itemTitle: string,
   parsed: { title?: string; specs?: string; store?: string }
 ): boolean {
-  const norm = (s: string) => ` ${(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim()} `;
+  const norm = (s: string) => ` ${(s || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').replace(/\s+/g, ' ').trim()} `;
   const hay = norm(`${parsed.title ?? ''} ${parsed.specs ?? ''} ${parsed.store ?? ''}`);
   const STOP = new Set([
     'with', 'for', 'and', 'the', 'mini', 'pro', 'plus', 'max', 'wifi', 'black', 'white',
@@ -1840,8 +1841,16 @@ export async function searchItemPriceCandidates(
   const q = (queryOverride || item.title || '').trim();
   if (!q) return { ok: false, candidates: [], error: 'Nothing to search for' };
 
+  let userStores: { name: string; url?: string }[] = [];
+  try {
+    const Store = await currentModel(StoreModel);
+    userStores = await Store.find({}, { name: 1, url: 1 }).lean();
+  } catch {
+    // optional user stores lookup
+  }
+
   const market = await shoppingMarket();
-  const results = await searchShops(q, market, 8);
+  const results = await searchShops(q, market, 8, { userStores, category: item.category });
   const urls = results
     .map((r) => r.url)
     .filter((u) => /^https?:\/\//i.test(u) && !/youtube|facebook|reddit|pinterest|instagram|tiktok|wikipedia/i.test(u))
@@ -1886,6 +1895,15 @@ export async function searchItemPriceCandidates(
       });
     }
   }
+
+  // Sort candidates: lowest positive price first, unpriced / errors last
+  candidates.sort((a, b) => {
+    if (a.price > 0 && b.price > 0) return a.price - b.price;
+    if (a.price > 0) return -1;
+    if (b.price > 0) return 1;
+    return 0;
+  });
+
   return { ok: true, candidates };
   });
 }

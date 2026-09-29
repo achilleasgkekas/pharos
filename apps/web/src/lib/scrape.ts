@@ -138,7 +138,7 @@ export function extractPriceCurrency(html: string): string {
   return iso(ipText?.[1]);
 }
 
-export async function fetchPageText(url: string): Promise<ScrapedPage> {
+export async function fetchRawHtml(url: string): Promise<string> {
   // SSRF guard: reject non-http(s) and any private/loopback/internal target
   // (also covers the FlareSolverr retry path below, which fetches the same URL).
   await assertPublicUrl(url);
@@ -176,6 +176,11 @@ export async function fetchPageText(url: string): Promise<ScrapedPage> {
     }
   }
   if (status >= 400 && !solved) throw new Error(`HTTP ${status} from ${hostOf(url)}`);
+  return html;
+}
+
+export async function fetchPageText(url: string): Promise<ScrapedPage> {
+  const html = await fetchRawHtml(url);
 
   // <title>
   const title = html.match(/<title[^>]*>([^<]*)<\/title>/i)?.[1]?.trim() ?? '';

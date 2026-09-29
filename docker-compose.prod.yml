@@ -39,8 +39,6 @@ services:
     depends_on:
       mongo:
         condition: service_healthy
-      searxng:
-        condition: service_started
 
   mongo:
     image: mongo:7@sha256:9854f7139445d766a9523571d6f047530c45547460ffcf8259eb2bf4264632ca
@@ -80,7 +78,6 @@ services:
     image: 21hsmw/flaresolverr:nodriver@sha256:dca8cda5852b04e6142752fc044c9845eb536353ea6f8b7bb58b4ff9419538fa
     container_name: homepage-flaresolverr
     restart: unless-stopped
-    profiles: ["scraper"]
     environment:
       LOG_LEVEL: ${FLARESOLVERR_LOG_LEVEL:-info}
       TZ: ${TZ:-Europe/Athens}
