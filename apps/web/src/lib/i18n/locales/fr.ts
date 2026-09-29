@@ -1329,6 +1329,11 @@ export const fr: Partial<Dict> = {
   'dup.keep': 'garder',
   'dup.itemStats': '{items} articles · {linked} liés · {model}',
 
+  'set.tabWorkspace': 'Espace de travail',
+  'set.tabAiTelemetry': 'IA & Télémétrie',
+  'set.tabStorageBackups': 'Stockage & Sauvegardes',
+  'set.tabIntegrations': 'Intégrations',
+  'set.tabUsersAccess': 'Utilisateurs & Accès',
   'set.tabGeneral': 'Général',
   'set.tabMoney': 'Argent',
   'set.tabAi': 'IA',

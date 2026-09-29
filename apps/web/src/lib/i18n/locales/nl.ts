@@ -1329,6 +1329,11 @@ export const nl: Partial<Dict> = {
   'dup.keep': 'houden',
   'dup.itemStats': '{items} items · {linked} gekoppeld · {model}',
 
+  'set.tabWorkspace': 'Werkruimte',
+  'set.tabAiTelemetry': 'AI & Telemetrie',
+  'set.tabStorageBackups': 'Opslag & Back-ups',
+  'set.tabIntegrations': 'Integraties',
+  'set.tabUsersAccess': 'Gebruikers & Toegang',
   'set.tabGeneral': 'Algemeen',
   'set.tabMoney': 'Geld',
   'set.tabAi': 'AI',

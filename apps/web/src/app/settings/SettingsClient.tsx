@@ -2,7 +2,7 @@
 import { useState, useTransition, useRef, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Activity, Sun, Moon, Sparkles, Database, CreditCard, ExternalLink, Server, Cloud, Download, Upload, Loader2, Check, Store as StoreIcon, Pencil, Trash2, Plus, X, Copy, ShieldCheck, SlidersHorizontal, Bell, MessageSquareCode, RotateCcw, ChevronDown, Globe, HardDrive, FolderTree, RefreshCw, Plug, Users, UserPlus, KeyRound, Star, Landmark, TrendingUp, TrendingDown, CalendarPlus, Tags, MapPin, FlaskConical, Webhook, Mail, Bookmark, LogOut, History, Zap, Coins } from 'lucide-react';
+import { Activity, Sun, Moon, Sparkles, Database, CreditCard, ExternalLink, Server, Cloud, Download, Upload, Loader2, Check, Store as StoreIcon, Pencil, Trash2, Plus, X, Copy, ShieldCheck, SlidersHorizontal, Bell, MessageSquareCode, RotateCcw, ChevronDown, Globe, HardDrive, FolderTree, RefreshCw, Plug, Users, UserPlus, KeyRound, Star, Landmark, TrendingUp, TrendingDown, CalendarPlus, Tags, MapPin, FlaskConical, Webhook, Mail, Bookmark, LogOut, History, Zap, Coins, Briefcase } from 'lucide-react';
 import { useTheme, type Theme } from '@/components/ThemeProvider';
 import { cur } from '@/lib/money';
 import { cn } from '@/components/ui/cn';
@@ -149,22 +149,20 @@ const OPENROUTER_SUGGESTIONS = ['openai/gpt-4o-mini', 'anthropic/claude-3.5-sonn
 // Mirror of the server-side vision detection (lib/aiConfig.ts) for inline warnings.
 const isVisionName = (name: string) => /vl|vision|llava|minicpm-v|moondream|bakllava|llama3\.2-vision/i.test(name);
 
-type TabId = 'general' | 'money' | 'ai' | 'storage' | 'data' | 'notifications' | 'users' | 'activity' | 'system';
+type TabId = 'workspace' | 'ai' | 'storage' | 'integrations' | 'users' | 'activity' | 'system';
 
 import type { Role } from '@/lib/roles';
 
 type CurrentUser = { id: string; name: string; role: Role };
 
 const TABS: { id: TabId; label: string; icon: React.ReactNode; adminOnly?: boolean; selfHostOnly?: boolean; multiUserOnly?: boolean }[] = [
-  { id: 'general', label: 'General', icon: <SlidersHorizontal size={15} /> },
-  { id: 'money', label: 'Money', icon: <CreditCard size={15} /> },
+  { id: 'workspace', label: 'Workspace', icon: <Briefcase size={15} /> },
   // Hosted: AI moves to Workspace → AI (key + toggles in one control-plane place), so hide the
   // product AI tab in SaaS. Self-host keeps it — it is the only AI settings surface there.
-  { id: 'ai', label: 'AI', icon: <Sparkles size={15} />, selfHostOnly: true },
-  { id: 'storage', label: 'Storage & backup', icon: <HardDrive size={15} /> },
-  { id: 'data', label: 'Stores & lists', icon: <StoreIcon size={15} /> },
-  { id: 'notifications', label: 'Notifications', icon: <Bell size={15} />, adminOnly: true },
-  { id: 'users', label: 'Users', icon: <Users size={15} />, adminOnly: true, selfHostOnly: true },
+  { id: 'ai', label: 'AI & Telemetry', icon: <Sparkles size={15} />, selfHostOnly: true },
+  { id: 'storage', label: 'Storage & Backups', icon: <HardDrive size={15} /> },
+  { id: 'integrations', label: 'Integrations', icon: <Plug size={15} /> },
+  { id: 'users', label: 'Users & Access', icon: <Users size={15} />, adminOnly: true, selfHostOnly: true },
   // P89 (#23): who added or trashed what. Every role may read it, but only once there is a
   // second account: on a single-user install there is nobody else's activity to show.
   { id: 'activity', label: 'Activity', icon: <History size={15} />, multiUserOnly: true },
@@ -174,21 +172,37 @@ const TABS: { id: TabId; label: string; icon: React.ReactNode; adminOnly?: boole
 ];
 
 const TAB_KEY: Record<TabId, TKey> = {
-  general: 'set.tabGeneral',
-  money: 'set.tabMoney',
-  ai: 'set.tabAi',
-  storage: 'set.tabStorage',
-  data: 'set.tabData',
-  notifications: 'set.tabNotifications',
-  users: 'set.tabUsers',
+  workspace: 'set.tabWorkspace',
+  ai: 'set.tabAiTelemetry',
+  storage: 'set.tabStorageBackups',
+  integrations: 'set.tabIntegrations',
+  users: 'set.tabUsersAccess',
   activity: 'set.tabActivity',
   system: 'set.tabSystem',
 };
 
+function normalizeTab(raw: string | null): TabId | null {
+  if (!raw) return null;
+  const ALIASES: Record<string, TabId> = {
+    workspace: 'workspace',
+    general: 'workspace',
+    money: 'workspace',
+    data: 'workspace',
+    ai: 'ai',
+    storage: 'storage',
+    integrations: 'integrations',
+    notifications: 'integrations',
+    users: 'users',
+    activity: 'activity',
+    system: 'system',
+  };
+  return ALIASES[raw] ?? null;
+}
+
 export function SettingsClient({ info, currentUser }: { info: Info; currentUser: CurrentUser }) {
   const { theme, setTheme } = useTheme();
   const t = useT();
-  const [tab, setTab] = useState<TabId>('general');
+  const [tab, setTab] = useState<TabId>('workspace');
   const isAdmin = currentUser.role === 'admin';
   const multiUser = useAttributionNames() !== null;
   const visibleTabs = TABS.filter((t) => (!t.adminOnly || isAdmin) && (!t.multiUserOnly || multiUser));
@@ -197,13 +211,13 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
   // A ?tab= deep-link (e.g. from the "Set up AI" banner) wins; otherwise restore the
   // last-open tab from localStorage. Read on mount to avoid an SSR mismatch.
   useEffect(() => {
-    const fromUrl = searchParams.get('tab');
+    const fromUrl = normalizeTab(searchParams.get('tab'));
     if (fromUrl && visibleTabs.some((t) => t.id === fromUrl)) {
-      setTab(fromUrl as TabId);
+      setTab(fromUrl);
       return;
     }
-    const saved = typeof window !== 'undefined' ? window.localStorage.getItem('settingsTab') : null;
-    if (saved && visibleTabs.some((t) => t.id === saved)) setTab(saved as TabId);
+    const saved = normalizeTab(typeof window !== 'undefined' ? window.localStorage.getItem('settingsTab') : null);
+    if (saved && visibleTabs.some((t) => t.id === saved)) setTab(saved);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -244,7 +258,7 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
 
         {/* Active panel */}
         <div className="flex-1 min-w-0 space-y-4">
-          {tab === 'general' && (
+          {tab === 'workspace' && (
             <>
               <Section title={t('set.appearance')} icon={<Sun size={15} />}>
                 <div className="flex items-center justify-between">
@@ -274,19 +288,15 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
 
               <DefaultsManager settings={info.settings} />
 
+              <StoresManager stores={info.stores} />
+              <ListsManager lists={info.lists} />
+              <SpacesManager spaces={info.settings.spaces} />
 
-              {(
-                <Section title={t('ics.title')} icon={<CalendarPlus size={15} />}>
-                  <CalendarFeedManager />
-                </Section>
-              )}
-
+              <CategoryRulesManager settings={info.settings} />
+              <CardsManager cards={info.cardList} />
 
               <SelfPasswordCard />
-
               <SelfMfaCard />
-
-
 
               <Section title={t('set.about')}>
                 <UpdateChecker canEdit={isAdmin} />
@@ -300,30 +310,17 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
             </>
           )}
 
-          {tab === 'money' && (
-            <>
-              <CategoryRulesManager settings={info.settings} />
-              <CardsManager cards={info.cardList} />
-            </>
-          )}
-
-
           {tab === 'ai' && (
             <>
               <AiMasterAndFeatures ai={info.ai} canEdit={isAdmin} />
               <AiSettings ai={info.ai} ollamaUp={info.ollamaUp} />
               <ScraperAiSettings scraperAi={info.scraperAi} installed={info.ai.installed} hasAnthropicKey={info.ai.hasKey} />
               <AiPromptsManager prompts={info.prompts} />
-              <Section title={t('set.mobileMcpTitle')} icon={<Plug size={15} />}>
-                <McpManager />
-              </Section>
             </>
           )}
 
-
           {tab === 'storage' && (
             <>
-
               <StorageManager storage={info.storage} counts={info.counts} />
               <Section title={t('set.dataSection')} icon={<Database size={15} />}>
                 <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
@@ -336,29 +333,26 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
                 <BackupRestore />
               </Section>
               <MigrationImportManager />
-              <ImapImportManager imap={info.imap} />
-              <Section title={t('bm.title')} icon={<Bookmark size={15} />}>
-                <BookmarkletManager />
-              </Section>
               <SampleDataManager />
             </>
           )}
 
-          {tab === 'data' && (
-            <>
-              <StoresManager stores={info.stores} />
-              <ListsManager lists={info.lists} />
-              <SpacesManager spaces={info.settings.spaces} />
-            </>
-          )}
-
-          {tab === 'notifications' && (
+          {tab === 'integrations' && (
             <>
               <NotificationsManager />
               <WebhookManager />
+              <Section title={t('set.mobileMcpTitle')} icon={<Plug size={15} />}>
+                <McpManager />
+              </Section>
+              <Section title={t('ics.title')} icon={<CalendarPlus size={15} />}>
+                <CalendarFeedManager />
+              </Section>
+              <ImapImportManager imap={info.imap} />
+              <Section title={t('bm.title')} icon={<Bookmark size={15} />}>
+                <BookmarkletManager />
+              </Section>
             </>
           )}
-
 
           {tab === 'users' && isAdmin && <UsersManager currentUserId={currentUser.id} />}
           {tab === 'activity' && multiUser && <ActivityFeed />}

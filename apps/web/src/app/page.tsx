@@ -162,9 +162,9 @@ function onboardingSteps(o: OnboardingSignals, t: TFunc): OnboardingStep[] {
   return [
     { key: 'storage', label: t('home.onbStorage'), done: o.storageConnected, href: '/settings?tab=storage' },
     { key: 'receipt', label: t('home.onbReceipt'), done: o.hasReceipt, href: '/receipts' },
-    { key: 'budget', label: t('home.onbBudget'), done: o.hasBudget, href: '/settings?tab=money' },
-    { key: 'card', label: t('home.onbCard'), done: o.hasCard, href: '/settings?tab=money' },
-    { key: 'notify', label: t('home.onbNotify'), done: o.notifyEnabled, href: '/settings?tab=notifications' },
+    { key: 'budget', label: t('home.onbBudget'), done: o.hasBudget, href: '/settings?tab=workspace' },
+    { key: 'card', label: t('home.onbCard'), done: o.hasCard, href: '/settings?tab=workspace' },
+    { key: 'notify', label: t('home.onbNotify'), done: o.notifyEnabled, href: '/settings?tab=integrations' },
   ];
 }
 

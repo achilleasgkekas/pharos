@@ -1024,6 +1024,11 @@ export const en = {
   'views.saveDisabled': 'Set a filter first',
 
   // Settings
+  'set.tabWorkspace': 'Workspace',
+  'set.tabAiTelemetry': 'AI & Telemetry',
+  'set.tabStorageBackups': 'Storage & Backups',
+  'set.tabIntegrations': 'Integrations',
+  'set.tabUsersAccess': 'Users & Access',
   'set.tabGeneral': 'General',
   'set.tabMoney': 'Money',
   'set.tabAi': 'AI',
