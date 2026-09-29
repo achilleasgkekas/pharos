@@ -25,7 +25,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        pkg: [apps/web, apps/landing, services/scraper]
+        pkg: [apps/web, apps/landing, services/scraper, scripts/ci/npm]
     defaults:
       run:
         working-directory: ${{ matrix.pkg }}
