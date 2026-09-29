@@ -63,6 +63,8 @@ async function recordAiRunSafe(run: {
   costMicros?: number;
   requestId?: string;
   stopReason?: string;
+  prompt?: string;
+  output?: string;
   trigger?: 'user' | 'job' | 'cron' | 'email' | 'api';
   record?: { type: string; id: string };
 }): Promise<void> {
@@ -92,6 +94,7 @@ export async function extractPrice(page: ScrapedPage, meta?: ExtractPriceMeta): 
     .filter(Boolean)
     .join('\n\n');
 
+  const promptText = `SYSTEM:\n${system}\n\nUSER:\n${content}`;
   const t0 = Date.now();
   const trigger = meta?.trigger ?? 'cron';
 
@@ -107,6 +110,7 @@ export async function extractPrice(page: ScrapedPage, meta?: ExtractPriceMeta): 
         status: 'error',
         durationMs: Date.now() - t0,
         error: (err as Error).message,
+        prompt: promptText,
         trigger,
         record: meta?.record,
       });
@@ -133,6 +137,8 @@ export async function extractPrice(page: ScrapedPage, meta?: ExtractPriceMeta): 
       costMicros,
       requestId: res.requestId,
       stopReason: res.stopReason,
+      prompt: promptText,
+      output: res.raw,
       trigger,
       record: meta?.record,
     });
@@ -163,6 +169,8 @@ export async function extractPrice(page: ScrapedPage, meta?: ExtractPriceMeta): 
         outputTokens: res.eval_count ?? 0,
       },
       costMicros: 0,
+      prompt: promptText,
+      output: raw,
       trigger,
       record: meta?.record,
     });
@@ -175,6 +183,7 @@ export async function extractPrice(page: ScrapedPage, meta?: ExtractPriceMeta): 
       status: 'error',
       durationMs: Date.now() - t0,
       error: (err as Error).message,
+      prompt: promptText,
       trigger,
       record: meta?.record,
     });

@@ -114,6 +114,16 @@ async function runAiCommandInTenant(history: ChatTurn[], conversationId?: string
         usage.cacheWriteTokens,
         usage.cacheReadTokens
       );
+      const { content } = res;
+      const toolUses = content.filter((b): b is Extract<AnthropicBlock, { type: 'tool_use' }> => b.type === 'tool_use');
+      const textOut = content
+        .filter((b): b is Extract<AnthropicBlock, { type: 'text' }> => b.type === 'text')
+        .map((b) => b.text)
+        .join('\n')
+        .trim();
+
+      const promptText = messages.map((m) => `${m.role.toUpperCase()}: ${typeof m.content === 'string' ? m.content : JSON.stringify(m.content)}`).join('\n\n');
+      const outputText = textOut || (toolUses.length ? JSON.stringify(toolUses, null, 2) : '');
 
       void recordAiRun({
         feature: 'commandBar',
@@ -124,19 +134,13 @@ async function runAiCommandInTenant(history: ChatTurn[], conversationId?: string
         usage,
         requestId: res.requestId,
         stopReason: res.stopReason,
+        prompt: promptText,
+        output: outputText,
         trigger: 'user',
         userId: user?.id,
         conversationId: convId,
         turn: i + 1,
       });
-
-      const { content } = res;
-      const toolUses = content.filter((b): b is Extract<AnthropicBlock, { type: 'tool_use' }> => b.type === 'tool_use');
-      const textOut = content
-        .filter((b): b is Extract<AnthropicBlock, { type: 'text' }> => b.type === 'text')
-        .map((b) => b.text)
-        .join('\n')
-        .trim();
 
       if (toolUses.length === 0) {
         reply = textOut;

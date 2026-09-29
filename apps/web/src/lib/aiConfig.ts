@@ -21,6 +21,7 @@ export type AiConfig = {
   // case of a plain workspace key. Format: `wrkspc_…`.
   anthropicWorkspaceId: string;
   anthropicAdminKey?: string;
+  anthropicPrepaidCredits?: number;
   timezone?: string;
   openaiApiKey: string;
   openaiModel: string;
@@ -97,6 +98,7 @@ export async function getAiConfig(): Promise<AiConfig> {
     anthropicModel?: string;
     anthropicWorkspaceId?: string;
     anthropicAdminKey?: string;
+    anthropicPrepaidCredits?: number;
     timezone?: string;
     openaiApiKey?: string;
     openaiModel?: string;
@@ -144,6 +146,7 @@ export async function getAiConfig(): Promise<AiConfig> {
     anthropicModel: doc?.anthropicModel || CLAUDE_MAIN_DEFAULT,
     anthropicWorkspaceId: doc?.anthropicWorkspaceId || process.env.ANTHROPIC_WORKSPACE_ID || '',
     anthropicAdminKey: doc?.anthropicAdminKey || process.env.ANTHROPIC_ADMIN_KEY || '',
+    anthropicPrepaidCredits: Number(doc?.anthropicPrepaidCredits) || 0,
     timezone: doc?.timezone || process.env.TZ || 'UTC',
     openaiApiKey: doc?.openaiApiKey || process.env.OPENAI_API_KEY || '',
     openaiModel: doc?.openaiModel || 'gpt-4o-mini',

@@ -28,13 +28,6 @@ function renderRich(text: string) {
   ));
 }
 
-const EXAMPLES = [
-  'Add a YouTube Premium subscription',
-  'Πρόσθεσε έξοδο ΔΕΗ 84€',
-  'Show me this month’s stats',
-  'Add task: order the 10G switch',
-];
-
 const TYPE_ICON: Record<SearchHit['type'], React.ComponentType<{ size?: number; className?: string }>> = {
   item: Package,
   receipt: ReceiptIcon,
@@ -358,9 +351,9 @@ export function AiCommandBar() {
           {messages.length === 0 && !aiPending && (
             <div className="p-2.5">
               <p className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)] px-1.5 mb-1.5" style={{ fontFamily: 'var(--font-mono)' }}>{t('bar.try')}</p>
-              {EXAMPLES.map((ex) => (
+              {[t('bar.example1'), t('bar.example2'), t('bar.example3'), t('bar.example4')].map((ex, idx) => (
                 <button
-                  key={ex}
+                  key={idx}
                   onClick={() => send(ex)}
                   className="w-full text-left flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm text-[color:var(--color-text-dim)] hover:bg-[color:var(--color-surface-2)] hover:text-[color:var(--color-text)] transition-colors"
                 >

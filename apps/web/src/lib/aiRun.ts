@@ -30,6 +30,8 @@ export type RecordAiRunParams = {
   costMicros?: number;
   requestId?: string | null;
   stopReason?: string | null;
+  prompt?: string | null;
+  output?: string | null;
   trigger?: 'user' | 'job' | 'cron' | 'email' | 'api';
   userId?: string | null;
   jobId?: string | null;
@@ -59,6 +61,8 @@ export type SerializedAiRun = {
   priceVersion?: string | null;
   requestId?: string | null;
   stopReason?: string | null;
+  prompt?: string | null;
+  output?: string | null;
   trigger: string;
   userId?: string | null;
   jobId?: string | null;
@@ -130,6 +134,8 @@ export async function recordAiRun(params: RecordAiRunParams): Promise<void> {
       priceVersion: PRICE_VERSION,
       requestId: params.requestId ?? null,
       stopReason: params.stopReason ?? null,
+      prompt: params.prompt ? params.prompt.slice(0, 32000) : null,
+      output: params.output ? params.output.slice(0, 32000) : null,
       trigger: params.trigger ?? 'user',
       userId: params.userId ?? null,
       jobId: params.jobId ?? null,
@@ -143,7 +149,7 @@ export async function recordAiRun(params: RecordAiRunParams): Promise<void> {
   }
 }
 
-function serializeDoc(d: Record<string, unknown>): SerializedAiRun {
+export function serializeAiRun(d: Record<string, unknown>): SerializedAiRun {
   const usage = (d.usage as Record<string, unknown>) || {};
   const record = (d.record as Record<string, unknown>) || null;
   return {
@@ -166,6 +172,8 @@ function serializeDoc(d: Record<string, unknown>): SerializedAiRun {
     priceVersion: d.priceVersion ? String(d.priceVersion) : null,
     requestId: d.requestId ? String(d.requestId) : null,
     stopReason: d.stopReason ? String(d.stopReason) : null,
+    prompt: d.prompt ? String(d.prompt) : null,
+    output: d.output ? String(d.output) : null,
     trigger: String(d.trigger || 'user'),
     userId: d.userId ? String(d.userId) : null,
     jobId: d.jobId ? String(d.jobId) : null,
@@ -262,7 +270,7 @@ export async function getAiRuns(filters: AiRunFilter = {}): Promise<{
   };
 
   return {
-    runs: docs.map((d) => serializeDoc(d as unknown as Record<string, unknown>)),
+    runs: docs.map((d) => serializeAiRun(d as unknown as Record<string, unknown>)),
     total,
     summary,
     dailyCosts,
@@ -274,7 +282,7 @@ export async function getRecentAiRuns(limit: number = 5): Promise<SerializedAiRu
   await connectDB();
   const Model = await withRequestTenant(() => currentModel(AiRun));
   const docs = await Model.find().sort({ at: -1 }).limit(limit).lean();
-  return docs.map((d) => serializeDoc(d as unknown as Record<string, unknown>));
+  return docs.map((d) => serializeAiRun(d as unknown as Record<string, unknown>));
 }
 
 /** Get AI cost statistics for a background job */

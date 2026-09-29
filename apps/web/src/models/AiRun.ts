@@ -39,6 +39,8 @@ const AiRunSchema = new Schema(
     priceVersion: { type: String, default: null },
     requestId: { type: String, default: null },
     stopReason: { type: String, default: null },
+    prompt: { type: String, default: null },
+    output: { type: String, default: null },
     trigger: {
       type: String,
       enum: ['user', 'job', 'cron', 'email', 'api'],
@@ -56,7 +58,7 @@ const AiRunSchema = new Schema(
       index: { expires: 0 },
     },
   },
-  { timestamps: false }
+  { collection: 'airuns', timestamps: false }
 );
 
 // Compound index for history filtering & totals

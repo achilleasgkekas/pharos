@@ -54,6 +54,8 @@ const AiRunSchema = new Schema(
     priceVersion: { type: Number, default: 1 },
     requestId: { type: String },
     stopReason: { type: String },
+    prompt: { type: String, default: null },
+    output: { type: String, default: null },
     trigger: { type: String, enum: ['user', 'job', 'cron', 'email', 'api'], default: 'cron', index: true },
     userId: { type: Schema.Types.ObjectId, ref: 'User', default: null, index: true },
     jobId: { type: String, default: null, index: true },
@@ -65,7 +67,7 @@ const AiRunSchema = new Schema(
     turn: { type: Number },
     expiresAt: { type: Date, required: true },
   },
-  { collection: 'ai_runs' }
+  { collection: 'airuns' }
 );
 
 export const AiRun = model('AiRun', AiRunSchema);

@@ -142,6 +142,7 @@ export async function runVisionJSON(
 
   const t0 = Date.now();
   try {
+    const promptText = `SYSTEM:\n${systemPrompt}\n\nUSER:\n${userPrompt}`;
     const cloud = await cloudJSON(cfg, systemPrompt, userPrompt, imagesBase64);
     if (cloud) {
       await recordAiSpend(
@@ -160,6 +161,8 @@ export async function runVisionJSON(
         usage: cloud.usage,
         requestId: cloud.requestId,
         stopReason: cloud.stopReason,
+        prompt: promptText,
+        output: cloud.raw,
         trigger: opts?.trigger,
         record: opts?.record,
         jobId: opts?.jobId,
@@ -192,6 +195,8 @@ export async function runVisionJSON(
         inputTokens: response.prompt_eval_count ?? 0,
         outputTokens: response.eval_count ?? 0,
       },
+      prompt: promptText,
+      output: raw,
       trigger: opts?.trigger,
       record: opts?.record,
       jobId: opts?.jobId,
@@ -199,6 +204,7 @@ export async function runVisionJSON(
     });
     return result;
   } catch (err) {
+    const promptText = `SYSTEM:\n${systemPrompt}\n\nUSER:\n${userPrompt}`;
     void recordAiRun({
       feature,
       provider: cfg.provider,
@@ -206,6 +212,7 @@ export async function runVisionJSON(
       status: 'error',
       durationMs: Date.now() - t0,
       error: (err as Error).message,
+      prompt: promptText,
       trigger: opts?.trigger,
       record: opts?.record,
       jobId: opts?.jobId,
@@ -264,6 +271,7 @@ async function runTextJSONWith(
 
   const t0 = Date.now();
   try {
+    const promptText = `SYSTEM:\n${systemPrompt}\n\nUSER:\n${userPrompt}`;
     const cloud = await cloudJSON(cfg, systemPrompt, userPrompt);
     if (cloud) {
       await recordAiSpend(
@@ -282,6 +290,8 @@ async function runTextJSONWith(
         usage: cloud.usage,
         requestId: cloud.requestId,
         stopReason: cloud.stopReason,
+        prompt: promptText,
+        output: cloud.raw,
         trigger: opts?.trigger,
         record: opts?.record,
         jobId: opts?.jobId,
@@ -312,6 +322,8 @@ async function runTextJSONWith(
         inputTokens: response.prompt_eval_count ?? 0,
         outputTokens: response.eval_count ?? 0,
       },
+      prompt: promptText,
+      output: raw,
       trigger: opts?.trigger,
       record: opts?.record,
       jobId: opts?.jobId,
@@ -319,6 +331,7 @@ async function runTextJSONWith(
     });
     return result;
   } catch (err) {
+    const promptText = `SYSTEM:\n${systemPrompt}\n\nUSER:\n${userPrompt}`;
     void recordAiRun({
       feature,
       provider: cfg.provider,
@@ -326,6 +339,7 @@ async function runTextJSONWith(
       status: 'error',
       durationMs: Date.now() - t0,
       error: (err as Error).message,
+      prompt: promptText,
       trigger: opts?.trigger,
       record: opts?.record,
       jobId: opts?.jobId,

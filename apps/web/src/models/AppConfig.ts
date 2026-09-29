@@ -26,6 +26,7 @@ const AppConfigSchema = new Schema(
     },
     anthropicWorkspaceId: { type: String, default: '' }, // for identity-linked keys → anthropic-workspace-id header; not a secret
     anthropicAdminKey: { type: String, default: '' }, // optional Admin API key for cost reports & credit balances (#361)
+    anthropicPrepaidCredits: { type: Number, default: 0 }, // prepaid credits ($) for tracking remaining balance (#377)
 
     // Cost guard: confirm (with a rough cost estimate) before starting a BULK AI job.
     // On by default so cloud (Anthropic) runs never start by accident.

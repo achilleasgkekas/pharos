@@ -11,6 +11,7 @@ export async function anthropicPriceJSON(opts: {
   system: string;
   user: string;
 }): Promise<{
+  raw: string;
   json: unknown;
   usage: {
     inputTokens: number;
@@ -57,6 +58,7 @@ export async function anthropicPriceJSON(opts: {
     .join('')
     .trim();
   return {
+    raw: text,
     json: JSON.parse(stripFences(text)),
     usage: {
       inputTokens: data.usage?.input_tokens ?? 0,

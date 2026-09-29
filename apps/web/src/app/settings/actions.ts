@@ -244,6 +244,7 @@ export async function saveAiConfig(formData: FormData): Promise<{ ok: boolean; e
     // to a non-negative number (a blank or garbage field reads as 0 = off). The running spend
     // ledger (aiSpendPeriod/aiSpendMicros) is written by lib/aiBudget.ts, never from the form.
     aiMonthlyBudget: Math.max(0, Number(formData.get('aiMonthlyBudget')) || 0),
+    anthropicPrepaidCredits: Math.max(0, Number(formData.get('anthropicPrepaidCredits')) || 0),
   };
   if (formData.has('timezone')) {
     const tz = String(formData.get('timezone') || '').trim();
@@ -264,7 +265,8 @@ export async function saveAiConfig(formData: FormData): Promise<{ ok: boolean; e
 
 import { getAiBudgetStatus, budgetPeriod, dayPeriod } from '@/lib/aiBudget';
 import { getRecentAiRuns, type SerializedAiRun } from '@/lib/aiRun';
-import { getAnthropicMonthlyBilled } from '@/lib/anthropicAdmin';
+import { getAnthropicMonthlyBilled, estimateCreditBalance } from '@/lib/anthropicAdmin';
+import { fetchFxRate } from '@/lib/fxRates';
 import { AiRun } from '@/models/AiRun';
 
 export type LiveAiSpendData = {
@@ -289,8 +291,15 @@ export type LiveAiSpendData = {
     ok: boolean;
     error?: string;
   };
+  balance?: {
+    remainingBalance: number;
+    lowBalance: boolean;
+    pctRemaining: number;
+    prepaidCredits: number;
+  };
   hasAdminKey: boolean;
   currency: string;
+  fxRateEur: number;
 };
 
 export async function getLiveAiSpendAction(): Promise<LiveAiSpendData> {
@@ -373,6 +382,24 @@ export async function getLiveAiSpendAction(): Promise<LiveAiSpendData> {
         ? Math.min(100, Math.round((budgetStatus.spent / budgetStatus.budget) * 100))
         : 0;
 
+    let balance: LiveAiSpendData['balance'] = undefined;
+    if (cfg.anthropicPrepaidCredits && cfg.anthropicPrepaidCredits > 0) {
+      const totalSpent = adminBilled?.ok
+        ? adminBilled.billedDollars
+        : monthCost / 1_000_000;
+      const res = estimateCreditBalance({
+        prepaidCredits: cfg.anthropicPrepaidCredits,
+        totalSpent,
+      });
+      balance = {
+        ...res,
+        prepaidCredits: cfg.anthropicPrepaidCredits,
+      };
+    }
+
+    const fxRes = await fetchFxRate('USD', 'EUR').catch(() => null);
+    const fxRateEur = fxRes && fxRes.ok ? fxRes.hit.rate : 0.92;
+
     return {
       today: { costMicros: todayCost, count: todayCount },
       month: {
@@ -391,8 +418,10 @@ export async function getLiveAiSpendAction(): Promise<LiveAiSpendData> {
       },
       last5Runs: recentRuns,
       adminBilled,
+      balance,
       hasAdminKey: !!cfg.anthropicAdminKey,
       currency: 'USD',
+      fxRateEur,
     };
   });
 }
