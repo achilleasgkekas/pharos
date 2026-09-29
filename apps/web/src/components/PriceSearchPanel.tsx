@@ -1,7 +1,7 @@
 'use client';
 import { cur } from '@/lib/money';
 import { useState, useTransition } from 'react';
-import { Search, Loader2, Check, ExternalLink, AlertTriangle } from 'lucide-react';
+import { Search, Loader2, Check, ExternalLink, AlertTriangle, Plus } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/components/ui/cn';
@@ -47,7 +47,32 @@ export function PriceSearchPanel({
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const [directUrl, setDirectUrl] = useState('');
+  const [addingDirect, setAddingDirect] = useState(false);
+  const [directError, setDirectError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
+
+  function addDirectLink() {
+    const url = directUrl.trim();
+    if (!url || !/^https?:\/\//i.test(url)) {
+      setDirectError('Please enter a valid http(s) URL');
+      return;
+    }
+    setDirectError(null);
+    setAddingDirect(true);
+    startTransition(async () => {
+      const r = await addPriceLinks(item._id, [{ store: '', url, price: 0 }]);
+      setAddingDirect(false);
+      if (r.ok && r.item) {
+        setDirectUrl('');
+        onAdded(r.item);
+        router.refresh();
+        onClose();
+      } else {
+        setDirectError(r.error ?? 'Could not add the link');
+      }
+    });
+  }
 
   async function runSearch() {
     setError(null);
@@ -111,6 +136,12 @@ export function PriceSearchPanel({
   }
 
   const pickableCount = candidates ? candidates.filter((c) => picked.has(c.url) && c.price > 0).length : 0;
+  const lowestPrice = candidates
+    ? candidates.reduce<number | null>(
+        (min, c) => (c.price > 0 && !c.error && (min === null || c.price < min) ? c.price : min),
+        null
+      )
+    : null;
 
   return (
     <Modal open={open} onClose={onClose} title={t('ps.title')} size="lg">
@@ -132,10 +163,13 @@ export function PriceSearchPanel({
         </p>
 
         {searching && (
-          <div className="py-12 flex flex-col items-center gap-3 text-[color:var(--color-text-dim)]">
-            <Loader2 size={24} className="animate-spin" />
-            <p className="text-xs" style={{ fontFamily: 'var(--font-mono)' }}>
-              Reading up to 5 shops + AI extracting the price…
+          <div className="py-12 flex flex-col items-center gap-3 text-center">
+            <Loader2 size={24} className="animate-spin text-[color:var(--color-accent)]" />
+            <p className="text-xs font-medium text-[color:var(--color-text)]">
+              AI selecting best stores & reading prices via headless sandbox…
+            </p>
+            <p className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
+              Analyzing product category, querying relevant stores, and extracting live prices.
             </p>
           </div>
         )}
@@ -154,6 +188,7 @@ export function PriceSearchPanel({
               {candidates.map((c) => {
                 const disabled = c.price <= 0 || !!c.error;
                 const on = picked.has(c.url);
+                const isLowest = lowestPrice !== null && c.price === lowestPrice && !c.error;
                 return (
                   <div
                     key={c.url}
@@ -182,6 +217,11 @@ export function PriceSearchPanel({
                     <span className="min-w-0 flex-1">
                       <span className="flex items-center gap-1.5">
                         <span className="text-sm font-semibold text-[color:var(--color-text)] truncate">{c.store}</span>
+                        {isLowest && (
+                          <span className="text-[9px] uppercase tracking-wider font-semibold text-[color:var(--color-green)] bg-[color:var(--color-green)]/10 px-1.5 py-0.5 rounded shrink-0">
+                            Lowest
+                          </span>
+                        )}
                         {c.alreadyLinked && (
                           <span className="text-[9px] uppercase tracking-wider text-[color:var(--color-cyan)] shrink-0">already tracked</span>
                         )}
@@ -228,6 +268,35 @@ export function PriceSearchPanel({
             </div>
           )
         )}
+
+        <div className="pt-3 border-t border-[color:var(--color-border)]">
+          <p className="text-xs font-semibold text-[color:var(--color-text)] mb-1.5">
+            Or track a specific product URL manually:
+          </p>
+          <div className="flex items-center gap-2">
+            <input
+              value={directUrl}
+              onChange={(e) => setDirectUrl(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && !addingDirect && directUrl.trim() && addDirectLink()}
+              placeholder="https://example-shop.com/product/..."
+              className="flex-1 min-w-0 text-xs px-3 py-2 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] focus:border-[color:var(--color-accent)] outline-none"
+            />
+            <Button
+              variant="secondary"
+              onClick={addDirectLink}
+              disabled={addingDirect || !directUrl.trim()}
+              className="shrink-0 text-xs"
+            >
+              {addingDirect ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
+              Add Link
+            </Button>
+          </div>
+          {directError && (
+            <p className="text-[11px] text-[color:var(--color-red)] mt-1" style={{ fontFamily: 'var(--font-mono)' }}>
+              {directError}
+            </p>
+          )}
+        </div>
       </div>
     </Modal>
   );
