@@ -100,7 +100,7 @@ async function dispatch(req: NextRequest, role: Role): Promise<NextResponse> {
       const args = (params?.arguments && typeof params.arguments === 'object' ? params.arguments : {}) as Record<string, unknown>;
       if (!TOOLS.some((t) => t.name === name)) return rpcError(id, -32602, `Unknown tool: ${name}`);
       // P31: a read-only token may query, never change. Refused HERE rather than inside the
-      // tools, because the cookie-based guard they use cannot see a bearer caller at all.
+      // tools. Nested write guards also see the explicitly established bearer role.
       if (toolWrites(name) && !canWrite(role)) return rpcError(id, -32001, READ_ONLY_MESSAGE);
       const r = await execute(name, args);
       return rpc(id, { content: [{ type: 'text', text: `${r.summary ? r.summary + ' — ' : ''}${r.content}` }] });

@@ -2,8 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest, NextResponse } from 'next/server';
 
 // The coverage scan proves the guard is CALLED everywhere. This proves the guard actually
-// stops a viewer, on both enforcement paths, including the two pass-throughs that exist so
-// background work and logged-out requests keep behaving as before.
+// stops unauthorized writes, while explicit API and worker authorization remains scoped.
 
 const { cookiesMock, verifySessionMock, findOneMock } = vi.hoisted(() => ({
   cookiesMock: vi.fn(),

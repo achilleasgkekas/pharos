@@ -190,3 +190,29 @@ describe('connection-time DNS validation', () => {
     await vi.waitFor(() => expect(callback).toHaveBeenCalledWith(null, addresses));
   });
 });
+
+describe('connection-time DNS errors and address families', () => {
+  it('returns the checked single address when all-address mode is not requested', async () => {
+    mockLookup.mockResolvedValueOnce([{ address: '93.184.216.34', family: 4 }] as never);
+    const callback = vi.fn();
+    publicLookup('public.example', { family: 4 }, callback);
+    await vi.waitFor(() => expect(callback).toHaveBeenCalledWith(null, '93.184.216.34', 4));
+  });
+  it('rejects empty DNS answers and unavailable requested families', async () => {
+    for (const addresses of [[], [{ address: '93.184.216.34', family: 4 }]]) {
+      mockLookup.mockResolvedValueOnce(addresses as never);
+      const callback = vi.fn();
+      publicLookup('public.example', { family: 6 }, callback);
+      await vi.waitFor(() => expect(callback).toHaveBeenCalled());
+      expect(callback.mock.calls[0][0]).toBeInstanceOf(Error);
+      expect(callback.mock.calls[0][1]).toBe('');
+    }
+  });
+  it('propagates DNS errors to the connector instead of falling back to unchecked lookup', async () => {
+    const error = new Error('DNS unavailable');
+    mockLookup.mockRejectedValueOnce(error);
+    const callback = vi.fn();
+    publicLookup('public.example', {}, callback);
+    await vi.waitFor(() => expect(callback).toHaveBeenCalledWith(error, '', 0));
+  });
+});

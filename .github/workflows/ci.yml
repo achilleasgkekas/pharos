@@ -149,7 +149,7 @@ jobs:
         run: |
           base="$RUNNER_TEMP/baseline"
           mkdir -p "$base"
-          run_id=$(gh run list --workflow CI --branch main --event push --status success --limit 1 --json databaseId --jq '.[0].databaseId // empty')
+          run_id=$(gh run list --workflow ci.yml --branch main --event push --status success --limit 1 --json databaseId --jq '.[0].databaseId // empty')
           if [ -n "$run_id" ]; then gh run download "$run_id" --name ci-baseline --dir "$base" || echo "main run $run_id has no ci-baseline artifact"; fi
           gh api "repos/$GH_REPO/pulls/$PR/files" --paginate --jq '.[].filename' > "$RUNNER_TEMP/changed.txt"
           node ../../scripts/ci/baseline.mjs compare "$base" coverage/coverage-summary.json "$RUNNER_TEMP/bundle.json" "$RUNNER_TEMP/changed.txt" | tee -a "$GITHUB_STEP_SUMMARY"
