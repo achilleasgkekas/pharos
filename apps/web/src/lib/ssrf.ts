@@ -1,4 +1,4 @@
-import { isIP } from 'node:net';
+import { isIP, type LookupFunction } from 'node:net';
 import { lookup } from 'node:dns/promises';
 
 /**
@@ -9,7 +9,7 @@ import { lookup } from 'node:dns/promises';
  * Docker-internal services (mongo, searxng, flaresolverr), the host's Ollama,
  * cloud metadata endpoints, or anything else on the LAN. assertPublicUrl()
  * resolves the host and rejects any private / loopback / link-local target,
- * which also defeats DNS-rebinding (we check the resolved IPs, not the name).
+ * while publicLookup also checks the addresses used by the actual socket connection.
  *
  * services/scraper/src/ssrf.ts is a byte-for-byte copy (scraperCopies.parity.test.ts):
  * edit here, then copy the file across.
@@ -105,3 +105,18 @@ export async function assertPublicUrl(url: string): Promise<void> {
     throw new Error('Host resolves to a private address');
   }
 }
+
+/** Validate DNS answers at connection time, closing the preflight/fetch rebinding gap. */
+export const publicLookup: LookupFunction = (hostname, options, callback) => {
+  lookup(hostname, { all: true }).then((addresses) => {
+    if (!addresses.length || addresses.some((a) => addrIsPrivate(a.address))) {
+      callback(new Error('Host resolves to a private address'), '', 0);
+      return;
+    }
+    const family = options.family === 'IPv4' ? 4 : options.family === 'IPv6' ? 6 : options.family;
+    const allowed = family ? addresses.filter((a) => a.family === family) : addresses;
+    if (!allowed.length) { callback(new Error('Host did not resolve'), '', 0); return; }
+    if (options.all) callback(null, allowed);
+    else callback(null, allowed[0].address, allowed[0].family);
+  }, (err: Error) => callback(err, '', 0));
+};

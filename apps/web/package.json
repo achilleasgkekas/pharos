@@ -7,7 +7,7 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint .",
+    "lint": "eslint . --max-warnings 92",
     "type-check": "node node_modules/typescript7/bin/tsc --noEmit",
     "type-check:ts5": "tsc --noEmit",
     "migrate": "tsx ../../scripts/migrate.ts",
@@ -41,6 +41,7 @@
     "react-is": "19.3.0",
     "recharts": "^3.10.1",
     "tailwind-merge": "^3.7.0",
+    "undici": "8.11.2",
     "web-push": "^3.6.7",
     "zod": "^4.6.5"
   },

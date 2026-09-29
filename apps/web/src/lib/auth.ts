@@ -1,6 +1,6 @@
 // Node-runtime auth helpers: password hashing (node:crypto scrypt — no native
 // dep, Alpine-safe) + current-user accessors for server components/actions.
-// NEVER import this from middleware (it pulls node:crypto into the edge bundle).
+// Node-only; middleware uses sessionUser.ts for request-cookie-independent validation.
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { scryptSync, randomBytes, timingSafeEqual } from 'node:crypto';
@@ -8,7 +8,6 @@ import {
   SESSION_COOKIE,
   sessionCookieOptions,
   signSession,
-  verifySession,
   SESSION_MFA_PENDING_COOKIE,
   mfaPendingCookieOptions,
   signMfaPendingToken,
@@ -16,6 +15,8 @@ import {
   type Role,
   type SessionClaims,
 } from './session';
+import { validateSessionToken } from './sessionUser';
+import { authorizedWriteRole } from './writeAuthorization';
 import { canWrite, READ_ONLY_MESSAGE } from './roles';
 
 export type SessionUser = { id: string; role: Role; name: string };
@@ -88,7 +89,8 @@ async function currentSessionEpoch(userId: string): Promise<number> {
   const { User } = await import('@/models/User');
   await connectDB();
   const doc = (await User.findById(userId).select('sessionEpoch').lean()) as { sessionEpoch?: number } | null;
-  return Number(doc?.sessionEpoch) || 0;
+  if (!doc) throw new Error('User not found');
+  return Number(doc.sessionEpoch) || 0;
 }
 
 /** Bump a user's session epoch → invalidates every existing token for them (P91). Returns
@@ -102,26 +104,15 @@ export async function bumpSessionEpoch(userId: string): Promise<number> {
     { $inc: { sessionEpoch: 1 } },
     { returnDocument: 'after', projection: { sessionEpoch: 1 } }
   ).lean()) as { sessionEpoch?: number } | null;
-  return Number(doc?.sessionEpoch) || 0;
+  if (!doc) throw new Error('User not found');
+  return Number(doc.sessionEpoch) || 0;
 }
 
-/** Read + verify the session cookie. Null when logged out. Token-only EXCEPT when the token
- *  carries a P91 epoch, in which case it is compared to the user's current sessionEpoch (one
- *  indexed lookup) so a "sign out everywhere" takes effect. Fails OPEN on a DB error — a
- *  transient outage must never lock out a validly-signed session — but a real mismatch (or a
- *  deleted user) invalidates. Pre-P91 tokens carry no epoch and skip the check entirely. */
+/** Read the session and validate current account state, failing closed. */
 export async function getCurrentUser(): Promise<SessionUser | null> {
   const store = await cookies();
-  const claims = await verifySession(store.get(SESSION_COOKIE)?.value);
-  if (!claims) return null;
-  if (claims.epoch !== undefined) {
-    try {
-      if ((await currentSessionEpoch(claims.sub)) !== claims.epoch) return null;
-    } catch {
-      /* DB hiccup → fail open; the signature + expiry were already checked */
-    }
-  }
-  return { id: claims.sub, role: claims.role, name: claims.name };
+  const claims = await validateSessionToken(store.get(SESSION_COOKIE)?.value);
+  return claims ? { id: claims.sub, role: claims.role, name: claims.name } : null;
 }
 
 /** Current self-hosted user. Hosted account cookies are no longer credentials. */
@@ -136,31 +127,15 @@ export async function requireUser(): Promise<SessionUser> {
   return u;
 }
 
-/**
- * P31 write guard for server actions. Throws for a read-only (viewer) session, otherwise
- * returns silently.
- *
- * Two deliberate pass-throughs, both about NOT breaking paths that were never a user
- * pressing a button:
- *
- *  - **Outside a request** (`cookies()` throws in the background job runner and in cron
- *    work), there is no session to judge, and the work was authorised when it was
- *    enqueued. Same reason `safeRevalidate` exists.
- *  - **No session at all** is already handled upstream by the middleware, which sends the
- *    request to /login. Redirecting again from deep inside an action would only turn a
- *    clean 302 into a confusing thrown digest.
- *
- * So the one thing this adds is: a logged-in viewer cannot write. Everything else behaves
- * exactly as before.
- */
+/** Require a live session or an explicit authorization from a trusted entry point. */
 export async function assertCanWrite(): Promise<void> {
-  let user: SessionUser | null;
-  try {
-    user = await getSessionUser();
-  } catch {
-    return; // background job / cron: no request scope, nothing to authorise against
+  const explicit = authorizedWriteRole();
+  if (explicit !== undefined) {
+    if (!canWrite(explicit)) throw new Error(READ_ONLY_MESSAGE);
+    return;
   }
-  if (!user) return;
+  const user = await getSessionUser();
+  if (!user) throw new Error('Unauthorized');
   if (!canWrite(user.role)) throw new Error(READ_ONLY_MESSAGE);
 }
 
@@ -172,20 +147,9 @@ export async function requireAdmin(): Promise<SessionUser> {
   return u;
 }
 
-/** Mint a session JWT and set the httpOnly cookie. Call from a server action / route handler.
- *  Enriches the claims with the user's current session epoch (P91) when the caller didn't set
- *  one, so every freshly-minted self-host session is bound to the current epoch — callers keep
- *  passing just { sub, role, name }. Fails open on a DB error (mints without an epoch rather
- *  than refusing to log the user in). */
+/** Mint only revocable sessions for an account that still exists. */
 export async function setSessionCookie(claims: SessionClaims): Promise<void> {
-  let epoch = claims.epoch;
-  if (epoch === undefined) {
-    try {
-      epoch = await currentSessionEpoch(claims.sub);
-    } catch {
-      /* DB hiccup → mint a pre-P91-shaped token; still a valid session */
-    }
-  }
+  const epoch = await currentSessionEpoch(claims.sub);
   const token = await signSession({ ...claims, epoch });
   const store = await cookies();
   store.set(SESSION_COOKIE, token, sessionCookieOptions());

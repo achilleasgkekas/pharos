@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { withWriteAuthorization } from '@/lib/writeAuthorization';
 import { checkCronAuth } from '@/lib/cronAuth';
 import { runPriceScrape } from '@/app/items/actions';
 import { recordCronRun } from '@/lib/cronHeartbeat';
@@ -31,7 +32,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const result = await runPriceScrape();
+    const result = await withWriteAuthorization('member', () => runPriceScrape());
     await recordCronRun('prices'); // heartbeat for the System-status "Scheduled tasks" check
     return NextResponse.json(result); // already { ok: true, scanned, itemsChanged, ... }
   } catch (err) {

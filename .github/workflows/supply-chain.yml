@@ -30,10 +30,10 @@ jobs:
       run:
         working-directory: ${{ matrix.pkg }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: 24
       # Production dependencies only, high and critical only: a dev-only advisory in a test tool
@@ -48,7 +48,7 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
       # Blocks a PR that ADDS a dependency with a high-severity advisory or a licence that
@@ -63,7 +63,7 @@ jobs:
     name: Secret scan (gitleaks)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
           fetch-depth: 0
@@ -72,7 +72,17 @@ jobs:
           EVENT: ${{ github.event_name }}
           BASE_REF: ${{ github.base_ref }}
         run: |
-          curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz | tar xz gitleaks
+          python3 scripts/ci/install-tool.py gitleaks
           # A PR scans only its own commits; main and the schedule scan the last 50.
           if [ "$EVENT" = "pull_request" ]; then range="origin/$BASE_REF..HEAD"; else range="-50"; fi
           ./gitleaks git --no-banner --redact --log-opts="$range" .
+
+  passed:
+    name: Supply chain passed
+    if: always()
+    needs: [audit, dependency-review, secrets]
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          FAILED: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+        run: test "$FAILED" = false

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { withWriteAuthorization } from '@/lib/writeAuthorization';
 import { checkCronAuth } from '@/lib/cronAuth';
 import { runAlertChecks } from '@/app/settings/actions';
 import { recordCronRun } from '@/lib/cronHeartbeat';
@@ -36,7 +37,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const { sent, summary } = await runAlertChecks({ dedupe: true });
+    const { sent, summary } = await withWriteAuthorization('member', () => runAlertChecks({ dedupe: true }));
     await recordCronRun('alerts'); // heartbeat for the System-status "Scheduled tasks" check
     // `sent: false` with an "All clear" summary is a healthy run, not a failure — the cron
     // log should be able to tell "nothing to report" apart from "the scan blew up".

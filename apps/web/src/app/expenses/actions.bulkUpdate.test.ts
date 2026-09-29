@@ -113,3 +113,9 @@ describe('bulkUpdateExpenses', () => {
     expect(res).toEqual({ ok: false, updated: 0, error: 'boom' });
   });
 });
+
+// Business-logic tests use an authorized caller; auth failures are tested in writeGuard.behaviour.test.ts.
+vi.mock('@/lib/auth', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/auth')>()),
+  assertCanWrite: vi.fn(async () => {}),
+}));

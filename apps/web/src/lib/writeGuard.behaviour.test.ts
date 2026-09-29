@@ -21,11 +21,9 @@ vi.mock('@/lib/tenancy/connection', () => ({ currentModel: async (m: unknown) =>
 vi.mock('@/models/User', () => ({
   User: { findOne: (...a: unknown[]) => findOneMock(...a) },
 }));
-vi.mock('./session', async (orig) => ({
-  ...(await orig<Record<string, unknown>>()),
-  verifySession: verifySessionMock,
-}));
+vi.mock('./sessionUser', () => ({ validateSessionToken: verifySessionMock }));
 
+import { withWriteAuthorization } from './writeAuthorization';
 import { assertCanWrite } from './auth';
 import { withAuth } from './apiAuth';
 import { READ_ONLY_MESSAGE } from './roles';
@@ -58,15 +56,22 @@ describe('assertCanWrite (server actions)', () => {
     await expect(assertCanWrite()).rejects.toThrow(READ_ONLY_MESSAGE);
   });
 
-  it('passes through with no session, because the middleware already redirects those', async () => {
+  it('rejects a missing or revoked session', async () => {
     session(null);
-    await expect(assertCanWrite()).resolves.toBeUndefined();
+    await expect(assertCanWrite()).rejects.toThrow('Unauthorized');
   });
 
-  it('passes through outside a request, so the background job runner is unaffected', async () => {
+  it('rejects a missing request scope without explicit authorization', async () => {
     // `cookies()` throws when there is no request scope (job runner, cron).
     cookiesMock.mockImplementation(() => { throw new Error('called outside a request scope'); });
-    await expect(assertCanWrite()).resolves.toBeUndefined();
+    await expect(assertCanWrite()).rejects.toThrow('outside a request');
+  });
+
+  it('allows explicit worker authorization and does not leak it to later calls', async () => {
+    session(null);
+    await expect(withWriteAuthorization('member', () => assertCanWrite())).resolves.toBeUndefined();
+    await expect(withWriteAuthorization('viewer', () => assertCanWrite())).rejects.toThrow(READ_ONLY_MESSAGE);
+    await expect(assertCanWrite()).rejects.toThrow('Unauthorized');
   });
 });
 
@@ -78,6 +83,15 @@ describe('withAuth (/api/v1)', () => {
     });
   }
   const ok = async () => NextResponse.json({ ok: true });
+
+  it('propagates bearer permission to nested write actions without cookies', async () => {
+    session(null);
+    bearer('member');
+    expect((await withAuth(req('POST'), async () => {
+      await assertCanWrite();
+      return ok();
+    })).status).toBe(200);
+  });
 
   function bearer(role: string) {
     findOneMock.mockReturnValue({

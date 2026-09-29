@@ -19,9 +19,9 @@ services:
     container_name: homepage-web
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "${WEB_BIND_ADDRESS:-127.0.0.1}:3000:3000"
     environment:
-      MONGO_URI: mongodb://${MONGO_USER:-admin}:${MONGO_PASS:-changeme}@mongo:27017/homepage?authSource=admin
+      MONGO_URI: mongodb://${MONGO_USER:-admin}:${MONGO_PASS:?set MONGO_PASS in .env}@mongo:27017/homepage?authSource=admin
       SOLVER_URL: ${SOLVER_URL:-http://flaresolverr:8191}
       SEARXNG_URL: ${SEARXNG_URL:-http://searxng:8080}
       STORAGE_ROOT: /storage
@@ -30,7 +30,7 @@ services:
       NEXT_SERVER_ACTIONS_ENCRYPTION_KEY: ${NEXT_SERVER_ACTIONS_ENCRYPTION_KEY:?set NEXT_SERVER_ACTIONS_ENCRYPTION_KEY in .env}
       AUTH_SECRET: ${AUTH_SECRET:?set AUTH_SECRET in .env}
       # Set true only behind an HTTPS reverse proxy.
-      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
+      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-true}
       SESSION_IDLE_HOURS: ${SESSION_IDLE_HOURS:-12}
     volumes:
       - ./data/storage:/storage
@@ -43,14 +43,14 @@ services:
         condition: service_started
 
   mongo:
-    image: mongo:7
+    image: mongo:7@sha256:9854f7139445d766a9523571d6f047530c45547460ffcf8259eb2bf4264632ca
     container_name: homepage-mongo
     restart: unless-stopped
     ports:
       - "127.0.0.1:27017:27017"
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-admin}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASS:-changeme}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASS:?set MONGO_PASS in .env}
       MONGO_INITDB_DATABASE: homepage
     volumes:
       - mongo-data:/data/db
@@ -62,7 +62,7 @@ services:
 
   # Self-hosted metasearch (web + image) for "AI fill without a link" + product photos.
   searxng:
-    image: searxng/searxng:latest
+    image: searxng/searxng:latest@sha256:eb2a404db174d33a04cd9f2e519bcae2ca722a58923510652cc1314be94e8e63
     container_name: homepage-searxng
     restart: unless-stopped
     ports:
@@ -77,7 +77,7 @@ services:
   # Cloudflare-challenge solver for URL-import / price-scrape from bot-protected shops.
   # Opt-in: docker compose -f docker-compose.prod.yml --profile scraper up -d flaresolverr
   flaresolverr:
-    image: 21hsmw/flaresolverr:nodriver
+    image: 21hsmw/flaresolverr:nodriver@sha256:dca8cda5852b04e6142752fc044c9845eb536353ea6f8b7bb58b4ff9419538fa
     container_name: homepage-flaresolverr
     restart: unless-stopped
     profiles: ["scraper"]
@@ -89,7 +89,7 @@ services:
 
   # DB admin UI. Opt-in: docker compose -f docker-compose.prod.yml --profile tools up -d mongo-express
   mongo-express:
-    image: mongo-express:1.0.2
+    image: mongo-express:1.0.2@sha256:1b23d7976f0210dbec74045c209e52fbb26d29b2e873d6c6fa3d3f0ae32c2a64
     container_name: homepage-mongo-ui
     restart: unless-stopped
     profiles: ["tools"]
@@ -97,8 +97,8 @@ services:
       - "127.0.0.1:8081:8081"
     environment:
       ME_CONFIG_MONGODB_ADMINUSERNAME: ${MONGO_USER:-admin}
-      ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGO_PASS:-changeme}
-      ME_CONFIG_MONGODB_URL: mongodb://${MONGO_USER:-admin}:${MONGO_PASS:-changeme}@mongo:27017/
+      ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGO_PASS:?set MONGO_PASS in .env}
+      ME_CONFIG_MONGODB_URL: mongodb://${MONGO_USER:-admin}:${MONGO_PASS:?set MONGO_PASS in .env}@mongo:27017/
       ME_CONFIG_BASICAUTH_USERNAME: ${ME_USER:-admin}
       ME_CONFIG_BASICAUTH_PASSWORD: ${ME_PASS:-changeme}
     depends_on:

@@ -337,3 +337,9 @@ describe('mergeExpenses and the money it was paid with (#168)', () => {
     expect(keep.paymentSplits).toEqual(own);
   });
 });
+
+// Business-logic tests use an authorized caller; auth failures are tested in writeGuard.behaviour.test.ts.
+vi.mock('@/lib/auth', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/auth')>()),
+  assertCanWrite: vi.fn(async () => {}),
+}));

@@ -7,6 +7,7 @@ import { canWrite, parseRole, READ_ONLY_MESSAGE, type Role } from '@/lib/roles';
 import { currentModel } from '@/lib/tenancy/connection';
 import { withTenant } from '@/lib/tenancy/current';
 import { runAsActor } from '@/lib/actor';
+import { withWriteAuthorization } from '@/lib/writeAuthorization';
 
 // Remote MCP server (Streamable-HTTP, JSON-RPC 2.0) so an external Claude (mobile
 // app / Claude Code / MCP Inspector) can drive Pharos. Tools-only, so plain JSON
@@ -27,16 +28,7 @@ export const dynamic = 'force-dynamic';
 const SERVER_INFO = { name: 'pharos', version: '1.0.0' };
 const PROTOCOL_VERSION = '2025-06-18';
 
-/** Runs inside the ambient tenant established by `POST`, so the token is looked up in THAT
- *  workspace's `users` collection. A token minted in workspace A does not exist in B's database.
- *
- *  Returns the token's ROLE, not just yes/no: this door has to decide P31 read-only access by
- *  itself. `assertCanWrite()`, which guards every server action the tools call, resolves the
- *  session from COOKIES and passes silently when there is none — on purpose, so background jobs
- *  and cron can write — and an MCP request carries a bearer token and no cookie. So every write
- *  guard downstream saw "no session" and waved the call through, and a read-only account's token
- *  could add, edit and delete records (#192). The role the token belongs to is the only thing
- *  that can answer that here, so it is read together with the token. */
+/** Resolve the current bearer role before establishing explicit authorization for tools. */
 async function authed(req: NextRequest): Promise<{ role: Role; userId: string | null } | null> {
   const m = (req.headers.get('authorization') || '').match(/^Bearer\s+(.+)$/i);
   const token = m?.[1]?.trim();
@@ -78,7 +70,7 @@ async function handle(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ jsonrpc: '2.0', id: null, error: { code: -32001, message: 'Unauthorized' } }, { status: 401 });
   }
   // P75: whatever the tools create is attributed to the token's owner.
-  return runAsActor(auth.userId, () => dispatch(req, auth.role));
+  return withWriteAuthorization(auth.role, () => runAsActor(auth.userId, () => dispatch(req, auth.role)));
 }
 
 async function dispatch(req: NextRequest, role: Role): Promise<NextResponse> {

@@ -7,10 +7,8 @@ import { SignJWT, jwtVerify } from 'jose';
 // module edge-safe). Re-exported because middleware and auth already import Role here.
 export type { Role } from './roles';
 import { parseRole, type Role } from './roles';
-// `epoch` is the "sign out everywhere" counter (P91), embedded so the server-side auth
-// check can compare it to the user's current User.sessionEpoch. Optional: a token minted
-// before P91 (or by a caller that doesn't set it) carries none, and the check is skipped
-// for it — so nothing about the existing stateless flow changes until an epoch is present.
+// Every browser session minted by auth.ts has a revocation epoch. Token-only callers
+// may omit it, but validateSessionToken rejects those tokens for authenticated requests.
 export type SessionClaims = { sub: string; role: Role; name: string; exp?: number; epoch?: number };
 
 // Cookie shared by middleware (read/refresh) + auth.ts (set/clear).
@@ -49,9 +47,8 @@ export function authConfigured(): boolean {
 export async function signSession(claims: SessionClaims): Promise<string> {
   const secret = getSecret();
   if (!secret) throw new Error('AUTH_SECRET is not set (min 16 chars)');
-  const payload: Record<string, unknown> = { role: claims.role, name: claims.name };
-  // Only embed the epoch when the caller provides one (setSessionCookie does), so a bare
-  // signSession still produces a pre-P91-shaped token that the auth check leaves alone.
+  const payload: Record<string, unknown> = { typ: 'session', role: claims.role, name: claims.name };
+  // setSessionCookie supplies the current database epoch. Missing epochs cannot authenticate.
   if (claims.epoch !== undefined) payload.epoch = claims.epoch;
   return await new SignJWT(payload)
     .setProtectedHeader({ alg: 'HS256' })
@@ -68,6 +65,7 @@ export async function verifySession(token: string | undefined | null): Promise<S
   if (!secret) return null;
   try {
     const { payload } = await jwtVerify(token, secret, { algorithms: ['HS256'] });
+    if (payload.typ !== 'session' || typeof payload.exp !== 'number') return null;
     const sub = typeof payload.sub === 'string' ? payload.sub : '';
     if (!sub) return null;
     // Read the role through the same table the write guards use. The old expression here was

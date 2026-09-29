@@ -405,3 +405,9 @@ it('keeps the PDF while an AI-disabled draft is being persisted', async () => {
   expect((await importStatementPdf(formWith(pdfFile()))).ok).toBe(true);
   expect(deleteFileMock).not.toHaveBeenCalled();
 });
+
+// Business-logic tests use an authorized caller; auth failures are tested in writeGuard.behaviour.test.ts.
+vi.mock('@/lib/auth', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/auth')>()),
+  assertCanWrite: vi.fn(async () => {}),
+}));

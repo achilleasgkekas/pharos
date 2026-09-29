@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { SESSION_COOKIE, verifySession, signSession, shouldRefresh, sessionCookieOptions } from '@/lib/session';
-// Auth gate. Runs on the Edge runtime, so it imports ONLY lib/session.ts (jose —
-// no node:crypto, no Mongoose). First-run detection (zero users) is NOT done here
-// (can't reach Mongo at the edge) — the /login page redirects to /setup instead.
+import { SESSION_COOKIE, signSession, shouldRefresh, sessionCookieOptions } from '@/lib/session';
+import { validateSessionToken } from '@/lib/sessionUser';
+// Node runtime is required to enforce deletion and revocation before serving any page.
 export async function middleware(req: NextRequest) {
   const { pathname, search } = req.nextUrl;
 
@@ -13,7 +12,7 @@ export async function middleware(req: NextRequest) {
   headers.set('x-pathname', pathname);
   const pass = () => NextResponse.next({ request: { headers } });
 
-  const claims = await verifySession(req.cookies.get(SESSION_COOKIE)?.value);
+  const claims = await validateSessionToken(req.cookies.get(SESSION_COOKIE)?.value);
 
   if (claims) {
     const res = pass();
@@ -44,6 +43,7 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
+  runtime: 'nodejs',
   // Gate everything EXCEPT: Next internals, the icon/manifest, the Web Push service
   // worker (public/sw.js — the browser must fetch it unauthenticated to register, P102),
   // the auth-action
