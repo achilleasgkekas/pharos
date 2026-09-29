@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import {
   claudePrice,
   claudeRateMicros,
-  allClaudePrices,
   estimateTaskCost,
   formatTaskCost,
   taskCostSummary,
