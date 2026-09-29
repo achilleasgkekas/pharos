@@ -987,6 +987,11 @@ export const el: Partial<Dict> = {
   'views.delete': 'Διαγραφή προβολής',
   'views.saveDisabled': 'Βάλε πρώτα ένα φίλτρο',
 
+  'set.tabWorkspace': 'Χώρος εργασίας',
+  'set.tabAiTelemetry': 'AI & Τηλεμετρία',
+  'set.tabStorageBackups': 'Αποθήκευση & Αντίγραφα',
+  'set.tabIntegrations': 'Ενσωματώσεις',
+  'set.tabUsersAccess': 'Χρήστες & Πρόσβαση',
   'set.tabGeneral': 'Γενικά',
   'set.tabMoney': 'Οικονομικά',
   'set.tabAi': 'AI',
