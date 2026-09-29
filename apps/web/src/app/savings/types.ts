@@ -20,6 +20,7 @@ export type SavingsData = {
   startBalance: number;
   /** Whether any account balance is on file at all — a forecast from 0 needs saying so. */
   hasAccounts: boolean;
+  accounts?: Record<string, number>;
   /** Commitments inside the baseline that run out, with when. */
   obligations: Obligation[];
   /** What could be cut to close a gap, dearest first. */

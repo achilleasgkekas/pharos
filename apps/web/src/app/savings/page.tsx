@@ -82,6 +82,7 @@ async function getData(): Promise<SavingsData> {
       projection,
       startBalance,
       hasAccounts: accounts.length > 0,
+      accounts: settings.assetAccounts || {},
       obligations,
       levers,
       goals,
