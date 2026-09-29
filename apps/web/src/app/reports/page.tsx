@@ -443,7 +443,7 @@ async function getReports(monthsBack = 12, locale = 'en') {
   return {
     fxIssues,
     baseCurrency: appSettings.currency,
-    netWorth: { accountsTotal: Math.round(accountsTotal), series: netWorthSeries },
+    netWorth: { accountsTotal: Math.round(accountsTotal), series: netWorthSeries, accounts: appSettings.assetAccounts },
     safeToSpend,
     monthReview,
     monthlySpend,

@@ -25,7 +25,6 @@ import { uploadExpense, updateExpense, addExpense, deleteExpense, rescanExpense,
 import { equalSplit, splitTotals, computeBalances, type SplitEntry } from '@/lib/split';
 import { paymentSplitTotal, paymentSplitRemainder, paymentSplitsBalance, balancePaymentSplits, type PaymentSplitEntry } from '@/lib/paymentSplit';
 import { RECURRING_CYCLES } from '@/lib/billingCycle';
-import { TAX_CATEGORY_PRESETS } from '@/lib/taxonomies';
 import { CsvImportModal } from './CsvImportModal';
 import { ExpenseDuplicatesModal } from './ExpenseDuplicatesModal';
 import { OpenInOneDriveButton } from '@/components/OpenInOneDriveButton';
@@ -238,12 +237,6 @@ export function ExpensesClient({ kind, expenses, cards, vendors, ollamaUp, categ
         <FilterSection label={t('ex.space')}>
           <SearchableSelect value={spaceFilter} onChange={setSpaceFilter} options={spaceFilterOptions(spaces)} labels={{ [NO_SPACE]: t('ex.spaceNone') }} placeholder={t('ex.allSpaces')} clearable size="sm" className="w-full" />
         </FilterSection>
-      )}
-      {!isIncome && (
-        <label className="flex items-center gap-2 text-xs text-[color:var(--color-text-dim)] cursor-pointer">
-          <input type="checkbox" checked={taxOnly} onChange={(e) => setTaxOnly(e.target.checked)} className="accent-[color:var(--color-gold)]" />
-          <Landmark size={12} className="text-[color:var(--color-gold)]" /> {t('ex.taxDeductible')}
-        </label>
       )}
       {vendorOptions.length > 0 && (
         <FilterSection label={t('ex.vendor')}>
@@ -744,19 +737,6 @@ function FormFields({ form, set, cards, vendors, categories, spaces, fx, seriesB
       <Field label={t('v.fNotes')}>
         <textarea value={form.notes} onChange={(e) => set({ notes: e.target.value })} rows={2} className={controlClass} />
       </Field>
-      {form.kind !== 'income' && (
-        <div className="grid grid-cols-2 gap-3 items-end">
-          <div className="flex items-center justify-between gap-2 rounded-lg border border-[color:var(--color-border)] px-3 py-2">
-            <span className="text-xs font-medium flex items-center gap-1.5"><Landmark size={13} className="text-[color:var(--color-gold)]" /> {t('ex.taxDeductible')}</span>
-            <button type="button" role="switch" aria-label={t('ex.taxDeductible')} aria-checked={form.taxDeductible} onClick={() => set({ taxDeductible: !form.taxDeductible })} className={cn('relative w-9 h-5 rounded-full transition-colors shrink-0', form.taxDeductible ? 'bg-[color:var(--color-gold)]' : 'bg-[color:var(--color-surface-3)] border border-[color:var(--color-border)]')}>
-              <span className={cn('absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform', form.taxDeductible && 'translate-x-4')} />
-            </button>
-          </div>
-          <Field label={t('ex.fTaxCategory')}>
-            <SearchableSelect value={form.taxCategory} onChange={(v) => set({ taxCategory: v })} options={TAX_CATEGORY_PRESETS} placeholder={t('ex.fTaxCategoryPlaceholder')} allowCustom clearable size="sm" />
-          </Field>
-        </div>
-      )}
       {form.kind !== 'income' && (
         <SplitEditor split={form.split} amount={baseAmount} baseCurrency={fx.base} onChange={(split) => set({ split })} />
       )}

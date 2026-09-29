@@ -10,6 +10,7 @@ import { useRouter } from 'next/navigation';
 import { Search, Plus, Trash2, X, Loader2, Sparkles, Link2, ExternalLink, Wand2, ListPlus, Check, FileText, TrendingDown, TrendingUp, Target, Merge, Columns3, ImagePlus, Pencil, Truck, Printer, Wrench, HandHelping, ShieldAlert, Boxes } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { RecomputePricesButton } from './RecomputePricesButton';
 import { Input, controlClass, filterControlClass } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -273,6 +274,7 @@ export function ItemsClient({
   // a hook here would see the context default, not the value being provided.
   const bulkCategoryOptions = categoryOptionsFrom(configuredCategories);
   const fx: FxCtx = { base: baseCurrency, enabled: multiCurrency };
+  const router = useRouter();
   const t = useT();
   const cfg = VIEW_CONFIG[view];
   const viewName = view === 'shopping' ? t('nav.wishlist') : t('nav.inventory');
@@ -775,6 +777,9 @@ export function ItemsClient({
               >
                 <Merge size={14} /> {t('it.duplicates')}
               </button>
+            )}
+            {items.length > 0 && !selectMode && (
+              <RecomputePricesButton onDone={() => router.refresh()} />
             )}
             <ViewToggle value={layout} onChange={setLayout} />
             <PrimaryAction onClick={() => setShowCreate(true)} />

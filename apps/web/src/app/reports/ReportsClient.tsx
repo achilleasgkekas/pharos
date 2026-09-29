@@ -24,7 +24,8 @@ import {
   CartesianGrid,
 } from 'recharts';
 import { keepSeriesOrder } from '@/lib/chartOrder';
-import { Store, CalendarClock, Receipt as ReceiptIcon, Layers, ShieldCheck, TrendingUp, CreditCard, Wallet, Target, Plus, Trash2, X, Sparkles, AlertTriangle, Check, ArrowRight } from 'lucide-react';
+import { Store, CalendarClock, Receipt as ReceiptIcon, Layers, ShieldCheck, TrendingUp, CreditCard, Wallet, Target, Plus, Trash2, X, Sparkles, AlertTriangle, Check, ArrowRight, Pencil } from 'lucide-react';
+import { AssetAccountsModal } from '@/components/AssetAccountsModal';
 import { convertToBase } from '@/lib/fx';
 import { applyFxRate, applyFxRateToCurrency } from './fxActions';
 import { FxRateButton } from '@/components/FxRateButton';
@@ -118,7 +119,7 @@ type GoalRow = {
 
 type Data = {
   statementPayments: PaymentReport;
-  netWorth: { accountsTotal: number; series: NetWorthPoint[] };
+  netWorth: { accountsTotal: number; series: NetWorthPoint[]; accounts?: Record<string, number> };
   safeToSpend: SafeToSpend;
   monthReview: MonthReview;
   monthlySpend: { key: string; label: string; total: number; count: number }[];
@@ -368,6 +369,7 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
   const router = useRouter();
   const [periodPending, startPeriod] = useTransition();
   const [pendingMonths, setPendingMonths] = useState<number | null>(null);
+  const [showAccountsModal, setShowAccountsModal] = useState(false);
   const shownMonths = periodPending && pendingMonths ? pendingMonths : months;
   const inWindow = (title: string) => `${title} · ${months}mo`;
 
@@ -433,7 +435,20 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
           </div>
           <div className="flex flex-wrap gap-5 text-xs" style={{ fontFamily: 'var(--font-mono)' }}>
             <div><span className="text-[color:var(--color-text-faint)] block mb-0.5">{t('reports.inventoryValue')}</span><span className="text-[color:var(--color-text)] text-sm">{money(s.ownedValue)}</span></div>
-            <div><span className="text-[color:var(--color-text-faint)] block mb-0.5">{t('reports.accounts')}</span><span className="text-[color:var(--color-cyan)] text-sm">{money(data.netWorth.accountsTotal)}</span></div>
+            <div>
+              <div className="flex items-center gap-1 mb-0.5">
+                <span className="text-[color:var(--color-text-faint)] block">{t('reports.accounts')}</span>
+                <button
+                  type="button"
+                  onClick={() => setShowAccountsModal(true)}
+                  className="text-[color:var(--color-text-faint)] hover:text-[color:var(--color-accent)] transition-colors p-0.5"
+                  title={t('reports.accounts')}
+                >
+                  <Pencil size={11} />
+                </button>
+              </div>
+              <span className="text-[color:var(--color-cyan)] text-sm">{money(data.netWorth.accountsTotal)}</span>
+            </div>
             <div><span className="text-[color:var(--color-text-faint)] block mb-0.5">{t('reports.owed')}</span><span className="text-[color:var(--color-red)] text-sm">-{money(s.installmentsRemaining)}</span></div>
             <div><span className="text-[color:var(--color-text-faint)] block mb-0.5">{t('reports.cardBalance')}</span><span className="text-[color:var(--color-gold)] text-sm">-{money(s.outstanding)}</span></div>
           </div>
@@ -901,6 +916,13 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
       <div id="goals">
         <GoalsCard goals={data.goals} className="mt-4" />
       </div>
+
+      <AssetAccountsModal
+        open={showAccountsModal}
+        onClose={() => setShowAccountsModal(false)}
+        initialAccounts={data.netWorth.accounts || {}}
+        onSaved={() => router.refresh()}
+      />
     </main>
   );
 }

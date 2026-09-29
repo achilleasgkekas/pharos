@@ -10,7 +10,7 @@ import { PAGE_MAIN, PageHeader } from '@/components/ui/PageHeader';
 import { controlClass } from '@/components/ui/Input';
 import { Field } from '@/components/ui/Field';
 import { useConfirm, usePrompt } from '@/components/ui/ConfirmDialog';
-import { saveAiConfig, pullOllamaModel, testAnthropic, saveStore, deleteStore, setAiConfirmBulk, exportData, exportDataEncrypted, importData, importDataEncrypted, verifyBackup, exportCSV, exportInsuranceBundle, exportTaxBundle, saveBudgets, saveBudgetRollover, suggestBudgets, saveAssetAccounts, saveDepreciation, saveCategoryRules, setAiEnabled, setAiFeature, fetchProviderModels, dismissAiModelNotices, getLiveAiSpendAction, type LiveAiSpendData } from './actions';
+import { saveAiConfig, pullOllamaModel, testAnthropic, saveStore, deleteStore, setAiConfirmBulk, exportData, exportDataEncrypted, importData, importDataEncrypted, verifyBackup, exportCSV, exportInsuranceBundle, saveCategoryRules, setAiEnabled, setAiFeature, fetchProviderModels, dismissAiModelNotices, getLiveAiSpendAction, type LiveAiSpendData } from './actions';
 import { applyCategoryRulesToExisting } from '@/app/expenses/actions';
 import type { CategoryRule } from '@/lib/categoryRules';
 import type { SerializedAiRun } from '@/lib/aiRun';
@@ -22,8 +22,7 @@ import { StoreDuplicatesModal } from './StoreDuplicatesModal';
 import { YnabImportModal } from './YnabImportModal';
 import type { StoreLite } from '@/lib/storeService';
 import type { AppSettings } from '@/lib/appSettings';
-import { rateForCategory } from '@/lib/depreciation';
-import { saveDefaults, runAlertChecks, getNotifierChannels, saveNotifierChannels, getNotifyTypes, saveNotifyTypes, getQuietHours, saveQuietHours, testNotifierChannel, getDeliveryLogs, getWebhookSubscriptions, saveWebhookSubscriptions, testWebhookSubscription, savePrompt, resetPrompt, saveScraperAi, saveStorageConfig, testRemoteConnection, testSecondaryRemote, syncToRemote, saveList, saveSpaces, getTrash, restoreFromTrash, purgeFromTrash, emptyTrash, startOnedriveAuth, pollOnedriveAuth, disconnectOnedriveAccount, testOnedriveConnection, saveImapConfigAction, testImapConnectionAction, checkImapInboxNow, type PromptEditorEntry, type ScraperAiConfig, type StorageInfo, type ListEditorEntry, type TrashRow, type ImapInfo } from './actions';
+import { saveDefaults, runAlertChecks, getNotifierChannels, saveNotifierChannels, getNotifyTypes, saveNotifyTypes, getQuietHours, saveQuietHours, testNotifierChannel, getDeliveryLogs, getWebhookSubscriptions, saveWebhookSubscriptions, testWebhookSubscription, savePrompt, resetPrompt, saveScraperAi, saveStorageConfig, testRemoteConnection, testSecondaryRemote, syncToRemote, saveList, saveSpaces, startOnedriveAuth, pollOnedriveAuth, disconnectOnedriveAccount, testOnedriveConnection, saveImapConfigAction, testImapConnectionAction, checkImapInboxNow, type PromptEditorEntry, type ScraperAiConfig, type StorageInfo, type ListEditorEntry, type ImapInfo } from './actions';
 import { enqueueOnedriveSync } from '@/app/jobActions';
 import { DEFAULT_SMTP_PORT, NOTIFIER_TYPES, type NotifierConfig, type NotifierType } from '@/lib/notifiers.shared';
 import { ALERT_TYPES, type AlertType, type NotifyTypes } from '@/lib/alertTypes';
@@ -55,7 +54,6 @@ import { UpdateChecker } from './UpdateChecker';
 import { WebPushToggle } from './WebPushToggle';
 import { BookmarkletManager } from './BookmarkletManager';
 import { SystemHealthPanel } from './SystemHealthPanel';
-import { RecomputePricesButton } from './RecomputePricesButton';
 import { getSampleDataStatus, loadSampleData, clearSampleData } from './sampleDataActions';
 import { renderStoragePath, TEMPLATE_TOKENS } from '@/lib/storagePath';
 import { CURRENCIES } from '@/lib/money';
@@ -304,10 +302,7 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
 
           {tab === 'money' && (
             <>
-              <BudgetsManager settings={info.settings} />
               <CategoryRulesManager settings={info.settings} />
-              <AssetAccountsManager settings={info.settings} />
-              <DepreciationManager settings={info.settings} />
               <CardsManager cards={info.cardList} />
             </>
           )}
@@ -339,7 +334,6 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
                   <Stat label={t('set.statCards')} value={info.counts.cards} />
                 </div>
                 <BackupRestore />
-                <RecomputePricesButton />
               </Section>
               <MigrationImportManager />
               <ImapImportManager imap={info.imap} />
@@ -347,7 +341,6 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
                 <BookmarkletManager />
               </Section>
               <SampleDataManager />
-              <TrashManager />
             </>
           )}
 
@@ -2243,104 +2236,7 @@ const saveBtn =
 const ghostBtn =
   'flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] hover:border-[color:var(--color-accent)] transition-colors disabled:opacity-50';
 
-function BudgetsManager({ settings }: { settings: AppSettings }) {
-  const money = useMoney();
-  const t = useT();
-  const [pending, startTransition] = useTransition();
-  const [budgets, setBudgets] = useState<Record<string, string>>(() =>
-    Object.fromEntries(settings.expenseCategories.map((c) => [c, settings.budgets[c] != null ? String(settings.budgets[c]) : '']))
-  );
-  const [msg, setMsg] = useState<string | null>(null);
-  const [suggesting, setSuggesting] = useState(false);
-  const [rollover, setRollover] = useState(settings.budgetRollover);
-  const total = Object.values(budgets).reduce((s, v) => s + (Number(v) || 0), 0);
 
-  function toggleRollover(v: boolean) {
-    setRollover(v);
-    startTransition(async () => {
-      await saveBudgetRollover(v);
-    });
-  }
-
-  function save() {
-    setMsg(null);
-    const out: Record<string, number> = {};
-    for (const [k, v] of Object.entries(budgets)) {
-      const n = Number(v);
-      if (n > 0) out[k] = n;
-    }
-    startTransition(async () => {
-      await saveBudgets(out);
-      setMsg(t('common.savedOk'));
-    });
-  }
-
-  function suggest() {
-    setMsg(null);
-    setSuggesting(true);
-    (async () => {
-      try {
-        const { suggestions, months } = await suggestBudgets();
-        const n = Object.keys(suggestions).length;
-        if (n === 0) {
-          setMsg(t('set.budgetsNoHistory'));
-          return;
-        }
-        // Pre-fill only categories the history covers; leave the rest untouched
-        // so the user reviews before saving (suggest ≠ auto-apply).
-        setBudgets((p) => {
-          const next = { ...p };
-          for (const [cat, amount] of Object.entries(suggestions)) next[cat] = String(amount);
-          return next;
-        });
-        setMsg(t('set.budgetsSuggested', { n, months }));
-      } finally {
-        setSuggesting(false);
-      }
-    })();
-  }
-
-  return (
-    <Section title={t('set.budgetsTitle')} icon={<SlidersHorizontal size={15} />}>
-      <p className="text-xs text-[color:var(--color-text-dim)] mb-3">{t('set.budgetsDesc')}</p>
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-        {settings.expenseCategories.map((c) => (
-          <label key={c} className="flex items-center gap-1.5 bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-2.5 py-1.5">
-            <span className="text-[11px] text-[color:var(--color-text-dim)] flex-1 truncate" title={c}>{c}</span>
-            <span className="text-[10px] text-[color:var(--color-text-faint)]">{cur()}</span>
-            <input
-              type="number"
-              min="0"
-              inputMode="decimal"
-              value={budgets[c] ?? ''}
-              onChange={(e) => setBudgets((p) => ({ ...p, [c]: e.target.value }))}
-              placeholder="0"
-              className="w-14 bg-transparent text-right text-xs text-[color:var(--color-text)] focus:outline-none"
-            />
-          </label>
-        ))}
-      </div>
-      <div className="flex items-center gap-3 mt-3 flex-wrap">
-        <button onClick={save} disabled={pending} className="text-xs px-3 py-1.5 rounded-lg bg-[color:var(--color-accent)] text-black font-semibold hover:opacity-90 disabled:opacity-50">
-          {pending ? t('common.saving') : t('set.saveBudgets')}
-        </button>
-        <button onClick={suggest} disabled={suggesting} title={t('set.suggestBudgetsHint')} className="text-xs px-3 py-1.5 rounded-lg border border-[color:var(--color-border)] text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:border-[color:var(--color-border-light)] disabled:opacity-50 inline-flex items-center gap-1.5">
-          {suggesting ? <Loader2 size={13} className="animate-spin" /> : <TrendingUp size={13} />}
-          {t('set.suggestBudgets')}
-        </button>
-        <span className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>{t('set.budgetTotal', { amount: money(total) })}</span>
-        {msg && <span className="text-[11px] text-[color:var(--color-accent)]">{msg}</span>}
-      </div>
-      <label className="flex items-center justify-between gap-3 mt-3 pt-3 border-t border-[color:var(--color-border)] cursor-pointer">
-        <span className="min-w-0">
-          <span className="text-xs font-medium block">{t('set.budgetRollover')}</span>
-          <span className="text-[10px] text-[color:var(--color-text-faint)] block">{t('set.budgetRolloverDesc')}</span>
-        </span>
-        <Switch label={t('set.budgetRollover')} checked={rollover} onChange={toggleRollover} />
-      </label>
-    </Section>
-  );
-}
 
 /** Manual asset accounts (cash, bank balances) counted into net worth (PA2).
  *  Free-form name + balance rows — no bank integration, the user updates by hand. */
@@ -2463,163 +2359,7 @@ function CategoryRulesManager({ settings }: { settings: AppSettings }) {
   );
 }
 
-function AssetAccountsManager({ settings }: { settings: AppSettings }) {
-  const money = useMoney();
-  const t = useT();
-  const [pending, startTransition] = useTransition();
-  const [rows, setRows] = useState<Array<{ name: string; balance: string }>>(() => {
-    const existing = Object.entries(settings.assetAccounts).map(([name, balance]) => ({ name, balance: String(balance) }));
-    return existing.length ? existing : [{ name: '', balance: '' }];
-  });
-  const [msg, setMsg] = useState<string | null>(null);
-  const total = rows.reduce((s, r) => s + (Number(r.balance) || 0), 0);
 
-  function save() {
-    setMsg(null);
-    const out: Record<string, number> = {};
-    for (const r of rows) {
-      const n = Number(r.balance);
-      // A named account is saved whatever its balance — including ZERO. The old condition was
-      // `n > 0`, which meant draining an account and typing 0 silently DELETED it: the row was
-      // dropped from the payload, the list on screen still showed it until the next reload, and
-      // the account was gone. Emptying an account is the normal life of a cash envelope, and the
-      // X button is the only way to remove one. Only a blank name skips a row (the trailing empty
-      // row the editor always keeps), and a typo that is not a number saves as 0 rather than
-      // vanishing.
-      if (r.name.trim()) out[r.name.trim()] = Number.isFinite(n) ? Math.max(0, n) : 0;
-    }
-    startTransition(async () => {
-      await saveAssetAccounts(out);
-      setMsg(t('common.savedOk'));
-    });
-  }
-
-  return (
-    <Section title={t('set.accountsTitle')} icon={<Landmark size={15} />}>
-      <p className="text-xs text-[color:var(--color-text-dim)] mb-3">{t('set.accountsDesc')}</p>
-      <div className="space-y-2">
-        {rows.map((r, i) => (
-          <div key={i} className="flex items-center gap-2">
-            <input
-              value={r.name}
-              onChange={(e) => setRows((p) => p.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))}
-              placeholder={t('set.accountNamePlaceholder')}
-              className="flex-1 min-w-0 bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-3 py-1.5 text-xs text-[color:var(--color-text)] focus:outline-none focus:border-[color:var(--color-accent)]"
-            />
-            <label className="flex items-center gap-1.5 bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-2.5 py-1.5">
-              <span className="text-[10px] text-[color:var(--color-text-faint)]">{cur()}</span>
-              <input
-                type="number"
-                min="0"
-                inputMode="decimal"
-                value={r.balance}
-                onChange={(e) => setRows((p) => p.map((x, j) => (j === i ? { ...x, balance: e.target.value } : x)))}
-                placeholder="0"
-                className="w-24 bg-transparent text-right text-xs text-[color:var(--color-text)] focus:outline-none"
-              />
-            </label>
-            <button onClick={() => setRows((p) => p.filter((_, j) => j !== i))} className="text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)]" title={t('common.delete')}>
-              <X size={14} />
-            </button>
-          </div>
-        ))}
-      </div>
-      <div className="flex items-center gap-3 mt-3">
-        <button onClick={() => setRows((p) => [...p, { name: '', balance: '' }])} className="flex items-center gap-1 text-xs text-[color:var(--color-cyan)] hover:text-[color:var(--color-accent)]">
-          <Plus size={13} /> {t('set.addAccount')}
-        </button>
-        <button onClick={save} disabled={pending} className="text-xs px-3 py-1.5 rounded-lg bg-[color:var(--color-accent)] text-black font-semibold hover:opacity-90 disabled:opacity-50">
-          {pending ? t('common.saving') : t('set.saveAccounts')}
-        </button>
-        <span className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>{t('set.accountsTotal', { amount: money(total) })}</span>
-        {msg && <span className="text-[11px] text-[color:var(--color-accent)]">{msg}</span>}
-      </div>
-    </Section>
-  );
-}
-
-/** Asset depreciation model (P29). Owned-inventory value on Reports is estimated
- *  from purchase price + date via a per-category declining-balance curve instead of
- *  staying frozen at cost. Toggle, salvage floor, default rate, and per-category rates. */
-function DepreciationManager({ settings }: { settings: AppSettings }) {
-  const t = useT();
-  const dep = settings.depreciation;
-  const [pending, startTransition] = useTransition();
-  const [enabled, setEnabled] = useState(dep.enabled);
-  const [floorPct, setFloorPct] = useState(String(dep.floorPct));
-  const [defaultRate, setDefaultRate] = useState(String(dep.defaultRate));
-  const [rates, setRates] = useState<Record<string, string>>(() =>
-    Object.fromEntries(settings.itemCategories.map((c) => [c, dep.rates[c] != null ? String(dep.rates[c]) : '']))
-  );
-  const [msg, setMsg] = useState<string | null>(null);
-
-  function save() {
-    setMsg(null);
-    // Only non-empty inputs become explicit overrides; empty → the default rate
-    // applies at read time (so "empty" ≠ "0% / never depreciates").
-    const out: Record<string, number> = {};
-    for (const [k, v] of Object.entries(rates)) {
-      if (v.trim() === '') continue;
-      const n = Number(v);
-      if (Number.isFinite(n) && n >= 0) out[k] = n;
-    }
-    startTransition(async () => {
-      await saveDepreciation({ enabled, floorPct: Number(floorPct) || 0, defaultRate: Number(defaultRate) || 0, rates: out });
-      setMsg(t('common.savedOk'));
-    });
-  }
-
-  return (
-    <Section title={t('set.depreciationTitle')} icon={<TrendingDown size={15} />}>
-      <p className="text-xs text-[color:var(--color-text-dim)] mb-3">{t('set.depreciationDesc')}</p>
-      <label className="flex items-center justify-between gap-3 mb-3">
-        <span className="text-xs text-[color:var(--color-text-dim)]">{t('set.depreciationEnabled')}</span>
-        <Switch label={t('set.depreciationEnabled')} checked={enabled} onChange={setEnabled} />
-      </label>
-      {enabled && (
-        <>
-          <div className="grid grid-cols-2 gap-3 mb-3">
-            <label className="flex items-center gap-1.5 bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-2.5 py-1.5">
-              <span className="text-[11px] text-[color:var(--color-text-dim)] flex-1">{t('set.depreciationDefaultRate')}</span>
-              <input type="number" min="0" max="100" inputMode="decimal" value={defaultRate} onChange={(e) => setDefaultRate(e.target.value)} className="w-14 bg-transparent text-right text-xs text-[color:var(--color-text)] focus:outline-none" />
-              <span className="text-[10px] text-[color:var(--color-text-faint)]">%/yr</span>
-            </label>
-            <label className="flex items-center gap-1.5 bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-2.5 py-1.5">
-              <span className="text-[11px] text-[color:var(--color-text-dim)] flex-1">{t('set.depreciationFloor')}</span>
-              <input type="number" min="0" max="100" inputMode="decimal" value={floorPct} onChange={(e) => setFloorPct(e.target.value)} className="w-14 bg-transparent text-right text-xs text-[color:var(--color-text)] focus:outline-none" />
-              <span className="text-[10px] text-[color:var(--color-text-faint)]">%</span>
-            </label>
-          </div>
-          <p className="text-[11px] text-[color:var(--color-text-faint)] mb-2">{t('set.depreciationRatesLabel')}</p>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            {settings.itemCategories.map((c) => (
-              <label key={c} className="flex items-center gap-1.5 bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-2.5 py-1.5">
-                <span className="text-[11px] text-[color:var(--color-text-dim)] flex-1 truncate" title={c}>{c}</span>
-                <input
-                  type="number"
-                  min="0"
-                  max="100"
-                  inputMode="decimal"
-                  value={rates[c] ?? ''}
-                  onChange={(e) => setRates((p) => ({ ...p, [c]: e.target.value }))}
-                  placeholder={String(rateForCategory({ ...dep, rates: {} }, c))}
-                  className="w-12 bg-transparent text-right text-xs text-[color:var(--color-text)] focus:outline-none"
-                />
-                <span className="text-[10px] text-[color:var(--color-text-faint)]">%</span>
-              </label>
-            ))}
-          </div>
-        </>
-      )}
-      <div className="flex items-center gap-3 mt-3">
-        <button onClick={save} disabled={pending} className="text-xs px-3 py-1.5 rounded-lg bg-[color:var(--color-accent)] text-black font-semibold hover:opacity-90 disabled:opacity-50">
-          {pending ? t('common.saving') : t('set.depreciationSave')}
-        </button>
-        {msg && <span className="text-[11px] text-[color:var(--color-accent)]">{msg}</span>}
-      </div>
-    </Section>
-  );
-}
 
 function DefaultsManager({ settings }: { settings: AppSettings }) {
   const t = useT();
@@ -3405,99 +3145,7 @@ function WebhookManager() {
 
 // ─── Backup / restore ────────────────────────────────────────────────────────
 
-// ─── Trash (soft-deleted records) ────────────────────────────────────────────
 
-function TrashManager() {
-  const locale = useLocale();
-  const t = useT();
-  const [rows, setRows] = useState<TrashRow[] | null>(null);
-  const [pending, startTransition] = useTransition();
-  const [busyId, setBusyId] = useState('');
-  const confirm = useConfirm();
-
-  function load() {
-    startTransition(async () => setRows(await getTrash()));
-  }
-  useEffect(load, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  function restore(r: TrashRow) {
-    setBusyId(r.id);
-    startTransition(async () => {
-      await restoreFromTrash(r.type, r.id);
-      setRows((p) => (p ?? []).filter((x) => x.id !== r.id));
-      setBusyId('');
-    });
-  }
-  async function purge(r: TrashRow) {
-    const ok = await confirm({
-      title: t('set.deleteForeverTitle'),
-      message: t('set.confirmPurge', { title: r.title }),
-      confirmLabel: t('common.deleteForever'),
-      danger: true,
-    });
-    if (!ok) return;
-    setBusyId(r.id);
-    startTransition(async () => {
-      await purgeFromTrash(r.type, r.id);
-      setRows((p) => (p ?? []).filter((x) => x.id !== r.id));
-      setBusyId('');
-    });
-  }
-  async function empty() {
-    const ok = await confirm({
-      title: t('set.emptyTrashTitle'),
-      message: t('set.confirmEmpty', { n: rows?.length ?? 0 }),
-      confirmLabel: t('set.emptyTrashBtn'),
-      danger: true,
-    });
-    if (!ok) return;
-    startTransition(async () => {
-      await emptyTrash();
-      setRows([]);
-    });
-  }
-
-  return (
-    <Section title={`${t('set.trashTitle')}${rows?.length ? ` (${rows.length})` : ''}`} icon={<Trash2 size={15} />}>
-      <p className="text-xs text-[color:var(--color-text-dim)] mb-3">
-        {t('set.trashDesc')}
-      </p>
-      {rows === null ? (
-        <p className="text-xs text-[color:var(--color-text-faint)]"><Loader2 size={13} className="inline animate-spin" /> {t('common.loading')}</p>
-      ) : rows.length === 0 ? (
-        <p className="text-xs text-[color:var(--color-text-faint)] italic">{t('set.trashEmpty')}</p>
-
-      ) : (
-        <>
-          <div className="space-y-1.5 max-h-72 overflow-y-auto pr-1">
-            {rows.map((r) => (
-              <div key={`${r.type}-${r.id}`} className="flex items-center gap-2.5 bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-3 py-2">
-                <span className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-faint)] bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded px-1.5 py-0.5 shrink-0" style={{ fontFamily: 'var(--font-mono)' }}>
-                  {r.type}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <span className="text-xs font-medium truncate block">{r.title}</span>
-                  <span className="text-[10px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
-                    {r.subtitle} · {t('set.deletedOn', { date: formatDate(r.deletedAt, locale) })}
-                  </span>
-                </div>
-                <button onClick={() => restore(r)} disabled={pending && busyId === r.id} className="text-[11px] text-[color:var(--color-accent)] hover:underline disabled:opacity-50 shrink-0">
-                  {t('set.restore')}
-                </button>
-                <button onClick={() => purge(r)} disabled={pending && busyId === r.id} className="text-[11px] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] disabled:opacity-50 shrink-0">
-                  {t('set.deleteForeverLower')}
-                </button>
-              </div>
-            ))}
-          </div>
-          <button onClick={empty} disabled={pending} className="mt-3 text-xs px-3 py-1.5 rounded-lg border border-[color:var(--color-border)] text-[color:var(--color-red)] hover:border-[color:var(--color-red)] transition-colors disabled:opacity-50">
-            {t('set.emptyTrash', { n: rows.length })}
-          </button>
-        </>
-      )}
-    </Section>
-  );
-}
 
 function MigrationImportManager() {
   const t = useT();
@@ -3729,8 +3377,6 @@ function BackupRestore() {
   const [report, setReport] = useState<{ ok: boolean; headline: string; issues: { level: string; message: string }[] } | null>(null);
   const confirm = useConfirm();
   const prompt = usePrompt();
-  const nowYear = new Date().getFullYear();
-  const [taxYear, setTaxYear] = useState(nowYear);
 
   function download(text: string, name: string, mime: string) {
     const blob = new Blob([text], { type: mime });
@@ -3880,28 +3526,6 @@ function BackupRestore() {
     });
   }
 
-  function handleTaxExport() {
-    setMsg(null);
-    startTransition(async () => {
-      try {
-        const { base64, itemCount, totalValue } = await exportTaxBundle(taxYear);
-        const bin = atob(base64);
-        const bytes = new Uint8Array(bin.length);
-        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-        const blob = new Blob([bytes], { type: 'application/zip' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `pharos-tax-export-${taxYear}.zip`;
-        a.click();
-        URL.revokeObjectURL(url);
-        setMsg(t('set.taxExportDone', { n: itemCount, total: money(totalValue) }));
-      } catch (e) {
-        setMsg(t('set.taxFailed', { error: (e as Error).message.slice(0, 80) }));
-      }
-    });
-  }
-
   const btn =
     'flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] hover:border-[color:var(--color-accent)] transition-colors disabled:opacity-50';
 
@@ -3983,25 +3607,6 @@ function BackupRestore() {
       </div>
       <p className="text-[10px] text-[color:var(--color-text-faint)] mt-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
         {t('set.insuranceExportDesc')}
-      </p>
-      <div className="flex items-center gap-2 flex-wrap mt-3 pt-3 border-t border-[color:var(--color-border)]">
-        <select
-          aria-label={t('set.taxYear')}
-          value={taxYear}
-          onChange={(e) => setTaxYear(Number(e.target.value))}
-          className="text-xs px-2 py-1.5 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)]"
-          style={{ fontFamily: 'var(--font-mono)' }}
-        >
-          {Array.from({ length: 5 }, (_, i) => nowYear - i).map((y) => (
-            <option key={y} value={y}>{y}</option>
-          ))}
-        </select>
-        <button type="button" onClick={handleTaxExport} disabled={pending} className={cn(btn, 'text-[color:var(--color-gold)]')}>
-          {pending ? <Loader2 size={13} className="animate-spin" /> : <Landmark size={13} />} {t('set.taxExport')}
-        </button>
-      </div>
-      <p className="text-[10px] text-[color:var(--color-text-faint)] mt-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
-        {t('set.taxExportDesc')}
       </p>
     </div>
   );

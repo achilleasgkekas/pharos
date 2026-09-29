@@ -2,11 +2,13 @@
 import { PAGE_MAIN, PageHeader } from '@/components/ui/PageHeader';
 import { DateInput } from '@/components/ui/DateInput';
 import { useMemo, useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 import { useLocale, useT, useMoney } from '@/components/LocaleProvider';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { ResponsiveContainer, AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, ReferenceLine, Legend } from 'recharts';
 import { keepSeriesOrder } from '@/lib/chartOrder';
-import { Target, TrendingUp, Wallet, Plus, Trash2, Scissors, Check, AlertTriangle } from 'lucide-react';
+import { Target, TrendingUp, Wallet, Plus, Trash2, Scissors, Check, AlertTriangle, Pencil } from 'lucide-react';
+import { AssetAccountsModal } from '@/components/AssetAccountsModal';
 import {
   balanceOn,
   planForTarget,
@@ -72,11 +74,13 @@ const VERDICT_COLOR: Record<SavingsVerdict, string> = {
 };
 
 export function SavingsClient({ data }: { data: SavingsData }) {
+  const router = useRouter();
   const locale = useLocale();
   const t = useT();
   const money = useMoney();
   const moneyExact = useMoney({ minimumFractionDigits: 0, maximumFractionDigits: 2 });
   const { baseline, projection, goals, levers, obligations } = data;
+  const [showAccountsModal, setShowAccountsModal] = useState(false);
 
   // Default six months out: far enough to be a forecast, near enough to still be about
   // the decision in front of you.
@@ -118,7 +122,21 @@ export function SavingsClient({ data }: { data: SavingsData }) {
       {/* Honesty first: a forecast built on nothing, or on a balance the app does not
           know, is worth saying out loud ABOVE the number it would otherwise flatter. */}
       {baseline.basis === 'none' && <Notice tone="warn" text={t('sav.basisNone')} />}
-      {!data.hasAccounts && <Notice tone="info" text={t('sav.noAccounts')} />}
+      {!data.hasAccounts && (
+        <Notice
+          tone="info"
+          text={t('sav.noAccounts')}
+          action={
+            <button
+              type="button"
+              onClick={() => setShowAccountsModal(true)}
+              className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-medium text-[color:var(--color-cyan)] hover:underline"
+            >
+              <Pencil size={11} /> {t('common.edit')} {t('reports.accounts')}
+            </button>
+          }
+        />
+      )}
       {baseline.basis !== 'none' && baseline.incomeMonths < baseline.months / 2 && (
         <Notice tone="info" text={t('sav.incomeSparse', { n: baseline.incomeMonths, m: baseline.months })} />
       )}
@@ -129,6 +147,14 @@ export function SavingsClient({ data }: { data: SavingsData }) {
           <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
             <span className="flex items-center gap-1.5 text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-[0.15em]" style={{ fontFamily: 'var(--font-mono)' }}>
               <Wallet size={12} /> {t('sav.forecastTitle')}
+              <button
+                type="button"
+                onClick={() => setShowAccountsModal(true)}
+                className="ml-2 text-[10px] normal-case text-[color:var(--color-accent)] hover:underline flex items-center gap-1"
+                title={t('reports.accounts')}
+              >
+                <Pencil size={10} /> {t('reports.accounts')}
+              </button>
             </span>
             <label className="flex items-center gap-2 text-[11px] text-[color:var(--color-text-dim)]">
               {t('sav.pickDate')}
@@ -265,6 +291,13 @@ export function SavingsClient({ data }: { data: SavingsData }) {
           </ResponsiveContainer>
         </Card>
       )}
+
+      <AssetAccountsModal
+        open={showAccountsModal}
+        onClose={() => setShowAccountsModal(false)}
+        initialAccounts={data.accounts || {}}
+        onSaved={() => router.refresh()}
+      />
     </main>
   );
 }
@@ -467,12 +500,15 @@ function SaveAsGoal({ amount, date }: { amount: number; date: string }) {
   );
 }
 
-function Notice({ tone, text }: { tone: 'info' | 'warn'; text: string }) {
+function Notice({ tone, text, action }: { tone: 'info' | 'warn'; text: string; action?: React.ReactNode }) {
   const color = tone === 'warn' ? 'var(--color-gold)' : 'var(--color-cyan)';
   return (
     <div className="mb-3 rounded-xl border p-3 flex items-start gap-2" style={{ borderColor: `${color}40`, background: `${color}12` }}>
       <AlertTriangle size={13} className="shrink-0 mt-0.5" style={{ color }} />
-      <p className="text-[11px] text-[color:var(--color-text-dim)]">{text}</p>
+      <div className="text-[11px] text-[color:var(--color-text-dim)]">
+        <p>{text}</p>
+        {action}
+      </div>
     </div>
   );
 }
