@@ -1,3 +1,5 @@
+# PyJWT 2.14.0 overrides Semgrep 1.178.0's vulnerable ~=2.13.0 cap.
+# Install with --no-deps, then run check-semgrep-dependencies.py to verify closure.
 # Python 3.12 / Linux x86_64. All direct and transitive wheel hashes are verified.
 # Regenerate: pip download --only-binary=:all: --dest wheels semgrep==1.178.0
 --only-binary=:all:
