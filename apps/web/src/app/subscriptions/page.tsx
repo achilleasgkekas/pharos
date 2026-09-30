@@ -33,7 +33,7 @@ async function getData(): Promise<{
   const now = Date.now();
   const subscriptions = (JSON.parse(JSON.stringify(subs)) as SerializedSubscription[]).map((s) => ({
     ...s,
-    nextRenewal: effectiveNextRenewalISO(s.nextRenewal, s.billingCycle, now),
+    nextRenewal: effectiveNextRenewalISO(s.nextRenewal, s.billingCycle, now, s.startDate),
   }));
   return {
     subscriptions,

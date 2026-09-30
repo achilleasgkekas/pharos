@@ -51,11 +51,12 @@ export function renewalHasPassed(date: string | Date | null | undefined, now: nu
 }
 
 /** Step `start` forward one cycle at a time for as long as `behind` says it is too early. */
-function roll(start: Date, cycle: string, behind: (d: Date) => boolean): Date {
+function roll(start: Date, cycle: string, behind: (d: Date) => boolean, anchor?: Date | null): Date {
   let d = start;
   let guard = 0;
+  const anc = anchor || start;
   while (behind(d) && guard < MAX_STEPS) {
-    d = addCycle(d, cycle);
+    d = addCycle(d, cycle, anc);
     guard++;
   }
   return d;
@@ -64,6 +65,7 @@ function roll(start: Date, cycle: string, behind: (d: Date) => boolean): Date {
 /**
  * The date a subscription is ACTUALLY next charged on: the stored `nextRenewal` while it
  * is still ahead, otherwise the next occurrence of the same cycle after today.
+ * An optional `anchor` (e.g. `startDate`) preserves the original billing day across short months.
  *
  * A cycle that never renews ('lifetime') is returned untouched — there is no next charge
  * to roll to, and stepping it would spin (addCycle returns the same date). An absent date
@@ -72,26 +74,30 @@ function roll(start: Date, cycle: string, behind: (d: Date) => boolean): Date {
 export function effectiveNextRenewal(
   nextRenewal: string | Date | null | undefined,
   billingCycle: string | null | undefined,
-  now: number = Date.now()
+  now: number = Date.now(),
+  anchor?: string | Date | null
 ): Date | null {
   const stored = toDate(nextRenewal);
   if (!stored) return null;
   const cycle = billingCycle || 'monthly';
   if (!cycleRenews(cycle)) return stored;
-  return roll(stored, cycle, (d) => renewalHasPassed(d, now));
+  const anc = toDate(anchor);
+  return roll(stored, cycle, (d) => renewalHasPassed(d, now), anc);
 }
 
 /** ISO form of {@link effectiveNextRenewal}, for the serialized shapes the UI/API hand out. */
 export function effectiveNextRenewalISO(
   nextRenewal: string | Date | null | undefined,
   billingCycle: string | null | undefined,
-  now: number = Date.now()
+  now: number = Date.now(),
+  anchor?: string | Date | null
 ): string | null {
-  return effectiveNextRenewal(nextRenewal, billingCycle, now)?.toISOString() ?? null;
+  return effectiveNextRenewal(nextRenewal, billingCycle, now, anchor)?.toISOString() ?? null;
 }
 
 /**
  * The first occurrence on or after `boundary`, for the calendar/agenda projections.
+ * An optional `anchor` (e.g. `startDate`) preserves the original billing day across short months.
  *
  * Deliberately NOT `effectiveNextRenewal`: those views draw a whole month, including the
  * days of it that have already gone by, so a charge that landed on the 3rd belongs in the
@@ -102,11 +108,13 @@ export function effectiveNextRenewalISO(
 export function renewalOnOrAfter(
   nextRenewal: string | Date | null | undefined,
   billingCycle: string | null | undefined,
-  boundary: Date
+  boundary: Date,
+  anchor?: string | Date | null
 ): Date | null {
   const stored = toDate(nextRenewal);
   if (!stored) return null;
   const cycle = billingCycle || 'monthly';
   if (!cycleRenews(cycle)) return stored;
-  return roll(stored, cycle, (d) => d < boundary);
+  const anc = toDate(anchor);
+  return roll(stored, cycle, (d) => d < boundary, anc);
 }

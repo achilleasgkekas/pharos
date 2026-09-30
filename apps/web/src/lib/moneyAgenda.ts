@@ -70,7 +70,7 @@ export async function computeMoneyAgenda(now: Date = new Date(), locale = 'en'):
   ]);
 
   const [subs, statements, items, vouchers, recurring, bills, goals] = await Promise.all([
-    Subscription.find({ active: true, nextRenewal: { $ne: null }, deletedAt: null }).select('name amount billingCycle nextRenewal').lean(),
+    Subscription.find({ active: true, nextRenewal: { $ne: null }, deletedAt: null }).select('name amount billingCycle nextRenewal startDate').lean(),
     Statement.find().lean(),
     Item.find({ warrantyUntil: { $gte: windowStart, $lt: windowEnd }, status: { $in: [...WARRANTY_ALERT_STATUSES] }, deletedAt: null }).select('title warrantyUntil').lean(),
     Voucher.find({ used: false, expiresAt: { $gte: windowStart, $lt: windowEnd }, deletedAt: null }).select('title store discount expiresAt').lean(),
@@ -113,7 +113,7 @@ export async function computeMoneyAgenda(now: Date = new Date(), locale = 'en'):
   };
 
   // Subscription renewals — step each one forward through the window.
-  for (const s of subs as { name?: string; amount?: number; billingCycle?: string; nextRenewal?: Date }[]) {
+  for (const s of subs as { name?: string; amount?: number; billingCycle?: string; nextRenewal?: Date; startDate?: Date }[]) {
     // A non-renewing cycle (lifetime) must not be stepped: addCycle returns the same
     // date, which would push the identical entry once per guard iteration.
     if (!cycleRenews(s.billingCycle || 'monthly')) continue;
@@ -121,7 +121,8 @@ export async function computeMoneyAgenda(now: Date = new Date(), locale = 'en'):
     // advances, so a subscription last saved years ago used to burn the whole step budget
     // catching up and never reach the window at all — the charge simply vanished from the
     // agenda, and from the safe-to-spend figure built on it.
-    let d = renewalOnOrAfter(s.nextRenewal, s.billingCycle, windowStart);
+    const anchor = s.startDate || s.nextRenewal;
+    let d = renewalOnOrAfter(s.nextRenewal, s.billingCycle, windowStart, anchor);
     if (!d) continue;
     let guard = 0;
     while (d < windowEnd && guard < MAX_RENEWALS_PER_WINDOW) {
@@ -129,7 +130,7 @@ export async function computeMoneyAgenda(now: Date = new Date(), locale = 'en'):
       if (d >= windowStart) {
         push(d, { kind: 'renewal', label: s.name || 'Subscription', sub: `Renews ${cycleWord(s.billingCycle || 'monthly')}`, amount: s.amount || 0 });
       }
-      d = addCycle(d, s.billingCycle || 'monthly');
+      d = addCycle(d, s.billingCycle || 'monthly', anchor);
     }
   }
 
@@ -150,7 +151,8 @@ export async function computeMoneyAgenda(now: Date = new Date(), locale = 'en'):
     const key = `${r.kind}|${r.vendorKey}`;
     if (!r.vendorKey || seen.has(key)) continue;
     seen.add(key);
-    let d = addCycle(new Date(r.date as unknown as string), String(r.recurringCycle));
+    const anchor = new Date(r.date as unknown as string);
+    let d = addCycle(anchor, String(r.recurringCycle), anchor);
     let guard = 0;
     while (d < windowEnd && guard < 8) {
       guard++;
@@ -162,7 +164,7 @@ export async function computeMoneyAgenda(now: Date = new Date(), locale = 'en'):
           amount: r.amount || 0,
         });
       }
-      d = addCycle(d, String(r.recurringCycle));
+      d = addCycle(d, String(r.recurringCycle), anchor);
     }
   }
 
