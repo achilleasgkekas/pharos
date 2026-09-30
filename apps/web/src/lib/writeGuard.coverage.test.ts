@@ -39,6 +39,8 @@ const ALLOWLIST: Record<string, string> = {
   // as mutating here in the first place.)
   'settings/users.actions.ts:confirmSelfMfaEnrollment': 'own credentials only',
   'settings/users.actions.ts:disableSelfMfa': 'own credentials only',
+  'account/actions.ts:updateProfile': 'own profile only',
+  'account/actions.ts:updateAlertSubscriptions': 'own notification preferences only',
   // Not user intent: these run on page load to keep derived state fresh (alerts recomputed
   // from existing data, missing PDF thumbnails rendered). Guarding them would make every
   // page a viewer opens throw. Neither can store user-supplied content.

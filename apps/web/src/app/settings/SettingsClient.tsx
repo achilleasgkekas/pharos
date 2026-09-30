@@ -2,7 +2,9 @@
 import { useState, useTransition, useRef, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Activity, Sun, Moon, Sparkles, Database, CreditCard, ExternalLink, Server, Cloud, Download, Upload, Loader2, Check, Store as StoreIcon, Pencil, Trash2, Plus, X, Copy, ShieldCheck, SlidersHorizontal, Bell, MessageSquareCode, RotateCcw, ChevronDown, Globe, HardDrive, FolderTree, RefreshCw, Plug, Users, UserPlus, KeyRound, Star, Landmark, TrendingUp, TrendingDown, CalendarPlus, Tags, MapPin, FlaskConical, Webhook, Mail, Bookmark, LogOut, History, Zap, Coins, Briefcase } from 'lucide-react';
+import { Activity, Sun, Moon, Sparkles, Database, CreditCard, ExternalLink, Server, Cloud, Download, Upload, Loader2, Check, Store as StoreIcon, Pencil, Trash2, Plus, X, Copy, ShieldCheck, SlidersHorizontal, Bell, MessageSquareCode, RotateCcw, ChevronDown, Globe, HardDrive, FolderTree, RefreshCw, Plug, Users, UserPlus, KeyRound, Star, Landmark, TrendingUp, TrendingDown, CalendarPlus, Tags, MapPin, FlaskConical, Webhook, Mail, Bookmark, LogOut, History, Zap, Coins, Briefcase, UserRound } from 'lucide-react';
+import { AccountManager } from '@/app/account/AccountManager';
+import { getAccountData, type AccountData } from '@/app/account/actions';
 import { useTheme, type Theme } from '@/components/ThemeProvider';
 import { cur } from '@/lib/money';
 import { cn } from '@/components/ui/cn';
@@ -149,7 +151,7 @@ const OPENROUTER_SUGGESTIONS = ['openai/gpt-4o-mini', 'anthropic/claude-3.5-sonn
 // Mirror of the server-side vision detection (lib/aiConfig.ts) for inline warnings.
 const isVisionName = (name: string) => /vl|vision|llava|minicpm-v|moondream|bakllava|llama3\.2-vision/i.test(name);
 
-type TabId = 'workspace' | 'ai' | 'storage' | 'integrations' | 'users' | 'activity' | 'system';
+type TabId = 'workspace' | 'account' | 'ai' | 'storage' | 'integrations' | 'users' | 'activity' | 'system';
 
 import type { Role } from '@/lib/roles';
 
@@ -157,6 +159,7 @@ type CurrentUser = { id: string; name: string; role: Role };
 
 const TABS: { id: TabId; label: string; icon: React.ReactNode; adminOnly?: boolean; selfHostOnly?: boolean; multiUserOnly?: boolean }[] = [
   { id: 'workspace', label: 'Workspace', icon: <Briefcase size={15} /> },
+  { id: 'account', label: 'Account', icon: <UserRound size={15} /> },
   // Hosted: AI moves to Workspace → AI (key + toggles in one control-plane place), so hide the
   // product AI tab in SaaS. Self-host keeps it — it is the only AI settings surface there.
   { id: 'ai', label: 'AI & Telemetry', icon: <Sparkles size={15} />, selfHostOnly: true },
@@ -173,6 +176,7 @@ const TABS: { id: TabId; label: string; icon: React.ReactNode; adminOnly?: boole
 
 const TAB_KEY: Record<TabId, TKey> = {
   workspace: 'set.tabWorkspace',
+  account: 'set.tabAccount' as TKey,
   ai: 'set.tabAiTelemetry',
   storage: 'set.tabStorageBackups',
   integrations: 'set.tabIntegrations',
@@ -185,6 +189,8 @@ function normalizeTab(raw: string | null): TabId | null {
   if (!raw) return null;
   const ALIASES: Record<string, TabId> = {
     workspace: 'workspace',
+    account: 'account',
+    profile: 'account',
     general: 'workspace',
     money: 'workspace',
     data: 'workspace',
@@ -203,10 +209,17 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
   const { theme, setTheme } = useTheme();
   const t = useT();
   const [tab, setTab] = useState<TabId>('workspace');
+  const [accountData, setAccountData] = useState<AccountData | null>(null);
   const isAdmin = currentUser.role === 'admin';
   const multiUser = useAttributionNames() !== null;
   const visibleTabs = TABS.filter((t) => (!t.adminOnly || isAdmin) && (!t.multiUserOnly || multiUser));
   const searchParams = useSearchParams();
+
+  useEffect(() => {
+    if (tab === 'account' && !accountData) {
+      getAccountData().then(setAccountData).catch(() => {});
+    }
+  }, [tab, accountData]);
 
   // A ?tab= deep-link (e.g. from the "Set up AI" banner) wins; otherwise restore the
   // last-open tab from localStorage. Read on mount to avoid an SSR mismatch.
@@ -308,6 +321,16 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
                 </Row>
               </Section>
             </>
+          )}
+
+          {tab === 'account' && (
+            accountData ? (
+              <AccountManager initialData={accountData} embedded />
+            ) : (
+              <div className="flex items-center justify-center p-12 text-xs text-[color:var(--color-text-dim)]">
+                <Loader2 size={16} className="animate-spin mr-2" /> {t('common.loading')}
+              </div>
+            )
           )}
 
           {tab === 'ai' && (

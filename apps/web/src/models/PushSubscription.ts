@@ -21,6 +21,8 @@ const PushSubscriptionSchema = new Schema(
     },
     // Best-effort label so a future "your devices" list can name them; not required.
     userAgent: { type: String, default: '' },
+    // User who registered this push subscription (#383).
+    userId: { type: Schema.Types.ObjectId, ref: 'User', default: null, index: true },
   },
   { timestamps: true }
 );

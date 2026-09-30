@@ -11,6 +11,7 @@ const UserSchema = new Schema(
   {
     username: { type: String, required: true, unique: true, lowercase: true, trim: true },
     name: { type: String, default: '' }, // display name
+    email: { type: String, default: '', lowercase: true, trim: true }, // personal notification email
     passwordHash: { type: String, required: true }, // scrypt string — NEVER sent to the client
     role: { type: String, enum: ['admin', 'member', 'viewer'], default: 'member' },
     // Personal API token (bearer) for the remote MCP endpoint. Null = no token.
@@ -29,6 +30,8 @@ const UserSchema = new Schema(
     mfaSecretEnc: { type: String, default: null },
     mfaPendingSecretEnc: { type: String, default: null },
     mfaRecoveryHashes: { type: [String], default: [] },
+    // Per-user alert category subscriptions (#383). Overrides workspace notifyTypes.
+    alertSubscriptions: { type: Schema.Types.Mixed, default: () => ({}) },
     // "Sign out everywhere" epoch (P91). Embedded in every session JWT at mint time and
     // compared on the server-side auth check; bumping it invalidates every existing token
     // for this user at once (leaked password, a shared/family tablet left logged in). Same
@@ -39,7 +42,11 @@ const UserSchema = new Schema(
   { timestamps: true }
 );
 
-export type UserDoc = InferSchemaType<typeof UserSchema> & { _id: string };
+export type UserDoc = InferSchemaType<typeof UserSchema> & {
+  _id: string;
+  email?: string;
+  alertSubscriptions?: Record<string, boolean>;
+};
 
 export const User: Model<UserDoc> =
   (models.User as Model<UserDoc>) || model<UserDoc>('User', UserSchema);
