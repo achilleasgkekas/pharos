@@ -2,7 +2,7 @@
 import { useState, useTransition, useRef, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { UserRound, Activity, Sun, Moon, Sparkles, Database, CreditCard, ExternalLink, Server, Cloud, Download, Upload, Loader2, Check, Store as StoreIcon, Pencil, Trash2, Plus, X, Copy, ShieldCheck, SlidersHorizontal, Bell, MessageSquareCode, RotateCcw, ChevronDown, Globe, HardDrive, FolderTree, RefreshCw, Plug, Users, UserPlus, KeyRound, Star, Landmark, TrendingUp, TrendingDown, CalendarPlus, Tags, MapPin, FlaskConical, Webhook, Mail, Bookmark, LogOut, History, Zap, Coins, Briefcase } from 'lucide-react';
+import { Activity, Sun, Moon, Sparkles, Database, CreditCard, ExternalLink, Server, Cloud, Download, Upload, Loader2, Check, Store as StoreIcon, Pencil, Trash2, Plus, X, Copy, ShieldCheck, SlidersHorizontal, Bell, MessageSquareCode, RotateCcw, ChevronDown, Globe, HardDrive, FolderTree, RefreshCw, Plug, Users, UserPlus, KeyRound, Star, Landmark, TrendingUp, TrendingDown, CalendarPlus, Tags, MapPin, FlaskConical, Webhook, Mail, Bookmark, LogOut, History, Zap, Coins, Briefcase } from 'lucide-react';
 import { useTheme, type Theme } from '@/components/ThemeProvider';
 import { cur } from '@/lib/money';
 import { cn } from '@/components/ui/cn';
@@ -35,8 +35,17 @@ import {
   deleteUser,
   setUserRole,
   changeUserPassword,
+  changeOwnPassword,
+  logoutOtherSessions,
+  getSelfMfaStatus,
+  beginSelfMfaEnrollment,
+  confirmSelfMfaEnrollment,
+  disableSelfMfa,
   type UserRow,
 } from './users.actions';
+import type { MfaStatus } from '@/lib/userMfaStore';
+import { mfaCodeReady, mfaPasswordReady, describeMfaError } from '@/lib/mfaSettings';
+import { QrCode } from '@/components/QrCode';
 import { McpManager } from './McpManager';
 import { CalendarFeedManager } from './CalendarFeedManager';
 import { ActivityFeed } from './ActivityFeed';
@@ -286,12 +295,8 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
               <CategoryRulesManager settings={info.settings} />
               <CardsManager cards={info.cardList} />
 
-              <Section title={t('profile.movedToProfile')} icon={<KeyRound size={15} />}>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-[color:var(--color-text-dim)]">{t('profile.movedToProfileDesc')}</span>
-                  <Link href="/profile" className={ghostBtn}><UserRound size={15} /> {t('nav.profile')}</Link>
-                </div>
-              </Section>
+              <SelfPasswordCard />
+              <SelfMfaCard />
 
               <Section title={t('set.about')}>
                 <UpdateChecker canEdit={isAdmin} />
@@ -3948,7 +3953,269 @@ function UsersManager({ currentUserId }: { currentUserId: string }) {
   );
 }
 
+/** "Change my own password" — available to every signed-in user (incl. members). */
+function SelfPasswordCard() {
+  const t = useT();
+  const [open, setOpen] = useState(false);
+  const [oldPwd, setOldPwd] = useState('');
+  const [newPwd, setNewPwd] = useState('');
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [pending, startTransition] = useTransition();
 
+  function submit() {
+    setMsg(null);
+    startTransition(async () => {
+      const r = await changeOwnPassword(oldPwd, newPwd);
+      if (r.ok) { setMsg({ ok: true, text: t('set.passwordChanged') }); setOldPwd(''); setNewPwd(''); setOpen(false); }
+      else setMsg({ ok: false, text: r.error || t('common.failed') });
+    });
+  }
+
+  // P91: invalidate every other session for this account (leaked password, a family
+  // tablet left logged in). This device stays signed in — the server re-mints its cookie.
+  function signOutOthers() {
+    setMsg(null);
+    startTransition(async () => {
+      const r = await logoutOtherSessions();
+      setMsg(r.ok ? { ok: true, text: t('set.signedOutOthers') } : { ok: false, text: t('common.failed') });
+    });
+  }
+
+  return (
+    <Section title={t('set.yourPassword')} icon={<KeyRound size={15} />}>
+      {open ? (
+        <div className="space-y-2.5">
+          <input value={oldPwd} onChange={(e) => setOldPwd(e.target.value)} type="password" placeholder={t('set.currentPwdPlaceholder')} className={controlClass} />
+          <input value={newPwd} onChange={(e) => setNewPwd(e.target.value)} type="password" placeholder={t('set.newPwdPlaceholder')} className={controlClass} />
+          <div className="flex items-center gap-2">
+            <button onClick={submit} disabled={pending} className={saveBtn}>{pending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} {t('set.update')}</button>
+            <button onClick={() => { setOpen(false); setMsg(null); }} className={ghostBtn}><X size={13} /> {t('common.cancel')}</button>
+            {msg && <span className={cn('text-[11px]', msg.ok ? 'text-[color:var(--color-accent)]' : 'text-[color:var(--color-red)]')}>{msg.text}</span>}
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-[color:var(--color-text-dim)]">{t('set.changePasswordDesc')}</span>
+          <div className="flex items-center gap-2">
+            {msg && <span className={cn('text-[11px]', msg.ok ? 'text-[color:var(--color-accent)]' : 'text-[color:var(--color-red)]')}>{msg.text}</span>}
+            <button onClick={signOutOthers} disabled={pending} className={ghostBtn} title={t('set.signOutOthersDesc')}>
+              {pending ? <Loader2 size={13} className="animate-spin" /> : <LogOut size={13} />} {t('set.signOutOthers')}
+            </button>
+            <button onClick={() => setOpen(true)} className={ghostBtn}><KeyRound size={13} /> {t('set.changePassword')}</button>
+          </div>
+        </div>
+      )}
+    </Section>
+  );
+}
+
+/** Which sub-form the "Two-factor authentication" card is currently showing. Mirrors
+ *  components/saas/AccountSettingsPanel.tsx's MfaStage exactly (same flow, same rules) — the
+ *  self-hosted account settings and the SaaS account settings are now the same feature over two
+ *  different models. */
+type MfaStage = 'idle' | 'need-password-to-start' | 'enrolling' | 'need-password-to-disable' | 'recovery-codes';
+
+/** "Set up / manage two-factor authentication for my own account" (P79) — the self-hosted
+ *  counterpart of AccountSettingsPanel.tsx's MFA section, wired to server actions instead of
+ *  fetch()+routes (same idiom as SelfPasswordCard above). Loads its own status on mount, same
+ *  pattern as UpdateChecker, so a slow read never blocks the rest of Settings. */
+function SelfMfaCard() {
+  const t = useT();
+  const [status, setStatus] = useState<MfaStatus | null>(null);
+  const [stage, setStage] = useState<MfaStage>('idle');
+  const [reauthPassword, setReauthPassword] = useState('');
+  const [disablePassword, setDisablePassword] = useState('');
+  const [code, setCode] = useState('');
+  const [secret, setSecret] = useState('');
+  const [uri, setUri] = useState('');
+  const [recoveryCodes, setRecoveryCodes] = useState<string[] | null>(null);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [pending, startTransition] = useTransition();
+
+  useEffect(() => {
+    getSelfMfaStatus().then(setStatus).catch(() => {});
+  }, []);
+
+  function resetFlow() {
+    setStage('idle');
+    setReauthPassword('');
+    setDisablePassword('');
+    setCode('');
+    setSecret('');
+    setUri('');
+    setError('');
+  }
+
+  function clickStart() {
+    setError('');
+    setNotice('');
+    if (status?.enabled) {
+      setStage('need-password-to-start');
+    } else {
+      beginEnrollment('');
+    }
+  }
+
+  function beginEnrollment(password: string) {
+    setError('');
+    startTransition(async () => {
+      const res = await beginSelfMfaEnrollment(password);
+      if (res.ok && res.secret && res.uri) {
+        setSecret(res.secret);
+        setUri(res.uri);
+        setStage('enrolling');
+      } else {
+        setError(describeMfaError(400, res.error));
+      }
+    });
+  }
+
+  function confirmEnrollment() {
+    setError('');
+    startTransition(async () => {
+      const res = await confirmSelfMfaEnrollment(code);
+      if (res.ok && res.recoveryCodes) {
+        setRecoveryCodes(res.recoveryCodes);
+        setStage('recovery-codes');
+        setStatus((s) => (s ? { ...s, enabled: true, pending: false } : s));
+      } else {
+        setError(describeMfaError(400, res.error));
+      }
+    });
+  }
+
+  function finishRecoveryCodes() {
+    setRecoveryCodes(null);
+    resetFlow();
+    setNotice(t('set.twoFactorEnabledNotice'));
+  }
+
+  function confirmDisable() {
+    setError('');
+    startTransition(async () => {
+      const res = await disableSelfMfa(disablePassword);
+      if (res.ok) {
+        resetFlow();
+        setStatus((s) => (s ? { ...s, enabled: false, pending: false } : s));
+        setNotice(t('set.twoFactorDisabledNotice'));
+      } else {
+        setError(res.error || t('common.failed'));
+      }
+    });
+  }
+
+  return (
+    <Section title={t('set.twoFactor')} icon={<ShieldCheck size={15} />}>
+      {status?.enabled && stage === 'idle' && (
+        <span className="inline-block mb-1 text-[10px] uppercase tracking-wider text-[color:var(--color-accent)] border border-[color:var(--color-accent)]/40 rounded-full px-1.5 py-0.5">
+          {t('set.twoFactorEnabled')}
+        </span>
+      )}
+
+      {error && <p className="text-xs text-[color:var(--color-red)]">{error}</p>}
+      {notice && !error && stage === 'idle' && <p className="text-xs text-[color:var(--color-accent)]">{notice}</p>}
+
+      {status && !status.cryptoReady && <p className="text-xs text-[color:var(--color-text-dim)]">{t('set.twoFactorUnavailable')}</p>}
+
+      {status?.cryptoReady && stage === 'idle' && (
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-xs text-[color:var(--color-text-dim)]">{status.enabled ? t('set.twoFactorDescOn') : t('set.twoFactorDescOff')}</span>
+          <div className="flex items-center gap-2 shrink-0">
+            <button onClick={clickStart} disabled={pending} className={ghostBtn}>
+              <ShieldCheck size={13} /> {status.enabled ? t('set.twoFactorReplace') : t('set.twoFactorEnable')}
+            </button>
+            {status.enabled && (
+              <button
+                onClick={() => {
+                  setError('');
+                  setStage('need-password-to-disable');
+                }}
+                disabled={pending}
+                className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-red)]/50 text-[color:var(--color-red)] hover:bg-[color:var(--color-red)]/10 transition-colors disabled:opacity-50"
+              >
+                {t('set.twoFactorDisable')}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {stage === 'need-password-to-start' && (
+        <div className="space-y-2.5">
+          <p className="text-xs text-[color:var(--color-text-dim)]">{t('set.twoFactorPasswordToStart')}</p>
+          <input value={reauthPassword} onChange={(e) => setReauthPassword(e.target.value)} type="password" autoComplete="current-password" placeholder={t('set.currentPwdPlaceholder')} className={controlClass} />
+          <div className="flex items-center gap-2">
+            <button onClick={() => beginEnrollment(reauthPassword)} disabled={pending || !mfaPasswordReady(reauthPassword)} className={saveBtn}>
+              {pending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} {pending ? t('set.twoFactorContinuing') : t('set.twoFactorContinue')}
+            </button>
+            <button onClick={resetFlow} disabled={pending} className={ghostBtn}><X size={13} /> {t('common.cancel')}</button>
+          </div>
+        </div>
+      )}
+
+      {stage === 'enrolling' && (
+        <div className="space-y-2.5">
+          <p className="text-xs text-[color:var(--color-text-dim)]">{t('set.twoFactorEnrollHint')}</p>
+          {uri && <QrCode value={uri} label={t('set.twoFactorQrAlt')} />}
+          <div className="rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] p-3">
+            <p className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>{t('set.twoFactorManualKey')}</p>
+            <p className="mt-1 select-all break-all text-sm" style={{ fontFamily: 'var(--font-mono)' }}>{secret}</p>
+          </div>
+          <label className="block text-xs">
+            <span className="text-[color:var(--color-text-dim)]">{t('set.twoFactorCode')}</span>
+            <input
+              value={code}
+              onChange={(e) => setCode(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))}
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              placeholder="000000"
+              className={cn(controlClass, 'mt-1 max-w-[10rem] text-center tracking-[0.3em]')}
+              style={{ fontFamily: 'var(--font-mono)' }}
+            />
+          </label>
+          <div className="flex items-center gap-2">
+            <button onClick={confirmEnrollment} disabled={pending || !mfaCodeReady(code)} className={saveBtn}>
+              {pending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} {pending ? t('set.twoFactorVerifying') : t('set.twoFactorConfirm')}
+            </button>
+            <button onClick={resetFlow} disabled={pending} className={ghostBtn}><X size={13} /> {t('common.cancel')}</button>
+          </div>
+        </div>
+      )}
+
+      {stage === 'need-password-to-disable' && (
+        <div className="space-y-2.5">
+          <p className="text-xs text-[color:var(--color-text-dim)]">{t('set.twoFactorPasswordToDisable')}</p>
+          <input value={disablePassword} onChange={(e) => setDisablePassword(e.target.value)} type="password" autoComplete="current-password" placeholder={t('set.currentPwdPlaceholder')} className={controlClass} />
+          <div className="flex items-center gap-2">
+            <button
+              onClick={confirmDisable}
+              disabled={pending || !mfaPasswordReady(disablePassword)}
+              className="flex items-center gap-1.5 text-xs px-4 py-2 rounded-lg bg-[color:var(--color-red)]/15 border border-[color:var(--color-red)]/50 text-[color:var(--color-red)] font-semibold hover:bg-[color:var(--color-red)]/25 transition-colors disabled:opacity-50"
+            >
+              {pending ? <Loader2 size={13} className="animate-spin" /> : <X size={13} />} {pending ? t('set.twoFactorDisabling') : t('set.twoFactorDisable')}
+            </button>
+            <button onClick={resetFlow} disabled={pending} className={ghostBtn}><X size={13} /> {t('common.cancel')}</button>
+          </div>
+        </div>
+      )}
+
+      {stage === 'recovery-codes' && recoveryCodes && (
+        <div className="space-y-2.5">
+          <div className="rounded-lg border border-[color:var(--color-gold)]/45 bg-[color:var(--color-gold)]/10 px-3 py-2 text-xs text-[color:var(--color-gold)]">
+            {t('set.twoFactorRecoveryWarning')}
+          </div>
+          <div className="grid grid-cols-2 gap-2 rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] p-3 text-sm" style={{ fontFamily: 'var(--font-mono)' }}>
+            {recoveryCodes.map((c) => (
+              <span key={c} className="select-all">{c}</span>
+            ))}
+          </div>
+          <button onClick={finishRecoveryCodes} className={saveBtn}><Check size={13} /> {t('set.twoFactorRecoverySaved')}</button>
+        </div>
+      )}
+    </Section>
+  );
+}
 
 // ─── Editable dropdown lists (taxonomies) ─────────────────────────────────────
 

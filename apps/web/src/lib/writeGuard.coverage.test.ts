@@ -49,10 +49,6 @@ const ALLOWLIST: Record<string, string> = {
   // content, nothing another user sees. Guarding it would mean a viewer cannot even see
   // which version the instance is running. The opt-out toggle beside it IS guarded.
   'settings/updateCheckActions.ts:getUpdateStatus': 'derived refresh on load, no user input',
-  // #383: a viewer must be able to edit their own display name and notification email — it
-  // touches only their own user document, nothing shared.
-  'profile/actions.ts:updateProfile': 'own profile only',
-  'profile/actions.ts:updateAlertSubscriptions': 'own notification preferences only',
 };
 
 /** A server action changes stored state if it refreshes the UI after itself, or if it

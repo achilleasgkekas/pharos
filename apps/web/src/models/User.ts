@@ -35,12 +35,6 @@ const UserSchema = new Schema(
     // stateless idiom as apiToken/calendarToken invalidation — a single counter, no session
     // store. Also bumped on password change. 0 = never bumped (every pre-P91 user).
     sessionEpoch: { type: Number, default: 0 },
-    // #383: personal notification email (optional). Workspace channels (Discord, etc.) stay
-    // in AppConfig; this email is for per-user alerts only.
-    email: { type: String, default: '' },
-    // #383: per-user alert type subscriptions. When set, overrides the workspace-level
-    // notifyTypes for this user's push/email notifications. Null = inherit workspace setting.
-    alertSubscriptions: { type: Schema.Types.Mixed, default: null },
   },
   { timestamps: true }
 );
