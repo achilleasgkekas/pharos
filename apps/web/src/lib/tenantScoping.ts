@@ -49,7 +49,6 @@ export const SCOPING_EXEMPT_FILES: Record<string, string> = {
   'app/login/actions.ts': 'Pre-tenant: self-host login runs before any tenant context; User is a base identity.',
   'app/setup/actions.ts': 'Pre-tenant: first-run setup creates the first User + AppConfig before tenancy exists.',
   'app/settings/users.actions.ts': 'User identity: self-host account management; User lives on the base connection.',
-  'app/profile/actions.ts': 'User identity: #383 dedicated profile page; reads/updates own User record on the base connection.',
   'app/settings/calendarFeedActions.ts': 'User identity: sets the calendar-feed token on the User record.',
   'app/settings/mcpActions.ts': 'User identity: sets the MCP/API token on the User record.',
   'app/api/calendar.ics/route.ts': 'User identity, self-host only: resolves a User by calendar token; returns 404 in SaaS mode before any DB access (#121).',
