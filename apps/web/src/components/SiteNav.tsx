@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import {
   ChevronDown,
   Sun,
@@ -32,16 +32,13 @@ import { logoutAction } from '@/app/login/actions';
 import { useT } from './LocaleProvider';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { NotificationBell } from './NotificationBell';
-import type { TKey } from '@/lib/i18n';
 import type { Role } from '@/lib/roles';
 import {
   NAV_GROUPS,
-  HOME_ITEM,
   MONEY_LINKS,
   ACCOUNT_LINKS,
   ALL_NAV_ITEMS,
   navActive,
-  type NavItem,
   type NavGroup,
 } from '@/lib/nav';
 
@@ -140,6 +137,14 @@ function UserMenu({ user }: { user: SessionUser }) {
             </p>
           </div>
 
+          <Link
+            href={'/profile'}
+            prefetch={false}
+            onClick={() => setOpen(false)}
+            className={cn(menuRow, pathname.startsWith('/profile') && 'text-[color:var(--color-accent)]')}
+          >
+            <UserRound size={15} /> {t('nav.profile')}
+          </Link>
           <Link
             href={'/settings'}
             prefetch={false}

@@ -9,7 +9,7 @@ import {
 
 // Extracted from apps/web/e2e/smoke.mjs
 const SMOKE_PAGES = [
-  '/', '/items', '/shopping', '/shopping-list', '/receipts', '/expenses', '/income', '/bills',
+  '/', '/profile', '/items', '/shopping', '/shopping-list', '/receipts', '/expenses', '/income', '/bills',
   '/utilities', '/vehicles', '/statements', '/subscriptions', '/vouchers', '/calendar', '/tasks',
   '/documents', '/special-dates', '/savings', '/reports', '/jobs', '/history', '/trash', '/settings',
 ];
@@ -46,6 +46,7 @@ describe('Navigation structure (#367)', () => {
     ]);
     expect(HOME_ITEM.href).toBe('/');
     expect(ACCOUNT_LINKS.map((l) => l.href)).toEqual([
+      '/profile',
       '/settings',
       '/jobs',
       '/history',
