@@ -2335,6 +2335,20 @@ export const en = {
   "hist.copyPrompt": "Copy prompt",
   "hist.copyOutput": "Copy output",
   "hist.copied": "Copied!",
+  'nav.profile': 'Profile',
+  'profile.title': 'Your profile',
+  'profile.details': 'Profile details',
+  'profile.displayName': 'Display name',
+  'profile.email': 'Notification email',
+  'profile.emailPlaceholder': 'you@example.com',
+  'profile.edit': 'Edit',
+  'profile.alerts': 'Alert preferences',
+  'profile.alertsDesc': 'Choose which alert categories you want to receive via push and email. By default you inherit the workspace setting.',
+  'profile.alertsInherit': 'Using workspace defaults',
+  'profile.alertsCustomize': 'Customize',
+  'profile.alertsReset': 'Reset to workspace defaults',
+  'profile.movedToProfile': 'Account security',
+  'profile.movedToProfileDesc': 'Password and two-factor authentication have moved to your profile.',
 } as const;
 
 export type Dict = Record<keyof typeof en, string>;

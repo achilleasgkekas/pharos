@@ -21,6 +21,9 @@ const PushSubscriptionSchema = new Schema(
     },
     // Best-effort label so a future "your devices" list can name them; not required.
     userAgent: { type: String, default: '' },
+    // #383: which user registered this subscription. Null for legacy (pre-#383) subscriptions
+    // that broadcast to all users; new subscriptions are scoped to the signed-in user.
+    userId: { type: String, default: null, index: true },
   },
   { timestamps: true }
 );
