@@ -4,7 +4,7 @@ import { connectDB } from '@/lib/db';
 import { PushSubscription } from '@/models/PushSubscription';
 import { withRequestTenant } from '@/lib/tenancy/request';
 import { currentModel } from '@/lib/tenancy/connection';
-import { assertCanWrite } from '@/lib/auth';
+import { assertCanWrite, getSessionUser } from '@/lib/auth';
 import { getOrCreateVapid, getWebPushPublicKey, dispatchWebPush } from '@/lib/webPush';
 
 /**
@@ -45,12 +45,13 @@ export async function savePushSubscription(
   const parsed = SubSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: 'Invalid subscription' };
   const sub = parsed.data;
+  const user = await getSessionUser();
   return withRequestTenant(async () => {
     await connectDB();
     const Subs = await currentModel(PushSubscription);
     await Subs.updateOne(
       { endpoint: sub.endpoint },
-      { $set: { keys: sub.keys, userAgent: userAgent.slice(0, 300) } },
+      { $set: { keys: sub.keys, userAgent: userAgent.slice(0, 300), ...(user ? { userId: user.id } : {}) } },
       { upsert: true }
     );
     return { ok: true };

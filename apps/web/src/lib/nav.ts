@@ -24,6 +24,7 @@ import {
   Activity,
   MessageSquare,
   Trash2,
+  UserRound,
 } from 'lucide-react';
 
 export type NavItem = {
@@ -74,6 +75,7 @@ export const PLANNER_LINKS: NavItem[] = [
 ];
 
 export const ACCOUNT_LINKS: NavItem[] = [
+  { href: '/account', key: 'nav.account', icon: UserRound },
   { href: '/settings', key: 'nav.settings', icon: Settings },
   { href: '/jobs', key: 'nav.jobs', icon: Activity },
   { href: '/history', key: 'nav.history', icon: MessageSquare },

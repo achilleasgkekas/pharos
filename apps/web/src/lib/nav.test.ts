@@ -46,6 +46,7 @@ describe('Navigation structure (#367)', () => {
     ]);
     expect(HOME_ITEM.href).toBe('/');
     expect(ACCOUNT_LINKS.map((l) => l.href)).toEqual([
+      '/account',
       '/settings',
       '/jobs',
       '/history',
