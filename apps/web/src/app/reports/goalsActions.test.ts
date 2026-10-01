@@ -12,8 +12,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // Behaviour pinned:
 //  - createGoal/updateGoal: Zod `GoalFormSchema` applies its defaults (targetAmount 0,
 //    category/notes/targetDate ''), coerces targetAmount to a number, rejects a missing/
-//    empty title, and runs targetDate through safeDateOrNull (blank/unparseable → null,
-//    never throws).
+//    empty title, and runs targetDate through safeDateOrNull (blank → null); a date that is
+//    there but is not a real day is refused, not dropped (#415).
 //  - createGoal always forces contributions:[] and archived:false regardless of form input
 //    (the schema doesn't even accept those fields).
 //  - deleteGoal: SOFT delete ($set deletedAt via updateOne), not an actual removal.
@@ -126,8 +126,15 @@ describe('createGoal', () => {
     expect(goalCreate).not.toHaveBeenCalled();
   });
 
-  it('an unparseable targetDate string is stored as null, not rejected (targetDate is optional)', async () => {
-    const res = await createGoal(formData({ title: 'X', targetDate: 'not-a-date' }));
+  // #415: a date that is there but is not a real day used to drop silently to "no target date".
+  it.each(['not-a-date', '31/02/2026', '2026-02-31'])('refuses the target date %j instead of dropping it', async (targetDate) => {
+    const res = await createGoal(formData({ title: 'X', targetDate }));
+    expect(res).toEqual({ ok: false, error: 'Enter a valid date' });
+    expect(goalCreate).not.toHaveBeenCalled();
+  });
+
+  it('still saves a goal with no target date when the field is left blank', async () => {
+    const res = await createGoal(formData({ title: 'X', targetDate: '' }));
     expect(res).toEqual({ ok: true });
     expect(goalCreate.mock.calls[0][0].targetDate).toBeNull();
   });
@@ -153,6 +160,12 @@ describe('updateGoal', () => {
     expect(update.targetAmount).toBe(3000);
     expect(update.category).toBe('safety');
     expect(localYmd(update.targetDate)).toBe('2028-01-01');
+  });
+
+  it('refuses an impossible target date on edit too (#415)', async () => {
+    const res = await updateGoal('g1', formData({ title: 'X', targetDate: '31/02/2026' }));
+    expect(res).toEqual({ ok: false, error: 'Enter a valid date' });
+    expect(goalFindByIdAndUpdate).not.toHaveBeenCalled();
   });
 
   it('an invalid form returns an error, findByIdAndUpdate never runs', async () => {

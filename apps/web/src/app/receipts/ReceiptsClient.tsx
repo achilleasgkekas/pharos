@@ -949,6 +949,11 @@ function ReceiptDetailModal({
     };
   };
   const [form, setForm] = useState<EditState>(() => buildForm(receipt));
+  // #415: the date field reports text that is not a date (it emits '' for it); saving is a
+  // plain button, not a form submit, so nothing else would stop it saving as today.
+  const [dateProblem, setDateProblem] = useState('');
+  const [saveError, setSaveError] = useState('');
+  const dateBlocked = dateProblem || (!form.date ? t('date.invalid') : '');
   // Live from the select, so picking a foreign code immediately reveals the FX row.
   const foreign = fx.enabled && isForeignCurrency(form.currency, fx.base);
 
@@ -977,6 +982,8 @@ function ReceiptDetailModal({
   }
 
   async function save(verified: boolean) {
+    if (dateBlocked) return setSaveError(dateBlocked);
+    setSaveError('');
     const alreadyAdded = (receipt.itemIds?.length ?? 0) > 0;
     let addToInventory = false;
     if (verified && form.lineItems.length > 0 && !alreadyAdded) {
@@ -987,7 +994,7 @@ function ReceiptDetailModal({
       });
     }
     startTransition(async () => {
-      await updateReceipt(receipt._id, {
+      const res = await updateReceipt(receipt._id, {
         store: form.store,
         date: form.date,
         total: Number(form.total),
@@ -1009,6 +1016,8 @@ function ReceiptDetailModal({
           category: li.category,
         })),
       });
+      // A rejected save keeps the dialog and what was typed, and says why (#403 / #415).
+      if (!res.ok) return setSaveError(res.error || t('common.saveFailed'));
       if (addToInventory) await addReceiptItemsToLibrary(receipt._id);
       onClose();
     });
@@ -1196,7 +1205,7 @@ function ReceiptDetailModal({
               />
             </Field>
             <Field label={t('ex.fDate')}>
-              <DateInput value={form.date} onValueChange={(v) => setForm((p) => ({ ...p, date: v }))} />
+              <DateInput required value={form.date} onValueChange={(v) => setForm((p) => ({ ...p, date: v }))} onProblemChange={setDateProblem} />
             </Field>
           </div>
           {/* Total — the key number, on its own wide row so it's never cramped */}
@@ -1407,12 +1416,13 @@ function ReceiptDetailModal({
           )}
 
           {/* Actions */}
+          {saveError && <p role="alert" className="text-xs text-[color:var(--color-red)]">{saveError}</p>}
           <div className="flex flex-wrap gap-2 pt-2 border-t border-[color:var(--color-border)]">
-            <Button variant="primary" size="sm" onClick={() => save(true)} disabled={pending}>
+            <Button variant="primary" size="sm" onClick={() => save(true)} disabled={pending || !!dateBlocked}>
               <CheckCircle2 size={13} /> {receipt.verified ? t('common.save') : t('common.confirm')}
             </Button>
             {receipt.verified && (
-              <Button variant="secondary" size="sm" onClick={() => save(false)} disabled={pending}>
+              <Button variant="secondary" size="sm" onClick={() => save(false)} disabled={pending || !!dateBlocked}>
                 {t('rc.unverify')}
               </Button>
             )}
