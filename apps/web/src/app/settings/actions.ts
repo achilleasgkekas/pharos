@@ -65,6 +65,7 @@ import { anthropicTest, anthropicModelCheck } from '@/lib/anthropic';
 import { CLAUDE_MAIN_DEFAULT, modelLifecycle } from '@/lib/claudeModels';
 import { claudePrice } from '@/lib/claudePricing';
 import { getAppSettings, invalidateAppSettingsForRequest } from '@/lib/appSettings';
+import { normalizeVatRate } from '@/lib/vatRate';
 import { assertCanWrite, requireAdmin } from '@/lib/auth';
 import { AI_FEATURE_KEYS, type AiFeatureKey } from '@/lib/aiFeatures';
 import { PROVIDER_RECOMMEND, priceForModel, looksVisionModel, type FetchedModel, type AiProviderId } from '@/lib/aiModels';
@@ -628,7 +629,8 @@ export async function saveDefaults(formData: FormData): Promise<{ ok: boolean }>
   const autoAdd = formData.get('autoAddStores') === 'true';
   const currency = (String(formData.get('currency') || 'EUR').trim().toUpperCase()) || 'EUR';
   const multiCurrency = formData.get('multiCurrency') === 'true'; // P9 opt-in
-  const vatRate = Math.max(0, Math.min(100, Number(formData.get('defaultVatRate')) || 24));
+  // #402: an explicit 0% is a real choice, not a missing value.
+  const vatRate = normalizeVatRate(formData.get('defaultVatRate'));
   // 0 is meaningful here (return tracking off), so parse explicitly instead of `|| 14`.
   const returnRaw = Number(formData.get('defaultReturnWindowDays'));
   const returnDays = Number.isFinite(returnRaw) ? Math.max(0, Math.min(365, Math.round(returnRaw))) : 14;

@@ -19,7 +19,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 //    every other saver in this file — intentional, these are safe per-account defaults,
 //    not admin-only config. Several numeric fields use `Number(x) || fallback`, which
 //    means an explicit "0" is INDISTINGUISHABLE from blank and silently becomes the
-//    fallback (defaultWarrantyMonths, warrantyAlertDays, defaultVatRate); others
+//    fallback (defaultWarrantyMonths, warrantyAlertDays); defaultVatRate keeps 0 (#402); others
 //    (trialAlertDays, billAlertDays, defaultReturnWindowDays)
 //    deliberately parse with Number.isFinite so an explicit 0 (alerts off) sticks —
 //    but note a MISSING field also reads as 0 there (Number(null) is 0, which IS
@@ -275,11 +275,23 @@ describe('saveDefaults', () => {
       autoAddStores: false,
       currency: 'EUR',
       multiCurrency: false,
-      defaultVatRate: 24,
+      defaultVatRate: 0, // #402: blank means the neutral 0%, as in the setup wizard
       defaultReturnWindowDays: 0,
       shoppingCountry: '',
       shoppingExtraShops: [],
     });
+  });
+
+  it('keeps an explicit 0% VAT and clamps the rest to [0,100] (#402)', async () => {
+    const vat = (i: number) => (appConfigUpdateOne.mock.calls[i][1] as Record<string, { defaultVatRate: number }>).$set.defaultVatRate;
+    await saveDefaults(formData({ defaultVatRate: '0' }));
+    expect(vat(0)).toBe(0);
+    await saveDefaults(formData({ defaultVatRate: '13' }));
+    expect(vat(1)).toBe(13);
+    await saveDefaults(formData({ defaultVatRate: '250' }));
+    expect(vat(2)).toBe(100);
+    await saveDefaults(formData({ defaultVatRate: 'abc' }));
+    expect(vat(3)).toBe(0);
   });
 
   it('only "list" flips the item view; anything else (including garbage) is "grid"', async () => {
@@ -353,15 +365,6 @@ describe('saveDefaults', () => {
     expect((appConfigUpdateOne.mock.calls[0][1] as Record<string, { currency: string }>).$set.currency).toBe('USD');
     await saveDefaults(formData({ currency: '   ' }));
     expect((appConfigUpdateOne.mock.calls[1][1] as Record<string, { currency: string }>).$set.currency).toBe('EUR');
-  });
-
-  it('clamps defaultVatRate to [0,100] with the same 0-becomes-default (24) trap', async () => {
-    await saveDefaults(formData({ defaultVatRate: '0' }));
-    expect((appConfigUpdateOne.mock.calls[0][1] as Record<string, { defaultVatRate: number }>).$set.defaultVatRate).toBe(24);
-    await saveDefaults(formData({ defaultVatRate: '250' }));
-    expect((appConfigUpdateOne.mock.calls[1][1] as Record<string, { defaultVatRate: number }>).$set.defaultVatRate).toBe(100);
-    await saveDefaults(formData({ defaultVatRate: '13' }));
-    expect((appConfigUpdateOne.mock.calls[2][1] as Record<string, { defaultVatRate: number }>).$set.defaultVatRate).toBe(13);
   });
 
   it('defaultReturnWindowDays deliberately allows an explicit 0 (return tracking off) and clamps to [0,365]', async () => {

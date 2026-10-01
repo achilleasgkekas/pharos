@@ -193,9 +193,15 @@ describe('saveSetupBasics', () => {
     expect(appConfigUpdateOne.mock.calls[0][1]).toEqual({ $set: { currency: 'EUR', defaultVatRate: 100 } });
   });
 
-  it('falls back a NaN VAT to the 24% default', async () => {
+  // #402: the wizard starts at 0 and `Number(vat) || 24` saved 24 for a user who kept it.
+  it('keeps an explicit 0% VAT', async () => {
+    await saveSetupBasics('EUR', 0);
+    expect(appConfigUpdateOne.mock.calls[0][1]).toEqual({ $set: { currency: 'EUR', defaultVatRate: 0 } });
+  });
+
+  it('falls back a NaN VAT to the neutral 0%, not 24%', async () => {
     await saveSetupBasics('EUR', Number('not-a-number'));
-    expect(appConfigUpdateOne.mock.calls[0][1]).toEqual({ $set: { currency: 'EUR', defaultVatRate: 24 } });
+    expect(appConfigUpdateOne.mock.calls[0][1]).toEqual({ $set: { currency: 'EUR', defaultVatRate: 0 } });
   });
 });
 
