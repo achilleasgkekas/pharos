@@ -106,7 +106,7 @@ export function BackupData() {
 
   async function restore(file: File) {
     if (restoreRef.current) restoreRef.current.value = '';
-    const ok = await confirm({ title: t('set.restoreTitle'), message: t('set.restoreConfirm'), confirmLabel: t('common.restore'), danger: true });
+    const ok = await confirm({ title: t('set.restoreTitle'), message: t('set.restoreConfirm'), confirmLabel: t('common.confirm'), danger: true });
     if (!ok) return;
     const text = await file.text();
     const encrypted = looksEncrypted(text);
