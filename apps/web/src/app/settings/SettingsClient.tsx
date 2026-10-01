@@ -12,7 +12,7 @@ import { PAGE_MAIN, PageHeader } from '@/components/ui/PageHeader';
 import { controlClass } from '@/components/ui/Input';
 import { Field } from '@/components/ui/Field';
 import { useConfirm, usePrompt } from '@/components/ui/ConfirmDialog';
-import { saveAiConfig, pullOllamaModel, testAnthropic, saveStore, deleteStore, setAiConfirmBulk, exportData, exportDataEncrypted, importData, importDataEncrypted, verifyBackup, exportCSV, exportInsuranceBundle, saveCategoryRules, setAiEnabled, setAiFeature, fetchProviderModels, dismissAiModelNotices, getLiveAiSpendAction, type LiveAiSpendData } from './actions';
+import { saveAiConfig, pullOllamaModel, testAnthropic, saveStore, deleteStore, setAiConfirmBulk, saveCategoryRules, setAiEnabled, setAiFeature, fetchProviderModels, dismissAiModelNotices, getLiveAiSpendAction, type LiveAiSpendData } from './actions';
 import { applyCategoryRulesToExisting } from '@/app/expenses/actions';
 import type { CategoryRule } from '@/lib/categoryRules';
 import type { SerializedAiRun } from '@/lib/aiRun';
@@ -49,6 +49,7 @@ import type { MfaStatus } from '@/lib/userMfaStore';
 import { mfaCodeReady, mfaPasswordReady, describeMfaError } from '@/lib/mfaSettings';
 import { QrCode } from '@/components/QrCode';
 import { McpManager } from './McpManager';
+import { BackupData } from './BackupData';
 import { CalendarFeedManager } from './CalendarFeedManager';
 import { ActivityFeed } from './ActivityFeed';
 import { useAttributionNames } from '@/components/CreatedBy';
@@ -353,7 +354,7 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
                   <Stat label={t('set.statSubs')} value={info.counts.subscriptions} />
                   <Stat label={t('set.statCards')} value={info.counts.cards} />
                 </div>
-                <BackupRestore />
+                <BackupData />
               </Section>
               <MigrationImportManager />
               <SampleDataManager />
@@ -3380,252 +3381,6 @@ function SampleDataManager() {
         </p>
       )}
     </Section>
-  );
-}
-
-function BackupRestore() {
-  const money = useMoney();
-  const locale = useLocale();
-  const t = useT();
-  const [pending, startTransition] = useTransition();
-  const [msg, setMsg] = useState<string | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
-  const verifyRef = useRef<HTMLInputElement>(null);
-  const [report, setReport] = useState<{ ok: boolean; headline: string; issues: { level: string; message: string }[] } | null>(null);
-  const confirm = useConfirm();
-  const prompt = usePrompt();
-
-  function download(text: string, name: string, mime: string) {
-    const blob = new Blob([text], { type: mime });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = name;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
-  function handleExport() {
-    setMsg(null);
-    startTransition(async () => {
-      try {
-        const json = await exportData();
-        download(json, `pharos-backup-${new Date().toISOString().slice(0, 10)}.json`, 'application/json');
-        setMsg(t('set.backupDownloaded'));
-      } catch (e) {
-        setMsg(t('set.exportFailed', { error: (e as Error).message.slice(0, 80) }));
-      }
-    });
-  }
-
-  // P54: passphrase-encrypted export. Passphrase is prompted, used once, never stored.
-  async function handleExportEncrypted() {
-    setMsg(null);
-    const pass = await prompt({ title: t('set.encTitle'), message: t('set.encHelp'), label: t('set.encPassLabel'), type: 'password', minLength: 8 });
-    if (pass === null) return; // cancelled
-    const confirmPass = await prompt({ title: t('set.encTitle'), label: t('set.encPassAgain'), type: 'password', minLength: 8, confirmLabel: t('set.exportEncrypted') });
-    if (confirmPass === null) return;
-    if (confirmPass !== pass) { setMsg(t('set.encMismatch')); return; }
-    startTransition(async () => {
-      try {
-        const env = await exportDataEncrypted(pass);
-        download(env, `pharos-backup-${new Date().toISOString().slice(0, 10)}.enc.json`, 'application/json');
-        setMsg(t('set.encDone'));
-      } catch (e) {
-        setMsg(t('set.encFailed', { error: (e as Error).message.slice(0, 80) }));
-      }
-    });
-  }
-
-  /** Structural check for a P54 envelope — inline so this client never imports the
-   *  node:crypto backup lib. Mirrors backupCrypto.isEncryptedBackup. */
-  function looksEncrypted(text: string): boolean {
-    try {
-      const o = JSON.parse(text);
-      return !!o && o.app === 'pharos-enc' && typeof o.data === 'string';
-    } catch {
-      return false;
-    }
-  }
-
-  async function handleFile(file: File) {
-    const ok = await confirm({
-      title: t('set.restoreTitle'),
-      message: t('set.restoreConfirm'),
-      confirmLabel: t('common.confirm'),
-      danger: true,
-    });
-    if (fileRef.current) fileRef.current.value = '';
-    if (!ok) return;
-    const text = await file.text();
-    const encrypted = looksEncrypted(text);
-    let pass = '';
-    if (encrypted) {
-      const entered = await prompt({ title: t('set.decTitle'), message: t('set.decHelp'), label: t('set.encPassLabel'), type: 'password', confirmLabel: t('common.restore') });
-      if (entered === null) { setMsg(null); return; } // cancelled
-      pass = entered;
-    }
-    setMsg(t('set.restoring'));
-    setReport(null);
-    startTransition(async () => {
-      const r = encrypted ? await importDataEncrypted(text, pass) : await importData(text);
-      setMsg(r.ok ? t('set.restored', { n: r.restored }) : `${t('common.failed')}: ${r.error}`);
-      // A restore that skipped collections or documents used to look identical to a
-      // clean one; surface what was dropped instead of leaving it silent.
-      if (r.warnings?.length) {
-        setReport({ ok: true, headline: t('set.restoreSkipped'), issues: r.warnings.map((message) => ({ level: 'warning', message })) });
-      }
-    });
-  }
-
-  /** Read-only integrity check — never writes, so no confirmation is needed. */
-  async function handleVerify(file: File) {
-    if (verifyRef.current) verifyRef.current.value = '';
-    setMsg(null);
-    setReport(null);
-    const text = await file.text();
-    startTransition(async () => {
-      try {
-        const r = await verifyBackup(text);
-        const stamp = formatDate(r.exportedAt, locale, undefined, '—');
-        setReport({
-          ok: r.ok,
-          headline: r.ok
-            ? t('set.verifyOk', { date: stamp, summary: r.summary })
-            : t('set.verifyBad', { name: file.name }),
-          issues: r.issues,
-        });
-      } catch (e) {
-        setReport({ ok: false, headline: `${t('common.failed')}: ${(e as Error).message.slice(0, 120)}`, issues: [] });
-      }
-    });
-  }
-
-  function handleCSV(kind: 'receipts' | 'expenses' | 'items') {
-    setMsg(null);
-    startTransition(async () => {
-      try {
-        const csv = await exportCSV(kind);
-        // BOM so Excel reads UTF-8 (Greek vendor names) correctly.
-        const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `pharos-${kind}-${new Date().toISOString().slice(0, 10)}.csv`;
-        a.click();
-        URL.revokeObjectURL(url);
-        setMsg(t('set.csvDone', { kind: t(CSV_KIND[kind]) }));
-      } catch (e) {
-        setMsg(t('set.csvFailed', { error: (e as Error).message.slice(0, 80) }));
-      }
-    });
-  }
-
-  function handleInsuranceExport() {
-    setMsg(null);
-    startTransition(async () => {
-      try {
-        const { base64, itemCount, totalValue } = await exportInsuranceBundle();
-        const bin = atob(base64);
-        const bytes = new Uint8Array(bin.length);
-        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-        const blob = new Blob([bytes], { type: 'application/zip' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `pharos-insurance-export-${new Date().toISOString().slice(0, 10)}.zip`;
-        a.click();
-        URL.revokeObjectURL(url);
-        setMsg(t('set.insuranceExportDone', { n: itemCount, total: money(totalValue) }));
-      } catch (e) {
-        setMsg(t('set.insuranceFailed', { error: (e as Error).message.slice(0, 80) }));
-      }
-    });
-  }
-
-  const btn =
-    'flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] hover:border-[color:var(--color-accent)] transition-colors disabled:opacity-50';
-
-  return (
-    <div className="mt-4 pt-4 border-t border-[color:var(--color-border)]">
-      <p className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)] mb-2" style={{ fontFamily: 'var(--font-mono)' }}>
-        {t('set.backup')}
-      </p>
-      <div className="flex items-center gap-2 flex-wrap">
-        <button type="button" onClick={handleExport} disabled={pending} className={cn(btn, 'text-[color:var(--color-accent)]')}>
-          {pending ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />} {t('set.exportJson')}
-        </button>
-        <button type="button" onClick={handleExportEncrypted} disabled={pending} className={cn(btn, 'text-[color:var(--color-accent)]')} title={t('set.exportEncryptedDesc')}>
-          <KeyRound size={13} /> {t('set.exportEncrypted')}
-        </button>
-        <button type="button" onClick={() => fileRef.current?.click()} disabled={pending} className={cn(btn, 'text-[color:var(--color-cyan)]')}>
-          <Upload size={13} /> {t('set.restoreDots')}
-        </button>
-        <input
-          ref={fileRef}
-          type="file"
-          accept="application/json,.json"
-          className="hidden"
-          onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
-        />
-        <button type="button" onClick={() => verifyRef.current?.click()} disabled={pending} className={cn(btn, 'text-[color:var(--color-text-dim)]')} title={t('set.verifyBackupDesc')}>
-          <ShieldCheck size={13} /> {t('set.verifyBackup')}
-        </button>
-        <input
-          ref={verifyRef}
-          type="file"
-          accept="application/json,.json"
-          className="hidden"
-          onChange={(e) => e.target.files?.[0] && handleVerify(e.target.files[0])}
-        />
-        {msg && (
-          <span className={cn('text-[11px]', msg.startsWith(t('common.failedWith', { error: '' })) || msg.includes('failed') ? 'text-[color:var(--color-red)]' : 'text-[color:var(--color-accent)]')} style={{ fontFamily: 'var(--font-mono)' }}>
-            {msg}
-          </span>
-        )}
-      </div>
-      {report && (
-        <div
-          className={cn(
-            'mt-2 rounded-lg border px-3 py-2 text-[11px]',
-            report.ok
-              ? 'border-[color:var(--color-border)] bg-[color:var(--color-surface-2)]'
-              : 'border-[color:var(--color-red)] bg-[color:var(--color-surface-2)]'
-          )}
-          style={{ fontFamily: 'var(--font-mono)' }}
-        >
-          <p className={report.ok ? 'text-[color:var(--color-accent)]' : 'text-[color:var(--color-red)]'}>{report.headline}</p>
-          {report.issues.length > 0 && (
-            <ul className="mt-1.5 space-y-1">
-              {report.issues.map((issue, i) => (
-                <li key={i} className={issue.level === 'error' ? 'text-[color:var(--color-red)]' : 'text-[color:var(--color-gold)]'}>
-                  {issue.level === 'error' ? '✕' : '⚠'} {issue.message}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
-      <div className="flex items-center gap-2 flex-wrap mt-2">
-        <span className="text-[10px] text-[color:var(--color-text-faint)] mr-1" style={{ fontFamily: 'var(--font-mono)' }}>{t('set.spreadsheetCsv')}</span>
-        {(['receipts', 'expenses', 'items'] as const).map((k) => (
-          <button key={k} type="button" onClick={() => handleCSV(k)} disabled={pending} className={cn(btn, 'text-[color:var(--color-text-dim)]')}>
-            <Download size={12} /> {k}
-          </button>
-        ))}
-      </div>
-      <p className="text-[10px] text-[color:var(--color-text-faint)] mt-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
-        {t('set.backupNote')}
-      </p>
-      <div className="flex items-center gap-2 flex-wrap mt-3 pt-3 border-t border-[color:var(--color-border)]">
-        <button type="button" onClick={handleInsuranceExport} disabled={pending} className={cn(btn, 'text-[color:var(--color-purple)]')}>
-          {pending ? <Loader2 size={13} className="animate-spin" /> : <ShieldCheck size={13} />} {t('set.insuranceExport')}
-        </button>
-      </div>
-      <p className="text-[10px] text-[color:var(--color-text-faint)] mt-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
-        {t('set.insuranceExportDesc')}
-      </p>
-    </div>
   );
 }
 
