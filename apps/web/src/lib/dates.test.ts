@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { safeDate, safeDateOrNull } from './dates';
+import { isBlankOrValidDate, safeDate, safeDateOrNull } from './dates';
 
 // dates.ts parses receipt/statement dates that native `new Date()` mishandles.
 // The critical rule: European day-first (DD/MM/YYYY, DD-MM-YYYY, DD.MM.YYYY) is
@@ -141,3 +141,24 @@ describe('todayLocal', () => {
   });
 });
 
+
+// #404: an impossible day used to roll over (31/02 → 3 March) or, once the form sent '', save as today.
+describe('impossible days', () => {
+  it.each(['31/02/2026', '30/02/2024', '29/02/2025', '31/04/2026', '2026-02-31', '2025-02-29T10:00:00Z', '2026-13-01'])(
+    'reads %j as no date',
+    (s) => {
+      expect(safeDateOrNull(s)).toBeNull();
+    }
+  );
+
+  it('still reads real leap days and timestamps', () => {
+    expect(safeDateOrNull('29/02/2024')?.toISOString()).toBe('2024-02-29T00:00:00.000Z');
+    expect(safeDateOrNull('2024-02-29')?.toISOString()).toBe('2024-02-29T00:00:00.000Z');
+    expect(safeDateOrNull('2026-07-05T09:30:00.000Z')?.toISOString()).toBe('2026-07-05T09:30:00.000Z');
+  });
+
+  it('isBlankOrValidDate tells a date left out from one typed wrong', () => {
+    for (const v of [undefined, null, '', '  ', '2026-07-05', '05/07/2026']) expect(isBlankOrValidDate(v), String(v)).toBe(true);
+    for (const v of ['31/02/2026', '2026-02-31', 'tomorrow', 42]) expect(isBlankOrValidDate(v), String(v)).toBe(false);
+  });
+});

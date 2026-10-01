@@ -11,7 +11,7 @@ import { isFeatureEnabled } from '@/lib/aiFeatures.server';
 import { extractPdfText, looksLikeScannedPdf } from '@/lib/pdf';
 import { ocrImage, looksLikeUsableOcr } from '@/lib/ocr';
 import { pdfFirstPageJpeg } from '@/lib/pdfThumb';
-import { safeDate } from '@/lib/dates';
+import { isBlankOrValidDate, safeDate } from '@/lib/dates';
 import { getAppSettings } from '@/lib/appSettings';
 import { matchCategoryRule } from '@/lib/categoryRules';
 import { mirrorFileToRemote } from '@/lib/mirror';
@@ -329,7 +329,8 @@ const UpdateSchema = z.object({
   amount: z.coerce.number().default(0),
   currency: z.string().default(''),
   fxRate: z.coerce.number().min(0).default(0),
-  date: z.string(),
+  // #404: an edited entry needs a real date; '' or text like 31/02/2026 used to save as today.
+  date: z.string().refine((v) => !!v.trim() && isBlankOrValidDate(v), 'Enter a valid date'),
   // #355: '' (derive from the date) or a real month. Free text used to store "09/2026" as-is.
   period: z.string().trim().regex(PERIOD_RE).default(''),
   recurring: z.boolean().default(false),
@@ -435,6 +436,9 @@ export async function updateExpense(id: string, data: z.input<typeof UpdateSchem
  * the form default 'other' means "not chosen", but a checkbox has no spare value for that.
  */
 const AddSchema = UpdateSchema.extend({
+  // A new entry may send a blank date, which means today; a date that is there but is not a
+  // real day is rejected rather than swapped for today (#404).
+  date: z.string().refine(isBlankOrValidDate, 'Enter a valid date'),
   taxDeductible: z.boolean().optional(),
   recurring: z.boolean().optional(),
 });

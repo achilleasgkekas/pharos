@@ -700,6 +700,13 @@ describe('logBillPayment', () => {
     expect(billUpdateOne).not.toHaveBeenCalled();
   });
 
+  it.each(['31/02/2026', '2026-02-31', 'soon'])('rejects the impossible date %j instead of logging today (#404)', async (date) => {
+    const res = await logBillPayment('b1', { amount: 10, date, note: 'x' });
+    expect(res).toEqual({ ok: false, error: 'Enter a valid date' });
+    expect(billFindById).not.toHaveBeenCalled();
+    expect(billUpdateOne).not.toHaveBeenCalled();
+  });
+
   it('not-found short-circuits before any write', async () => {
     billFindById.mockResolvedValueOnce(null);
     const res = await logBillPayment('nope', { amount: 10 });

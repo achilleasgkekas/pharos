@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PERIOD_RE, monthOfDate, periodFollowsDate, periodForUpdate } from './expensePeriod';
+import { expenseSaveBlocker, PERIOD_RE, monthOfDate, periodFollowsDate, periodForUpdate } from './expensePeriod';
 
 // #355: moving an expense's date to another month kept its old period, so it went on counting in
 // the old month (reproduced: date 2026-10-03 saved with period 2026-09).
@@ -42,5 +42,21 @@ describe('periodFollowsDate / PERIOD_RE / monthOfDate', () => {
 
   it('reads the month in UTC', () => {
     expect(monthOfDate(day('2026-10-01'))).toBe('2026-10');
+  });
+});
+
+// #403 / #404: the save buttons are not a native submit, so this is what keeps a bad entry back.
+describe('expenseSaveBlocker', () => {
+  const t = (k: string) => `[${k}]`;
+  it('passes a real date and a blank or real period', () => {
+    expect(expenseSaveBlocker({ date: '2026-09-30', period: '' }, '', t)).toBe('');
+    expect(expenseSaveBlocker({ date: '2026-09-30', period: '2026-08' }, '', t)).toBe('');
+  });
+  it('blocks a date the field flagged, even though it emitted no value', () => {
+    expect(expenseSaveBlocker({ date: '', period: '' }, 'Enter a valid date', t)).toBe('Enter a valid date');
+  });
+  it('blocks an empty date and an impossible period', () => {
+    expect(expenseSaveBlocker({ date: '', period: '' }, '', t)).toBe('[date.invalid]');
+    expect(expenseSaveBlocker({ date: '2026-09-30', period: '2026-99' }, '', t)).toBe('[ex.periodInvalid]');
   });
 });

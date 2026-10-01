@@ -5,7 +5,7 @@ import { Bill as BillModel } from '@/models/Bill';
 import { withRequestTenant } from '@/lib/tenancy/request';
 import { currentModel } from '@/lib/tenancy/connection';
 import { billIsSettledByPayments, billPaidAmount, billRemaining } from '@/lib/bill';
-import { safeDateOrNull } from '@/lib/dates';
+import { isBlankOrValidDate, safeDateOrNull } from '@/lib/dates';
 import { spawnNextBillOnce } from '@/lib/billRecurrence';
 import { addExpense } from '@/app/expenses/actions';
 import { billPaidExpenseId, billPaymentExpenseId, billPaymentId } from '@/lib/billExpenseId';
@@ -284,7 +284,8 @@ export async function markBillUnpaid(id: string): Promise<{ ok: boolean }> {
 
 const PaymentSchema = z.object({
   amount: z.coerce.number().positive('Payment amount must be greater than zero'),
-  date: z.string().default(''),
+  // '' means today; a date that is there but is not a real day is rejected, not swapped for today (#404).
+  date: z.string().default('').refine(isBlankOrValidDate, 'Enter a valid date'),
   note: z.string().default(''),
   logExpense: z.boolean().default(false),
   // #299: minted once by the payment form, so a double-click or a retry names the SAME instalment.
