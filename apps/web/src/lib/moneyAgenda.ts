@@ -1,7 +1,7 @@
 import { connectDB } from '@/lib/db';
 import { WARRANTY_ALERT_STATUSES } from '@/lib/itemStatus';
 import { addCycle, cycleRenews } from '@/lib/billingCycle';
-import { renewalOnOrAfter } from '@/lib/subscriptionRenewal';
+import { renewalAnchor, renewalOnOrAfter } from '@/lib/subscriptionRenewal';
 import { currentModel } from '@/lib/tenancy/connection';
 import { Subscription as SubscriptionModel } from '@/models/Subscription';
 import { Voucher as VoucherModel } from '@/models/Voucher';
@@ -121,7 +121,7 @@ export async function computeMoneyAgenda(now: Date = new Date(), locale = 'en'):
     // advances, so a subscription last saved years ago used to burn the whole step budget
     // catching up and never reach the window at all — the charge simply vanished from the
     // agenda, and from the safe-to-spend figure built on it.
-    const anchor = s.startDate || s.nextRenewal;
+    const anchor = renewalAnchor(s.nextRenewal, s.startDate);
     let d = renewalOnOrAfter(s.nextRenewal, s.billingCycle, windowStart, anchor);
     if (!d) continue;
     let guard = 0;

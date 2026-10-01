@@ -75,7 +75,7 @@ function daysInUTCMonth(year: number, month: number): number {
  * An optional `anchor` date preserves the original billing day across short months
  * (e.g. Jan 31 -> Feb 28/29 -> Mar 31) and leap years.
  */
-export function addCycleUTC(d: Date, cycle: string, anchor?: Date): Date {
+export function addCycleUTC(d: Date, cycle: string, anchor?: Date | null): Date {
   const spec = specOf(cycle);
   const n = new Date(d);
   if (!spec.step) return n;
@@ -115,7 +115,7 @@ export function addCycleUTC(d: Date, cycle: string, anchor?: Date): Date {
 /**
  * Roll a date forward by exactly one cycle using consistent UTC date-only arithmetic.
  */
-export function addCycle(d: Date, cycle: string, anchor?: Date): Date {
+export function addCycle(d: Date, cycle: string, anchor?: Date | null): Date {
   return addCycleUTC(d, cycle, anchor);
 }
 

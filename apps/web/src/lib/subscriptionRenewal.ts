@@ -50,6 +50,28 @@ export function renewalHasPassed(date: string | Date | null | undefined, now: nu
   return days !== null && days < 0;
 }
 
+/**
+ * The billing day to keep when stepping a subscription: `startDate` when the stored
+ * `nextRenewal` is on that same day (or is that day clamped into a short month, e.g. a
+ * start on the 31st renewing on Feb 28), otherwise `nextRenewal` itself. A subscription
+ * made by the AI command bar or the API can carry a `startDate` of "today" and a
+ * renewal on a different day ("every Feb 7"), and anchoring on the start date there
+ * would move every renewal onto the wrong day.
+ */
+export function renewalAnchor(
+  nextRenewal: string | Date | null | undefined,
+  startDate: string | Date | null | undefined
+): Date | null {
+  const stored = toDate(nextRenewal);
+  const start = toDate(startDate);
+  if (!stored || !start) return stored;
+  const day = stored.getUTCDate();
+  const startDay = start.getUTCDate();
+  if (day === startDay) return start;
+  const lastDay = new Date(Date.UTC(stored.getUTCFullYear(), stored.getUTCMonth() + 1, 0)).getUTCDate();
+  return startDay > day && day === lastDay ? start : stored;
+}
+
 /** Step `start` forward one cycle at a time for as long as `behind` says it is too early. */
 function roll(start: Date, cycle: string, behind: (d: Date) => boolean, anchor?: Date | null): Date {
   let d = start;
@@ -65,7 +87,8 @@ function roll(start: Date, cycle: string, behind: (d: Date) => boolean, anchor?:
 /**
  * The date a subscription is ACTUALLY next charged on: the stored `nextRenewal` while it
  * is still ahead, otherwise the next occurrence of the same cycle after today.
- * An optional `anchor` (e.g. `startDate`) preserves the original billing day across short months.
+ * An optional `anchor` (`startDate`) preserves the original billing day across short months,
+ * when it agrees with the stored date (see {@link renewalAnchor}).
  *
  * A cycle that never renews ('lifetime') is returned untouched — there is no next charge
  * to roll to, and stepping it would spin (addCycle returns the same date). An absent date
@@ -81,8 +104,7 @@ export function effectiveNextRenewal(
   if (!stored) return null;
   const cycle = billingCycle || 'monthly';
   if (!cycleRenews(cycle)) return stored;
-  const anc = toDate(anchor);
-  return roll(stored, cycle, (d) => renewalHasPassed(d, now), anc);
+  return roll(stored, cycle, (d) => renewalHasPassed(d, now), renewalAnchor(stored, anchor));
 }
 
 /** ISO form of {@link effectiveNextRenewal}, for the serialized shapes the UI/API hand out. */
@@ -97,7 +119,8 @@ export function effectiveNextRenewalISO(
 
 /**
  * The first occurrence on or after `boundary`, for the calendar/agenda projections.
- * An optional `anchor` (e.g. `startDate`) preserves the original billing day across short months.
+ * An optional `anchor` (`startDate`) preserves the original billing day across short months,
+ * when it agrees with the stored date (see {@link renewalAnchor}).
  *
  * Deliberately NOT `effectiveNextRenewal`: those views draw a whole month, including the
  * days of it that have already gone by, so a charge that landed on the 3rd belongs in the
@@ -115,6 +138,5 @@ export function renewalOnOrAfter(
   if (!stored) return null;
   const cycle = billingCycle || 'monthly';
   if (!cycleRenews(cycle)) return stored;
-  const anc = toDate(anchor);
-  return roll(stored, cycle, (d) => d < boundary, anc);
+  return roll(stored, cycle, (d) => d < boundary, renewalAnchor(stored, anchor));
 }
