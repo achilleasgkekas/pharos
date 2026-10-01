@@ -1,7 +1,7 @@
 import { connectDB } from '@/lib/db';
 import { WARRANTY_ALERT_STATUSES } from '@/lib/itemStatus';
 import { addCycle, cycleRenews } from '@/lib/billingCycle';
-import { renewalOnOrAfter } from '@/lib/subscriptionRenewal';
+import { renewalAnchor, renewalOnOrAfter } from '@/lib/subscriptionRenewal';
 import { Subscription as SubscriptionModel } from '@/models/Subscription';
 import { Statement as StatementModel } from '@/models/Statement';
 import { Item as ItemModel } from '@/models/Item';
@@ -102,7 +102,8 @@ async function getAgenda(t: TFunc, intlTag: string): Promise<{ months: MonthBloc
     // Subscription renewals — step each one forward through the window
     for (const s of subs) {
       if (!cycleRenews(s.billingCycle || 'monthly')) continue;
-      let d = renewalOnOrAfter(s.nextRenewal, s.billingCycle, windowStart);
+      const anchor = renewalAnchor(s.nextRenewal, s.startDate);
+      let d = renewalOnOrAfter(s.nextRenewal, s.billingCycle, windowStart, anchor);
       if (!d) continue;
       let guard = 0;
       while (d < windowEnd && guard < 16) {
@@ -118,7 +119,7 @@ async function getAgenda(t: TFunc, intlTag: string): Promise<{ months: MonthBloc
             details,
           });
         }
-        d = addCycle(d, s.billingCycle || 'monthly');
+        d = addCycle(d, s.billingCycle || 'monthly', anchor);
       }
     }
 
@@ -147,7 +148,8 @@ async function getAgenda(t: TFunc, intlTag: string): Promise<{ months: MonthBloc
       const key = `${r.kind}|${r.vendorKey}`;
       if (!r.vendorKey || seen.has(key)) continue;
       seen.add(key);
-      let d = addCycle(new Date(r.date as unknown as string), String(r.recurringCycle));
+      const anchor = new Date(r.date as unknown as string);
+      let d = addCycle(anchor, String(r.recurringCycle), anchor);
       let guard = 0;
       while (d < windowEnd && guard < 8) {
         guard++;
@@ -162,7 +164,7 @@ async function getAgenda(t: TFunc, intlTag: string): Promise<{ months: MonthBloc
             details,
           });
         }
-        d = addCycle(d, String(r.recurringCycle));
+        d = addCycle(d, String(r.recurringCycle), anchor);
       }
     }
 

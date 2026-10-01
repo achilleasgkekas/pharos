@@ -5,6 +5,7 @@ import {
   effectiveNextRenewal,
   effectiveNextRenewalISO,
   renewalOnOrAfter,
+  renewalAnchor,
 } from './subscriptionRenewal';
 
 // The bug these pin: `nextRenewal` is written once and never advanced, so a subscription
@@ -132,5 +133,43 @@ describe('renewalOnOrAfter', () => {
 
   it('is null without a stored date', () => {
     expect(renewalOnOrAfter(null, 'monthly', windowStart)).toBeNull();
+  });
+});
+
+// #405: the start date anchors the billing day, but only when the stored renewal agrees with it.
+describe('renewalAnchor', () => {
+  const utc = (y: number, m: number, d: number) => new Date(Date.UTC(y, m - 1, d));
+
+  it('uses the start date when the renewal is on the same day', () => {
+    expect(renewalAnchor(utc(2026, 10, 31), utc(2026, 1, 31))).toEqual(utc(2026, 1, 31));
+  });
+
+  it('uses the start date when the renewal is that day clamped into a short month', () => {
+    expect(renewalAnchor(utc(2026, 2, 28), utc(2026, 1, 31))).toEqual(utc(2026, 1, 31));
+    expect(renewalAnchor(utc(2026, 4, 30), utc(2026, 1, 31))).toEqual(utc(2026, 1, 31));
+  });
+
+  it('keeps the stored renewal when its day differs (AI or API set a separate renewal date)', () => {
+    // created on Oct 1 with "renews every Feb 7"
+    expect(renewalAnchor(utc(2027, 2, 7), utc(2026, 10, 1))).toEqual(utc(2027, 2, 7));
+    // not a clamp: the 28th of a 31-day month
+    expect(renewalAnchor(utc(2026, 3, 28), utc(2026, 1, 31))).toEqual(utc(2026, 3, 28));
+  });
+
+  it('falls back to the stored renewal without a start date', () => {
+    expect(renewalAnchor(utc(2026, 2, 7), null)).toEqual(utc(2026, 2, 7));
+    expect(renewalAnchor(null, utc(2026, 2, 7))).toBeNull();
+  });
+
+  it('effectiveNextRenewal keeps a renewal day that differs from the start date', () => {
+    const now = Date.UTC(2026, 9, 1, 12);
+    const next = effectiveNextRenewal(utc(2026, 9, 7), 'monthly', now, utc(2026, 8, 1));
+    expect(next).toEqual(utc(2026, 10, 7));
+  });
+
+  it('effectiveNextRenewal restores the 31st after a February clamp', () => {
+    const now = Date.UTC(2026, 2, 5, 12);
+    const next = effectiveNextRenewal(utc(2026, 2, 28), 'monthly', now, utc(2026, 1, 31));
+    expect(next).toEqual(utc(2026, 3, 31));
   });
 });
