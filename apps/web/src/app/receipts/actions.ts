@@ -10,7 +10,7 @@ import { isFeatureEnabled } from '@/lib/aiFeatures.server';
 import { extractPdfText, looksLikeScannedPdf } from '@/lib/pdf';
 import { ocrImage, looksLikeUsableOcr } from '@/lib/ocr';
 import { pdfFirstPageJpeg } from '@/lib/pdfThumb';
-import { safeDate } from '@/lib/dates';
+import { isBlankOrValidDate, safeDate } from '@/lib/dates';
 import { safeRevalidate } from '@/lib/revalidate';
 import { getAppSettings } from '@/lib/appSettings';
 import { mirrorFileToRemote } from '@/lib/mirror';
@@ -303,11 +303,18 @@ function fxFields(p: z.infer<typeof UpdateReceiptSchema>, base: string) {
   };
 }
 
+/** A receipt needs a real day: '' or text like 31/02/2026 used to save as today (#415). */
+function receiptDateProblem(date: unknown): string {
+  return typeof date === 'string' && date.trim() && isBlankOrValidDate(date) ? '' : 'Enter a valid date';
+}
+
 export async function updateReceipt(
   id: string,
   data: z.input<typeof UpdateReceiptSchema>
-) {
+): Promise<{ ok: boolean; error?: string }> {
   await assertCanWrite();
+  const dateProblem = receiptDateProblem(data?.date);
+  if (dateProblem) return { ok: false, error: dateProblem };
   const parsed = UpdateReceiptSchema.parse(data);
   return withRequestTenant(async () => {
   await connectDB();
@@ -327,6 +334,7 @@ export async function updateReceipt(
   }
   if (doc?.verified && before?.store) await learnStoreAlias(before.store, doc.store);
   revalidatePath('/receipts');
+  return { ok: true };
   });
 }
 
@@ -335,8 +343,10 @@ export async function updateReceipt(
 export async function quickVerifyReceipt(
   id: string,
   fields: { store: string; date: string; total: number; subtotal?: number; vatAmount?: number }
-): Promise<{ ok: boolean }> {
+): Promise<{ ok: boolean; error?: string }> {
   await assertCanWrite();
+  const dateProblem = receiptDateProblem(fields?.date);
+  if (dateProblem) return { ok: false, error: dateProblem };
   return withRequestTenant(async () => {
   await connectDB();
   const Receipt = await currentModel(ReceiptModel);

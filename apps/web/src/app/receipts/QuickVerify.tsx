@@ -44,6 +44,11 @@ export function QuickVerify({
   const [date, setDate] = useState('');
   const [total, setTotal] = useState('');
   const [done, setDone] = useState(0);
+  // #415: the date field reports text that is not a date (it emits '' for it). Verify is a
+  // button and Enter, not a form submit, so this is what keeps 31/02 from saving as today.
+  const [dateProblem, setDateProblem] = useState('');
+  const [error, setError] = useState('');
+  const dateBlocked = dateProblem || (!date ? t('date.invalid') : '');
 
   const r = queue[i];
 
@@ -56,19 +61,24 @@ export function QuickVerify({
     // quickVerifyReceipt converts it back with the receipt's stored rate.
     const printed = isForeignCurrency(r.currency, base) ? r.origAmount || r.total : r.total;
     setTotal(printed ? String(printed) : '');
+    setError('');
   }, [r, base]);
 
   const next = useCallback(() => setI((n) => n + 1), []);
 
   const verify = useCallback(() => {
     if (!r || pending) return;
+    if (dateBlocked) return setError(dateBlocked);
+    setError('');
     startTransition(async () => {
-      await quickVerifyReceipt(r._id, { store, date, total: Number(total) || 0 });
+      const res = await quickVerifyReceipt(r._id, { store, date, total: Number(total) || 0 });
+      // A rejected verify stays on this receipt with what was typed, and says why.
+      if (!res.ok) return setError(res.error || t('common.saveFailed'));
       setDone((d) => d + 1);
       onChanged();
       next();
     });
-  }, [r, pending, store, date, total, onChanged, next]);
+  }, [r, pending, store, date, total, onChanged, next, dateBlocked, t]);
 
   const archive = useCallback(() => {
     if (!r || pending) return;
@@ -145,7 +155,7 @@ export function QuickVerify({
                 <div className="grid grid-cols-2 gap-3">
                   <label className="block">
                     <span className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>{t('ex.fDate')}</span>
-                    <DateInput value={date} onValueChange={setDate} />
+                    <DateInput required value={date} onValueChange={setDate} onProblemChange={setDateProblem} />
                   </label>
                   <label className="block">
                     <span className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)] flex items-center gap-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
@@ -164,8 +174,9 @@ export function QuickVerify({
             </div>
 
             {/* actions */}
+            {error && <p role="alert" className="text-xs text-[color:var(--color-red)] mb-2">{error}</p>}
             <div className="flex items-center gap-2 mt-5 pt-4 border-t border-[color:var(--color-border)] flex-wrap">
-              <button onClick={verify} disabled={pending} className="flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg bg-[color:var(--color-accent)] text-black font-semibold hover:opacity-90 disabled:opacity-50">
+              <button onClick={verify} disabled={pending || !!dateBlocked} className="flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg bg-[color:var(--color-accent)] text-black font-semibold hover:opacity-90 disabled:opacity-50">
                 {pending ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />} {t('qv.verifyNext')}
               </button>
               <button onClick={next} disabled={pending} className="flex items-center gap-1.5 text-sm px-3 py-2 rounded-lg border border-[color:var(--color-border)] hover:border-[color:var(--color-text-dim)] transition-colors disabled:opacity-50">

@@ -87,6 +87,9 @@ export function SavingsClient({ data }: { data: SavingsData }) {
   const [dateStr, setDateStr] = useState(() => isoDay(addMonths(new Date(), 6)));
   const [planAmount, setPlanAmount] = useState('');
   const [planDate, setPlanDate] = useState(() => isoDay(addMonths(new Date(), 12)));
+  // #415: text in the date field that is not a date reaches here as '', which would save the
+  // goal with no target date; the field says so, and Save as goal waits for a real day.
+  const [planDateProblem, setPlanDateProblem] = useState('');
 
   const forecastDate = useMemo(() => parseDay(dateStr), [dateStr]);
   // #355: a forecast is about the future and only as far as the projection reaches. A past date
@@ -255,9 +258,9 @@ export function SavingsClient({ data }: { data: SavingsData }) {
           </label>
           <label className="flex flex-col gap-1 text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-[0.12em]" style={{ fontFamily: 'var(--font-mono)' }}>
             {t('sav.planDate')}
-            <DateInput value={planDate} onValueChange={setPlanDate} min={today} className="py-1.5 normal-case tracking-normal" />
+            <DateInput value={planDate} onValueChange={setPlanDate} onProblemChange={setPlanDateProblem} min={today} className="py-1.5 normal-case tracking-normal" />
           </label>
-          {adHoc && <SaveAsGoal amount={Number(planAmount)} date={planDate} />}
+          {adHoc && <SaveAsGoal amount={Number(planAmount)} date={planDate} dateProblem={planDateProblem} />}
         </div>
         {adHoc ? <PlanReadout plan={adHoc} levers={levers} /> : <p className="text-xs text-[color:var(--color-text-faint)]">{t('sav.planHint')}</p>}
       </Card>
@@ -450,13 +453,17 @@ function GoalPlanCard({ goal, data }: { goal: SavingsGoal; data: SavingsData }) 
 }
 
 /** Turn the answer on screen into something the app will keep tracking. */
-function SaveAsGoal({ amount, date }: { amount: number; date: string }) {
+function SaveAsGoal({ amount, date, dateProblem }: { amount: number; date: string; dateProblem: string }) {
   const t = useT();
   const [pending, startTransition] = useTransition();
   const [title, setTitle] = useState('');
   const [error, setError] = useState('');
 
   function save() {
+    if (dateProblem) {
+      setError(dateProblem);
+      return;
+    }
     const name = title.trim();
     if (!name) {
       setError(t('sav.needTitle'));
@@ -489,13 +496,13 @@ function SaveAsGoal({ amount, date }: { amount: number; date: string }) {
         </label>
         <button
           onClick={save}
-          disabled={pending}
+          disabled={pending || !!dateProblem}
           className="px-3 py-1.5 rounded-lg text-xs bg-[color:var(--color-accent)]/10 text-[color:var(--color-accent)] hover:bg-[color:var(--color-accent)]/20 disabled:opacity-50 flex items-center gap-1.5"
         >
           <Check size={13} /> {t('sav.saveAsGoal')}
         </button>
       </div>
-      {error && <p className="text-[10px] text-[color:var(--color-red)]">{error}</p>}
+      {(error || dateProblem) && <p role="alert" className="text-[10px] text-[color:var(--color-red)]">{error || dateProblem}</p>}
     </div>
   );
 }

@@ -99,6 +99,28 @@ beforeEach(() => {
   getAppSettingsMock.mockResolvedValue({ defaultWarrantyMonths: 24, defaultVatRate: 24, currency: 'EUR' });
 });
 
+// #415: '' (what the date field sends for 31/02/2026) and impossible days used to save as today.
+describe('impossible receipt dates', () => {
+  it.each(['', '  ', '31/02/2026', '2026-02-31', 'yesterday'])('updateReceipt refuses %j without writing', async (date) => {
+    const res = await updateReceipt('r1', { store: 'Skroutz', date, total: 42 } as any);
+    expect(res).toEqual({ ok: false, error: 'Enter a valid date' });
+    expect(connectDBMock).not.toHaveBeenCalled();
+    expect(receiptFindByIdAndUpdate).not.toHaveBeenCalled();
+  });
+
+  it.each(['', '31/02/2026', '2026-02-31'])('quickVerifyReceipt refuses %j without verifying', async (date) => {
+    const res = await quickVerifyReceipt('r1', { store: 'Skroutz', date, total: 42 });
+    expect(res).toEqual({ ok: false, error: 'Enter a valid date' });
+    expect(receiptFindByIdAndUpdate).not.toHaveBeenCalled();
+  });
+
+  it('a real day still saves, on the day typed', async () => {
+    receiptFindByIdAndUpdateLean.mockResolvedValueOnce({ _id: 'r1', store: 'Skroutz', date: new Date('2024-02-29'), total: 42, verified: false, filePath: '' });
+    expect(await updateReceipt('r1', { store: 'Skroutz', date: '29/02/2024', total: 42 } as any)).toEqual({ ok: true });
+    expect(receiptFindByIdAndUpdate.mock.calls[0][1].date.toISOString()).toBe('2024-02-29T00:00:00.000Z');
+  });
+});
+
 describe('updateReceipt', () => {
   it('rejects an invalid payload (blank store) before touching the DB', async () => {
     await expect(updateReceipt('r1', { store: '', date: '2026-06-15', total: 10 } as any)).rejects.toThrow();

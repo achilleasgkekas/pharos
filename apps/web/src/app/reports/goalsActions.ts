@@ -1,7 +1,7 @@
 'use server';
 import { connectDB } from '@/lib/db';
 import { Goal } from '@/models/Goal';
-import { safeDateOrNull } from '@/lib/dates';
+import { isBlankOrValidDate, safeDateOrNull } from '@/lib/dates';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { assertCanWrite } from '@/lib/auth';
@@ -25,7 +25,8 @@ import { isMonthKey, sweepNote } from '@/lib/budgetSweep';
 const GoalFormSchema = z.object({
   title: z.string().min(1, 'Title required'),
   targetAmount: z.coerce.number().min(0).default(0),
-  targetDate: z.string().optional().default(''),
+  // '' = no target date; text that is there but is not a real day is refused (#415).
+  targetDate: z.string().optional().default('').refine(isBlankOrValidDate, 'Enter a valid date'),
   category: z.string().default(''),
   notes: z.string().default(''),
 });
