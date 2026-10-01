@@ -16,6 +16,24 @@ const VehicleLogSchema = new Schema(
     description: { type: String, default: '' }, // service: what was done
     shop: { type: String, default: '' }, // garage / fuel station
     expenseId: { type: String, default: '' },
+    // #363 (all optional, so older logs keep working):
+    pricePerLiter: { type: Number, default: null, min: 0 }, // fuel: as printed on the pump receipt
+    fuelType: { type: String, default: '' }, // fuel: what was put in, e.g. 'diesel'
+    filePath: { type: String, default: '' }, // the scanned receipt / invoice kept with the entry
+    // service: the invoice lines, when known (parts and labour)
+    items: {
+      type: [
+        {
+          description: { type: String, default: '' },
+          kind: { type: String, enum: ['part', 'labor', 'other'], default: 'other' },
+          cost: { type: Number, default: 0, min: 0 },
+        },
+      ],
+      default: [],
+    },
+    // service: the next one as the garage wrote it on the invoice; overrides the vehicle's interval
+    nextServiceKm: { type: Number, default: null, min: 0 },
+    nextServiceDate: { type: Date, default: null },
   },
   { timestamps: true }
 );

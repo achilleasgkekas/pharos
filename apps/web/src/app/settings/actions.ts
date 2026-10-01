@@ -15,10 +15,34 @@ import { SpecialDate as SpecialDateModel } from '@/models/SpecialDate';
 import { billDaysUntilDue } from '@/lib/bill';
 import { collectExpiringDocuments } from '@/lib/documentExpiry';
 import { normalizeScrapeScope, DEFAULT_OWNED_INTERVAL_DAYS, type ScrapeScope } from '@/lib/scrapeOrder';
-import { collectVehicleDue, type VehicleDueRow } from '@/lib/vehicles';
+import { FUEL_SCAN_PROMPT, SERVICE_SCAN_PROMPT } from '@/lib/vehicleScan';
+import { collectServiceDue, collectVehicleDue, type ServiceDueRow, type VehicleDueRow } from '@/lib/vehicles';
 import { Vehicle as VehicleModel } from '@/models/Vehicle';
+import { VehicleLog as VehicleLogModel } from '@/models/VehicleLog';
 
-const VEHICLE_DUE_WORD = { motUntil: 'MOT', insuranceUntil: 'insurance', roadTaxUntil: 'road tax', emissionsUntil: 'emissions card' } as const;
+/** "in 12d" / "3d ago" / "in 400 km" / "800 km over": the push wording for a due service (#363). */
+function serviceDueWords(n: { daysLeft: number | null; kmLeft: number | null }): string {
+  const parts: string[] = [];
+  if (n.daysLeft !== null) parts.push(n.daysLeft < 0 ? `${-n.daysLeft}d ago` : n.daysLeft === 0 ? 'today' : `in ${n.daysLeft}d`);
+  if (n.kmLeft !== null) parts.push(n.kmLeft < 0 ? `${-n.kmLeft} km over` : `in ${n.kmLeft} km`);
+  return parts.join(', ');
+}
+
+/** The service-relevant logs of these vehicles, grouped by vehicle id (#363). */
+async function vehicleLogsById(
+  VehicleLog: { find: (q: object) => { select: (f: string) => { lean: () => Promise<unknown> } } },
+  vehicles: { _id: unknown }[]
+) {
+  const m = new Map<string, { kind: string; date: Date; odometer: number | null; nextServiceKm: number | null; nextServiceDate: Date | null }[]>();
+  if (!vehicles.length) return m;
+  const logs = (await VehicleLog.find({ vehicleId: { $in: vehicles.map((v) => v._id) } })
+    .select('vehicleId kind date odometer nextServiceKm nextServiceDate')
+    .lean()) as { vehicleId: unknown; kind: string; date: Date; odometer: number | null; nextServiceKm: number | null; nextServiceDate: Date | null }[];
+  for (const l of logs) m.set(String(l.vehicleId), [...(m.get(String(l.vehicleId)) ?? []), l]);
+  return m;
+}
+
+const VEHICLE_DUE_WORD = { motUntil: 'MOT', insuranceUntil: 'insurance', roadTaxUntil: 'road tax', emissionsUntil: 'emissions card', tyreChangeUntil: 'tyre change', batteryUntil: 'battery' } as const;
 import { collectUpcomingDates } from '@/lib/specialDates';
 import { collectMaintenanceDue, MAINTENANCE_STATUSES, type MaintenanceRow } from '@/lib/maintenance';
 import { collectLendingOverdue, LENDING_STATUSES, type LendingRow } from '@/lib/lending';
@@ -972,10 +996,12 @@ export async function runAlertChecks(opts: { dedupe?: boolean } = {}): Promise<{
   const vehicleRows =
     s.documentAlertDays > 0
       ? ((await (await scoped(VehicleModel)).find({ archived: { $ne: true } })
-          .select('name plate motUntil insuranceUntil roadTaxUntil emissionsUntil')
-          .lean()) as VehicleDueRow[])
+          .select('name plate motUntil insuranceUntil roadTaxUntil emissionsUntil tyreChangeUntil batteryUntil serviceIntervalKm serviceIntervalMonths purchaseDate purchaseOdometer')
+          .lean()) as (VehicleDueRow & ServiceDueRow)[])
       : [];
   const vehiclesDue = collectVehicleDue(vehicleRows, s.documentAlertDays, now);
+  // #363: the next service, by date or km, from the same rule the vehicle page shows.
+  const servicesDue = collectServiceDue(vehicleRows, await vehicleLogsById(await scoped(VehicleLogModel), vehicleRows), s.documentAlertDays, now);
 
   // Special dates (P50): birthdays / anniversaries within the lead window. Same collector
   // the /special-dates page uses. Zero = off, query skipped.
@@ -1063,6 +1089,7 @@ export async function runAlertChecks(opts: { dedupe?: boolean } = {}): Promise<{
   const billsSplit = splitFreshAlerts(nt.bills ? billsDue : [], (b) => `bill:${String(b._id)}:${b.iso}`, previouslySent);
   const documentsSplit = splitFreshAlerts(nt.documents ? documentsExpiring : [], (d) => `document:${String(d._id)}:${d.iso}`, previouslySent);
   const vehiclesSplit = splitFreshAlerts(nt.vehicles ? vehiclesDue : [], (v) => `vehicle:${String(v._id)}:${v.kind}:${v.iso}`, previouslySent);
+  const servicesSplit = splitFreshAlerts(nt.vehicles ? servicesDue : [], (v) => `vehicleService:${String(v._id)}:${v.key}`, previouslySent);
   // Stable per-record key: fires once when the date enters the lead window and stays quiet
   // while it's in-window; after the day passes it leaves the live set (dropped from the
   // baseline), so next year it counts as fresh again and re-fires — same mechanic as warranty.
@@ -1089,6 +1116,7 @@ export async function runAlertChecks(opts: { dedupe?: boolean } = {}): Promise<{
     ...billsSplit.keys,
     ...documentsSplit.keys,
     ...vehiclesSplit.keys,
+    ...servicesSplit.keys,
     ...specialDatesSplit.keys,
     ...maintenanceSplit.keys,
     ...lendingSplit.keys,
@@ -1108,6 +1136,7 @@ export async function runAlertChecks(opts: { dedupe?: boolean } = {}): Promise<{
   const freshBillsDue = billsSplit.fresh;
   const freshDocumentsExpiring = documentsSplit.fresh;
   const freshVehiclesDue = vehiclesSplit.fresh;
+  const freshServicesDue = servicesSplit.fresh;
   const freshSpecialDates = specialDatesSplit.fresh;
   const freshMaintenanceDue = maintenanceSplit.fresh;
   const freshLendingDue = lendingSplit.fresh;
@@ -1168,6 +1197,13 @@ export async function runAlertChecks(opts: { dedupe?: boolean } = {}): Promise<{
       `🚗 ${freshVehiclesDue.length} vehicle date(s) due: ${freshVehiclesDue
         .slice(0, 5)
         .map((v) => `${v.name} ${VEHICLE_DUE_WORD[v.kind]} (${v.days < 0 ? `${-v.days}d ago` : v.days === 0 ? 'today' : `${v.days}d`})`)
+        .join(', ')}`
+    );
+  if (freshServicesDue.length)
+    lines.push(
+      `🔧 ${freshServicesDue.length} service(s) due: ${freshServicesDue
+        .slice(0, 5)
+        .map((v) => `${v.name} (${serviceDueWords(v.next)})`)
         .join(', ')}`
     );
   if (freshSpecialDates.length)
@@ -1300,6 +1336,8 @@ const PROMPT_DEFAULTS: Record<PromptKey, string> = {
   expense: EXPENSE_PROMPT,
   voucher: VOUCHER_PROMPT,
   productPhoto: PRODUCT_PHOTO_PROMPT,
+  vehicleFuel: FUEL_SCAN_PROMPT,
+  vehicleService: SERVICE_SCAN_PROMPT,
   scraperPrice: DEFAULT_SCRAPER_PRICE_PROMPT,
 };
 

@@ -25,6 +25,7 @@ const {
   documentFind,
   specialDateFind,
   vehicleFind,
+  vehicleLogFind,
   notificationFind,
   notificationInsertMany,
   notificationUpdateOne,
@@ -40,6 +41,7 @@ const {
     documents: unknown[];
     specialDates: unknown[];
     vehicles: unknown[];
+    vehicleLogs: unknown[];
     existingNotifications: Array<{ dedupeKey: string; deletedAt?: Date | null; dismissedAtPrice?: number | null; autoExpired?: boolean }>;
   } = {
     items: [],
@@ -50,6 +52,7 @@ const {
     documents: [],
     specialDates: [],
     vehicles: [],
+    vehicleLogs: [],
     existingNotifications: [],
   };
 
@@ -80,6 +83,7 @@ const {
     documentFind: vi.fn(() => leanQuery(() => state.documents)),
     specialDateFind: vi.fn(() => leanQuery(() => state.specialDates)),
     vehicleFind: vi.fn(() => leanQuery(() => state.vehicles)),
+    vehicleLogFind: vi.fn(() => leanQuery(() => state.vehicleLogs)),
     notificationFind: vi.fn(() => leanQuery(() => state.existingNotifications)),
     notificationInsertMany: vi.fn(async (_docs: unknown[]) => undefined),
     // Awaitable like a Query, and chainable for the one call that opts into trashed rows.
@@ -107,6 +111,7 @@ vi.mock('@/models/Bill', () => ({ Bill: { find: billFind } }));
 vi.mock('@/models/Document', () => ({ Document: { find: documentFind } }));
 vi.mock('@/models/SpecialDate', () => ({ SpecialDate: { find: specialDateFind } }));
 vi.mock('@/models/Vehicle', () => ({ Vehicle: { find: vehicleFind } }));
+vi.mock('@/models/VehicleLog', () => ({ VehicleLog: { find: vehicleLogFind } }));
 vi.mock('@/models/Notification', () => ({
   Notification: {
     find: notificationFind,
@@ -129,6 +134,7 @@ function resetState() {
   state.documents = [];
   state.specialDates = [];
   state.vehicles = [];
+  state.vehicleLogs = [];
   state.existingNotifications = [];
 }
 
@@ -363,8 +369,31 @@ describe('generateNotifications — vehicle date alert kind (P110)', () => {
     state.vehicles = [{ _id: 'v1', name: 'Golf', plate: 'ABC-1234', motUntil: '2026-08-04', insuranceUntil: '2026-07-10', roadTaxUntil: '2027-01-01' }];
     await generateNotifications();
     expect(notificationInsertMany).toHaveBeenCalledWith([
-      expect.objectContaining({ dedupeKey: 'vehicle:v1:insuranceUntil:2026-07-10', kind: 'vehicle', title: 'Golf (ABC-1234)', body: '-10|insuranceUntil', href: '/vehicles' }),
+      expect.objectContaining({ dedupeKey: 'vehicle:v1:insuranceUntil:2026-07-10', kind: 'vehicle', title: 'Golf (ABC-1234)', body: '-10|insuranceUntil', href: '/vehicles/v1' }),
       expect.objectContaining({ dedupeKey: 'vehicle:v1:motUntil:2026-08-04', body: '15|motUntil' }),
+    ]);
+  });
+
+  // #363: the next service alerts by date or km, from the last logged service plus the interval.
+  it('fires for a service due by km, keyed by the due point, and not for one still far off', async () => {
+    withDocWindow(30);
+    state.vehicles = [
+      { _id: 'v1', name: 'Golf', plate: 'ABC-1234', serviceIntervalKm: 15000, serviceIntervalMonths: 12 },
+      { _id: 'v2', name: 'Polo', plate: '', serviceIntervalKm: 15000, serviceIntervalMonths: 12 },
+    ];
+    state.vehicleLogs = [
+      // Golf: serviced at 100,000 km on 1 Feb; a fill at 114,600 km puts the next one 400 km away.
+      { vehicleId: 'v1', kind: 'service', date: new Date('2026-02-01T00:00:00Z'), odometer: 100000, nextServiceKm: null, nextServiceDate: null },
+      { vehicleId: 'v1', kind: 'fuel', date: new Date('2026-07-15T00:00:00Z'), odometer: 114600, nextServiceKm: null, nextServiceDate: null },
+      // Polo: serviced a month ago, barely driven since.
+      { vehicleId: 'v2', kind: 'service', date: new Date('2026-06-20T00:00:00Z'), odometer: 50000, nextServiceKm: null, nextServiceDate: null },
+      { vehicleId: 'v2', kind: 'fuel', date: new Date('2026-07-15T00:00:00Z'), odometer: 50900, nextServiceKm: null, nextServiceDate: null },
+    ];
+    await generateNotifications();
+    const docs = notificationInsertMany.mock.calls[0][0] as { dedupeKey: string; body: string; href: string }[];
+    const service = docs.filter((d) => d.dedupeKey.startsWith('vehicleService:'));
+    expect(service).toEqual([
+      expect.objectContaining({ dedupeKey: 'vehicleService:v1:2027-02-01:115000', body: '196|service|400', href: '/vehicles/v1' }),
     ]);
   });
 

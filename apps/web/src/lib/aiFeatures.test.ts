@@ -23,6 +23,7 @@ const EXPECTED_KEYS: AiFeatureKey[] = [
   'subscriptions',
   'itemsImport',
   'productPhoto',
+  'vehicles',
   'commandBar',
 ];
 
