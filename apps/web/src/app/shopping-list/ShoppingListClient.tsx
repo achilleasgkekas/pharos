@@ -13,6 +13,7 @@ import { shrinkImage } from '@/lib/clientImage';
 import { compareNames } from '@/lib/i18n/format';
 import { useLocale } from '@/components/LocaleProvider';
 import { useOpenParam } from '@/components/useOpenParam';
+import { matchesListSearch } from './search';
 import {
   addListItem,
   toggleListItem,
@@ -89,8 +90,7 @@ export function ShoppingListClient({ initialItems }: { initialItems: SerializedL
     if (statusFilter === 'todo') list = list.filter((i) => !i.checked);
     else if (statusFilter === 'bought') list = list.filter((i) => i.checked);
     if (catFilter) list = list.filter((i) => (i.category || '').toLowerCase() === catFilter.toLowerCase());
-    const q = search.trim().toLowerCase();
-    if (q) list = list.filter((i) => i.name.toLowerCase().includes(q) || (i.brand || '').toLowerCase().includes(q) || (i.category || '').toLowerCase().includes(q));
+    if (search.trim()) list = list.filter((i) => matchesListSearch(i, search));
     return [...list].sort((a, b) => {
       const c = (a.checked ? 1 : 0) - (b.checked ? 1 : 0); // unchecked first
       if (c) return c;
@@ -113,9 +113,11 @@ export function ShoppingListClient({ initialItems }: { initialItems: SerializedL
     if (!n) return;
     const clean = { name: n, quantity: d.quantity.trim(), category: d.category.trim(), brand: d.brand.trim(), aiScanned, restockIntervalDays: d.restockIntervalDays ? Number(d.restockIntervalDays) : undefined };
     // Make sure the new row is actually visible (a stale status/category filter would
-    // otherwise hide it → it looks like "I added it but it disappeared").
+    // otherwise hide it → it looks like "I added it but it disappeared"). The same goes for a
+    // search it does not match (#408); a search it does match stays, so the list keeps its place.
     setStatusFilter('all');
     setCatFilter('');
+    if (!matchesListSearch(clean, search)) setSearch('');
     setScanErr(null);
     const tmpId = 'tmp-' + Date.now() + '-' + idSeq.current++;
     const tmp: SerializedListItem = {

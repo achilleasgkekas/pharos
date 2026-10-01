@@ -78,7 +78,9 @@ export function TasksClient({ tasks }: { tasks: SerializedTask[] }) {
   const [statusFilter, setStatusFilter] = useState('');
   const [tagFilter, setTagFilter] = useState('');
   const [showCreate, setShowCreate] = useState(false);
-  const [selected, setSelected] = useState<SerializedTask | null>(null);
+  // The open task by id, read from the live list (#407): a stored snapshot never saw the
+  // revalidated checklist, so a step added, ticked or deleted only showed after reopening.
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   // Local mirror so drag-drop / quick-move feels instant; re-synced from the
   // server props whenever a mutation revalidates /tasks.
   const [localTasks, setLocalTasks] = useState(tasks);
@@ -87,6 +89,7 @@ export function TasksClient({ tasks }: { tasks: SerializedTask[] }) {
   const [, startTransition] = useTransition();
 
   useEffect(() => setLocalTasks(tasks), [tasks]);
+  const selected = selectedId ? localTasks.find((t) => t._id === selectedId) ?? null : null;
 
   const allTags = useMemo(() => {
     const set = new Set<string>();
@@ -97,7 +100,7 @@ export function TasksClient({ tasks }: { tasks: SerializedTask[] }) {
   // Deep-link from global search
   useOpenParam((id) => {
     const found = localTasks.find((t) => t._id === id);
-    if (found) setSelected(found);
+    if (found) setSelectedId(found._id);
   });
 
   const visible = useMemo(
@@ -234,7 +237,7 @@ export function TasksClient({ tasks }: { tasks: SerializedTask[] }) {
                             task={task}
                             colIndex={colIndex}
                             dragging={dragId === task._id}
-                            onOpen={() => setSelected(task)}
+                            onOpen={() => setSelectedId(task._id)}
                             onMove={moveTask}
                             onDelete={removeTask}
                             onDragStart={() => setDragId(task._id)}
@@ -278,7 +281,7 @@ export function TasksClient({ tasks }: { tasks: SerializedTask[] }) {
               ) : (
                 <div className="space-y-1.5">
                   {listFiltered.map((task) => (
-                    <TaskRow key={task._id} task={task} onOpen={() => setSelected(task)} />
+                    <TaskRow key={task._id} task={task} onOpen={() => setSelectedId(task._id)} />
                   ))}
                 </div>
               )}
@@ -290,7 +293,7 @@ export function TasksClient({ tasks }: { tasks: SerializedTask[] }) {
         <TaskCreateForm onClose={() => setShowCreate(false)} />
       </Modal>
 
-      {selected && <TaskDetailModal task={selected} onClose={() => setSelected(null)} />}
+      {selected && <TaskDetailModal key={selected._id} task={selected} onClose={() => setSelectedId(null)} />}
     </main>
   );
 }
@@ -573,11 +576,26 @@ function TaskDetailModal({ task, onClose }: { task: SerializedTask; onClose: () 
     });
   }
 
+  const [stepError, setStepError] = useState('');
+  // A step change refreshes `task` through the page's revalidation; the form above keeps any
+  // unsaved title/notes edits because it only reads `task` once. A failed change says so (#407).
+  function runStep(change: () => Promise<unknown>, onFail?: () => void) {
+    setStepError('');
+    startTransition(async () => {
+      try {
+        await change();
+      } catch {
+        setStepError(t('common.saveFailed'));
+        onFail?.();
+      }
+    });
+  }
+
   function handleAddStep() {
     if (!newStep.trim()) return;
     const text = newStep;
     setNewStep('');
-    startTransition(() => addStep(task._id, text));
+    runStep(() => addStep(task._id, text), () => setNewStep(text));
   }
 
   async function handleDelete() {
@@ -618,11 +636,11 @@ function TaskDetailModal({ task, onClose }: { task: SerializedTask; onClose: () 
           <div className="space-y-1.5">
             {task.steps.map((step) => (
               <div key={step._id} className="group flex items-center gap-2.5 bg-[color:var(--color-surface-2)] rounded-lg px-3 py-2">
-                <button onClick={() => startTransition(() => toggleStep(task._id, step._id, !step.done))} className="shrink-0">
+                <button onClick={() => runStep(() => toggleStep(task._id, step._id, !step.done))} disabled={pending} aria-label={step.text} aria-pressed={step.done} className="shrink-0">
                   {step.done ? <CheckCircle2 size={16} className="text-[color:var(--color-accent)]" /> : <Circle size={16} className="text-[color:var(--color-text-faint)]" />}
                 </button>
                 <span className={cn('flex-1 text-sm', step.done && 'line-through text-[color:var(--color-text-faint)]')}>{step.text}</span>
-                <button onClick={() => startTransition(() => deleteStep(task._id, step._id))} className="shrink-0 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)]">
+                <button onClick={() => runStep(() => deleteStep(task._id, step._id))} disabled={pending} aria-label={t('common.delete')} className="shrink-0 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)]">
                   <X size={13} />
                 </button>
               </div>
@@ -634,10 +652,11 @@ function TaskDetailModal({ task, onClose }: { task: SerializedTask; onClose: () 
                 onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddStep(); } }}
                 placeholder={t('tk.addStep')}
               />
-              <Button type="button" variant="secondary" onClick={handleAddStep} disabled={!newStep.trim()} className="shrink-0">
+              <Button type="button" variant="secondary" onClick={handleAddStep} disabled={!newStep.trim() || pending} className="shrink-0">
                 <Plus size={14} /> {t('common.add')}
               </Button>
             </div>
+            {stepError && <p role="alert" className="text-xs text-[color:var(--color-red)]">{stepError}</p>}
           </div>
         </div>
 
