@@ -168,7 +168,8 @@ export async function generateDueRecurring(): Promise<{ created: number }> {
   let created = 0;
   for (const seed of seeds) {
     const cycle = String(seed.recurringCycle);
-    let next = addCycleUTC(new Date(seed.date), cycle);
+    const anchor = new Date(seed.date);
+    let next = addCycleUTC(anchor, cycle, anchor);
     // #298: periods before `recurringFrom` predate the series being recurring; step past them
     // on the seed's own calendar (so a yearly Jan 1 bill stays on Jan 1) without creating
     // anything. This walk does not count against the 36-entry cap below, or a series whose
@@ -177,7 +178,7 @@ export async function generateDueRecurring(): Promise<{ created: number }> {
       const cutoff = new Date(seed.recurringFrom).getTime();
       let skip = 0;
       while (next.getTime() < cutoff && skip < 10000) {
-        next = addCycleUTC(next, cycle);
+        next = addCycleUTC(next, cycle, anchor);
         skip++;
       }
     }
@@ -217,7 +218,7 @@ export async function generateDueRecurring(): Promise<{ created: number }> {
         // id): either way the slot is taken and re-creating it is exactly what #69 is about.
         if (!isDuplicateKey(err)) throw err;
       }
-      next = addCycleUTC(next, cycle);
+      next = addCycleUTC(next, cycle, anchor);
     }
   }
 

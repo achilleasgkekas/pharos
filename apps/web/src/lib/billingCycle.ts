@@ -65,40 +65,64 @@ export function cycleRenews(cycle: string): boolean {
   return specOf(cycle).step !== null;
 }
 
-/**
- * Roll a date forward by exactly one cycle. A non-renewing cycle returns the date
- * unchanged — callers that iterate MUST check `cycleRenews` first, or they would spin.
- */
-export function addCycle(d: Date, cycle: string): Date {
-  const spec = specOf(cycle);
-  const n = new Date(d);
-  if (!spec.step) return n;
-  if (spec.step.days) n.setDate(n.getDate() + spec.step.days);
-  if (spec.step.months) n.setMonth(n.getMonth() + spec.step.months);
-  if (spec.step.years) n.setFullYear(n.getFullYear() + spec.step.years);
-  return n;
+function daysInUTCMonth(year: number, month: number): number {
+  return new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
 }
 
 /**
- * addCycle for DATE-ONLY values, which the app stores as UTC midnight (`safeDate('2026-05-01')`
- * → 2026-05-01T00:00Z). The local-time setters above shift such a value whenever the server's TZ
- * is behind UTC: 2026-05-01T00Z is Apr 30 20:00 in New York, "+1 month" there is May 30 20:00 =
- * May 31 00Z, and a monthly series drifts a day earlier every step (#103). UTC setters keep the
- * calendar day exactly, on any host.
+ * Roll a date forward by exactly one cycle using UTC date-only arithmetic.
+ * A non-renewing cycle returns the date unchanged.
+ * An optional `anchor` date preserves the original billing day across short months
+ * (e.g. Jan 31 -> Feb 28/29 -> Mar 31) and leap years.
  */
-export function addCycleUTC(d: Date, cycle: string): Date {
+export function addCycleUTC(d: Date, cycle: string, anchor?: Date | null): Date {
   const spec = specOf(cycle);
   const n = new Date(d);
   if (!spec.step) return n;
-  if (spec.step.days) n.setUTCDate(n.getUTCDate() + spec.step.days);
-  if (spec.step.months) n.setUTCMonth(n.getUTCMonth() + spec.step.months);
-  if (spec.step.years) n.setUTCFullYear(n.getUTCFullYear() + spec.step.years);
-  return n;
+
+  if (spec.step.days) {
+    n.setUTCDate(n.getUTCDate() + spec.step.days);
+    return n;
+  }
+
+  const anc = anchor ?? d;
+  const ancDay = anc.getUTCDate();
+
+  const curYear = d.getUTCFullYear();
+  const curMonth = d.getUTCMonth();
+
+  const monthsToAdd = (spec.step.years || 0) * 12 + (spec.step.months || 0);
+  const targetTotalMonths = curYear * 12 + curMonth + monthsToAdd;
+  const targetYear = Math.floor(targetTotalMonths / 12);
+  const targetMonth = targetTotalMonths % 12;
+
+  const maxDay = daysInUTCMonth(targetYear, targetMonth);
+  const targetDay = Math.min(ancDay, maxDay);
+
+  return new Date(
+    Date.UTC(
+      targetYear,
+      targetMonth,
+      targetDay,
+      d.getUTCHours(),
+      d.getUTCMinutes(),
+      d.getUTCSeconds(),
+      d.getUTCMilliseconds()
+    )
+  );
+}
+
+/**
+ * Roll a date forward by exactly one cycle using consistent UTC date-only arithmetic.
+ */
+export function addCycle(d: Date, cycle: string, anchor?: Date | null): Date {
+  return addCycleUTC(d, cycle, anchor);
 }
 
 /**
  * Roll `start` forward one cycle at a time until it is in the future. Returns null for
- * a cycle that never renews. The guard bounds the loop for a pathological start date
+ * a cycle that never renews. The original billing anchor day is preserved across short months.
+ * The guard bounds the loop for a pathological start date
  * (e.g. year 1900 on a weekly cycle is ~6500 steps, so the ceiling sits above that).
  */
 export function nextOccurrence(start: Date, cycle: string, now: Date = new Date()): Date | null {
@@ -106,7 +130,7 @@ export function nextOccurrence(start: Date, cycle: string, now: Date = new Date(
   let next = new Date(start);
   let guard = 0;
   while (next.getTime() <= now.getTime() && guard < 10000) {
-    next = addCycle(next, cycle);
+    next = addCycleUTC(next, cycle, start);
     guard++;
   }
   return next;

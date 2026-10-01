@@ -30,7 +30,7 @@ export function trim(s: SubLean) {
     // advances `nextRenewal` once its date arrives, so a stored value that has gone by is
     // simply stale and would have every API consumer reporting a renewal as overdue for
     // ever. Derived per cycle — see lib/subscriptionRenewal.ts.
-    nextRenewal: iso(effectiveNextRenewal(s.nextRenewal, s.billingCycle)),
+    nextRenewal: iso(effectiveNextRenewal(s.nextRenewal, s.billingCycle, Date.now(), s.startDate)),
     active: s.active !== false,
     paymentMethod: s.paymentMethod ?? '',
     url: s.url ?? '',

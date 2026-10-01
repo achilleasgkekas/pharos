@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import {
   ChevronDown,
   Sun,
@@ -32,16 +32,13 @@ import { logoutAction } from '@/app/login/actions';
 import { useT } from './LocaleProvider';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { NotificationBell } from './NotificationBell';
-import type { TKey } from '@/lib/i18n';
 import type { Role } from '@/lib/roles';
 import {
   NAV_GROUPS,
-  HOME_ITEM,
   MONEY_LINKS,
   ACCOUNT_LINKS,
   ALL_NAV_ITEMS,
   navActive,
-  type NavItem,
   type NavGroup,
 } from '@/lib/nav';
 
@@ -134,12 +131,27 @@ function UserMenu({ user }: { user: SessionUser }) {
       {open && (
         <div className="absolute right-0 top-full mt-1 z-50 min-w-52 rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] shadow-2xl shadow-black/40 p-1">
           <div className="px-2.5 py-2 border-b border-[color:var(--color-border)] mb-1">
-            <p className="text-sm font-medium truncate">{user.name}</p>
-            <p className="text-[11px] text-[color:var(--color-text-faint)] uppercase" style={{ fontFamily: 'var(--font-mono)' }}>
-              {user.role}
-            </p>
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] flex items-center justify-center text-xs font-semibold text-[color:var(--color-accent)] shrink-0">
+                {(user.name || user.role || 'U').slice(0, 2).toUpperCase()}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium truncate leading-tight">{user.name || t('nav.account')}</p>
+                <span className="inline-block mt-0.5 text-[10px] px-1.5 py-0.2 rounded font-mono font-medium tracking-wide uppercase bg-[color:var(--color-surface-2)] text-[color:var(--color-text-faint)] border border-[color:var(--color-border)]">
+                  {user.role}
+                </span>
+              </div>
+            </div>
           </div>
 
+          <Link
+            href={'/account'}
+            prefetch={false}
+            onClick={() => setOpen(false)}
+            className={cn(menuRow, pathname.startsWith('/account') && 'text-[color:var(--color-accent)] font-medium')}
+          >
+            <UserRound size={15} /> {t('nav.account')}
+          </Link>
           <Link
             href={'/settings'}
             prefetch={false}
