@@ -138,7 +138,6 @@ async function getStats() {
       dismissed: appSettings.onboardingDismissed,
       storageConnected: storageConfig.backend !== 'local',
       hasReceipt: receiptCount > 0,
-      hasBudget: Object.keys(appSettings.budgets).length > 0,
       hasCard: cardCount > 0,
       notifyEnabled: notifiers.some((n) => n.enabled),
     },
@@ -153,7 +152,6 @@ type OnboardingSignals = {
   dismissed: boolean;
   storageConnected: boolean;
   hasReceipt: boolean;
-  hasBudget: boolean;
   hasCard: boolean;
   notifyEnabled: boolean;
 };
@@ -162,9 +160,8 @@ function onboardingSteps(o: OnboardingSignals, t: TFunc): OnboardingStep[] {
   return [
     { key: 'storage', label: t('home.onbStorage'), done: o.storageConnected, href: '/settings?tab=storage' },
     { key: 'receipt', label: t('home.onbReceipt'), done: o.hasReceipt, href: '/receipts' },
-    { key: 'budget', label: t('home.onbBudget'), done: o.hasBudget, href: '/settings?tab=workspace' },
-    { key: 'card', label: t('home.onbCard'), done: o.hasCard, href: '/settings?tab=workspace' },
-    { key: 'notify', label: t('home.onbNotify'), done: o.notifyEnabled, href: '/settings?tab=integrations' },
+    { key: 'card', label: t('home.onbCard'), done: o.hasCard, href: '/settings?tab=cards' },
+    { key: 'notify', label: t('home.onbNotify'), done: o.notifyEnabled, href: '/settings?tab=notifications' },
   ];
 }
 

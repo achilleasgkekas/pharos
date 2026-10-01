@@ -2,11 +2,9 @@
 import { useState, useTransition, useRef, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Activity, Sun, Moon, Sparkles, Database, CreditCard, ExternalLink, Server, Cloud, Download, Upload, Loader2, Check, Store as StoreIcon, Pencil, Trash2, Plus, X, Copy, ShieldCheck, SlidersHorizontal, Bell, MessageSquareCode, RotateCcw, ChevronDown, Globe, HardDrive, FolderTree, RefreshCw, Plug, Users, UserPlus, KeyRound, Star, Landmark, TrendingUp, TrendingDown, CalendarPlus, Tags, MapPin, FlaskConical, Webhook, Mail, Bookmark, LogOut, History, Zap, Coins, Briefcase, UserRound } from 'lucide-react';
+import { Activity, Sparkles, Database, CreditCard, ExternalLink, Server, Cloud, Download, Upload, Loader2, Check, Store as StoreIcon, Pencil, Trash2, Plus, X, Copy, ShieldCheck, SlidersHorizontal, Bell, MessageSquareCode, RotateCcw, ChevronDown, Globe, HardDrive, FolderTree, RefreshCw, Plug, Users, UserPlus, KeyRound, Star, TrendingDown, CalendarPlus, Tags, MapPin, FlaskConical, Webhook, Mail, Bookmark, History, Zap, Coins, UserRound } from 'lucide-react';
 import { AccountManager } from '@/app/account/AccountManager';
 import { getAccountData, type AccountData } from '@/app/account/actions';
-import { useTheme, type Theme } from '@/components/ThemeProvider';
-import { cur } from '@/lib/money';
 import { cn } from '@/components/ui/cn';
 import { PAGE_MAIN, PageHeader } from '@/components/ui/PageHeader';
 import { controlClass } from '@/components/ui/Input';
@@ -37,17 +35,8 @@ import {
   deleteUser,
   setUserRole,
   changeUserPassword,
-  changeOwnPassword,
-  logoutOtherSessions,
-  getSelfMfaStatus,
-  beginSelfMfaEnrollment,
-  confirmSelfMfaEnrollment,
-  disableSelfMfa,
   type UserRow,
 } from './users.actions';
-import type { MfaStatus } from '@/lib/userMfaStore';
-import { mfaCodeReady, mfaPasswordReady, describeMfaError } from '@/lib/mfaSettings';
-import { QrCode } from '@/components/QrCode';
 import { McpManager } from './McpManager';
 import { BackupData } from './BackupData';
 import { CalendarFeedManager } from './CalendarFeedManager';
@@ -61,7 +50,7 @@ import { getSampleDataStatus, loadSampleData, clearSampleData } from './sampleDa
 import { renderStoragePath, TEMPLATE_TOKENS } from '@/lib/storagePath';
 import { CURRENCIES } from '@/lib/money';
 import type { SerializedCard } from '@/types';
-import { useT, useLocale, useMoney } from '@/components/LocaleProvider';
+import { useT, useLocale } from '@/components/LocaleProvider';
 import { SHOPPING_COUNTRIES, SHOPPING_PRESETS } from '@/lib/shoppingRegion';
 import { ForeignShopsEditor } from './ForeignShopsEditor';
 import type { TKey } from '@/lib/i18n';
@@ -134,7 +123,6 @@ const WH_EVENT: Record<WebhookEvent, { label: TKey; hint: TKey }> = {
   'installment.due': { label: 'wh.evInstallment', hint: 'wh.evInstallmentHint' },
   'price.drop': { label: 'wh.evPrice', hint: 'wh.evPriceHint' },
 };
-const CSV_KIND: Record<'receipts' | 'expenses' | 'items', TKey> = { receipts: 'nav.receipts', expenses: 'nav.expenses', items: 'nav.inventory' };
 
 // Vision-capable local models that fit a Mac mini M4 16GB (receipts/cards need vision).
 const MODEL_SUGGESTIONS: { name: string; note: string; vision: boolean }[] = [
@@ -152,68 +140,115 @@ const OPENROUTER_SUGGESTIONS = ['openai/gpt-4o-mini', 'anthropic/claude-3.5-sonn
 // Mirror of the server-side vision detection (lib/aiConfig.ts) for inline warnings.
 const isVisionName = (name: string) => /vl|vision|llava|minicpm-v|moondream|bakllava|llama3\.2-vision/i.test(name);
 
-type TabId = 'workspace' | 'account' | 'ai' | 'storage' | 'integrations' | 'users' | 'activity' | 'system';
+type TabId =
+  | 'account'
+  | 'general'
+  | 'alerts'
+  | 'categories'
+  | 'stores'
+  | 'cards'
+  | 'ai'
+  | 'scraper'
+  | 'prompts'
+  | 'storage'
+  | 'backups'
+  | 'import'
+  | 'notifications'
+  | 'integrations'
+  | 'users'
+  | 'activity'
+  | 'system'
+  | 'about';
 
 import type { Role } from '@/lib/roles';
 
 type CurrentUser = { id: string; name: string; role: Role };
 
-const TABS: { id: TabId; label: string; icon: React.ReactNode; adminOnly?: boolean; selfHostOnly?: boolean; multiUserOnly?: boolean }[] = [
-  { id: 'workspace', label: 'Workspace', icon: <Briefcase size={15} /> },
-  { id: 'account', label: 'Account', icon: <UserRound size={15} /> },
-  // Hosted: AI moves to Workspace → AI (key + toggles in one control-plane place), so hide the
-  // product AI tab in SaaS. Self-host keeps it — it is the only AI settings surface there.
-  { id: 'ai', label: 'AI & Telemetry', icon: <Sparkles size={15} />, selfHostOnly: true },
-  { id: 'storage', label: 'Storage & Backups', icon: <HardDrive size={15} /> },
-  { id: 'integrations', label: 'Integrations', icon: <Plug size={15} /> },
-  { id: 'users', label: 'Users & Access', icon: <Users size={15} />, adminOnly: true, selfHostOnly: true },
-  // P89 (#23): who added or trashed what. Every role may read it, but only once there is a
-  // second account: on a single-user install there is nobody else's activity to show.
-  { id: 'activity', label: 'Activity', icon: <History size={15} />, multiUserOnly: true },
-  // P77 — host-level numbers (Mongo latency, volume free space, job queue). Shared
-  // infrastructure on the managed SaaS, so self-host + admin only.
-  { id: 'system', label: 'System status', icon: <Activity size={15} />, adminOnly: true, selfHostOnly: true },
+type TabDef = { id: TabId; label: TKey; desc: TKey; icon: React.ReactNode; adminOnly?: boolean; selfHostOnly?: boolean; multiUserOnly?: boolean };
+
+// Settings are grouped by what they are about, one focused page each, so no panel turns into
+// a wall of unrelated cards. The order inside a group is the order people reach for them.
+const GROUPS: { label: TKey; tabs: TabDef[] }[] = [
+  {
+    label: 'set.grpYou',
+    tabs: [{ id: 'account', label: 'set.tabAccount', desc: 'set.descAccount', icon: <UserRound size={15} /> }],
+  },
+  {
+    label: 'set.grpWorkspace',
+    tabs: [
+      { id: 'general', label: 'set.tabGeneral', desc: 'set.descGeneral', icon: <SlidersHorizontal size={15} /> },
+      { id: 'alerts', label: 'set.tabAlerts', desc: 'set.descAlerts', icon: <Bell size={15} /> },
+      { id: 'categories', label: 'set.tabCategories', desc: 'set.descCategories', icon: <Tags size={15} /> },
+      { id: 'stores', label: 'set.tabStores', desc: 'set.descStores', icon: <StoreIcon size={15} /> },
+      { id: 'cards', label: 'set.tabCards', desc: 'set.descCards', icon: <CreditCard size={15} /> },
+    ],
+  },
+  {
+    // Hosted: AI moves to Workspace → AI (key + toggles in one control-plane place), so these
+    // are self-host surfaces. Self-host keeps them: they are the only AI settings there.
+    label: 'set.grpAi',
+    tabs: [
+      { id: 'ai', label: 'set.tabAiFeatures', desc: 'set.descAi', icon: <Sparkles size={15} />, selfHostOnly: true },
+      { id: 'scraper', label: 'set.tabScraper', desc: 'set.descScraper', icon: <TrendingDown size={15} />, selfHostOnly: true },
+      { id: 'prompts', label: 'set.tabPrompts', desc: 'set.descPrompts', icon: <MessageSquareCode size={15} />, selfHostOnly: true },
+    ],
+  },
+  {
+    label: 'set.grpData',
+    tabs: [
+      { id: 'storage', label: 'set.tabFileStorage', desc: 'set.descStorage', icon: <HardDrive size={15} /> },
+      { id: 'backups', label: 'set.tabBackups', desc: 'set.descBackups', icon: <Database size={15} /> },
+      { id: 'import', label: 'set.tabImport', desc: 'set.descImport', icon: <Upload size={15} /> },
+    ],
+  },
+  {
+    label: 'set.grpConnect',
+    tabs: [
+      { id: 'notifications', label: 'set.tabNotifications', desc: 'set.descNotifications', icon: <Bell size={15} /> },
+      { id: 'integrations', label: 'set.tabIntegrations', desc: 'set.descIntegrations', icon: <Plug size={15} /> },
+    ],
+  },
+  {
+    label: 'set.grpAdmin',
+    tabs: [
+      { id: 'users', label: 'set.tabUsersAccess', desc: 'set.descUsers', icon: <Users size={15} />, adminOnly: true, selfHostOnly: true },
+      // P89 (#23): who added or trashed what. Every role may read it, but only once there is a
+      // second account: on a single-user install there is nobody else's activity to show.
+      { id: 'activity', label: 'set.tabActivity', desc: 'set.descActivity', icon: <History size={15} />, multiUserOnly: true },
+      // P77: host-level numbers (Mongo latency, volume free space, job queue). Shared
+      // infrastructure on the managed SaaS, so self-host + admin only.
+      { id: 'system', label: 'set.tabSystem', desc: 'set.descSystem', icon: <Activity size={15} />, adminOnly: true, selfHostOnly: true },
+      { id: 'about', label: 'set.tabAbout', desc: 'set.descAbout', icon: <Server size={15} /> },
+    ],
+  },
 ];
 
-const TAB_KEY: Record<TabId, TKey> = {
-  workspace: 'set.tabWorkspace',
-  account: 'set.tabAccount' as TKey,
-  ai: 'set.tabAiTelemetry',
-  storage: 'set.tabStorageBackups',
-  integrations: 'set.tabIntegrations',
-  users: 'set.tabUsersAccess',
-  activity: 'set.tabActivity',
-  system: 'set.tabSystem',
-};
+const ALL_TABS = GROUPS.flatMap((g) => g.tabs);
 
 function normalizeTab(raw: string | null): TabId | null {
   if (!raw) return null;
+  if (ALL_TABS.some((t) => t.id === raw)) return raw as TabId;
+  // Old tab ids (links, bookmarks, a saved last tab) land on the page that now holds them.
   const ALIASES: Record<string, TabId> = {
-    workspace: 'workspace',
-    account: 'account',
+    workspace: 'general',
     profile: 'account',
-    general: 'workspace',
-    money: 'workspace',
-    data: 'workspace',
-    ai: 'ai',
-    storage: 'storage',
-    integrations: 'integrations',
-    notifications: 'integrations',
-    users: 'users',
-    activity: 'activity',
-    system: 'system',
+    money: 'general',
+    data: 'stores',
+    budget: 'general',
   };
   return ALIASES[raw] ?? null;
 }
 
 export function SettingsClient({ info, currentUser }: { info: Info; currentUser: CurrentUser }) {
-  const { theme, setTheme } = useTheme();
   const t = useT();
-  const [tab, setTab] = useState<TabId>('workspace');
+  const [tab, setTab] = useState<TabId>('general');
   const [accountData, setAccountData] = useState<AccountData | null>(null);
   const isAdmin = currentUser.role === 'admin';
   const multiUser = useAttributionNames() !== null;
-  const visibleTabs = TABS.filter((t) => (!t.adminOnly || isAdmin) && (!t.multiUserOnly || multiUser));
+  const visible = (d: TabDef) => (!d.adminOnly || isAdmin) && (!d.multiUserOnly || multiUser);
+  const groups = GROUPS.map((g) => ({ ...g, tabs: g.tabs.filter(visible) })).filter((g) => g.tabs.length);
+  const visibleTabs = groups.flatMap((g) => g.tabs);
+  const current = visibleTabs.find((d) => d.id === tab) ?? visibleTabs[0];
   const searchParams = useSearchParams();
 
   useEffect(() => {
@@ -230,7 +265,12 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
       setTab(fromUrl);
       return;
     }
-    const saved = normalizeTab(typeof window !== 'undefined' ? window.localStorage.getItem('settingsTab') : null);
+    let saved: TabId | null = null;
+    try {
+      saved = normalizeTab(window.localStorage.getItem('settingsTab'));
+    } catch {
+      /* private mode → ignore */
+    }
     if (saved && visibleTabs.some((t) => t.id === saved)) setTab(saved);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -242,110 +282,108 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
     } catch {
       /* private mode → ignore */
     }
+    if (typeof window !== 'undefined' && window.innerWidth < 768) window.scrollTo({ top: 0 });
   }
 
   return (
     <main className={PAGE_MAIN}>
       <PageHeader title={t('nav.settings')} />
 
-      <div className="flex flex-col md:flex-row gap-5">
-        {/* Tab navigation — sidebar on desktop, scrollable pills on mobile */}
-        <nav className="w-full min-w-0 md:w-52 md:shrink-0">
-          <div className="flex md:flex-col gap-1.5 overflow-x-auto md:overflow-visible md:sticky md:top-20 pb-1 md:pb-0 -mx-4 px-4 md:mx-0 md:px-0">
-            {visibleTabs.map((tb) => (
-              <button
-                key={tb.id}
-                onClick={() => go(tb.id)}
-                className={cn(
-                  'flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all shrink-0 md:w-full',
-                  tab === tb.id
-                    ? 'bg-[color:var(--color-accent)] text-black'
-                    : 'bg-[color:var(--color-surface-2)] md:bg-transparent border border-[color:var(--color-border)] md:border-transparent text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface-2)]'
-                )}
-              >
-                {tb.icon}
-                {t(TAB_KEY[tb.id])}
-              </button>
+      <div className="flex flex-col md:flex-row gap-6">
+        {/* Phone: one native picker instead of a row of 18 pills that scrolls sideways. */}
+        <label className="md:hidden block">
+          <span className="sr-only">{t('set.sectionPicker')}</span>
+          <select value={current.id} onChange={(e) => go(e.target.value as TabId)} className={controlClass}>
+            {groups.map((g) => (
+              <optgroup key={g.label} label={t(g.label)}>
+                {g.tabs.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {t(d.label)}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+        </label>
+
+        <nav aria-label={t('nav.settings')} className="hidden md:block w-56 shrink-0">
+          <div className="sticky top-20 space-y-5">
+            {groups.map((g) => (
+              <div key={g.label}>
+                <div className="px-3 mb-1 text-[11px] font-semibold uppercase tracking-wider text-[color:var(--color-text-faint)]">{t(g.label)}</div>
+                <ul className="space-y-0.5">
+                  {g.tabs.map((d) => {
+                    const active = d.id === current.id;
+                    return (
+                      <li key={d.id}>
+                        <button
+                          type="button"
+                          onClick={() => go(d.id)}
+                          aria-current={active ? 'page' : undefined}
+                          className={cn(
+                            'w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-left transition-colors',
+                            active
+                              ? 'bg-[color:var(--color-surface-2)] text-[color:var(--color-text)] font-medium shadow-[inset_2px_0_0_var(--color-accent)]'
+                              : 'text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface)]'
+                          )}
+                        >
+                          <span className={active ? 'text-[color:var(--color-accent)]' : ''}>{d.icon}</span>
+                          {t(d.label)}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
             ))}
           </div>
         </nav>
 
         {/* Active panel */}
         <div className="flex-1 min-w-0 space-y-4">
-          {tab === 'workspace' && (
-            <>
-              <Section title={t('set.appearance')} icon={<Sun size={15} />}>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-sm font-medium">{t('set.theme')}</div>
-                    <div className="text-xs text-[color:var(--color-text-faint)]">{t('set.themeDesc')}</div>
-                  </div>
-                  <div className="flex gap-1.5">
-                    {(['dark', 'light'] as Theme[]).map((th) => (
-                      <button
-                        key={th}
-                        onClick={() => setTheme(th)}
-                        className={cn(
-                          'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all',
-                          theme === th
-                            ? 'bg-[color:var(--color-accent)] text-black'
-                            : 'bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]'
-                        )}
-                      >
-                        {th === 'dark' ? <Moon size={13} /> : <Sun size={13} />}
-                        {th === 'dark' ? t('set.dark') : t('set.light')}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </Section>
+          <div className="pb-1">
+            <h2 className="text-lg font-semibold" style={{ fontFamily: 'var(--font-display)' }}>
+              {t(current.label)}
+            </h2>
+            <p className="text-sm text-[color:var(--color-text-dim)] mt-0.5">{t(current.desc)}</p>
+          </div>
 
-              <DefaultsManager settings={info.settings} />
-
-              <StoresManager stores={info.stores} />
-              <ListsManager lists={info.lists} />
-              <SpacesManager spaces={info.settings.spaces} />
-
-              <CategoryRulesManager settings={info.settings} />
-              <CardsManager cards={info.cardList} />
-
-              <SelfPasswordCard />
-              <SelfMfaCard />
-
-              <Section title={t('set.about')}>
-                <UpdateChecker canEdit={isAdmin} />
-
-                <Row label={t('set.privacy')}>
-                  <span className="text-[color:var(--color-text-dim)]">
-                    {info.ai.effectiveProvider === 'anthropic' ? t('set.privacyHybrid') : t('set.privacyLocal')}
-                  </span>
-                </Row>
-              </Section>
-            </>
-          )}
-
-          {tab === 'account' && (
-            accountData ? (
+          {current.id === 'account' &&
+            (accountData ? (
               <AccountManager initialData={accountData} embedded />
             ) : (
               <div className="flex items-center justify-center p-12 text-xs text-[color:var(--color-text-dim)]">
                 <Loader2 size={16} className="animate-spin mr-2" /> {t('common.loading')}
               </div>
-            )
-          )}
+            ))}
 
-          {tab === 'ai' && (
+          {current.id === 'general' && <DefaultsManager settings={info.settings} part="general" />}
+          {current.id === 'alerts' && <DefaultsManager settings={info.settings} part="alerts" />}
+
+          {current.id === 'categories' && (
             <>
-              <AiMasterAndFeatures ai={info.ai} canEdit={isAdmin} />
-              <AiSettings ai={info.ai} ollamaUp={info.ollamaUp} />
-              <ScraperAiSettings scraperAi={info.scraperAi} installed={info.ai.installed} hasAnthropicKey={info.ai.hasKey} />
-              <AiPromptsManager prompts={info.prompts} />
+              <ListsManager lists={info.lists} />
+              <CategoryRulesManager settings={info.settings} />
+              <SpacesManager spaces={info.settings.spaces} />
             </>
           )}
 
-          {tab === 'storage' && (
+          {current.id === 'stores' && <StoresManager stores={info.stores} />}
+          {current.id === 'cards' && <CardsManager cards={info.cardList} />}
+
+          {current.id === 'ai' && (
             <>
-              <StorageManager storage={info.storage} counts={info.counts} />
+              <AiMasterAndFeatures ai={info.ai} canEdit={isAdmin} />
+              <AiSettings ai={info.ai} ollamaUp={info.ollamaUp} />
+            </>
+          )}
+          {current.id === 'scraper' && <ScraperAiSettings scraperAi={info.scraperAi} installed={info.ai.installed} hasAnthropicKey={info.ai.hasKey} />}
+          {current.id === 'prompts' && <AiPromptsManager prompts={info.prompts} />}
+
+          {current.id === 'storage' && <StorageManager storage={info.storage} counts={info.counts} />}
+
+          {current.id === 'backups' && (
+            <>
               <Section title={t('set.dataSection')} icon={<Database size={15} />}>
                 <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                   <Stat label={t('set.statItems')} value={info.counts.items} />
@@ -354,16 +392,22 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
                   <Stat label={t('set.statSubs')} value={info.counts.subscriptions} />
                   <Stat label={t('set.statCards')} value={info.counts.cards} />
                 </div>
-                <BackupData />
               </Section>
+              <BackupData />
+            </>
+          )}
+
+          {current.id === 'import' && (
+            <>
               <MigrationImportManager />
               <SampleDataManager />
             </>
           )}
 
-          {tab === 'integrations' && (
+          {current.id === 'notifications' && <NotificationsManager />}
+
+          {current.id === 'integrations' && (
             <>
-              <NotificationsManager />
               <WebhookManager />
               <Section title={t('set.mobileMcpTitle')} icon={<Plug size={15} />}>
                 <McpManager />
@@ -378,13 +422,24 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
             </>
           )}
 
-          {tab === 'users' && isAdmin && <UsersManager currentUserId={currentUser.id} />}
-          {tab === 'activity' && multiUser && <ActivityFeed />}
+          {current.id === 'users' && <UsersManager currentUserId={currentUser.id} />}
+          {current.id === 'activity' && <ActivityFeed />}
 
-          {tab === 'system' && isAdmin && (
+          {current.id === 'system' && (
             <Section title={t('sys.title')} icon={<Activity size={15} />}>
               <p className="text-xs text-[color:var(--color-text-faint)] -mt-1 mb-1">{t('sys.desc')}</p>
               <SystemHealthPanel />
+            </Section>
+          )}
+
+          {current.id === 'about' && (
+            <Section title={t('set.about')} icon={<Server size={15} />}>
+              <UpdateChecker canEdit={isAdmin} />
+              <Row label={t('set.privacy')}>
+                <span className="text-[color:var(--color-text-dim)]">
+                  {info.ai.effectiveProvider === 'anthropic' ? t('set.privacyHybrid') : t('set.privacyLocal')}
+                </span>
+              </Row>
             </Section>
           )}
         </div>
@@ -2248,7 +2303,7 @@ function Switch({ checked, onChange, label }: { checked: boolean; onChange: (v: 
   );
 }
 
-const fieldLabel = 'text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider mb-1.5 block';
+const fieldLabel = 'text-xs font-medium text-[color:var(--color-text-dim)] mb-1.5 block';
 const saveBtn =
   'flex items-center gap-1.5 text-xs px-4 py-2 rounded-lg bg-[color:var(--color-accent)] text-black font-semibold hover:opacity-90 transition-opacity disabled:opacity-50';
 const ghostBtn =
@@ -2379,7 +2434,7 @@ function CategoryRulesManager({ settings }: { settings: AppSettings }) {
 
 
 
-function DefaultsManager({ settings }: { settings: AppSettings }) {
+function DefaultsManager({ settings, part }: { settings: AppSettings; part: 'general' | 'alerts' }) {
   const t = useT();
   const [pending, startTransition] = useTransition();
   const [view, setView] = useState<'grid' | 'list'>(settings.defaultItemView);
@@ -2467,129 +2522,130 @@ function DefaultsManager({ settings }: { settings: AppSettings }) {
     });
   }
 
+  // Both pages share one form state and one save, so saving either page always sends every
+  // field and never resets the half that is not on screen.
+  const num = (label: TKey, value: string, set: (v: string) => void, max: number) => ({ label, value, set, max });
+  const alertRows = [
+    num('set.warrantyAlert', alertDays, setAlertDays, 730),
+    num('set.trialAlert', trialDays, setTrialDays, 60),
+    num('set.billAlert', billDays, setBillDays, 90),
+    num('set.documentAlert', docDays, setDocDays, 180),
+    num('set.specialDateAlert', specialDays, setSpecialDays, 180),
+    num('set.maintenanceAlert', maintDays, setMaintDays, 180),
+    num('set.lendingAlert', lendDays, setLendDays, 180),
+    num('set.claimStaleAlert', claimStaleDays, setClaimStaleDays, 180),
+    num('set.syncStaleAlert', syncStaleDays, setSyncStaleDays, 365),
+    num('set.subscriptionReviewAlert', subscriptionReviewDays, setSubscriptionReviewDays, 730),
+  ];
+
+  const footer = (
+    <div className="flex items-center gap-3 pt-4 border-t border-[color:var(--color-border)] mt-2">
+      <button type="button" onClick={save} disabled={pending} className={saveBtn}>
+        {pending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} {t('set.saveSettings')}
+      </button>
+      {msg && <span className="text-xs text-[color:var(--color-accent)]">{msg}</span>}
+    </div>
+  );
+
+  if (part === 'alerts') {
+    return (
+      <Section title={t('set.tabAlerts')} icon={<Bell size={15} />}>
+        <ul className="divide-y divide-[color:var(--color-border)]">
+          {alertRows.map((r) => (
+            <li key={r.label} className="flex items-center justify-between gap-4 py-2.5">
+              <label htmlFor={`alert-${r.label}`} className="text-sm text-[color:var(--color-text)] min-w-0">
+                {t(r.label)}
+              </label>
+              <input
+                id={`alert-${r.label}`}
+                type="number"
+                min="0"
+                max={r.max}
+                value={r.value}
+                onChange={(e) => r.set(e.target.value)}
+                className={cn(controlClass, 'w-24 shrink-0 text-right')}
+              />
+            </li>
+          ))}
+        </ul>
+        {footer}
+      </Section>
+    );
+  }
+
   return (
-    <Section title={t('set.defaultsTitle')} icon={<SlidersHorizontal size={15} />}>
-      <div className="grid sm:grid-cols-2 gap-4">
-        <label className="block">
-          <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.currency')}</span>
-          <select value={currency} onChange={(e) => setCurrency(e.target.value)} className={controlClass}>
-            {CURRENCIES.map((c) => (
-              <option key={c.code} value={c.code}>
-                {c.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="block">
-          <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.defaultVat')}</span>
-          <input type="number" min="0" max="100" step="0.5" value={vatRate} onChange={(e) => setVatRate(e.target.value)} className={controlClass} />
-        </label>
-        <label className="block">
-          <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.defaultView')}</span>
-          <select value={view} onChange={(e) => setView(e.target.value as 'grid' | 'list')} className={controlClass}>
-            <option value="grid">{t('v.grid')}</option>
-            <option value="list">{t('v.list')}</option>
-          </select>
-        </label>
-        <label className="block">
-          <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.defaultWarranty')}</span>
-          <input type="number" min="0" max="120" value={warrantyMonths} onChange={(e) => setWarrantyMonths(e.target.value)} className={controlClass} />
-        </label>
-        <label className="block">
-          <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.warrantyAlert')}</span>
-          <input type="number" min="0" max="730" value={alertDays} onChange={(e) => setAlertDays(e.target.value)} className={controlClass} />
-        </label>
-        <label className="block">
-          <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.returnWindow')}</span>
-          <input type="number" min="0" max="365" value={returnDays} onChange={(e) => setReturnDays(e.target.value)} className={controlClass} />
-        </label>
-        <label className="block">
-          <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.shoppingCountry')}</span>
-          <select
-            value={shoppingCountry}
-            onChange={(e) => handleCountryChange(e.target.value)}
-            className={controlClass}
-          >
-            <option value="">{t('set.shoppingCountryAny')}</option>
-            {[...SHOPPING_COUNTRIES]
-              .sort((a, b) => countryName(a).localeCompare(countryName(b), locale))
-              .map((code) => (
-                <option key={code} value={code}>
-                  {countryName(code)}
+    <>
+      <Section title={t('set.defaultsGeneral')} icon={<SlidersHorizontal size={15} />}>
+        <div className="grid sm:grid-cols-2 gap-4">
+          <label className="block">
+            <span className={fieldLabel}>{t('set.currency')}</span>
+            <select value={currency} onChange={(e) => setCurrency(e.target.value)} className={controlClass}>
+              {CURRENCIES.map((c) => (
+                <option key={c.code} value={c.code}>
+                  {c.label}
                 </option>
               ))}
-          </select>
-        </label>
-        {shoppingCountry && (
-          <div className="sm:col-span-2">
-            <ForeignShopsEditor
-              country={shoppingCountry}
-              countryLabel={countryName(shoppingCountry)}
-              shops={extraShops}
-              onChange={setExtraShops}
-            />
-          </div>
-        )}
-        <label className="block">
-          <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.trialAlert')}</span>
-          <input type="number" min="0" max="60" value={trialDays} onChange={(e) => setTrialDays(e.target.value)} className={controlClass} />
-        </label>
-        <label className="block">
-          <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.billAlert')}</span>
-          <input type="number" min="0" max="90" value={billDays} onChange={(e) => setBillDays(e.target.value)} className={controlClass} />
-        </label>
-        <label className="block">
-          <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.documentAlert')}</span>
-          <input type="number" min="0" max="180" value={docDays} onChange={(e) => setDocDays(e.target.value)} className={controlClass} />
-        </label>
-        <label className="block">
-          <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.specialDateAlert')}</span>
-          <input type="number" min="0" max="180" value={specialDays} onChange={(e) => setSpecialDays(e.target.value)} className={controlClass} />
-        </label>
-        <label className="block">
-          <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.maintenanceAlert')}</span>
-          <input type="number" min="0" max="180" value={maintDays} onChange={(e) => setMaintDays(e.target.value)} className={controlClass} />
-        </label>
-        <label className="block">
-          <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.lendingAlert')}</span>
-          <input type="number" min="0" max="180" value={lendDays} onChange={(e) => setLendDays(e.target.value)} className={controlClass} />
-        </label>
-        <label className="block">
-          <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.claimStaleAlert')}</span>
-          <input type="number" min="0" max="180" value={claimStaleDays} onChange={(e) => setClaimStaleDays(e.target.value)} className={controlClass} />
-        </label>
-        <label className="block">
-          <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.syncStaleAlert')}</span>
-          <input type="number" min="0" max="365" value={syncStaleDays} onChange={(e) => setSyncStaleDays(e.target.value)} className={controlClass} />
-        </label>
-        <label className="block">
-          <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.subscriptionReviewAlert')}</span>
-          <input type="number" min="0" max="730" value={subscriptionReviewDays} onChange={(e) => setSubscriptionReviewDays(e.target.value)} className={controlClass} />
-        </label>
-        <div className="flex items-center justify-between gap-3 self-end pb-1">
-          <span className="min-w-0">
-            <span className="text-xs font-medium block">{t('set.autoAddStores')}</span>
-            <span className="text-[10px] text-[color:var(--color-text-faint)] block">{t('set.autoAddStoresDesc')}</span>
-          </span>
-          <Switch label={t('set.autoAddStores')} checked={autoAdd} onChange={setAutoAdd} />
+            </select>
+          </label>
+          <label className="block">
+            <span className={fieldLabel}>{t('set.defaultVat')}</span>
+            <input type="number" min="0" max="100" step="0.5" value={vatRate} onChange={(e) => setVatRate(e.target.value)} className={controlClass} />
+          </label>
+          <label className="block">
+            <span className={fieldLabel}>{t('set.defaultView')}</span>
+            <select value={view} onChange={(e) => setView(e.target.value as 'grid' | 'list')} className={controlClass}>
+              <option value="grid">{t('v.grid')}</option>
+              <option value="list">{t('v.list')}</option>
+            </select>
+          </label>
+          <label className="block">
+            <span className={fieldLabel}>{t('set.defaultWarranty')}</span>
+            <input type="number" min="0" max="120" value={warrantyMonths} onChange={(e) => setWarrantyMonths(e.target.value)} className={controlClass} />
+          </label>
+          <label className="block">
+            <span className={fieldLabel}>{t('set.returnWindow')}</span>
+            <input type="number" min="0" max="365" value={returnDays} onChange={(e) => setReturnDays(e.target.value)} className={controlClass} />
+          </label>
+          <label className="block">
+            <span className={fieldLabel}>{t('set.shoppingCountry')}</span>
+            <select value={shoppingCountry} onChange={(e) => handleCountryChange(e.target.value)} className={controlClass}>
+              <option value="">{t('set.shoppingCountryAny')}</option>
+              {[...SHOPPING_COUNTRIES]
+                .sort((a, b) => countryName(a).localeCompare(countryName(b), locale))
+                .map((code) => (
+                  <option key={code} value={code}>
+                    {countryName(code)}
+                  </option>
+                ))}
+            </select>
+          </label>
+          {shoppingCountry && (
+            <div className="sm:col-span-2">
+              <ForeignShopsEditor country={shoppingCountry} countryLabel={countryName(shoppingCountry)} shops={extraShops} onChange={setExtraShops} />
+            </div>
+          )}
         </div>
-        {/* P9 opt-in: keeps the currency + FX-rate fields out of the way for the
-            single-currency majority. Totals always stay in the base currency above. */}
-        <div className="flex items-center justify-between gap-3 self-end pb-1">
-          <span className="min-w-0">
-            <span className="text-xs font-medium block">{t('set.multiCurrency')}</span>
-            <span className="text-[10px] text-[color:var(--color-text-faint)] block">{t('set.multiCurrencyDesc', { code: currency })}</span>
-          </span>
-          <Switch label={t('set.multiCurrency')} checked={multiCurrency} onChange={setMultiCurrency} />
-        </div>
-      </div>
-      <div className="flex items-center gap-3 pt-3 border-t border-[color:var(--color-border)] mt-1">
-        <button type="button" onClick={save} disabled={pending} className={saveBtn}>
-          {pending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} {t('set.saveDefaults')}
-        </button>
-        {msg && <span className="text-[11px] text-[color:var(--color-accent)]" style={{ fontFamily: 'var(--font-mono)' }}>{msg}</span>}
-      </div>
-    </Section>
+        <ul className="divide-y divide-[color:var(--color-border)] border-t border-[color:var(--color-border)] mt-4">
+          <li className="flex items-center justify-between gap-4 py-3">
+            <span className="min-w-0">
+              <span className="text-sm font-medium block">{t('set.autoAddStores')}</span>
+              <span className="text-xs text-[color:var(--color-text-faint)] block">{t('set.autoAddStoresDesc')}</span>
+            </span>
+            <Switch label={t('set.autoAddStores')} checked={autoAdd} onChange={setAutoAdd} />
+          </li>
+          {/* P9 opt-in: keeps the currency + FX-rate fields out of the way for the
+              single-currency majority. Totals always stay in the base currency above. */}
+          <li className="flex items-center justify-between gap-4 py-3">
+            <span className="min-w-0">
+              <span className="text-sm font-medium block">{t('set.multiCurrency')}</span>
+              <span className="text-xs text-[color:var(--color-text-faint)] block">{t('set.multiCurrencyDesc', { code: currency })}</span>
+            </span>
+            <Switch label={t('set.multiCurrency')} checked={multiCurrency} onChange={setMultiCurrency} />
+          </li>
+        </ul>
+        {footer}
+      </Section>
+    </>
   );
 }
 
@@ -3731,270 +3787,6 @@ function UsersManager({ currentUserId }: { currentUserId: string }) {
   );
 }
 
-/** "Change my own password" — available to every signed-in user (incl. members). */
-function SelfPasswordCard() {
-  const t = useT();
-  const [open, setOpen] = useState(false);
-  const [oldPwd, setOldPwd] = useState('');
-  const [newPwd, setNewPwd] = useState('');
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  const [pending, startTransition] = useTransition();
-
-  function submit() {
-    setMsg(null);
-    startTransition(async () => {
-      const r = await changeOwnPassword(oldPwd, newPwd);
-      if (r.ok) { setMsg({ ok: true, text: t('set.passwordChanged') }); setOldPwd(''); setNewPwd(''); setOpen(false); }
-      else setMsg({ ok: false, text: r.error || t('common.failed') });
-    });
-  }
-
-  // P91: invalidate every other session for this account (leaked password, a family
-  // tablet left logged in). This device stays signed in — the server re-mints its cookie.
-  function signOutOthers() {
-    setMsg(null);
-    startTransition(async () => {
-      const r = await logoutOtherSessions();
-      setMsg(r.ok ? { ok: true, text: t('set.signedOutOthers') } : { ok: false, text: t('common.failed') });
-    });
-  }
-
-  return (
-    <Section title={t('set.yourPassword')} icon={<KeyRound size={15} />}>
-      {open ? (
-        <div className="space-y-2.5">
-          <input value={oldPwd} onChange={(e) => setOldPwd(e.target.value)} type="password" placeholder={t('set.currentPwdPlaceholder')} className={controlClass} />
-          <input value={newPwd} onChange={(e) => setNewPwd(e.target.value)} type="password" placeholder={t('set.newPwdPlaceholder')} className={controlClass} />
-          <div className="flex items-center gap-2">
-            <button onClick={submit} disabled={pending} className={saveBtn}>{pending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} {t('set.update')}</button>
-            <button onClick={() => { setOpen(false); setMsg(null); }} className={ghostBtn}><X size={13} /> {t('common.cancel')}</button>
-            {msg && <span className={cn('text-[11px]', msg.ok ? 'text-[color:var(--color-accent)]' : 'text-[color:var(--color-red)]')}>{msg.text}</span>}
-          </div>
-        </div>
-      ) : (
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-[color:var(--color-text-dim)]">{t('set.changePasswordDesc')}</span>
-          <div className="flex items-center gap-2">
-            {msg && <span className={cn('text-[11px]', msg.ok ? 'text-[color:var(--color-accent)]' : 'text-[color:var(--color-red)]')}>{msg.text}</span>}
-            <button onClick={signOutOthers} disabled={pending} className={ghostBtn} title={t('set.signOutOthersDesc')}>
-              {pending ? <Loader2 size={13} className="animate-spin" /> : <LogOut size={13} />} {t('set.signOutOthers')}
-            </button>
-            <button onClick={() => setOpen(true)} className={ghostBtn}><KeyRound size={13} /> {t('set.changePassword')}</button>
-          </div>
-        </div>
-      )}
-    </Section>
-  );
-}
-
-/** Which sub-form the "Two-factor authentication" card is currently showing. Mirrors
- *  components/saas/AccountSettingsPanel.tsx's MfaStage exactly (same flow, same rules) — the
- *  self-hosted account settings and the SaaS account settings are now the same feature over two
- *  different models. */
-type MfaStage = 'idle' | 'need-password-to-start' | 'enrolling' | 'need-password-to-disable' | 'recovery-codes';
-
-/** "Set up / manage two-factor authentication for my own account" (P79) — the self-hosted
- *  counterpart of AccountSettingsPanel.tsx's MFA section, wired to server actions instead of
- *  fetch()+routes (same idiom as SelfPasswordCard above). Loads its own status on mount, same
- *  pattern as UpdateChecker, so a slow read never blocks the rest of Settings. */
-function SelfMfaCard() {
-  const t = useT();
-  const [status, setStatus] = useState<MfaStatus | null>(null);
-  const [stage, setStage] = useState<MfaStage>('idle');
-  const [reauthPassword, setReauthPassword] = useState('');
-  const [disablePassword, setDisablePassword] = useState('');
-  const [code, setCode] = useState('');
-  const [secret, setSecret] = useState('');
-  const [uri, setUri] = useState('');
-  const [recoveryCodes, setRecoveryCodes] = useState<string[] | null>(null);
-  const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
-  const [pending, startTransition] = useTransition();
-
-  useEffect(() => {
-    getSelfMfaStatus().then(setStatus).catch(() => {});
-  }, []);
-
-  function resetFlow() {
-    setStage('idle');
-    setReauthPassword('');
-    setDisablePassword('');
-    setCode('');
-    setSecret('');
-    setUri('');
-    setError('');
-  }
-
-  function clickStart() {
-    setError('');
-    setNotice('');
-    if (status?.enabled) {
-      setStage('need-password-to-start');
-    } else {
-      beginEnrollment('');
-    }
-  }
-
-  function beginEnrollment(password: string) {
-    setError('');
-    startTransition(async () => {
-      const res = await beginSelfMfaEnrollment(password);
-      if (res.ok && res.secret && res.uri) {
-        setSecret(res.secret);
-        setUri(res.uri);
-        setStage('enrolling');
-      } else {
-        setError(describeMfaError(400, res.error));
-      }
-    });
-  }
-
-  function confirmEnrollment() {
-    setError('');
-    startTransition(async () => {
-      const res = await confirmSelfMfaEnrollment(code);
-      if (res.ok && res.recoveryCodes) {
-        setRecoveryCodes(res.recoveryCodes);
-        setStage('recovery-codes');
-        setStatus((s) => (s ? { ...s, enabled: true, pending: false } : s));
-      } else {
-        setError(describeMfaError(400, res.error));
-      }
-    });
-  }
-
-  function finishRecoveryCodes() {
-    setRecoveryCodes(null);
-    resetFlow();
-    setNotice(t('set.twoFactorEnabledNotice'));
-  }
-
-  function confirmDisable() {
-    setError('');
-    startTransition(async () => {
-      const res = await disableSelfMfa(disablePassword);
-      if (res.ok) {
-        resetFlow();
-        setStatus((s) => (s ? { ...s, enabled: false, pending: false } : s));
-        setNotice(t('set.twoFactorDisabledNotice'));
-      } else {
-        setError(res.error || t('common.failed'));
-      }
-    });
-  }
-
-  return (
-    <Section title={t('set.twoFactor')} icon={<ShieldCheck size={15} />}>
-      {status?.enabled && stage === 'idle' && (
-        <span className="inline-block mb-1 text-[10px] uppercase tracking-wider text-[color:var(--color-accent)] border border-[color:var(--color-accent)]/40 rounded-full px-1.5 py-0.5">
-          {t('set.twoFactorEnabled')}
-        </span>
-      )}
-
-      {error && <p className="text-xs text-[color:var(--color-red)]">{error}</p>}
-      {notice && !error && stage === 'idle' && <p className="text-xs text-[color:var(--color-accent)]">{notice}</p>}
-
-      {status && !status.cryptoReady && <p className="text-xs text-[color:var(--color-text-dim)]">{t('set.twoFactorUnavailable')}</p>}
-
-      {status?.cryptoReady && stage === 'idle' && (
-        <div className="flex items-center justify-between gap-3">
-          <span className="text-xs text-[color:var(--color-text-dim)]">{status.enabled ? t('set.twoFactorDescOn') : t('set.twoFactorDescOff')}</span>
-          <div className="flex items-center gap-2 shrink-0">
-            <button onClick={clickStart} disabled={pending} className={ghostBtn}>
-              <ShieldCheck size={13} /> {status.enabled ? t('set.twoFactorReplace') : t('set.twoFactorEnable')}
-            </button>
-            {status.enabled && (
-              <button
-                onClick={() => {
-                  setError('');
-                  setStage('need-password-to-disable');
-                }}
-                disabled={pending}
-                className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-red)]/50 text-[color:var(--color-red)] hover:bg-[color:var(--color-red)]/10 transition-colors disabled:opacity-50"
-              >
-                {t('set.twoFactorDisable')}
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
-      {stage === 'need-password-to-start' && (
-        <div className="space-y-2.5">
-          <p className="text-xs text-[color:var(--color-text-dim)]">{t('set.twoFactorPasswordToStart')}</p>
-          <input value={reauthPassword} onChange={(e) => setReauthPassword(e.target.value)} type="password" autoComplete="current-password" placeholder={t('set.currentPwdPlaceholder')} className={controlClass} />
-          <div className="flex items-center gap-2">
-            <button onClick={() => beginEnrollment(reauthPassword)} disabled={pending || !mfaPasswordReady(reauthPassword)} className={saveBtn}>
-              {pending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} {pending ? t('set.twoFactorContinuing') : t('set.twoFactorContinue')}
-            </button>
-            <button onClick={resetFlow} disabled={pending} className={ghostBtn}><X size={13} /> {t('common.cancel')}</button>
-          </div>
-        </div>
-      )}
-
-      {stage === 'enrolling' && (
-        <div className="space-y-2.5">
-          <p className="text-xs text-[color:var(--color-text-dim)]">{t('set.twoFactorEnrollHint')}</p>
-          {uri && <QrCode value={uri} label={t('set.twoFactorQrAlt')} />}
-          <div className="rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] p-3">
-            <p className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>{t('set.twoFactorManualKey')}</p>
-            <p className="mt-1 select-all break-all text-sm" style={{ fontFamily: 'var(--font-mono)' }}>{secret}</p>
-          </div>
-          <label className="block text-xs">
-            <span className="text-[color:var(--color-text-dim)]">{t('set.twoFactorCode')}</span>
-            <input
-              value={code}
-              onChange={(e) => setCode(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))}
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              placeholder="000000"
-              className={cn(controlClass, 'mt-1 max-w-[10rem] text-center tracking-[0.3em]')}
-              style={{ fontFamily: 'var(--font-mono)' }}
-            />
-          </label>
-          <div className="flex items-center gap-2">
-            <button onClick={confirmEnrollment} disabled={pending || !mfaCodeReady(code)} className={saveBtn}>
-              {pending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} {pending ? t('set.twoFactorVerifying') : t('set.twoFactorConfirm')}
-            </button>
-            <button onClick={resetFlow} disabled={pending} className={ghostBtn}><X size={13} /> {t('common.cancel')}</button>
-          </div>
-        </div>
-      )}
-
-      {stage === 'need-password-to-disable' && (
-        <div className="space-y-2.5">
-          <p className="text-xs text-[color:var(--color-text-dim)]">{t('set.twoFactorPasswordToDisable')}</p>
-          <input value={disablePassword} onChange={(e) => setDisablePassword(e.target.value)} type="password" autoComplete="current-password" placeholder={t('set.currentPwdPlaceholder')} className={controlClass} />
-          <div className="flex items-center gap-2">
-            <button
-              onClick={confirmDisable}
-              disabled={pending || !mfaPasswordReady(disablePassword)}
-              className="flex items-center gap-1.5 text-xs px-4 py-2 rounded-lg bg-[color:var(--color-red)]/15 border border-[color:var(--color-red)]/50 text-[color:var(--color-red)] font-semibold hover:bg-[color:var(--color-red)]/25 transition-colors disabled:opacity-50"
-            >
-              {pending ? <Loader2 size={13} className="animate-spin" /> : <X size={13} />} {pending ? t('set.twoFactorDisabling') : t('set.twoFactorDisable')}
-            </button>
-            <button onClick={resetFlow} disabled={pending} className={ghostBtn}><X size={13} /> {t('common.cancel')}</button>
-          </div>
-        </div>
-      )}
-
-      {stage === 'recovery-codes' && recoveryCodes && (
-        <div className="space-y-2.5">
-          <div className="rounded-lg border border-[color:var(--color-gold)]/45 bg-[color:var(--color-gold)]/10 px-3 py-2 text-xs text-[color:var(--color-gold)]">
-            {t('set.twoFactorRecoveryWarning')}
-          </div>
-          <div className="grid grid-cols-2 gap-2 rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] p-3 text-sm" style={{ fontFamily: 'var(--font-mono)' }}>
-            {recoveryCodes.map((c) => (
-              <span key={c} className="select-all">{c}</span>
-            ))}
-          </div>
-          <button onClick={finishRecoveryCodes} className={saveBtn}><Check size={13} /> {t('set.twoFactorRecoverySaved')}</button>
-        </div>
-      )}
-    </Section>
-  );
-}
-
 // ─── Editable dropdown lists (taxonomies) ─────────────────────────────────────
 
 function ListsManager({ lists }: { lists: ListEditorEntry[] }) {
@@ -4102,16 +3894,15 @@ function SpacesManager({ spaces }: { spaces: string[] }) {
 
 function Section({ title, icon, children }: { title: string; icon?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div className="bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-2xl p-5">
-      <h2
-        className="flex items-center gap-2 text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-[0.15em] mb-4"
-        style={{ fontFamily: 'var(--font-mono)' }}
-      >
-        {icon}
+    <section className="bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-2xl p-5">
+      <h3 className="flex items-center gap-2.5 text-sm font-semibold text-[color:var(--color-text)] mb-3">
+        {icon && (
+          <span className="grid place-items-center w-7 h-7 rounded-lg bg-[color:var(--color-surface-2)] text-[color:var(--color-accent)] shrink-0">{icon}</span>
+        )}
         {title}
-      </h2>
+      </h3>
       <div className="space-y-2.5">{children}</div>
-    </div>
+    </section>
   );
 }
 

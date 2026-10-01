@@ -695,7 +695,7 @@ function ReceiptCard({
     >
       {/* Thumbnail */}
       <div className="aspect-[4/3] bg-[color:var(--color-surface-2)] relative overflow-hidden flex items-center justify-center">
-        {isImage ? (
+        {isImage && receipt.filePath ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={fileUrl(receipt.filePath)}

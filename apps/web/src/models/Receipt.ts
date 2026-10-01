@@ -45,7 +45,8 @@ const ReceiptSchema = new Schema(
     space: { type: String, default: '', index: true },
     lineItems: { type: [LineItemSchema], default: [] },
 
-    filePath: { type: String, required: true }, // /storage/receipts/...
+    // Sample receipts (P1) have no scan behind them, so only a real receipt must carry a file.
+    filePath: { type: String, default: '', required: function (this: { isSample?: boolean }) { return !this.isSample; } }, // /storage/receipts/...
     fileType: { type: String, default: 'image/jpeg' },
     thumbPath: { type: String, default: '' }, // rendered 1st-page JPEG for PDF list cards
     fileSize: { type: Number, default: 0 },

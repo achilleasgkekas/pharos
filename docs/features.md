@@ -51,7 +51,7 @@ adds people in **Settings → Users** with one of three roles:
 | **Viewer** | Read only. Every write is refused on the server, not just hidden in the UI. |
 
 Each person can change their own password and turn on two-factor authentication
-(TOTP) in Settings → General.
+(TOTP) in Settings → Account.
 
 Once there is more than one account, records show who added them ("Added by
 Maria") on items, expenses, receipts and tasks. It is recorded for anything added
@@ -102,7 +102,7 @@ Highlights:
   limit never runs out before it reaches what you want to buy. For Shopping items with
   no store link yet, it searches shops in your shopping country (up to 3 items per run,
   each at most weekly) and adds the ones that match. Each item shows when it was last
-  checked and, if no price was read, why. Configure it in Settings → AI → Scraper AI.
+  checked and, if no price was read, why. Configure it in Settings → Price tracking.
 - **Shopping country.** Pick the country you shop in (Settings → General, or the
   setup wizard) and price searches only look at shops that sell there: the
   country's own shops plus the foreign shops you add (Amazon.de by default for
@@ -121,7 +121,7 @@ Highlights:
 - **Attachments** (manuals, warranty certificates, serial number photos) can be
   uploaded and stored with each item. The attachments are synced with your file
   storage backend (local, SMB, FTP, OneDrive) alongside receipt and statement files.
-- **Insurance export (P13).** Settings → Storage & backup → **Insurance export
+- **Insurance export (P13).** Settings → Backups & exports → **Insurance export
   (ZIP)** bundles every owned item (with depreciation-adjusted value, serial
   number, warranty expiry) into a ZIP file with: (1) a CSV manifest for
   spreadsheet review, (2) a standalone printable HTML report (view, print, and
@@ -159,7 +159,7 @@ product, and AI extracts the name.
 ### Quick-capture bookmarklet (P5)
 
 Add any product from any e-shop to your inventory or shopping list in one click,
-without leaving the webpage. **How it works:** Visit Settings → Storage & backup →
+without leaving the webpage. **How it works:** Visit Settings → Integrations →
 **Bookmarklet**. You'll see a "Add to Pharos" link (drag it to your bookmarks bar)
 and a copy-paste code fallback. Then, while browsing an e-shop (Amazon or another regional shop,
 Ubiquiti, AliExpress, etc.), click the bookmarklet. A small popup opens on top of
@@ -208,7 +208,7 @@ date / total with keyboard shortcuts. You can also:
 - **Add items to library** — turn receipt line items into Inventory items,
   optionally with a warranty end date.
 - **Archive** documents that are not receipts (shipping notices, T&Cs, marketing).
-- **Email-in (IMAP auto-import).** Connect your email inbox (IMAP) and poll it for receipt emails. The app fetches attachments (PDFs/images) and HTML bodies and feeds each one through the same upload + parse pipeline as a manual upload — one AI parse per message. Manual "Check inbox now" trigger in Settings → Storage & backup → Email-in (IMAP). Capped at 25 messages per check; the first run is limited to the last 7 days to avoid re-processing old mail. Self-hosted only (no background cron in this app).
+- **Email-in (IMAP auto-import).** Connect your email inbox (IMAP) and poll it for receipt emails. The app fetches attachments (PDFs/images) and HTML bodies and feeds each one through the same upload + parse pipeline as a manual upload — one AI parse per message. Manual "Check inbox now" trigger in Settings → Integrations → Email-in (IMAP). Capped at 25 messages per check; the first run is limited to the last 7 days to avoid re-processing old mail. Self-hosted only (no background cron in this app).
 - Import receipts in bulk from a Gmail Takeout export (see the project history).
 - **Multi-currency support (P9).** Handle receipts in multiple currencies while keeping reports and budgets in your base currency. When you scan a foreign receipt, the form shows Currency and FX rate fields; all receipt amounts (total, net, VAT, and line item prices) convert together with the same rate. Rates can be auto-extracted where visible or entered manually. A gold badge appears if the rate is unknown, defaulting the stored amount to the printed value rather than guessing 1:1.
 
@@ -232,19 +232,19 @@ Receipts: dropzone scan, manual add, grid / list, and a filter sidebar.
   Rules run on create across all three entry paths (AI scan, manual add, CSV import) —
   a rule wins over the AI guess but a manual add only applies one when you left the
   category unset. An "Apply to existing" button retro-tags uncategorised records.
-  Configure the rules in Settings → Money.
+  Configure the rules in Settings → Categories & rules.
 - **Migration import (YNAB / other tools).** Upload a CSV export from YNAB (You Need
   A Budget) or another expense tracker to bulk-import historical transactions. The
   importer maps common columns (date, description, amount, category, account) and runs
   each imported entry through category auto-rules so you get consistent tagging. A YNAB
   register export is denominated in the budget's own currency, so it always imports as
-  your base currency. Available in Settings → Storage & backup → **Migrate data**.
+  your base currency. Available in Settings → Import & sample data.
 
 ### Multi-currency support (P9)
 
 Handle expenses in multiple currencies while keeping reports and budgets in your base currency (configurable per deployment). When you import or manually enter an expense in a foreign currency, the system tracks both the **original amount** and the **exchange rate applied**, then stores the **base-currency equivalent** for aggregations (reports, budgets, net worth, anomaly detection). This ensures all your financial summaries remain consistent even when spending in EUR, USD, GBP, and other currencies.
 
-- **Opt-in per deployment.** Multi-currency is disabled by default. When enabled via **Settings → Defaults**, the expense form gains a **Currency** field, FX rate input, and a live preview of what amount will be stored in the reports.
+- **Opt-in per deployment.** Multi-currency is disabled by default. When enabled via **Settings → General**, the expense form gains a **Currency** field, FX rate input, and a live preview of what amount will be stored in the reports.
 - **AI extracts currency.** When you upload a foreign bill (for example a GBP receipt from a UK shop), the OCR/AI parser reads the currency symbol or code and sets the currency field automatically; you only need to confirm or correct the rate.
 - **Rate handling.** If the exchange rate is known (entered manually or looked up), a green FxBadge shows the stored amount and the applied rate. If the rate is unknown, a gold warning badge appears — the amount stored defaults to the printed number (same as the old behaviour when multi-currency was unsupported), so no existing totals shift.
 - **Deterministic conversion.** `amount` (what you see in reports and budgets) is always in base currency. `origAmount` and `fxRate` are kept for audit trail and future rate lookup / correction. All existing aggregations (cash flow, anomaly medians, split shares, net worth) keep summing `amount` unchanged, so you can enable multi-currency mid-year without migrating historical data.
@@ -285,7 +285,7 @@ contexts, most obviously a second home or rental (for example "Athens flat" vs
 label, distinct from category: a €40 electricity bill can be `utilities` **and**
 tagged to the Ionian cottage at the same time.
 
-- **Dormant until you use it.** Define your spaces in **Settings → Money → Spaces**.
+- **Dormant until you use it.** Define your spaces in **Settings → Categories & rules → Spaces**.
   With no spaces defined the whole feature stays hidden, so nothing changes for a
   single-property setup.
 - **On the expense.** Once at least one space exists, the expense form shows a
@@ -465,7 +465,7 @@ vehicle's own page (`/vehicles/<id>`), with tabs for **Overview**, **Fuel**, **S
   (photo or PDF) into date, garage, odometer, total, description, invoice lines and the next
   service. "Odometer from photo" reads the ODO off a dashboard photo. Nothing is saved until you
   press Save, and the photo or PDF stays attached to the entry. The switch is
-  **Settings → AI → Vehicle receipt scan**; the monthly AI spend cap applies and every scan
+  **Settings → Provider & features → Vehicle receipt scan**; the monthly AI spend cap applies and every scan
   shows in the AI run history.
 - **Service schedule.** Set a service interval in km and/or months. The next service counts
   from the last one you logged (or from the purchase), whichever of km or months comes first; a
@@ -483,7 +483,7 @@ vehicle's own page (`/vehicles/<id>`), with tabs for **Overview**, **Fuel**, **S
 
 ## Vouchers
 
-Coupons and discount codes (`/vouchers`). Payment cards live in Settings → Money.
+Coupons and discount codes (`/vouchers`). Payment cards live in Settings → Payment cards.
 
 Discount codes and promotional offers: title, code, store, discount %/amount,
 expiry date, URL, and notes. **AI fill** reads a pasted message or a screenshot
@@ -497,13 +497,13 @@ Personal papers that expire (`/documents`): passport, ID card, driving licence,
 residence permit, policies. Each has a title, a free-form type, an optional
 holder (for households), a number, and an expiry date. The list shows how long
 each one has left, and an alert fires ahead of the expiry (lead time in
-Settings → General) and keeps nagging once it has lapsed.
+Settings → Alerts) and keeps nagging once it has lapsed.
 
 ## Special dates
 
 Birthdays, anniversaries and namedays (`/special-dates`). Stored as a day and a
 month, with an optional year so the reminder can say how old someone turns. An
-alert fires a few days ahead (lead time in Settings → General).
+alert fires a few days ahead (lead time in Settings → Alerts).
 
 ## Calendar
 
@@ -717,11 +717,11 @@ you can subscribe Pharos to send machine-readable JSON POSTs to your webhooks on
 specific events: `receipt.parsed` (when a receipt is AI-scanned), `budget.exceeded`,
 `installment.due` (this month), and `price.drop` (for tracked items). Each webhook
 call includes a Stripe-style HMAC signature (using a shared secret) to prove it came
-from your Pharos instance. Configure these in **Settings → Notifications → Webhooks**.
+from your Pharos instance. Configure these in **Settings → Integrations → Webhooks**.
 
 ## Backup & restore (JSON)
 
-**Settings → Storage & backup → Export JSON** downloads every record as one JSON
+**Settings → Backups & exports → Export JSON** downloads every record as one JSON
 file; **Restore** reads it back, upserting each document by its id (so restoring
 into a populated instance merges rather than duplicating). Binary files (receipt
 scans, item photos, statement PDFs) are not in the JSON, they stay on disk (or on
@@ -754,34 +754,48 @@ avoid blocking a re-import of the same month.)
 
 ## Settings
 
-Configuration is grouped into tabs:
+Settings is split into small pages, grouped in the sidebar (a single picker on a phone).
+Each page opens with one line on what it holds. `?tab=<id>` links straight to a page;
+the old tab ids (`workspace`, `money`, `data`, `profile`) still land on the page that now
+holds their settings.
 
-- **General** — appearance, currency, default VAT, default item view, warranty
-  defaults, budgets, **demo / sample data** (Load sample data for a fresh install
-  to see Pharos in action; Clear sample data wipes all sample records), your own
-  password change, **two-factor authentication** (TOTP, opt-in — enroll with an
-  authenticator app, confirm a code, save the one-time recovery codes; see
-  [Security](security.md#1-session-cookie-the-web-ui)), about.
-- **Money** — budgets (with a **Suggest from history** button that pre-fills
-  per-category targets from the median of your last three complete months),
-  manual asset accounts, asset depreciation, and payment cards.
-- **AI** — provider (Ollama / Anthropic / OpenAI / Gemini / OpenRouter / Custom),
-  a separate scraper AI, editable AI prompts, and the calendar feed token
-  (generate / copy / rotate / revoke). Master AI toggle + per-feature toggles
-  (scan, parse, fill, search, summarize, translate, categorize, etc.) with status
-  indicators (disabled / no-provider / ready); only admins may edit toggles, but
-  all users see their status (to understand why a feature is unavailable).
-- **Storage & backup** — file storage backend (local / SMB / FTP / OneDrive),
-  folder / filename templates, mirror-on-verify, sync, backup / restore, CSV
-  export, **insurance export (ZIP)** with inventory manifest, photos, and
-  printable receipts report, **migration import** (YNAB and other tools), and Trash.
-- **Stores & lists** — known stores (with duplicate detection / merge) and the
-  editable dropdown taxonomies (item / expense / subscription categories).
-- **Notifications** (admin) — alert channels (ntfy, Discord, Slack, Telegram, email,
-  web push, webhook), per-category switches, lead times, test and check-now
-  buttons; outbound event webhooks for automation platforms.
-- **Users** (admin) — add household members and viewers, change roles.
-- **System status** (admin) — database latency, free disk space and the job queue.
+- **You**
+  - **Account** (`account`): profile, password, sign out other devices, **two-factor
+    authentication** (TOTP, opt-in: enroll with an authenticator app, confirm a code,
+    save the one-time recovery codes; see
+    [Security](security.md#1-session-cookie-the-web-ui)), theme and language.
+- **Workspace**
+  - **General** (`general`): currency, default VAT, default item view, warranty and
+    return-window defaults, shopping country, auto-add stores, multi-currency.
+  - **Alerts** (`alerts`): how many days ahead each kind of date warns you (warranty,
+    free trial, bill, document, special date, maintenance, lent item, quiet claim,
+    stale mirror, subscription review).
+  - **Categories & rules** (`categories`): the dropdown taxonomies, auto-category rules
+    and spaces.
+  - **Stores** (`stores`): known stores, with duplicate detection and merge.
+  - **Payment cards** (`cards`).
+- **AI** (self-hosted)
+  - **Provider & features** (`ai`): master switch, per-feature toggles with their
+    status (only admins may edit them), provider and model, spend cap and live spend.
+  - **Price tracking** (`scraper`): the scraper AI and the price-check schedule.
+  - **Prompts** (`prompts`): every AI prompt, editable and resettable.
+- **Data**
+  - **File storage** (`storage`): backend (local / SMB / FTP / OneDrive), folder and
+    filename templates, mirror and sync.
+  - **Backups & exports** (`backups`): JSON and encrypted backup, restore, verify, CSV
+    export and the **insurance export (ZIP)**.
+  - **Import & sample data** (`import`): migration import (YNAB) and demo data (load
+    a realistic set to see Pharos in use, or clear every sample record).
+- **Connections**
+  - **Notifications** (`notifications`): alert channels (ntfy, Discord, Slack, Telegram,
+    email, web push), per-category switches, quiet hours, test and check-now buttons.
+  - **Integrations** (`integrations`): event webhooks, the API / MCP connector, the
+    calendar feed, email-in (IMAP) and the bookmarklet.
+- **Administration**
+  - **Users & Access** (`users`, admin): household members and viewers, roles.
+  - **Activity** (`activity`, once there is a second account): who added or trashed what.
+  - **System status** (`system`, admin): database latency, free disk space, job queue.
+  - **About & updates** (`about`): version, update check, privacy.
 
 See the [Configuration guide](configuration.md) for the details of AI providers,
 storage backends, notifications, and internationalisation.

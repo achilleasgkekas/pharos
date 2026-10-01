@@ -548,7 +548,6 @@ function MfaSection() {
       <div className="space-y-4 pt-1">
         {status?.enabled ? (
           <div className="space-y-3">
-            <p className="text-xs text-[color:var(--color-text-dim)]">{t('set.twoFactorDescOn')}</p>
             {stage === 'need-password-to-disable' ? (
               <div className="space-y-2.5 max-w-sm pt-2">
                 <input
@@ -587,7 +586,6 @@ function MfaSection() {
           </div>
         ) : (
           <div className="space-y-3">
-            <p className="text-xs text-[color:var(--color-text-dim)]">{t('set.twoFactorDescOff')}</p>
             {stage === 'idle' && (
               <button
                 type="button"

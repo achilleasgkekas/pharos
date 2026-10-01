@@ -104,7 +104,7 @@ starts by accident.
 ### Editable prompts and scraper AI
 
 - **Prompts** — every AI query (receipt, statement, product, card, subscription,
-  category, voucher, price) has an editable prompt override under Settings → AI.
+  category, voucher, price) has an editable prompt override under Settings → Prompts.
   An empty override uses the built-in default.
 - **Scraper AI** — the price scraper has its own provider/model settings
   (`scraperProvider`, `scraperModel`), independent of the main AI, so you can
@@ -118,7 +118,7 @@ Receipts, statement PDFs, and item photos are binary files. Pharos always keeps
 a **local working copy** (used for serving, thumbnails, and AI) and can, in
 addition, **mirror** those files to a remote backend for off-box backup.
 
-Configure this under **Settings → Storage & backup**.
+Configure this under **Settings → File storage**.
 
 ### Backend options (`storageBackend`)
 
@@ -179,7 +179,7 @@ vehicle dates, special dates, maintenance and more) fan out to **every enabled
 channel**. Each alert category has its own switch under **Settings →
 Notifications**, so you can, say, keep bills on your phone but leave price hikes
 to the in-app bell. Lead times (how many days ahead a bill, trial, document or
-birthday warns you) are set in **Settings → General**. Every channel is a plain HTTP
+birthday warns you) are set in **Settings → Alerts**. Every channel is a plain HTTP
 POST except `email`, which sends plain-text mail through any SMTP server you
 point it at (a Gmail app password, Resend, Postmark, or your own relay).
 
@@ -230,7 +230,7 @@ The opt-in price scraper has its own ntfy alert path via environment variables
 
 In addition to human-readable alert summaries, Pharos can send machine-readable JSON
 events to automation platforms (Home Assistant, n8n, Node-RED, Zapier, etc.). Configure
-subscriptions under **Settings → Notifications → Webhooks**.
+subscriptions under **Settings → Integrations → Webhooks**.
 
 Each webhook includes a **Stripe-style HMAC-SHA256 signature** in the `x-pharos-signature`
 header. Verify it using your shared secret (shown when you create the subscription) to
@@ -274,7 +274,7 @@ browser/session.
 > (`defaultVatRate`, default `24`) under Settings → General. Currency changes the
 > displayed symbol only; it does not convert stored amounts.
 >
-> **Multi-currency support (P9):** Enable `multiCurrency` in Settings → Defaults to
+> **Multi-currency support (P9):** Enable `multiCurrency` in Settings → General to
 > track foreign-currency expenses (bills in USD, GBP, etc.) with exchange rates. When
 > enabled, each expense can have a `currency` code and `fxRate` to convert into your
 > base currency; `amount` is always stored in base currency so reports and budgets
