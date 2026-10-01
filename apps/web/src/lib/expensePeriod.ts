@@ -25,3 +25,15 @@ export function periodForUpdate(sent: string, newDate: Date, before: { date?: Da
 export function periodFollowsDate(period: string, isoDate: string): boolean {
   return !period || period === isoDate.slice(0, 7);
 }
+
+/**
+ * Why the expense form cannot be saved yet, or '' (#403, #404). The date field reports text
+ * that is not a date (it emits '' for it, which alone reads as "no date"), and the period must
+ * be a real YYYY-MM; the save buttons are not a native form submit, so nothing else checks.
+ */
+export function expenseSaveBlocker(form: { date: string; period?: string }, dateProblem: string, t: (k: 'date.invalid' | 'ex.periodInvalid') => string): string {
+  if (dateProblem) return dateProblem;
+  if (!form.date) return t('date.invalid');
+  if (form.period && !PERIOD_RE.test(form.period.trim())) return t('ex.periodInvalid');
+  return '';
+}

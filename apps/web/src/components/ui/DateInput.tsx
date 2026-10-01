@@ -24,6 +24,12 @@ interface DateInputProps {
    * the list jump). Clearing the field still emits ''.
    */
   keepWhileTyping?: boolean;
+  /**
+   * Hears the field's validation message ('' when fine). A save button that is not a native
+   * form submit never sees the custom validity, and the field emits '' for text that is not a
+   * date, so without this an impossible date looked like "no date" and saved as today (#404).
+   */
+  onProblemChange?: (problem: string) => void;
 }
 
 const base =
@@ -35,7 +41,7 @@ const base =
  * calendar button opens the browser's own picker on a hidden native input, because a picker
  * grid has no field order to get wrong and re-implementing one is not worth the weight.
  */
-export function DateInput({ value, onValueChange, required, name, id, className, disabled, min, max, 'aria-label': ariaLabel, keepWhileTyping }: DateInputProps) {
+export function DateInput({ value, onValueChange, required, name, id, className, disabled, min, max, 'aria-label': ariaLabel, keepWhileTyping, onProblemChange }: DateInputProps) {
   const locale = useLocale();
   const t = useT();
   const [text, setText] = useState(() => formatIsoDate(value, locale));
@@ -63,7 +69,8 @@ export function DateInput({ value, onValueChange, required, name, id, className,
 
   useEffect(() => {
     textRef.current?.setCustomValidity(problem);
-  }, [problem]);
+    onProblemChange?.(problem);
+  }, [problem, onProblemChange]);
 
   function emit(iso: string) {
     emitted.current = iso;

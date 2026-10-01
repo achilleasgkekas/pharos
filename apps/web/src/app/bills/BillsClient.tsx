@@ -633,12 +633,15 @@ function PartialPaymentForm({
   const [date, setDate] = useState(ymd(new Date()));
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
+  const [dateProblem, setDateProblem] = useState('');
   // #299: one key per opened form. A double-click (or a retry after an error) sends the same key,
   // so the server records the instalment and its expense once however many requests arrive.
   const [paymentKey] = useState(() =>
     typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `p${Date.now()}${Math.random().toString(36).slice(2)}`
   );
   const submit = () => {
+    // #404: text that is not a date reaches here as '' and used to be logged as today.
+    if (dateProblem || !date) return setError(dateProblem || t('date.invalid'));
     setError('');
     startTransition(async () => {
       const r = await logBillPayment(billId, { amount: Number(amount) || 0, date, note, logExpense, key: paymentKey });
@@ -654,7 +657,7 @@ function PartialPaymentForm({
           <Input type="number" step="0.01" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder={remaining === null ? '0.00' : remaining.toFixed(2)} />
         </Field>
         <Field label={t('bill.fPaidOn')}>
-          <DateInput value={date} onValueChange={setDate} />
+          <DateInput required value={date} onValueChange={setDate} onProblemChange={setDateProblem} />
         </Field>
         <Field label={t('bill.fNote')} className="col-span-2 sm:col-span-1">
           <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder={t('bill.noteHint')} />
@@ -667,7 +670,7 @@ function PartialPaymentForm({
       )}
       {error && <p className="text-xs text-[color:var(--color-red)]">{error}</p>}
       <div className="flex items-center gap-2">
-        <Button type="button" variant="primary" disabled={pending || !(Number(amount) > 0)} onClick={submit}>
+        <Button type="button" variant="primary" disabled={pending || !(Number(amount) > 0) || !!dateProblem || !date} onClick={submit}>
           <Coins size={14} /> {t('bill.logPayment')}
         </Button>
         <p className="text-[11px] text-[color:var(--color-text-faint)]">

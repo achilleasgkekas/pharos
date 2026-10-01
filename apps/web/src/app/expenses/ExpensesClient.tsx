@@ -31,7 +31,7 @@ import { OpenInOneDriveButton } from '@/components/OpenInOneDriveButton';
 import { useLocale, useT, useMoney } from '@/components/LocaleProvider';
 import type { TKey } from '@/lib/i18n';
 import { formatDate, compareNames } from '@/lib/i18n/format';
-import { PERIOD_RE, periodFollowsDate } from '@/lib/expensePeriod';
+import { PERIOD_RE, expenseSaveBlocker, periodFollowsDate } from '@/lib/expensePeriod';
 import { vendorKey, seriesGroupKey } from './lib';
 import { NO_SPACE, matchesSpace, spaceFilterOptions } from '@/lib/spaceFilter';
 
@@ -640,7 +640,7 @@ function toForm(e: SerializedExpense, base: string): FormState {
   };
 }
 
-function FormFields({ form, set, cards, vendors, categories, spaces, fx, seriesByVendor }: { form: FormState; set: (p: Partial<FormState>) => void; cards: SerializedCard[]; vendors: string[]; categories: string[]; spaces: string[]; fx: FxCtx; seriesByVendor: Record<string, string[]> }) {
+function FormFields({ form, set, cards, vendors, categories, spaces, fx, seriesByVendor, onDateProblem }: { form: FormState; set: (p: Partial<FormState>) => void; cards: SerializedCard[]; vendors: string[]; categories: string[]; spaces: string[]; fx: FxCtx; seriesByVendor: Record<string, string[]>; onDateProblem: (problem: string) => void }) {
   const t = useT();
   const locale = useLocale();
   const seriesOptions = seriesByVendor[vendorKey(form.vendor)] ?? [];
@@ -685,7 +685,9 @@ function FormFields({ form, set, cards, vendors, categories, spaces, fx, seriesB
         )}
         <Field label={t('ex.fDate')}>
           <DateInput
+            required
             value={form.date}
+            onProblemChange={onDateProblem}
             onValueChange={(v) => set(periodLinked && v && form.period ? { date: v, period: v.slice(0, 7) } : { date: v })}
           />
         </Field>
@@ -941,9 +943,16 @@ function ExpenseDetail({ expense, cards, vendors, categories, spaces, fx, series
   const set = (p: Partial<FormState>) => setForm((f) => ({ ...f, ...p }));
   const isImage = !!expense.fileType && expense.fileType.startsWith('image/');
 
+  const [dateProblem, setDateProblem] = useState('');
+  const [error, setError] = useState('');
+  const blocked = expenseSaveBlocker(form, dateProblem, t);
   function save(verified = form.verified) {
+    if (blocked) return setError(blocked);
+    setError('');
     startTransition(async () => {
-      await updateExpense(expense._id, { ...form, amount: Number(form.amount) || 0, fxRate: Number(form.fxRate) || 0, verified });
+      // #403: a rejected save keeps the dialog and what was typed, and says why.
+      const r = await updateExpense(expense._id, { ...form, amount: Number(form.amount) || 0, fxRate: Number(form.fxRate) || 0, verified });
+      if (!r.ok) return setError(r.error || t('common.saveFailed'));
       onChanged();
       onClose();
     });
@@ -990,11 +999,12 @@ function ExpenseDetail({ expense, cards, vendors, categories, spaces, fx, series
             <div className="rounded-xl border border-dashed border-[color:var(--color-border)] p-8 text-center text-xs text-[color:var(--color-text-faint)] flex items-center justify-center"><Wallet size={26} className="opacity-40" /></div>
           )}
         </div>
-        <div className="order-1 md:order-2"><FormFields form={form} set={set} cards={cards} vendors={vendors} categories={categories} spaces={spaces} fx={fx} seriesByVendor={seriesByVendor} /></div>
+        <div className="order-1 md:order-2"><FormFields form={form} set={set} cards={cards} vendors={vendors} categories={categories} spaces={spaces} fx={fx} seriesByVendor={seriesByVendor} onDateProblem={setDateProblem} /></div>
       </div>
+      {error && <p role="alert" className="mt-3 text-xs text-[color:var(--color-red)]">{error}</p>}
       <div className="flex items-center gap-2 pt-4 mt-4 border-t border-[color:var(--color-border)] flex-wrap">
-        <Button onClick={() => save(true)} disabled={pending}>{pending ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />} {t('common.confirm')}</Button>
-        <button onClick={() => save(form.verified)} disabled={pending} className="text-xs px-3 py-2 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] hover:border-[color:var(--color-accent)]">{t('common.save')}</button>
+        <Button onClick={() => save(true)} disabled={pending || !!blocked}>{pending ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />} {t('common.confirm')}</Button>
+        <button onClick={() => save(form.verified)} disabled={pending || !!blocked} className="text-xs px-3 py-2 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] hover:border-[color:var(--color-accent)]">{t('common.save')}</button>
         <CreatedBy id={expense.createdBy} />
         <button onClick={doDelete} disabled={pending} className="ml-auto flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-red)] hover:border-[color:var(--color-red)]"><Trash2 size={13} /> {t('common.delete')}</button>
       </div>
@@ -1014,14 +1024,25 @@ function ExpenseCreate({ kind, seriesByVendor, cards, vendors, categories, space
   const t = useT();
   const [pending, startTransition] = useTransition();
   const set = (p: Partial<FormState>) => setForm((f) => ({ ...f, ...p }));
+  const [dateProblem, setDateProblem] = useState('');
+  const [error, setError] = useState('');
+  const blocked = expenseSaveBlocker(form, dateProblem, t);
   function save() {
-    startTransition(async () => { await addExpense({ ...form, amount: Number(form.amount) || 0, fxRate: Number(form.fxRate) || 0 }); onCreated(); });
+    if (blocked) return setError(blocked);
+    setError('');
+    startTransition(async () => {
+      // #403: close only on a save that landed; a rejected one keeps the entry and says why.
+      const r = await addExpense({ ...form, amount: Number(form.amount) || 0, fxRate: Number(form.fxRate) || 0 });
+      if (!r.ok) return setError(r.error || t('common.saveFailed'));
+      onCreated();
+    });
   }
   return (
     <Modal open onClose={onClose} title={t('ex.newRecord')} size="lg">
-      <FormFields form={form} set={set} cards={cards} vendors={vendors} categories={categories} spaces={spaces} fx={fx} seriesByVendor={seriesByVendor} />
+      <FormFields form={form} set={set} cards={cards} vendors={vendors} categories={categories} spaces={spaces} fx={fx} seriesByVendor={seriesByVendor} onDateProblem={setDateProblem} />
+      {error && <p role="alert" className="mt-3 text-xs text-[color:var(--color-red)]">{error}</p>}
       <div className="flex items-center gap-2 pt-4 mt-4 border-t border-[color:var(--color-border)]">
-        <Button onClick={save} disabled={pending || !form.amount}>{pending ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} {t('common.add')}</Button>
+        <Button onClick={save} disabled={pending || !form.amount || !!blocked}>{pending ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} {t('common.add')}</Button>
         <button onClick={onClose} className="text-xs px-3 py-2 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)]"><X size={13} /></button>
       </div>
     </Modal>

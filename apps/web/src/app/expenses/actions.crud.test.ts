@@ -242,6 +242,34 @@ describe('multi-currency (resolveFx wiring)', () => {
   });
 });
 
+describe('impossible dates (#404)', () => {
+  it.each(['31/02/2026', '2026-02-31', 'not a date'])('addExpense rejects %j instead of saving today', async (date) => {
+    const res = await addExpense({ amount: 7.89, date } as any);
+    expect(res.ok).toBe(false);
+    expect(expenseCreate).not.toHaveBeenCalled();
+  });
+
+  it.each(['31/02/2026', '2026-02-31', '', '  '])('updateExpense rejects %j instead of saving today', async (date) => {
+    const res = await updateExpense('e1', { amount: 7.89, date } as any);
+    expect(res.ok).toBe(false);
+    expect(expenseUpdateOne).not.toHaveBeenCalled();
+  });
+
+  it('addExpense still reads a blank date as today', async () => {
+    const before = Date.now();
+    const res = await addExpense({ amount: 1, date: '' } as any);
+    expect(res.ok).toBe(true);
+    expect(expenseCreate.mock.calls[0][0].date.getTime()).toBeGreaterThanOrEqual(before);
+  });
+
+  it('a real leap day and a full ISO timestamp still save', async () => {
+    expect((await addExpense({ amount: 1, date: '29/02/2024' } as any)).ok).toBe(true);
+    expect(expenseCreate.mock.calls[0][0].date.toISOString()).toBe('2024-02-29T00:00:00.000Z');
+    expect((await addExpense({ amount: 1, date: '2026-07-05T09:30:00.000Z' } as any)).ok).toBe(true);
+    expect(expenseCreate.mock.calls[1][0].date.toISOString()).toBe('2026-07-05T09:30:00.000Z');
+  });
+});
+
 describe('addExpense', () => {
   it('rejects a missing date before touching the DB', async () => {
     const res = await addExpense({ vendor: 'ΔΕΗ' } as any);
