@@ -14,8 +14,8 @@ describe('addCycleUTC keeps the calendar day west of UTC (#103)', () => {
     expect(d.toISOString()).toBe('2027-05-01T00:00:00.000Z');
   });
 
-  it('the local-time version really does drift here (why the UTC one exists)', () => {
-    expect(addCycle(new Date('2026-05-01T00:00:00Z'), 'monthly').toISOString()).not.toBe('2026-06-01T00:00:00.000Z');
+  it('addCycle and addCycleUTC both keep the calendar day across host timezones', () => {
+    expect(addCycle(new Date('2026-05-01T00:00:00Z'), 'monthly').toISOString()).toBe('2026-06-01T00:00:00.000Z');
   });
 
   it('weekly and yearly step exactly', () => {

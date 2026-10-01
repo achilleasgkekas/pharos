@@ -136,5 +136,6 @@ export function billIsSettledByPayments(b: BillMoney, base: string): boolean {
 export function nextBillDue(dueDate: string | Date, cycle: string): Date {
   // Stepping lives in lib/billingCycle.ts so a bill, a recurring expense and a
   // subscription all advance by the same rules (an unknown cycle still means monthly).
-  return addCycle(new Date(dueDate), cycle);
+  const d = new Date(dueDate);
+  return addCycle(d, cycle, d);
 }
