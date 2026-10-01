@@ -87,12 +87,14 @@ export function LoginForm() {
             onSubmit={onSubmitMfa}
             className="rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-6 flex flex-col gap-3"
           >
-            <div className="flex items-center gap-1.5 text-xs font-medium text-[color:var(--color-text-dim)]">
+            <label htmlFor="mfa-code" className="flex items-center gap-1.5 text-xs font-medium text-[color:var(--color-text-dim)]">
               <ShieldCheck size={14} className="text-[color:var(--color-accent)]" /> {t('login.mfaTitle')}
-            </div>
+            </label>
             <p className="text-xs text-[color:var(--color-text-faint)]">{t('login.mfaPrompt')}</p>
             <Input
+              id="mfa-code"
               name="code"
+              required
               value={code}
               onChange={(e) => setCode(e.target.value)}
               autoFocus
@@ -121,10 +123,10 @@ export function LoginForm() {
             onSubmit={onSubmit}
             className="rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-6 flex flex-col gap-3"
           >
-            <label className="text-xs font-medium text-[color:var(--color-text-dim)]">{t('set.username')}</label>
-            <Input name="username" autoFocus autoComplete="username" icon={<UserIcon size={15} />} placeholder={t('login.userPlaceholder')} />
-            <label className="text-xs font-medium text-[color:var(--color-text-dim)] mt-1">{t('set.password')}</label>
-            <Input name="password" type="password" autoComplete="current-password" icon={<Lock size={15} />} placeholder="••••••••" />
+            <label htmlFor="username" className="text-xs font-medium text-[color:var(--color-text-dim)]">{t('set.username')}</label>
+            <Input id="username" name="username" required autoFocus autoComplete="username" icon={<UserIcon size={15} />} placeholder={t('login.userPlaceholder')} />
+            <label htmlFor="password" className="text-xs font-medium text-[color:var(--color-text-dim)] mt-1">{t('set.password')}</label>
+            <Input id="password" name="password" required type="password" autoComplete="current-password" icon={<Lock size={15} />} placeholder="••••••••" />
 
             {error && <p className="text-xs text-[color:var(--color-red)] mt-1">{error}</p>}
 
