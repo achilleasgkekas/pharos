@@ -12,6 +12,7 @@ export type AiFeatureKey =
   | 'subscriptions'
   | 'itemsImport'
   | 'productPhoto'
+  | 'vehicles'
   | 'commandBar';
 
 export type AiFeatureStatus = 'disabled' | 'no-provider' | 'ready';
@@ -24,6 +25,7 @@ export const AI_FEATURES: { key: AiFeatureKey; label: string; description: strin
   { key: 'statementCategorize', label: 'Transaction auto-categorize', description: 'Suggest categories for statement transactions.', area: 'Documents' },
   { key: 'vouchers', label: 'Voucher scanning', description: 'Read code, discount and expiry from a coupon.', area: 'Documents' },
   { key: 'cards', label: 'Card photo scan', description: 'Read name, last-4 and bank from a photo of a payment card.', area: 'Documents' },
+  { key: 'vehicles', label: 'Vehicle receipt scan', description: 'Fill a fuel fill-up or a service from a photo of the pump receipt or the garage invoice.', area: 'Documents' },
   { key: 'subscriptions', label: 'Subscription autofill', description: 'Fill provider, price and cycle from a subscription name.', area: 'Shopping & items' },
   { key: 'itemsImport', label: 'Product import & AI-fill', description: 'Import items from a URL and fill specs, price and photos.', area: 'Shopping & items' },
   { key: 'productPhoto', label: 'Product photo scan', description: 'Read a product from a photo of its packaging for the shopping list.', area: 'Shopping & items' },

@@ -26,8 +26,9 @@ import { lowestKnownPrice } from '@/lib/lowestKnownPrice';
 import { marketFor } from '@/lib/shoppingRegion';
 import { collectSubscriptionReviews, type ReviewableSubscription } from '@/lib/subscriptionReview';
 import { collectExpiringDocuments, type ExpiringDocRow } from '@/lib/documentExpiry';
-import { collectVehicleDue, type VehicleDueRow } from '@/lib/vehicles';
+import { collectServiceDue, collectVehicleDue, type ServiceDueRow, type VehicleDueRow } from '@/lib/vehicles';
 import { Vehicle as VehicleModel } from '@/models/Vehicle';
+import { VehicleLog as VehicleLogModel } from '@/models/VehicleLog';
 import { collectUpcomingDates, type SpecialDateRow } from '@/lib/specialDates';
 import { AUTO_NOTIF_KINDS, type NotifKind } from '@/lib/notificationKinds';
 
@@ -65,7 +66,7 @@ async function computeAlerts(): Promise<Alert[]> {
   const s = await getAppSettings(); // also sets the currency symbol for cur()
   const now = Date.now();
   const alerts: Alert[] = [];
-  const [Item, Statement, Expense, Subscription, Bill, DocumentM, SpecialDateM, VehicleM] = await Promise.all([
+  const [Item, Statement, Expense, Subscription, Bill, DocumentM, SpecialDateM, VehicleM, VehicleLogM] = await Promise.all([
     currentModel(ItemModel),
     currentModel(StatementModel),
     currentModel(ExpenseModel),
@@ -74,6 +75,7 @@ async function computeAlerts(): Promise<Alert[]> {
     currentModel(DocumentModel),
     currentModel(SpecialDateModel),
     currentModel(VehicleModel),
+    currentModel(VehicleLogModel),
   ]);
 
   // Deals — a tracked item whose best price reached its target.
@@ -284,8 +286,8 @@ async function computeAlerts(): Promise<Alert[]> {
   const vehicleRows =
     s.documentAlertDays > 0
       ? ((await VehicleM.find({ archived: { $ne: true } })
-          .select('name plate motUntil insuranceUntil roadTaxUntil emissionsUntil')
-          .lean()) as VehicleDueRow[])
+          .select('name plate motUntil insuranceUntil roadTaxUntil emissionsUntil tyreChangeUntil batteryUntil serviceIntervalKm serviceIntervalMonths purchaseDate purchaseOdometer')
+          .lean()) as (VehicleDueRow & ServiceDueRow)[])
       : [];
   for (const v of collectVehicleDue(vehicleRows, s.documentAlertDays, now)) {
     // body = "<days>|<kind>" (raw; negative = overdue, formatted in the bell)
@@ -294,8 +296,27 @@ async function computeAlerts(): Promise<Alert[]> {
       kind: 'vehicle',
       title: v.plate ? `${v.name} (${v.plate})` : v.name,
       body: `${v.days}|${v.kind}`,
-      href: '/vehicles',
+      href: `/vehicles/${String(v._id)}`,
     });
+  }
+  // #363: the next service, by date or km (whichever comes first). The key names the due
+  // point, so logging the service retires the alert.
+  if (vehicleRows.length) {
+    const logs = (await VehicleLogM.find({ vehicleId: { $in: vehicleRows.map((v) => String(v._id)) } })
+      .select('vehicleId kind date odometer nextServiceKm nextServiceDate')
+      .lean()) as { vehicleId: unknown; kind: string; date: Date; odometer: number | null; nextServiceKm: number | null; nextServiceDate: Date | null }[];
+    const byVehicle = new Map<string, typeof logs>();
+    for (const l of logs) byVehicle.set(String(l.vehicleId), [...(byVehicle.get(String(l.vehicleId)) ?? []), l]);
+    for (const v of collectServiceDue(vehicleRows, byVehicle, s.documentAlertDays, now)) {
+      // body = "<days>|service|<km>" (raw; either may be empty, negative = overdue)
+      alerts.push({
+        dedupeKey: `vehicleService:${String(v._id)}:${v.key}`,
+        kind: 'vehicle',
+        title: v.plate ? `${v.name} (${v.plate})` : v.name,
+        body: `${v.next.daysLeft ?? ''}|service|${v.next.kmLeft ?? ''}`,
+        href: `/vehicles/${String(v._id)}`,
+      });
+    }
   }
 
   // Birthdays / anniversaries within the lead window (P50, #197). The push keys these by id

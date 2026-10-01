@@ -56,6 +56,7 @@ const FEATURE_LABELS: Record<string, string> = {
   itemsImport: 'Product import',
   scraperPrice: 'Price scraper',
   productPhoto: 'Product photo',
+  vehicles: 'Vehicles',
   vouchers: 'Vouchers',
   cards: 'Cards',
   subscriptions: 'Subscriptions',

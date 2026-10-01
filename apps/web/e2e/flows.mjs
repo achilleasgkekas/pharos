@@ -8,6 +8,10 @@
 // backup export → restore round trip. Then axe checks a few key pages for serious and critical
 // accessibility violations.
 import { chromium } from 'playwright';
+import { createServer } from 'node:http';
+import { writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { AxeBuilder } from '@axe-core/playwright';
 
 const BASE = process.env.BASE_URL || 'http://127.0.0.1:3000';
@@ -122,19 +126,68 @@ await flow('log a fuel fill on a vehicle (and its expense)', async () => {
   await page.getByLabel('Name').fill(`Golf ${TAG}`);
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   await page.getByRole('heading', { name: 'Add vehicle' }).waitFor({ state: 'hidden' });
+  // #363: a new vehicle opens on its own page.
+  await page.getByRole('heading', { level: 1, name: `Golf ${TAG}` }).waitFor();
 
-  const card = page.locator('section', { has: page.getByRole('heading', { name: `Golf ${TAG}` }) });
-  await card.getByRole('button', { name: 'Add fuel' }).click();
+  await page.getByRole('button', { name: 'Add fuel' }).click();
   await page.getByLabel('Odometer (km)').fill('120000');
   await page.getByLabel('Litres').fill('40');
   await page.getByLabel('Cost', { exact: true }).fill('70');
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   await page.getByRole('heading', { name: `Add fuel · Golf ${TAG}` }).waitFor({ state: 'hidden' });
+  await page.getByRole('tab', { name: /^Fuel\s*1$/ }).waitFor();
 
   await open('/vehicles');
-  await page.locator('section', { has: page.getByRole('heading', { name: `Golf ${TAG}` }) }).getByText('History (1)').waitFor();
+  await page.getByRole('link', { name: new RegExp(`Golf ${TAG}`) }).waitFor();
   await open('/expenses');
   await page.getByText(`Golf ${TAG}`, { exact: false }).first().waitFor();
+});
+
+// ── Vehicles: fill a fuel entry from a scanned receipt (#363) ─────────────
+// The scan goes through the app's real AI path to a stand-in Ollama on its default address, which
+// answers with what a model would read off a pump receipt. Nothing is saved until Save.
+await flow('fill a fuel entry from a scanned receipt', async () => {
+  const fake = createServer((req, res) => {
+    let body = '';
+    req.on('data', (c) => (body += c));
+    req.on('end', () => {
+      res.setHeader('content-type', 'application/json');
+      if (req.url === '/api/chat') {
+        const content = JSON.stringify({ date: '2026-03-14', station: 'Shell Kifisias', liters: 32.5, pricePerLiter: 1.849, total: 60.09, fuelType: 'petrol', odometer: null });
+        res.end(JSON.stringify({ model: 'fake', message: { role: 'assistant', content }, done: true, prompt_eval_count: 1, eval_count: 1 }));
+      } else if (req.url === '/api/tags') {
+        res.end(JSON.stringify({ models: [] }));
+      } else {
+        res.statusCode = 404;
+        res.end('{}');
+      }
+    });
+  });
+  await new Promise((resolve, reject) => fake.once('error', reject).listen(11434, resolve));
+  try {
+    await open('/vehicles');
+    await page.getByRole('link', { name: new RegExp(`Golf ${TAG}`) }).click();
+    await page.getByRole('heading', { level: 1, name: `Golf ${TAG}` }).waitFor();
+    await page.getByRole('button', { name: 'Add fuel' }).click();
+    // A 1×1 PNG stands in for the photo; the stand-in model does not look at it.
+    const photo = join(tmpdir(), `receipt-${TAG}.png`);
+    writeFileSync(photo, Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64'));
+    await page.getByLabel('Scan receipt').setInputFiles(photo);
+    await page.getByText('Filled from the scan').waitFor({ timeout: 30_000 });
+    expect((await page.getByLabel('Litres').inputValue()) === '32.5', 'litres were not filled from the scan');
+    expect((await page.getByLabel('Cost', { exact: true }).inputValue()) === '60.09', 'the total was not filled from the scan');
+    expect((await page.getByLabel('Station').inputValue()) === 'Shell Kifisias', 'the station was not filled from the scan');
+    // The receipt has no odometer: the form asks for it, and saves only once it is there.
+    await page.getByLabel('Odometer (km)').fill('120600');
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await page.getByRole('heading', { name: `Add fuel · Golf ${TAG}` }).waitFor({ state: 'hidden' });
+    await page.getByRole('tab', { name: /^Fuel\s*2$/ }).click();
+    await page.getByText('Shell Kifisias').first().waitFor();
+    // The photo stays with the entry.
+    await page.getByRole('link', { name: 'Attached receipt' }).first().waitFor();
+  } finally {
+    await new Promise((resolve) => fake.close(resolve));
+  }
 });
 
 // ── Backup: export → restore ──────────────────────────────────────────────
@@ -149,9 +202,12 @@ await flow('export a backup and restore it', async () => {
   // flow passes even if restore cannot revive a deleted record, the case a backup exists for.
   // Deleting the vehicle also soft-deletes its fuel log, so the children are covered too.
   await open('/vehicles');
-  await page.locator('section', { has: page.getByRole('heading', { name: `Golf ${TAG}` }) }).getByRole('button', { name: 'Delete' }).click();
+  await page.getByRole('link', { name: new RegExp(`Golf ${TAG}`) }).click();
+  await page.getByRole('heading', { level: 1, name: `Golf ${TAG}` }).waitFor();
+  await page.getByRole('button', { name: 'Delete vehicle', exact: true }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Delete', exact: true }).click(); // the app's confirm dialog
-  await page.getByRole('heading', { name: `Golf ${TAG}` }).waitFor({ state: 'detached' });
+  await page.waitForURL(/\/vehicles$/);
+  await page.getByRole('link', { name: new RegExp(`Golf ${TAG}`) }).waitFor({ state: 'detached' });
 
   await open('/settings');
   await page.getByRole('button', { name: 'Storage & backup' }).first().click();
@@ -160,13 +216,14 @@ await flow('export a backup and restore it', async () => {
   const done = page.getByText(/✓ Restored \d+ records/);
   await done.waitFor({ timeout: 30_000 });
   const n = Number((await done.textContent()).match(/\d+/)[0]);
-  // The flows above created an item, a vehicle, a fuel log, a bill and two expenses.
+  // The flows above created an item, a vehicle, two fuel logs, a bill and expenses.
   expect(n >= 6, `restore reported ${n} records, expected at least 6`);
 
   await open('/items');
   await page.getByText(`Drill ${TAG}`).first().waitFor();
   await open('/vehicles');
-  await page.locator('section', { has: page.getByRole('heading', { name: `Golf ${TAG}` }) }).getByText('History (1)').waitFor();
+  await page.getByRole('link', { name: new RegExp(`Golf ${TAG}`) }).click();
+  await page.getByRole('tab', { name: /^Fuel\s*2$/ }).waitFor();
 });
 
 // ── Encrypted backup: the app's own passphrase prompt (#351) ─────────────

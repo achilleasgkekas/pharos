@@ -442,19 +442,43 @@ second home).
 
 ## Vehicles
 
-Track cars and motorbikes (`/vehicles`): name, plate, make, model, year and space.
+Track cars and motorbikes. `/vehicles` is an overview with one card per vehicle: photo, plate,
+odometer, consumption, cost per km and the next thing that is due. Click a card to open the
+vehicle's own page (`/vehicles/<id>`), with tabs for **Overview**, **Fuel**, **Service**,
+**Documents & dates** and **Costs**.
 
-- **Fuel log.** Log each fill with the odometer, litres and cost. Consumption
-  (L/100 km) uses the full-to-full method: a partial fill rolls into the next full
-  one, so the figure stays honest.
-- **Service log.** What was done, the garage, the cost and the odometer.
-- **Running cost.** Fuel spent, service spent and cost per km, worked out from
-  the logs. Nothing is stored, so correcting an old entry fixes every figure.
-- **Renewal dates.** MOT / inspection, insurance, road tax and the
-  emissions card show as badges (orange when due soon, red when overdue) and raise
-  alerts using the same lead time as Documents.
-- **Also log as expense.** A fill lands in Expenses under `fuel` and a service
-  under `transport`, in the vehicle's space.
+- **Details.** Besides name, plate, make, model, year and space, every field is optional:
+  VIN, fuel type (petrol, diesel, LPG, CNG, hybrid, plug-in hybrid, electric), engine size and
+  power, transmission, colour and first registration; the purchase (date, price, seller,
+  odometer); maintenance specs (tank or battery capacity, tyre size and pressure, oil type and
+  capacity); and the insurance (insurer, policy number, cover, yearly premium). A photo of the
+  car and its papers (registration certificate, insurance card, inspection report) live on the
+  Documents tab.
+- **Fuel log.** Each fill with the odometer, litres, price per litre, cost, fuel type and
+  station. Consumption (L/100 km) uses the full-to-full method: a partial fill rolls into the
+  next full one, so the figure stays honest.
+- **Service log.** What was done, the garage, the cost, the odometer, the invoice lines (parts,
+  labour, other) and the next service if the garage wrote one down.
+- **Edit any entry.** Fuel and service entries can be edited and deleted from the vehicle page.
+- **Scan with the camera.** "Scan receipt" reads a photo of the pump receipt into date,
+  station, litres, price per litre, total and fuel type; "Scan invoice" reads a garage invoice
+  (photo or PDF) into date, garage, odometer, total, description, invoice lines and the next
+  service. "Odometer from photo" reads the ODO off a dashboard photo. Nothing is saved until you
+  press Save, and the photo or PDF stays attached to the entry. The switch is
+  **Settings → AI → Vehicle receipt scan**; the monthly AI spend cap applies and every scan
+  shows in the AI run history.
+- **Service schedule.** Set a service interval in km and/or months. The next service counts
+  from the last one you logged (or from the purchase), whichever of km or months comes first; a
+  next service printed on the invoice wins. It alerts within the documents lead time, or within
+  1,000 km.
+- **Renewal dates.** MOT / inspection, insurance, road tax, emissions card, tyre change and
+  battery show as badges (orange when due soon, red when overdue) and raise alerts using the
+  same lead time as Documents.
+- **Costs.** Fuel price per litre over time, spend per month (fuel and service), cost per km,
+  average per month and service cost per year, all worked out from the logs. Nothing is stored,
+  so correcting an old entry fixes every figure.
+- **Also log as expense.** A fill lands in Expenses under `fuel` and a service under
+  `transport`, in the vehicle's space. Editing an entry later leaves that expense as it is.
 - **Archive** a vehicle you sold; its history stays.
 
 ## Vouchers

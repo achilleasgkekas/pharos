@@ -18,7 +18,7 @@ import {
 } from '@/app/notifications/actions';
 
 const KIND_ICON: Record<NotifKind, typeof Bell> = { deal: Tag, warranty: ShieldCheck, installment: CreditCard, pricehike: TrendingUp, trialend: AlarmClock, subreview: AlarmClock, bill: FileText, maintenance: Wrench, lending: Handshake, claim: PackageOpen, document: IdCard, vehicle: Car, specialdate: Cake, system: Bell };
-const VEHICLE_WHAT = { motUntil: 'veh.mot', insuranceUntil: 'veh.insurance', roadTaxUntil: 'veh.roadTax', emissionsUntil: 'veh.emissions' } as const;
+const VEHICLE_WHAT = { motUntil: 'veh.mot', insuranceUntil: 'veh.insurance', roadTaxUntil: 'veh.roadTax', emissionsUntil: 'veh.emissions', tyreChangeUntil: 'veh.tyreChange', batteryUntil: 'veh.battery' } as const;
 const KIND_COLOR: Record<NotifKind, string> = {
   deal: 'var(--color-accent)',
   warranty: 'var(--color-gold)',
@@ -153,8 +153,18 @@ export function NotificationBell({ open, onOpenChange }: { open: boolean; onOpen
       return { heading: n.title, sub: t(key, { days: Math.abs(d) }) };
     }
     if (n.kind === 'vehicle') {
-      // body = "<days>|<kind>", kind one of VEHICLE_DUE_KINDS
-      const [days, which] = n.body.split('|');
+      // body = "<days>|<kind>", kind one of VEHICLE_DUE_KINDS; or "<days>|service|<km>" (#363)
+      const [days, which, km] = n.body.split('|');
+      if (which === 'service') {
+        const kmLeft = km === '' || km === undefined ? null : Number(km);
+        const d = days === '' ? null : Number(days);
+        // Say whichever is the nearer reason; km wins when only km says it is close.
+        if (kmLeft !== null && (d === null || d > 30 || kmLeft < 0)) {
+          return { heading: n.title, sub: t(kmLeft < 0 ? 'notif.serviceKmOverdueSub' : 'notif.serviceKmSub', { km: Math.abs(kmLeft).toLocaleString() }) };
+        }
+        const dd = d ?? 0;
+        return { heading: n.title, sub: t(dd < 0 ? 'notif.serviceOverdueSub' : dd === 0 ? 'notif.serviceTodaySub' : 'notif.serviceSub', { days: Math.abs(dd) }) };
+      }
       const d = Number(days);
       const what = VEHICLE_WHAT[which as keyof typeof VEHICLE_WHAT] ? t(VEHICLE_WHAT[which as keyof typeof VEHICLE_WHAT]) : '';
       const key = d < 0 ? 'notif.vehicleOverdueSub' : d === 0 ? 'notif.vehicleTodaySub' : 'notif.vehicleSub';

@@ -4,7 +4,8 @@ import { currentModel } from '@/lib/tenancy/connection';
 import { withRequestTenant } from '@/lib/tenancy/request';
 import { Vehicle as VehicleModel } from '@/models/Vehicle';
 import { VehicleLog as VehicleLogModel } from '@/models/VehicleLog';
-import { VehiclesClient, type VehicleRow, type LogRow } from './VehiclesClient';
+import { VehiclesClient } from './VehiclesClient';
+import type { LogRow, VehicleRow } from './shared';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,8 +14,9 @@ async function getData(): Promise<{ vehicles: VehicleRow[]; logs: LogRow[]; spac
     await connectDB();
     const [Vehicle, VehicleLog] = await Promise.all([currentModel(VehicleModel), currentModel(VehicleLogModel)]);
     const [vehicles, logs, settings] = await Promise.all([
-      Vehicle.find().sort({ archived: 1, name: 1 }).lean(),
-      VehicleLog.find().sort({ date: -1, createdAt: -1 }).lean(),
+      Vehicle.find().sort({ archived: 1, name: 1 }).select('-attachments').lean(),
+      // The overview only needs what the cards summarize, not invoice lines or files.
+      VehicleLog.find().sort({ date: -1, createdAt: -1 }).select('vehicleId kind date odometer cost liters fullTank nextServiceKm nextServiceDate').lean(),
       getAppSettings(),
     ]);
     return {

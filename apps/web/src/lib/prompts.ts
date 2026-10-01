@@ -3,13 +3,12 @@ import { AppConfig } from '@/models/AppConfig';
 import { currentModel } from './tenancy/connection';
 import { currentTenant } from './tenancy/current';
 
-export type PromptKey = 'receipt' | 'statement' | 'product' | 'card' | 'subscription' | 'category' | 'expense' | 'voucher' | 'productPhoto' | 'scraperPrice';
+export type PromptKey = 'receipt' | 'statement' | 'product' | 'card' | 'subscription' | 'category' | 'expense' | 'voucher' | 'productPhoto' | 'vehicleFuel' | 'vehicleService' | 'scraperPrice';
 
-/** Shared output contract for the built-in prompts (#364/#366). Proper names, merchant names,
- * URLs, codes and explicitly raw printed text remain unchanged; explanatory/free-text fields are
- * English so records stay consistent across deployments and source-document languages. */
-export const ENGLISH_OUTPUT_RULE =
-  'Language: write every descriptive/free-text output field in English. Preserve proper names, merchant and product brand names, URLs, codes, and fields explicitly described as raw printed text.';
+// Shared output contract for the built-in prompts (#364/#366); lives in promptRules.ts so a
+// module that only needs the rule does not pull in the DB-backed override store.
+import { ENGLISH_OUTPUT_RULE } from './promptRules';
+export { ENGLISH_OUTPUT_RULE };
 
 /** Default scraper price-extraction prompt. KEEP IN SYNC with the scraper's own copy at
  *  services/scraper/src/extract.ts (PROMPT). Shown here so Settings can display/reset it;
@@ -39,6 +38,8 @@ export const PROMPT_META: { key: PromptKey; label: string; where: string }[] = [
   { key: 'expense', label: 'Expense / income', where: 'Expenses & Income: scan a bill / payslip' },
   { key: 'voucher', label: 'Voucher / coupon', where: 'Vouchers: scan a coupon' },
   { key: 'productPhoto', label: 'Product photo', where: 'Shopping list: scan a product photo' },
+  { key: 'vehicleFuel', label: 'Fuel receipt', where: 'Vehicles: scan a pump receipt' },
+  { key: 'vehicleService', label: 'Service invoice', where: 'Vehicles: scan a garage invoice' },
   { key: 'scraperPrice', label: 'Scraper price', where: 'Price scraper service: extract current price' },
 ];
 
