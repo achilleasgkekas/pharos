@@ -6,6 +6,7 @@ import { hashPassword, setSessionCookie, requireAdmin } from '@/lib/auth';
 import { invalidateAiConfigCache } from '@/lib/aiConfig';
 import { invalidateAppSettings } from '@/lib/appSettings';
 import { normalizeShoppingCountry, SHOPPING_PRESETS } from '@/lib/shoppingRegion';
+import { normalizeVatRate } from '@/lib/vatRate';
 import { saveAiConfig } from '@/app/settings/actions';
 
 /** Step 1 — create the first account (admin) and sign them in. Only works on first run. */
@@ -35,7 +36,7 @@ export async function saveSetupBasics(currency: string, vat: number, shoppingCou
   await requireAdmin();
   await connectDB();
   const code = (currency || 'EUR').trim().toUpperCase() || 'EUR';
-  const vatRate = Math.max(0, Math.min(100, Number(vat) || 24));
+  const vatRate = normalizeVatRate(vat);
   const $set: Record<string, unknown> = { currency: code, defaultVatRate: vatRate };
   if (shoppingCountry !== undefined) {
     const country = normalizeShoppingCountry(shoppingCountry);
