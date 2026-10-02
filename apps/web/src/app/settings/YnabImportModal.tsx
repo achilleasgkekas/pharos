@@ -89,7 +89,7 @@ export function YnabImportModal({ onClose, onImported }: Props) {
             ) : (
               <p className="text-xs">{t('ynab.dropHint')}</p>
             )}
-            <p className="text-[10px] text-[color:var(--color-text-faint)]">{t('ynab.formats')}</p>
+            <p className="text-[11px] text-[color:var(--color-text-faint)]">{t('ynab.formats')}</p>
           </div>
         </div>
 
@@ -106,7 +106,7 @@ export function YnabImportModal({ onClose, onImported }: Props) {
               <div className="overflow-x-auto rounded-xl border border-[color:var(--color-border)]">
                 <table className="w-full text-xs">
                   <thead>
-                    <tr className="text-left text-[10px] uppercase text-[color:var(--color-text-faint)] border-b border-[color:var(--color-border)]" style={{ fontFamily: 'var(--font-mono)' }}>
+                    <tr className="text-left text-[11px] text-[color:var(--color-text-faint)] border-b border-[color:var(--color-border)]" style={{ fontFamily: 'var(--font-mono)' }}>
                       <th className="px-3 py-2">{t('csv.f_date')}</th>
                       <th className="px-3 py-2">{t('csv.f_vendor')}</th>
                       <th className="px-3 py-2 text-right">{t('csv.f_amount')}</th>

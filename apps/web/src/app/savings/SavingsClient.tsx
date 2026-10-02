@@ -148,12 +148,12 @@ export function SavingsClient({ data }: { data: SavingsData }) {
       <div className="grid md:grid-cols-3 gap-3 mb-4">
         <div className="md:col-span-2 bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-2xl p-5">
           <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-            <span className="flex items-center gap-1.5 text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-[0.15em]" style={{ fontFamily: 'var(--font-mono)' }}>
+            <span className="flex items-center gap-1.5 text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
               <Wallet size={12} /> {t('sav.forecastTitle')}
               <button
                 type="button"
                 onClick={() => setShowAccountsModal(true)}
-                className="ml-2 text-[10px] normal-case text-[color:var(--color-accent)] hover:underline flex items-center gap-1"
+                className="ml-2 text-[11px] normal-case text-[color:var(--color-accent)] hover:underline flex items-center gap-1"
                 title={t('reports.accounts')}
               >
                 <Pencil size={10} /> {t('reports.accounts')}
@@ -187,7 +187,7 @@ export function SavingsClient({ data }: { data: SavingsData }) {
               </p>
             </>
           )}
-          <p className="text-[10px] text-[color:var(--color-text-faint)] mt-2">{basisNote}</p>
+          <p className="text-[11px] text-[color:var(--color-text-faint)] mt-2">{basisNote}</p>
         </div>
 
         <div className="grid grid-cols-1 gap-3">
@@ -227,7 +227,7 @@ export function SavingsClient({ data }: { data: SavingsData }) {
         )}
         {obligations.length > 0 && (
           <div className="mt-3 pt-3 border-t border-[color:var(--color-border)]">
-            <p className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-[0.12em] mb-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
+            <p className="text-[11px] text-[color:var(--color-text-faint)] mb-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
               {t('sav.endingTitle')}
             </p>
             <ul className="space-y-1">
@@ -244,7 +244,7 @@ export function SavingsClient({ data }: { data: SavingsData }) {
       {/* ── The planner: "can I make it?" ───────────────────────────────── */}
       <Card title={t('sav.planTitle')} className="mb-4">
         <div className="flex flex-wrap items-end gap-3 mb-3">
-          <label className="flex flex-col gap-1 text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-[0.12em]" style={{ fontFamily: 'var(--font-mono)' }}>
+          <label className="flex flex-col gap-1 text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
             {t('sav.planAmount')}
             <input
               type="number"
@@ -256,7 +256,7 @@ export function SavingsClient({ data }: { data: SavingsData }) {
               className="w-32 bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-2 py-1.5 text-sm text-[color:var(--color-text)] focus:outline-none focus:border-[color:var(--color-accent)]"
             />
           </label>
-          <label className="flex flex-col gap-1 text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-[0.12em]" style={{ fontFamily: 'var(--font-mono)' }}>
+          <label className="flex flex-col gap-1 text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
             {t('sav.planDate')}
             <DateInput value={planDate} onValueChange={setPlanDate} onProblemChange={setPlanDateProblem} min={today} className="py-1.5 normal-case tracking-normal" />
           </label>
@@ -348,7 +348,7 @@ function PlanReadout({ plan, levers }: { plan: SavingsPlan; levers: SavingsData[
       )}
       {cover.picks.length > 0 && (
         <div className="rounded-xl bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] p-3">
-          <p className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-[0.12em] mb-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
+          <p className="text-[11px] text-[color:var(--color-text-faint)] mb-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
             {t('sav.coverTitle', { x: moneyExact(plan.shortfallPerMonth) })}
           </p>
           <ul className="space-y-0.5 mb-1.5">
@@ -359,7 +359,7 @@ function PlanReadout({ plan, levers }: { plan: SavingsPlan; levers: SavingsData[
               </li>
             ))}
           </ul>
-          <p className="text-[10px]" style={{ color: cover.closes ? 'var(--color-accent)' : 'var(--color-text-faint)' }}>
+          <p className="text-[11px]" style={{ color: cover.closes ? 'var(--color-accent)' : 'var(--color-text-faint)' }}>
             {cover.closes
               ? t('sav.coverCloses')
               : t('sav.coverShort', { x: moneyExact(cover.covered), y: moneyExact(plan.shortfallPerMonth) })}
@@ -407,7 +407,7 @@ function GoalPlanCard({ goal, data }: { goal: SavingsGoal; data: SavingsData }) 
             <Target size={12} className="shrink-0 text-[color:var(--color-text-faint)]" />
             {goal.title}
           </p>
-          <p className="text-[10px] text-[color:var(--color-text-faint)] mt-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
+          <p className="text-[11px] text-[color:var(--color-text-faint)] mt-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
             {t('sav.gOf', { a: money(goal.saved), b: money(goal.target) })}
             {goal.targetDate ? ` · ${fmtDay(goal.targetDate, locale)}` : ''}
           </p>
@@ -484,7 +484,7 @@ function SaveAsGoal({ amount, date, dateProblem }: { amount: number; date: strin
   return (
     <div className="flex flex-col gap-1">
       <div className="flex items-end gap-2">
-        <label className="flex flex-col gap-1 text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-[0.12em]" style={{ fontFamily: 'var(--font-mono)' }}>
+        <label className="flex flex-col gap-1 text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
           {t('sav.newGoalTitle')}
           <input
             value={title}
@@ -502,7 +502,7 @@ function SaveAsGoal({ amount, date, dateProblem }: { amount: number; date: strin
           <Check size={13} /> {t('sav.saveAsGoal')}
         </button>
       </div>
-      {(error || dateProblem) && <p role="alert" className="text-[10px] text-[color:var(--color-red)]">{error || dateProblem}</p>}
+      {(error || dateProblem) && <p role="alert" className="text-[11px] text-[color:var(--color-red)]">{error || dateProblem}</p>}
     </div>
   );
 }
@@ -510,7 +510,7 @@ function SaveAsGoal({ amount, date, dateProblem }: { amount: number; date: strin
 function Notice({ tone, text, action }: { tone: 'info' | 'warn'; text: string; action?: React.ReactNode }) {
   const color = tone === 'warn' ? 'var(--color-gold)' : 'var(--color-cyan)';
   return (
-    <div className="mb-3 rounded-xl border p-3 flex items-start gap-2" style={{ borderColor: `${color}40`, background: `${color}12` }}>
+    <div className="mb-3 rounded-xl border p-3 flex items-start gap-2" style={{ borderColor: `color-mix(in srgb, ${color} 25%, transparent)`, background: `color-mix(in srgb, ${color} 7%, transparent)` }}>
       <AlertTriangle size={13} className="shrink-0 mt-0.5" style={{ color }} />
       <div className="text-[11px] text-[color:var(--color-text-dim)]">
         <p>{text}</p>
@@ -523,14 +523,14 @@ function Notice({ tone, text, action }: { tone: 'info' | 'warn'; text: string; a
 function Stat({ icon, label, value, sub, accent }: { icon: React.ReactNode; label: string; value: string; sub: string; accent?: string }) {
   return (
     <div className="bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-xl p-4">
-      <div className="flex items-center gap-1.5 text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider mb-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
+      <div className="flex items-center gap-1.5 text-[11px] text-[color:var(--color-text-faint)] mb-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
         {icon}
         {label}
       </div>
       <div className="text-2xl font-bold tracking-tight" style={{ fontFamily: 'var(--font-display)', color: accent }}>
         {value}
       </div>
-      <div className="text-[10px] text-[color:var(--color-text-faint)] mt-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
+      <div className="text-[11px] text-[color:var(--color-text-faint)] mt-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
         {sub}
       </div>
     </div>
@@ -540,7 +540,7 @@ function Stat({ icon, label, value, sub, accent }: { icon: React.ReactNode; labe
 function Card({ title, children, className }: { title: string; children: React.ReactNode; className?: string }) {
   return (
     <div className={`bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-2xl p-5 ${className ?? ''}`}>
-      <h2 className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-[0.15em] mb-4" style={{ fontFamily: 'var(--font-mono)' }}>
+      <h2 className="text-[11px] text-[color:var(--color-text-faint)] mb-4" style={{ fontFamily: 'var(--font-mono)' }}>
         {title}
       </h2>
       {children}

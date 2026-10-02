@@ -172,7 +172,7 @@ function CheckCard({ check }: { check: HealthCheck }) {
             <span className="text-[color:var(--color-text-dim)] shrink-0">{meta.icon}</span>
             <span className="truncate">{t(meta.key)}</span>
           </div>
-          <span className={cn('flex items-center gap-1 text-[11px] font-semibold uppercase shrink-0', style.text)} style={{ fontFamily: 'var(--font-mono)' }}>
+          <span className={cn('flex items-center gap-1 text-[11px] font-semibold shrink-0', style.text)} style={{ fontFamily: 'var(--font-mono)' }}>
             {style.icon}
             {t(style.key)}
           </span>
@@ -192,7 +192,7 @@ function CheckCard({ check }: { check: HealthCheck }) {
           }
           return (
             <div key={m.key} className="flex items-baseline justify-between gap-2 min-w-0">
-              <dt className="text-[10px] uppercase tracking-wide text-[color:var(--color-text-faint)] truncate">{t(m.key as TKey)}</dt>
+              <dt className="text-[11px] text-[color:var(--color-text-faint)] truncate">{t(m.key as TKey)}</dt>
               <dd className="text-xs font-medium truncate" style={{ fontFamily: 'var(--font-mono)' }} title={val}>
                 {val || '—'}
               </dd>

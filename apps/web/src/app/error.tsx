@@ -52,7 +52,7 @@ export default function Error({ error, reset }: { error: Error & { digest?: stri
           ? 'This tab was loaded before the latest update. Reload to get the new version and continue.'
           : msg || 'Unexpected error while loading this page.'}
         {!isStaleDeploy && error.digest && (
-          <span className="block mt-1 text-[10px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
+          <span className="block mt-1 text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
             ref: {error.digest}
           </span>
         )}

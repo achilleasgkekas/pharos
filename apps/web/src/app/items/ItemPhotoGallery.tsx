@@ -133,7 +133,7 @@ export function ItemPhotoGallery({
         </button>
         <div className="flex items-center gap-2 flex-wrap">
           {fetchBtn}
-          {msg && <span className="text-[10px] text-[color:var(--color-text-dim)]" style={{ fontFamily: 'var(--font-mono)' }}>{msg}</span>}
+          {msg && <span className="text-[11px] text-[color:var(--color-text-dim)]" style={{ fontFamily: 'var(--font-mono)' }}>{msg}</span>}
         </div>
       </div>
     );
@@ -157,7 +157,7 @@ export function ItemPhotoGallery({
             <button type="button" onClick={() => setActive((a) => (a + 1) % photos.length)} className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity">
               <ChevronRight size={16} />
             </button>
-            <span className="absolute bottom-2 right-2 text-[10px] px-1.5 py-0.5 rounded bg-black/60 text-white" style={{ fontFamily: 'var(--font-mono)' }}>
+            <span className="absolute bottom-2 right-2 text-[11px] px-1.5 py-0.5 rounded bg-black/60 text-white" style={{ fontFamily: 'var(--font-mono)' }}>
               {active + 1}/{photos.length}
             </span>
           </>
@@ -192,7 +192,7 @@ export function ItemPhotoGallery({
         {uploadBtn}
         {fetchBtn}
       </div>
-      {msg && <p className="text-[10px] text-[color:var(--color-text-dim)]" style={{ fontFamily: 'var(--font-mono)' }}>{msg}</p>}
+      {msg && <p className="text-[11px] text-[color:var(--color-text-dim)]" style={{ fontFamily: 'var(--font-mono)' }}>{msg}</p>}
     </div>
   );
 }

@@ -4,12 +4,13 @@ import { CreatedBy } from '@/components/CreatedBy';
 import { isForeignCurrency, normalizeCurrency, convertToBase, deriveFxRate, sumBase } from '@/lib/fx';
 import { FxBadge } from '@/components/FxBadge';
 import { FxRateButton } from '@/components/FxRateButton';
-import { useState, useTransition, useRef, useMemo } from 'react';
-import { Upload, Loader2, Trash2, CheckCircle2, AlertTriangle, FileText, FileSpreadsheet, Repeat, Wallet, Search, Plus, X, Camera, Sparkles, MapPin, Users, Split as SplitIcon, Landmark, Copy, Check, Pencil, CreditCard, Banknote } from 'lucide-react';
+import { useState, useTransition, useMemo } from 'react';
+import { Loader2, Trash2, CheckCircle2, AlertTriangle, FileText, FileSpreadsheet, Repeat, Wallet, Search, Plus, X, Sparkles, MapPin, Users, Split as SplitIcon, Landmark, Copy, Check, Pencil, CreditCard, Banknote } from 'lucide-react';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { DateInput } from '@/components/ui/DateInput';
 import { Field } from '@/components/ui/Field';
-import { PAGE_MAIN, PageHeader, HeaderButton, ViewToggle, PrimaryAction, FilterLayout, FilterSection, FilterOptions } from '@/components/ui/PageHeader';
+import { PAGE_MAIN, PageHeader, HeaderButton, HeaderTotals, ViewToggle, PrimaryAction, FilterLayout, FilterSection, FilterOptions } from '@/components/ui/PageHeader';
+import { PageFileDrop, UploadButton } from '@/components/ui/FileDrop';
 import { Modal } from '@/components/ui/Modal';
 import { Input, controlClass, filterControlClass } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
@@ -73,17 +74,14 @@ export function ExpensesClient({ kind, expenses, cards, vendors, ollamaUp, categ
   const [showBalances, setShowBalances] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadMsg, setUploadMsg] = useState<string | null>(null);
-  const [dragOver, setDragOver] = useState(false);
   const [search, setSearch] = useState('');
   const [catFilter, setCatFilter] = useState('');
   const [spaceFilter, setSpaceFilter] = useState('');
   const [taxOnly, setTaxOnly] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'all' | Status>('all');
   const [sortBy, setSortBy] = useState<'recent' | 'oldest' | 'amount-desc' | 'amount-asc' | 'vendor'>('recent');
-  const [layout, setLayout] = useState<'grid' | 'list'>('grid');
+  const [layout, setLayout] = useState<'grid' | 'list'>('list');
   const [rescanning, setRescanning] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
-  const cameraRef = useRef<HTMLInputElement>(null);
 
   // P78: select-mode + bulk field-edit (category only — Expense has no tags field, see
   // bulkUpdateExpenses' doc comment). Mirrors ItemsClient's selectMode/selectedIds pattern.
@@ -215,21 +213,22 @@ export function ExpensesClient({ kind, expenses, cards, vendors, ollamaUp, categ
     router.refresh();
   }
 
+  const searchBox = <Input icon={<Search size={15} />} type="search" placeholder={t('ex.searchPlaceholder')} aria-label={t('ex.searchPlaceholder')} value={search} onChange={(e) => setSearch(e.target.value)} />;
+  const statusSwitch = (
+    <FilterOptions
+      variant="segmented"
+      value={statusFilter}
+      onChange={setStatusFilter}
+      options={[
+        { value: 'all', label: t('common.all') },
+        { value: 'verified', label: t('ex.stVerified') },
+        { value: 'parsed', label: t('ex.stParsed') },
+        { value: 'failed', label: t('ex.stNeedsScan') },
+      ]}
+    />
+  );
   const filterControls = (
-    <div className="space-y-4">
-      <Input icon={<Search size={14} />} placeholder={t('ex.searchPlaceholder')} value={search} onChange={(e) => setSearch(e.target.value)} />
-      <FilterSection label={t('common.status')}>
-        <FilterOptions
-          value={statusFilter}
-          onChange={setStatusFilter}
-          options={[
-            { value: 'all', label: t('common.all') },
-            { value: 'verified', label: t('ex.stVerified') },
-            { value: 'parsed', label: t('ex.stParsed') },
-            { value: 'failed', label: t('ex.stNeedsScan') },
-          ]}
-        />
-      </FilterSection>
+    <div>
       <FilterSection label={t('common.category')}>
         <SearchableSelect value={catFilter} onChange={setCatFilter} options={categories} placeholder={t('sub.allCategories')} clearable size="sm" className="w-full" />
       </FilterSection>
@@ -244,7 +243,7 @@ export function ExpensesClient({ kind, expenses, cards, vendors, ollamaUp, categ
         </FilterSection>
       )}
       <FilterSection label={t('common.sort')}>
-        <select aria-label={t('common.sort')} value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)} className={filterControlClass} style={{ fontFamily: 'var(--font-mono)' }}>
+        <select aria-label={t('common.sort')} value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)} className={filterControlClass}>
           <option value="recent">{t('ex.sortRecent')}</option>
           <option value="oldest">{t('ex.sortOldest')}</option>
           <option value="amount-desc">{t('ex.sortAmountDesc')}</option>
@@ -252,13 +251,31 @@ export function ExpensesClient({ kind, expenses, cards, vendors, ollamaUp, categ
           <option value="vendor">{t('ex.sortVendor')}</option>
         </select>
       </FilterSection>
-      {anyFilter && <button onClick={resetFilters} className="text-[0.65rem] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] underline" style={{ fontFamily: 'var(--font-mono)' }}>{t('common.resetFilters')}</button>}
+      {anyFilter && (
+        <div className="self-end">
+          <button onClick={resetFilters} className="h-10 text-sm text-[color:var(--color-text-dim)] hover:text-[color:var(--color-red)] underline">{t('common.resetFilters')}</button>
+        </div>
+      )}
     </div>
   );
 
   return (
     <main className={PAGE_MAIN}>
-      <PageHeader title={label} count={expenses.length}>
+      <PageHeader
+        title={label}
+        count={visible.length !== expenses.length ? `${visible.length} / ${expenses.length}` : expenses.length}
+        summary={
+          <>
+            <HeaderTotals
+              items={[
+                { label: t('ex.thisMonth'), value: money(monthSum.total), tone: isIncome ? 'accent' : undefined },
+                { label: t('ex.thisYear'), value: money(yearSum.total) },
+              ]}
+            />
+            {monthSum.needsRate + yearSum.needsRate > 0 && <TotalsNoRate n={Math.max(monthSum.needsRate, yearSum.needsRate)} />}
+          </>
+        }
+      >
         {!isIncome && balances.length > 0 && (
           <HeaderButton tone="cyan" icon={<Users size={14} />} onClick={() => setShowBalances(true)} title={t('ex.balancesTitle')}>
             {t('ex.balancesBtn')}{totalOwedToYou > 0.009 ? ` · ${money(totalOwedToYou)}` : ''}
@@ -294,51 +311,19 @@ export function ExpensesClient({ kind, expenses, cards, vendors, ollamaUp, categ
         <HeaderButton icon={<FileSpreadsheet size={14} />} onClick={() => setImportingCsv(true)} title={t('csv.title')}>
           {t('csv.button')}
         </HeaderButton>
+        <UploadButton onFiles={handleFiles} accept="image/*,application/pdf,.pdf" label={t('common.upload')} busy={uploading} />
         <ViewToggle value={layout} onChange={setLayout} />
         <PrimaryAction onClick={() => setCreating(true)} />
       </PageHeader>
+      <PageFileDrop onFiles={handleFiles} label={t('common.dropToUpload')} hint={ollamaUp ? t('ex.aiReads') : t('ex.manualEntry')} disabled={uploading} />
 
-      <FilterLayout filters={filterControls} active={anyFilter}>
-          {/* Totals */}
-          <div className="grid grid-cols-2 gap-3 mb-5">
-            <div className="rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-4">
-              <p className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)] mb-1" style={{ fontFamily: 'var(--font-mono)' }}>{t('ex.thisMonth')}</p>
-              <p className={cn('text-2xl font-bold', isIncome ? 'text-[color:var(--color-accent)]' : 'text-[color:var(--color-gold)]')} style={{ fontFamily: 'var(--font-display)' }}>{money(monthSum.total)}</p>
-              {monthSum.needsRate > 0 && <TotalsNoRate n={monthSum.needsRate} />}
-            </div>
-            <div className="rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-4">
-              <p className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)] mb-1" style={{ fontFamily: 'var(--font-mono)' }}>{t('ex.thisYear')}</p>
-              <p className="text-2xl font-bold" style={{ fontFamily: 'var(--font-display)' }}>{money(yearSum.total)}</p>
-              {yearSum.needsRate > 0 && <TotalsNoRate n={yearSum.needsRate} />}
-            </div>
-          </div>
-
-          {/* Dropzone */}
-          <div
-            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-            onDragLeave={() => setDragOver(false)}
-            onDrop={(e) => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }}
-            onClick={() => !uploading && fileRef.current?.click()}
-            className={cn('border-2 border-dashed rounded-2xl p-8 mb-6 text-center cursor-pointer transition-all', dragOver ? 'border-[color:var(--color-accent)] bg-[color:var(--color-accent)]/3' : 'border-[color:var(--color-border)] hover:border-[color:var(--color-border-light)]', uploading && 'pointer-events-none opacity-70')}
-          >
-            <input ref={fileRef} type="file" accept="image/*,application/pdf,.pdf" multiple className="hidden" onChange={(e) => handleFiles(e.target.files)} />
-            {uploading ? (
-              <div className="flex flex-col items-center gap-2 text-[color:var(--color-cyan)]"><Loader2 size={28} className="animate-spin" /><p className="text-sm">{uploadMsg}</p></div>
-            ) : (
-              <div className="flex flex-col items-center gap-2 text-[color:var(--color-text-dim)]">
-                <Upload size={28} />
-                <p className="text-sm font-medium text-[color:var(--color-text)]">{t('ex.dropBill', { doc: isIncome ? t('ex.payslip') : t('ex.invoice') })}</p>
-                <p className="text-xs text-[color:var(--color-text-faint)]">{ollamaUp ? t('ex.aiReads') : t('ex.manualEntry')}</p>
-                <button type="button" onClick={(e) => { e.stopPropagation(); cameraRef.current?.click(); }} className="mt-2 flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-text)] hover:border-[color:var(--color-accent)] transition-colors"><Camera size={14} /> {t('ex.takePhoto')}</button>
-              </div>
-            )}
-            <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => handleFiles(e.target.files)} />
-          </div>
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
-              {visible.length} {visible.length === 1 ? t('ex.recordOne') : t('ex.recordMany')}{visible.length !== expenses.length ? ` / ${expenses.length}` : ''}
-            </span>
-          </div>
+      <FilterLayout search={searchBox} quick={statusSwitch} filters={filterControls} active={catFilter !== '' || spaceFilter !== '' || sortBy !== 'recent'}>
+          {uploading && uploadMsg && (
+            <p role="status" className="mb-3 flex items-center gap-2 text-sm text-[color:var(--color-cyan)]">
+              <Loader2 size={15} className="animate-spin" /> {uploadMsg}
+            </p>
+          )}
+          {!uploading && uploadMsg && <p role="status" className="mb-3 text-sm text-[color:var(--color-accent)]">{uploadMsg}</p>}
           {visible.length === 0 ? (
             <EmptyState icon={isIncome ? <Banknote /> : <Wallet />} title={expenses.length === 0 ? t('ex.emptyNone', { label: label.toLowerCase() }) : t('ex.emptyFiltered')} />
           ) : layout === 'grid' ? (
@@ -358,7 +343,7 @@ export function ExpensesClient({ kind, expenses, cards, vendors, ollamaUp, categ
               ))}
             </div>
           ) : (
-            <div className="flex flex-col gap-2">
+            <div className="rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] overflow-hidden divide-y divide-[color:var(--color-border)]">
               {visible.map((e) => (
                 <ExpenseRow
                   key={e._id}
@@ -445,7 +430,7 @@ function BalancesModal({ balances, onClose, onChanged, confirm }: {
           ))}
           {settledUp.length > 0 && (
             <div className="pt-2">
-              <p className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)] mb-1.5" style={{ fontFamily: 'var(--font-mono)' }}>{t('ex.balancesSettled')}</p>
+              <p className="text-[11px] text-[color:var(--color-text-faint)] mb-1.5" style={{ fontFamily: 'var(--font-mono)' }}>{t('ex.balancesSettled')}</p>
               {settledUp.map((b) => (
                 <div key={b.name} className="flex items-center gap-3 px-4 py-2 text-sm text-[color:var(--color-text-dim)]">
                   <span className="flex-1 truncate">{b.name}</span>
@@ -470,7 +455,7 @@ function Thumb({ expense }: { expense: SerializedExpense }) {
   const isImage = !!expense.fileType && expense.fileType.startsWith('image/');
   const thumb = isImage ? expense.filePath : expense.thumbPath;
   return (
-    <div className="w-11 h-11 rounded-lg bg-[color:var(--color-surface-2)] overflow-hidden shrink-0 grid place-items-center text-[color:var(--color-text-faint)]">
+    <div className="w-10 h-10 rounded-lg bg-[color:var(--color-surface-2)] overflow-hidden shrink-0 grid place-items-center text-[color:var(--color-text-faint)]">
       {thumb ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={fileUrl(thumb)} alt={expense.vendor} loading="lazy" className="w-full h-full object-cover object-top" />
@@ -507,13 +492,13 @@ function ExpenseRow({ expense, isIncome, series, fx, onClick, selectMode, select
   const money = useMoney();
   const mainClick = selectMode ? onToggleSelect : onClick;
   return (
-    <div className={cn('group flex items-center gap-3 bg-[color:var(--color-surface)] border rounded-xl px-3 py-2.5 transition-all', selected ? 'border-[color:var(--color-accent)] ring-1 ring-[color:var(--color-accent)]' : 'border-[color:var(--color-border)] hover:border-[color:var(--color-border-light)]')}>
+    <div className={cn('group flex items-center gap-3 px-3 sm:px-4 py-2.5 transition-colors', selected ? 'bg-[color:var(--color-accent)]/10' : 'hover:bg-[color:var(--color-surface-2)]')}>
       <SelectCheckbox selectMode={selectMode} selected={selected} onToggleSelect={onToggleSelect} />
       <button onClick={mainClick} className="flex items-center gap-3 flex-1 min-w-0 text-left">
         <Thumb expense={expense} />
         <div className="min-w-0 flex-1">
-          <span className="font-semibold text-sm truncate block" style={{ fontFamily: 'var(--font-display)' }}>{expense.vendor || t('ex.unknown')}{expense.series ? ` · ${expense.series}` : ''}</span>
-          <span className="text-[10px] text-[color:var(--color-text-faint)] block mt-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
+          <span className="font-semibold text-[15px] truncate block">{expense.vendor || t('ex.unknown')}{expense.series ? ` · ${expense.series}` : ''}</span>
+          <span className="text-xs text-[color:var(--color-text-dim)] block mt-0.5 truncate">
             {fmtDate(expense.date, locale)} · {expense.category}{expense.space ? ` · ${expense.space}` : ''}{expense.recurring ? ` · ${t('ex.recurringTag')}` : ''}{series > 1 ? ` · ×${series}` : ''}
           </span>
         </div>
@@ -524,7 +509,7 @@ function ExpenseRow({ expense, isIncome, series, fx, onClick, selectMode, select
         <AnomalyBadge anomaly={expense.anomaly} />
         {expense.taxDeductible && <span title={t('ex.taxBadgeTitle')}><Landmark size={13} className="text-[color:var(--color-gold)]" /></span>}
         {expense.recurring && <Repeat size={13} className="text-[color:var(--color-purple)]" />}
-        <span className={cn('font-extrabold text-base leading-none', isIncome ? 'text-[color:var(--color-accent)]' : '')} style={{ fontFamily: 'var(--font-display)' }}>{money(expense.amount)}</span>
+        <span className={cn('font-semibold text-[15px] leading-none tabular-nums', isIncome ? 'text-[color:var(--color-accent)]' : '')}>{money(expense.amount)}</span>
         <StatusIcon status={statusOf(expense)} />
       </div>
     </div>
@@ -545,7 +530,7 @@ function ExpenseCard({ expense, isIncome, series, fx, onClick, selectMode, selec
             <Thumb expense={expense} />
             <div className="min-w-0">
               <p className="font-semibold truncate">{expense.vendor || t('ex.unknown')}{expense.series ? ` · ${expense.series}` : ''}</p>
-              <p className="text-[11px] text-[color:var(--color-text-faint)] uppercase tracking-wider" style={{ fontFamily: 'var(--font-mono)' }}>{expense.category}</p>
+              <p className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>{expense.category}</p>
             </div>
           </button>
         </div>
@@ -584,7 +569,7 @@ function SplitBadge({ split }: { split?: SplitEntry[] }) {
     <span
       title={settledUp ? 'Split — settled up' : `Split — ${money(owed)} owed to you`}
       className={cn(
-        'text-[10px] font-bold rounded-md px-1.5 py-0.5 flex items-center gap-1',
+        'text-[11px] font-bold rounded-md px-1.5 py-0.5 flex items-center gap-1',
         settledUp
           ? 'text-[color:var(--color-accent)] bg-[color:var(--color-accent)]/10 border border-[color:var(--color-accent)]/30'
           : 'text-[color:var(--color-cyan)] bg-[color:var(--color-cyan)]/10 border border-[color:var(--color-cyan)]/30'
@@ -602,7 +587,7 @@ function AnomalyBadge({ anomaly }: { anomaly?: number }) {
   return (
     <span
       title={`Unusual amount: ${anomaly > 0 ? '+' : ''}${anomaly}% vs this vendor's usual`}
-      className="text-[10px] font-bold text-[color:var(--color-gold)] bg-[color:var(--color-gold)]/10 border border-[color:var(--color-gold)]/30 rounded-md px-1.5 py-0.5"
+      className="text-[11px] font-bold text-[color:var(--color-gold)] bg-[color:var(--color-gold)]/10 border border-[color:var(--color-gold)]/30 rounded-md px-1.5 py-0.5"
       style={{ fontFamily: 'var(--font-mono)' }}
     >
       ⚠ {anomaly > 0 ? '+' : ''}{anomaly}%
@@ -830,7 +815,7 @@ function SplitEditor({ split, amount, baseCurrency, onChange }: { split: SplitEn
       <div className="flex items-center justify-between mb-2">
         <span className="text-xs font-medium flex items-center gap-1.5"><SplitIcon size={13} className="text-[color:var(--color-cyan)]" /> {t('ex.splitTitle')}{baseCurrency ? ` (${currencySymbol(baseCurrency).trim()})` : ''}</span>
         {split.length > 0 && (
-          <span className="text-[10px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
+          <span className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
             {t('ex.splitOwedYou', { amt: money(totals.owed) })}{totals.settled > 0 ? ` · ${t('ex.splitSettled', { amt: money(totals.settled) })}` : ''}
           </span>
         )}
@@ -899,7 +884,7 @@ function PaymentSplitEditor({ splits, amount, onChange }: { splits: PaymentSplit
       <div className="flex items-center justify-between mb-2">
         <span className="text-xs font-medium flex items-center gap-1.5"><CreditCard size={13} className="text-[color:var(--color-gold)]" /> {t('ex.paySplitTitle')}</span>
         {splits.length > 0 && (
-          <span className={cn('text-[10px]', balanced ? 'text-[color:var(--color-text-faint)]' : 'text-[color:var(--color-red)]')} style={{ fontFamily: 'var(--font-mono)' }}>
+          <span className={cn('text-[11px]', balanced ? 'text-[color:var(--color-text-faint)]' : 'text-[color:var(--color-red)]')} style={{ fontFamily: 'var(--font-mono)' }}>
             {t('ex.paySplitAllocated', { amt: money(allocated), total: money(amount) })}
           </span>
         )}
@@ -973,7 +958,7 @@ function ExpenseDetail({ expense, cards, vendors, categories, spaces, fx, series
     <Modal open onClose={onClose} title={expense.vendor ? `${expense.vendor}${expense.series ? ` · ${expense.series}` : ''}` : t('ex.recordFallback')} size="2xl">
       {expense.filePath && (
         <div className="flex items-center gap-2 mb-3 pb-3 border-b border-[color:var(--color-border)] text-xs flex-wrap">
-          <span className="text-[color:var(--color-text-faint)] uppercase tracking-wider" style={{ fontFamily: 'var(--font-mono)' }}>{t('ex.rescan')}</span>
+          <span className="text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>{t('ex.rescan')}</span>
           <button onClick={() => doRescan(false)} disabled={pending} className="px-2 py-1 rounded-md bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-accent)] hover:border-[color:var(--color-accent)]">{t('ex.rescanText')}</button>
           <button onClick={() => doRescan(true)} disabled={pending} className="px-2 py-1 rounded-md bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-cyan)] hover:border-[color:var(--color-cyan)]">{t('ex.rescanOcr')}</button>
           {pending && <Loader2 size={13} className="animate-spin" />}

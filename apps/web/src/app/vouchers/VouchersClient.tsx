@@ -38,7 +38,7 @@ export function VouchersClient({ vouchers }: { vouchers: SerializedVoucher[] }) 
   const [search, setSearch] = useState('');
   const [storeFilter, setStoreFilter] = useState('');
   const [sortBy, setSortBy] = useState<'expiry' | 'store' | 'title'>('expiry');
-  const [layout, setLayout] = useState<'grid' | 'list'>('grid');
+  const [layout, setLayout] = useState<'grid' | 'list'>('list');
   const [showCreate, setShowCreate] = useState(false);
   const [editing, setEditing] = useState<SerializedVoucher | null>(null);
 
@@ -73,36 +73,38 @@ export function VouchersClient({ vouchers }: { vouchers: SerializedVoucher[] }) 
   }, [vouchers, filter, search, storeFilter, sortBy]);
 
   const anyF = !!(filter !== 'all' || search || storeFilter || sortBy !== 'expiry');
+  const searchBox = <Input icon={<Search size={15} />} type="search" placeholder={t('v.searchPlaceholder')} aria-label={t('v.searchPlaceholder')} value={search} onChange={(e) => setSearch(e.target.value)} />;
+  const statusSwitch = (
+    <FilterOptions
+      variant="segmented"
+      value={filter}
+      onChange={setFilter}
+      options={FILTERS.map((f) => ({ value: f.value, label: f.value === 'all' ? t('common.all') : f.value === 'active' ? t('v.fActive') : t('v.fUsed') }))}
+    />
+  );
   const filterControls = (
-    <div className="space-y-4">
-      <Input icon={<Search size={14} />} placeholder={t('v.searchPlaceholder')} value={search} onChange={(e) => setSearch(e.target.value)} />
-      <FilterSection label={t('common.status')}>
-        <FilterOptions
-          value={filter}
-          onChange={setFilter}
-          options={FILTERS.map((f) => ({ value: f.value, label: f.value === 'all' ? t('common.all') : f.value === 'active' ? t('v.fActive') : t('v.fUsed') }))}
-        />
-      </FilterSection>
+    <div>
       {stores.length > 1 && (
         <FilterSection label={t('v.fStore')}>
           <SearchableSelect value={storeFilter} onChange={setStoreFilter} options={stores} placeholder={t('it.allStores')} clearable size="sm" className="w-full" />
         </FilterSection>
       )}
       <FilterSection label={t('common.sort')}>
-        <select value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)} className={filterControlClass} style={{ fontFamily: 'var(--font-mono)' }}>
+        <select value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)} className={filterControlClass} aria-label={t('common.sort')}>
           <option value="expiry">{t('v.sortExpiry')}</option>
           <option value="store">{t('v.sortStore')}</option>
           <option value="title">{t('v.sortTitle')}</option>
         </select>
       </FilterSection>
       {anyF && (
-        <button
-          onClick={() => { setFilter('all'); setSearch(''); setStoreFilter(''); setSortBy('expiry'); }}
-          className="text-[0.65rem] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] underline"
-          style={{ fontFamily: 'var(--font-mono)' }}
-        >
-          reset filters
-        </button>
+        <div className="self-end">
+          <button
+            onClick={() => { setFilter('all'); setSearch(''); setStoreFilter(''); setSortBy('expiry'); }}
+            className="h-10 text-sm text-[color:var(--color-text-dim)] hover:text-[color:var(--color-red)] underline"
+          >
+            {t('common.resetFilters')}
+          </button>
+        </div>
       )}
     </div>
   );
@@ -114,11 +116,11 @@ export function VouchersClient({ vouchers }: { vouchers: SerializedVoucher[] }) 
         <PrimaryAction onClick={() => setShowCreate(true)} />
       </PageHeader>
 
-      <FilterLayout filters={filterControls} active={anyF}>
+      <FilterLayout search={searchBox} quick={statusSwitch} filters={filterControls} active={anyF}>
           {visible.length === 0 ? (
             <EmptyState icon={<Ticket />} title={vouchers.length === 0 ? t('v.empty') : t('ex.emptyFiltered')} />
           ) : (
-            <div className={cn(layout === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3' : 'flex flex-col gap-2')}>
+            <div className={cn(layout === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3' : 'rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] overflow-hidden divide-y divide-[color:var(--color-border)]')}>
               {visible.map((v) =>
                 layout === 'grid' ? (
                   <VoucherCard key={v._id} voucher={v} onEdit={() => setEditing(v)} />
@@ -194,14 +196,14 @@ function VoucherCard({ voucher, onEdit }: { voucher: SerializedVoucher; onEdit: 
           onClick={copy}
           className="w-full flex items-center justify-between gap-2 bg-[color:var(--color-surface-2)] border border-dashed border-[color:var(--color-border-light)] rounded-lg px-3 py-2 mb-2 hover:border-[color:var(--color-accent)] transition-colors"
         >
-          <span className="text-sm font-bold tracking-wider truncate" style={{ fontFamily: 'var(--font-mono)' }}>
+          <span className="text-sm font-bold truncate" style={{ fontFamily: 'var(--font-mono)' }}>
             {voucher.code}
           </span>
           {copied ? <Check size={14} className="text-[color:var(--color-accent)] shrink-0" /> : <Copy size={13} className="text-[color:var(--color-text-faint)] shrink-0" />}
         </button>
       )}
 
-      <div className="flex items-center gap-2 text-[10px] mb-3" style={{ fontFamily: 'var(--font-mono)' }}>
+      <div className="flex items-center gap-2 text-[11px] mb-3" style={{ fontFamily: 'var(--font-mono)' }}>
         {voucher.expiresAt ? (
           <span className={expiryTone(expired, d)}>
             {expired ? t('v.expired') : t('v.expiresInD', { d: d ?? 0 })}
@@ -216,7 +218,7 @@ function VoucherCard({ voucher, onEdit }: { voucher: SerializedVoucher; onEdit: 
         <button
           onClick={() => startTransition(() => toggleVoucherUsed(voucher._id, !voucher.used))}
           disabled={pending}
-          className={cn('flex items-center gap-1 text-[10px] px-2 py-1 rounded-md transition-colors', voucher.used ? 'text-[color:var(--color-text-faint)] hover:text-[color:var(--color-accent)]' : 'text-[color:var(--color-accent)] hover:bg-[color:var(--color-surface-2)]')}
+          className={cn('flex items-center gap-1 text-[11px] px-2 py-1 rounded-md transition-colors', voucher.used ? 'text-[color:var(--color-text-faint)] hover:text-[color:var(--color-accent)]' : 'text-[color:var(--color-accent)] hover:bg-[color:var(--color-surface-2)]')}
         >
           <Check size={12} /> {voucher.used ? t('v.markUnused') : t('v.markUsed')}
         </button>
@@ -246,13 +248,13 @@ function VoucherRow({ voucher, onEdit }: { voucher: SerializedVoucher; onEdit: (
   const mono = { fontFamily: 'var(--font-mono)' };
 
   return (
-    <div className={cn('group flex items-center gap-3 bg-[color:var(--color-surface)] border border-[color:var(--color-border)] hover:border-[color:var(--color-border-light)] rounded-xl px-3 py-2.5 transition-colors', voucher.used && 'opacity-50')}>
+    <div className={cn('group flex items-center gap-3 hover:bg-[color:var(--color-surface-2)] px-3 sm:px-4 py-2.5 transition-colors', voucher.used && 'opacity-50')}>
       <button type="button" onClick={onEdit} className="min-w-0 flex-1 text-left" aria-label={`${t('common.edit')}: ${voucher.title}`}>
-        <span className="block text-sm font-semibold truncate" style={{ fontFamily: 'var(--font-display)' }}>
+        <span className="block text-[15px] font-semibold truncate">
           {voucher.title}
           {voucher.store && <span className="text-[color:var(--color-text-faint)] font-normal"> · {voucher.store}</span>}
         </span>
-        <span className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-0.5 text-[10px]" style={mono}>
+        <span className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-0.5 text-xs">
           {voucher.discount && <span className="font-bold text-[color:var(--color-accent)]">{voucher.discount}</span>}
           <span className={voucher.expiresAt ? expiryTone(expired, d) : 'text-[color:var(--color-text-faint)]'}>
             {voucher.expiresAt ? (expired ? t('v.expired') : t('v.expiresInD', { d: d ?? 0 })) : t('v.noExpiry')}
@@ -267,7 +269,7 @@ function VoucherRow({ voucher, onEdit }: { voucher: SerializedVoucher; onEdit: (
           title={voucher.code}
           className="shrink-0 max-w-[7.5rem] flex items-center gap-1.5 border border-dashed border-[color:var(--color-border-light)] bg-[color:var(--color-surface-2)] rounded-md px-2 py-1 hover:border-[color:var(--color-accent)] transition-colors"
         >
-          <span className="text-xs font-bold tracking-wider truncate" style={mono}>{voucher.code}</span>
+          <span className="text-xs font-bold truncate" style={mono}>{voucher.code}</span>
           {copied ? <Check size={12} className="text-[color:var(--color-accent)] shrink-0" /> : <Copy size={11} className="text-[color:var(--color-text-faint)] shrink-0" />}
         </button>
       )}
@@ -380,7 +382,7 @@ function VoucherForm({ voucher, onSuccess, onDeleted }: { voucher?: SerializedVo
     <form onSubmit={submit} className="space-y-3">
       {!voucher && (
         <div className="rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] p-3 space-y-2">
-          <p className="text-[10px] uppercase tracking-wider text-[color:var(--color-cyan)] flex items-center gap-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
+          <p className="text-[11px] text-[color:var(--color-cyan)] flex items-center gap-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
             <Sparkles size={12} /> {t('v.fillAi')}
           </p>
           <textarea
@@ -407,7 +409,7 @@ function VoucherForm({ voucher, onSuccess, onDeleted }: { voucher?: SerializedVo
       </Field>
       <div className="grid grid-cols-2 gap-3">
         <Field label={t('v.fCode')}>
-          <Input value={form.code} onChange={set('code')} placeholder="SAVE10" style={{ fontFamily: 'var(--font-mono)' }} />
+          <Input value={form.code} onChange={set('code')} placeholder="SAVE10" style={{ fontFamily: 'var(--font-code)' }} />
         </Field>
         <Field label={t('v.fDiscount')}>
           <Input value={form.discount} onChange={set('discount')} placeholder={t('v.fDiscountPlaceholder')} />

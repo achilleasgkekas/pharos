@@ -54,7 +54,7 @@ export function CalendarFeedManager() {
         <div>
           <span className={FIELD_LABEL} style={{ fontFamily: 'var(--font-mono)' }}>{t('ics.feedUrl')}</span>
           <div className="flex items-center gap-2">
-            <code className={`${codeCls} text-[color:var(--color-accent)]`} style={{ fontFamily: 'var(--font-mono)' }}>{url}</code>
+            <code className={`${codeCls} text-[color:var(--color-accent)]`} style={{ fontFamily: 'var(--font-code)' }}>{url}</code>
             <button type="button" onClick={() => copy(url)} className={iconBtn} title={t('ics.copyUrl')}>
               {copied ? <Check size={14} className="text-[color:var(--color-accent)]" /> : <Copy size={14} />}
             </button>

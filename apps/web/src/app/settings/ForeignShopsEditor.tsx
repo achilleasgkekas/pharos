@@ -61,7 +61,7 @@ export function ForeignShopsEditor({
     <div className="space-y-3">
       <div className="flex items-center justify-between text-xs">
         <span
-          className="font-medium text-[color:var(--color-text-dim)] uppercase tracking-wider"
+          className="font-medium text-[color:var(--color-text-dim)]"
           style={{ fontFamily: 'var(--font-mono)' }}
         >
           {t('set.shoppingExtraShops')}

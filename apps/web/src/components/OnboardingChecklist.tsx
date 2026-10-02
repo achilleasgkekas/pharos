@@ -51,24 +51,24 @@ export function OnboardingChecklist({
   }
 
   return (
-    <div className="max-w-[1400px] mx-auto px-4 mb-6">
+    <div className="mb-4">
       <div className="rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] overflow-hidden">
         {/* Dismiss sits BESIDE the collapse toggle, not inside it: a control nested in a button
             is unreachable for keyboard and screen-reader users (axe nested-interactive). */}
-        <div className="flex items-center gap-3 pr-5 hover:bg-[color:var(--color-surface-2)]/50 transition-colors">
+        <div className="flex items-center gap-3 pr-2 hover:bg-[color:var(--color-surface-2)]/50 transition-colors">
           <button
             type="button"
             onClick={() => setCollapsed((c) => !c)}
             aria-expanded={!collapsed}
-            className="flex-1 min-w-0 flex items-center gap-3 pl-5 py-3.5 text-left"
+            className="flex-1 min-w-0 flex items-center gap-3 pl-4 py-3 text-left"
           >
             <span
               className="shrink-0 grid place-items-center w-7 h-7 rounded-full text-xs font-bold"
               style={{
                 ...mono,
                 color: allDone ? 'var(--color-accent)' : 'var(--color-cyan)',
-                background: allDone ? 'var(--color-accent)1a' : 'var(--color-cyan)1a',
-                border: `1px solid ${allDone ? 'var(--color-accent)' : 'var(--color-cyan)'}33`,
+                background: `color-mix(in srgb, ${allDone ? 'var(--color-accent)' : 'var(--color-cyan)'} 10%, transparent)`,
+                border: `1px solid color-mix(in srgb, ${allDone ? 'var(--color-accent)' : 'var(--color-cyan)'} 20%, transparent)`,
               }}
             >
               {allDone ? <Check size={14} /> : `${doneCount}/${steps.length}`}
@@ -83,14 +83,14 @@ export function OnboardingChecklist({
             type="button"
             onClick={dismiss}
             aria-label={t('common.dismiss')}
-            className="shrink-0 text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)] p-1 -m-1"
+            className="shrink-0 grid place-items-center w-10 h-10 rounded-lg text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)]"
           >
             <X size={15} />
           </button>
         </div>
 
         {!collapsed && (
-          <div className="px-5 pb-4 pt-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+          <div className="px-4 pb-4 pt-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
             {steps.map((s) => (
               <Link
                 key={s.key}
@@ -106,7 +106,7 @@ export function OnboardingChecklist({
                   className="shrink-0 grid place-items-center w-5 h-5 rounded-full"
                   style={{
                     color: s.done ? 'var(--color-accent)' : 'var(--color-text-faint)',
-                    background: s.done ? 'var(--color-accent)1a' : 'transparent',
+                    background: s.done ? 'color-mix(in srgb, var(--color-accent) 10%, transparent)' : 'transparent',
                     border: `1px solid ${s.done ? 'var(--color-accent)' : 'var(--color-border-light)'}`,
                   }}
                 >

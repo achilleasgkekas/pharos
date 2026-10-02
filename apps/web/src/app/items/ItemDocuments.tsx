@@ -72,7 +72,7 @@ export function ItemDocuments({
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
-        <p className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider" style={{ fontFamily: 'var(--font-mono)' }}>
+        <p className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
           {t('it.documents')} {attachments.length > 0 && `· ${attachments.length}`}
         </p>
         <input
@@ -116,7 +116,7 @@ export function ItemDocuments({
                 </a>
                 {a.size > 0 && (
                   <span
-                    className="text-[10px] text-[color:var(--color-text-faint)] tabular-nums shrink-0"
+                    className="text-[11px] text-[color:var(--color-text-faint)] tabular-nums shrink-0"
                     style={{ fontFamily: 'var(--font-mono)' }}
                   >
                     {fmtSize(a.size)}
@@ -146,7 +146,7 @@ export function ItemDocuments({
         </div>
       )}
       {msg && (
-        <p className="text-[10px] text-[color:var(--color-red)] mt-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
+        <p className="text-[11px] text-[color:var(--color-red)] mt-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
           {msg}
         </p>
       )}

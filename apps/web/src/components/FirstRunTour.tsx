@@ -84,7 +84,7 @@ export function FirstRunTour() {
           <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-4 bg-[color:var(--color-accent)]/15 text-[color:var(--color-accent)]">
             <Icon size={24} />
           </div>
-          <p className="text-[10px] tracking-[0.22em] uppercase text-[color:var(--color-text-faint)] mb-2" style={{ fontFamily: 'var(--font-mono)' }}>
+          <p className="text-[11px] text-[color:var(--color-text-faint)] mb-2" style={{ fontFamily: 'var(--font-mono)' }}>
             {t('tour.title')} · {i + 1}/{steps.length}
           </p>
           <Dialog.Title className="text-xl font-bold leading-tight mb-2" style={{ fontFamily: 'var(--font-display)' }}>

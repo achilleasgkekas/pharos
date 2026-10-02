@@ -244,7 +244,7 @@ function FxCurrencyGroup({ currency, rows, base }: { currency: string; rows: FxI
           {money(total, currency)}
         </p>
         <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="text-[10px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
+          <span className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
             {t('reports.fxRateHint', { code: currency, base })}
           </span>
           <input
@@ -306,7 +306,7 @@ function FxIssueLine({ row, base, fallbackRate }: { row: FxIssueRow; base: strin
     <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-3 py-2">
       <a href={row.href} title={t('reports.fxOpenRecord')} className="min-w-0 flex-1 group">
         <span className="block text-sm text-[color:var(--color-text)] truncate group-hover:text-[color:var(--color-gold)] transition-colors">{row.title}</span>
-        <span className="block text-[10px] text-[color:var(--color-text-faint)] truncate" style={{ fontFamily: 'var(--font-mono)' }}>
+        <span className="block text-[11px] text-[color:var(--color-text-faint)] truncate" style={{ fontFamily: 'var(--font-mono)' }}>
           {t(FX_KIND_KEY[row.kind])}{row.subtitle ? ` · ${row.subtitle}` : ''}
         </span>
       </a>
@@ -379,7 +379,7 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
       aria-busy={periodPending}
     >
       <PageHeader title={t('nav.reports')}>
-        <div className="flex bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg p-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
+        <div className="shrink-0 flex h-10 items-center p-0.5 rounded-[10px] bg-[color:var(--color-surface-2)] border border-[color:var(--color-border-light)]">
           {[6, 12, 24].map((m) => (
             <a
               key={m}
@@ -392,9 +392,9 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
                 setPendingMonths(m);
                 startPeriod(() => router.push(`/reports?months=${m}`, { scroll: false }));
               }}
-              className={`px-2.5 py-1 rounded-md text-xs transition-colors ${shownMonths === m ? 'bg-[color:var(--color-accent)] text-black' : 'text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]'}`}
+              className={`h-full flex items-center px-3 rounded-lg text-sm font-semibold whitespace-nowrap transition-colors ${shownMonths === m ? 'bg-[color:var(--color-surface-3)] text-[color:var(--color-text)]' : 'text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]'}`}
             >
-              {m}mo
+              {t('reports.nMonths', { n: m })}
             </a>
           ))}
         </div>
@@ -408,7 +408,7 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
           reason they stay unfixed. */}
       {fxIssues.length > 0 && (
         <div className="mb-6 rounded-2xl border border-[color:var(--color-gold)]/40 bg-[color:var(--color-gold)]/5 p-5">
-          <p className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.15em] text-[color:var(--color-gold)] mb-1" style={{ fontFamily: 'var(--font-mono)' }}>
+          <p className="flex items-center gap-1.5 text-[11px] text-[color:var(--color-gold)] mb-1" style={{ fontFamily: 'var(--font-mono)' }}>
             <AlertTriangle size={12} /> {t('reports.fxMissing', { n: fxIssues.length })}
           </p>
           <p className="text-[11px] text-[color:var(--color-text-dim)] mb-3" style={{ fontFamily: 'var(--font-mono)' }}>
@@ -428,7 +428,7 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
       <div className="mb-6 rounded-2xl border border-[color:var(--color-border)] bg-gradient-to-br from-[color:var(--color-surface)] to-[color:var(--color-surface-2)] p-5">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="text-[10px] uppercase tracking-[0.15em] text-[color:var(--color-text-faint)] mb-1" style={{ fontFamily: 'var(--font-mono)' }}>{t('reports.netWorth')}</p>
+            <p className="text-[11px] text-[color:var(--color-text-faint)] mb-1" style={{ fontFamily: 'var(--font-mono)' }}>{t('reports.netWorth')}</p>
             <p className="text-3xl md:text-4xl font-bold" style={{ fontFamily: 'var(--font-display)', color: netWorthNow >= 0 ? 'var(--color-accent)' : 'var(--color-red)' }}>
               {money(netWorthNow)}
             </p>
@@ -481,7 +481,7 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
       <div className="mb-6 rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-5">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.15em] text-[color:var(--color-text-faint)] mb-1" style={{ fontFamily: 'var(--font-mono)' }}>
+            <p className="flex items-center gap-1.5 text-[11px] text-[color:var(--color-text-faint)] mb-1" style={{ fontFamily: 'var(--font-mono)' }}>
               <Wallet size={12} /> {t('payments.cashflow')} · {data.safeToSpend.monthLabel}
             </p>
             <p className="max-w-xl mb-3 text-xs leading-relaxed text-[color:var(--color-text-dim)]">{t('payments.cashflowNote')}</p>
@@ -495,7 +495,7 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
           <div className="flex flex-wrap gap-2">
             {data.safeToSpend.windows.map((w) => (
               <div key={w.days} className="rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] px-3 py-2 min-w-[92px]" style={{ fontFamily: 'var(--font-mono)' }}>
-                <span className="block text-[10px] text-[color:var(--color-text-faint)] mb-0.5">{t('reports.stsWindow', { d: w.days })}</span>
+                <span className="block text-[11px] text-[color:var(--color-text-faint)] mb-0.5">{t('reports.stsWindow', { d: w.days })}</span>
                 <span className="block text-sm font-semibold" style={{ color: w.net >= 0 ? 'var(--color-accent)' : 'var(--color-red)' }}>
                   {w.net >= 0 ? '' : '-'}{money(Math.abs(w.net))}
                 </span>
@@ -509,7 +509,7 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
       {/* Month in Review (P3) — deterministic narrative digest (budget/price-hike/
           warranty signals already computed elsewhere, zero AI, zero new queries). */}
       <div className="mb-6 rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-5">
-        <p className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.15em] text-[color:var(--color-text-faint)] mb-2" style={{ fontFamily: 'var(--font-mono)' }}>
+        <p className="flex items-center gap-1.5 text-[11px] text-[color:var(--color-text-faint)] mb-2" style={{ fontFamily: 'var(--font-mono)' }}>
           <Sparkles size={12} /> {t('reports.monthReview')} · {data.monthReview.monthLabel}
         </p>
         <p className="text-sm md:text-base leading-relaxed text-[color:var(--color-text)]">{data.monthReview.narrative}</p>
@@ -667,7 +667,7 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
                         <span
                           title={t('reports.budgetCarriedHint')}
                           style={{ fontFamily: 'var(--font-mono)' }}
-                          className={`text-[10px] px-1.5 py-px rounded ${carried > 0 ? 'text-[color:var(--color-accent)] bg-[color:var(--color-accent)]/10' : 'text-[color:var(--color-red)] bg-[color:var(--color-red)]/10'}`}
+                          className={`text-[11px] px-1.5 py-px rounded ${carried > 0 ? 'text-[color:var(--color-accent)] bg-[color:var(--color-accent)]/10' : 'text-[color:var(--color-red)] bg-[color:var(--color-red)]/10'}`}
                         >
                           {carried > 0 ? '+' : '−'}{money(Math.abs(carried))}
                         </span>
@@ -686,7 +686,7 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
                   {b.projected != null && limit > 0 && (() => {
                     const overPace = b.projected > limit;
                     return (
-                      <div className="mt-1 flex items-center gap-1.5 text-[10px]" style={{ fontFamily: 'var(--font-mono)' }}>
+                      <div className="mt-1 flex items-center gap-1.5 text-[11px]" style={{ fontFamily: 'var(--font-mono)' }}>
                         <span className="text-[color:var(--color-text-faint)]">
                           {t('reports.pace', { x: `~${money(b.projected)}` })}
                         </span>
@@ -842,7 +842,7 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
                       <ShieldCheck size={12} style={{ color: tone }} className="shrink-0" />
                       {w.title}
                     </span>
-                    <span className="text-[10px] shrink-0 tabular-nums" style={{ fontFamily: 'var(--font-mono)', color: tone }}>
+                    <span className="text-[11px] shrink-0 tabular-nums" style={{ fontFamily: 'var(--font-mono)', color: tone }}>
                       {w.days}d · {fmtDate(w.until, locale)}
                     </span>
                   </div>
@@ -861,12 +861,12 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
               {data.biggestPurchases.map((b, i) => (
                 <div key={i} className="flex items-center justify-between gap-2 bg-[color:var(--color-surface-2)] rounded-lg px-3 py-2">
                   <span className="flex items-center gap-2 text-xs truncate">
-                    <span className="text-[10px] text-[color:var(--color-text-faint)] tabular-nums w-4" style={{ fontFamily: 'var(--font-mono)' }}>
+                    <span className="text-[11px] text-[color:var(--color-text-faint)] tabular-nums w-4" style={{ fontFamily: 'var(--font-mono)' }}>
                       {i + 1}
                     </span>
                     <Store size={12} className="text-[color:var(--color-text-faint)] shrink-0" />
                     <span className="truncate">{b.store}</span>
-                    {b.date && <span className="text-[10px] text-[color:var(--color-text-faint)] shrink-0">{fmtDate(b.date, locale)}</span>}
+                    {b.date && <span className="text-[11px] text-[color:var(--color-text-faint)] shrink-0">{fmtDate(b.date, locale)}</span>}
                   </span>
                   <span className="text-xs font-bold text-[color:var(--color-accent)] shrink-0 tabular-nums" style={{ fontFamily: 'var(--font-mono)' }}>
                     {money(b.total)}
@@ -893,14 +893,14 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
                       {p.linked && <Layers size={11} className="text-[color:var(--color-accent)] shrink-0" />}
                       {p.label}
                     </span>
-                    <span className="text-[10px] text-[color:var(--color-text-faint)] shrink-0 tabular-nums" style={{ fontFamily: 'var(--font-mono)' }}>
+                    <span className="text-[11px] text-[color:var(--color-text-faint)] shrink-0 tabular-nums" style={{ fontFamily: 'var(--font-mono)' }}>
                       {p.paidInstallments}/{p.totalInstallments}
                     </span>
                   </div>
                   <div className="h-1.5 bg-[color:var(--color-surface-2)] rounded-full overflow-hidden">
                     <div className="h-full rounded-full" style={{ width: `${pct}%`, background: p.done ? 'var(--color-accent)' : 'var(--color-purple)' }} />
                   </div>
-                  <div className="flex items-center justify-between text-[10px] text-[color:var(--color-text-faint)] mt-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
+                  <div className="flex items-center justify-between text-[11px] text-[color:var(--color-text-faint)] mt-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
                     <span>{money(p.perAmount)}/mo</span>
                     <span>{p.done ? 'paid off ✓' : `${money(p.remainingAmount)} left`}</span>
                   </div>
@@ -933,7 +933,7 @@ function GoalsCard({ goals, className }: { goals: GoalRow[]; className?: string 
   return (
     <div className={`bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-2xl p-5 ${className ?? ''}`}>
       <div className="flex items-center justify-between mb-4">
-        <h2 className="flex items-center gap-1.5 text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-[0.15em]" style={{ fontFamily: 'var(--font-mono)' }}>
+        <h2 className="flex items-center gap-1.5 text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
           <Target size={12} /> {t('reports.cGoals')}
         </h2>
         <button
@@ -978,15 +978,15 @@ function NewGoalForm({ onDone }: { onDone: () => void }) {
   return (
     <form action={submit} className="mb-4 p-3 rounded-xl bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] flex flex-wrap gap-2 items-end">
       <div className="flex-1 min-w-[140px]">
-        <label className="block text-[10px] text-[color:var(--color-text-faint)] mb-1">{t('reports.gTitle')}</label>
+        <label className="block text-[11px] text-[color:var(--color-text-faint)] mb-1">{t('reports.gTitle')}</label>
         <input name="title" required placeholder={t('reports.gTitlePlaceholder')} className="w-full bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-lg px-2.5 py-1.5 text-xs text-[color:var(--color-text)] focus:outline-none focus:border-[color:var(--color-accent)]" />
       </div>
       <div className="w-28">
-        <label className="block text-[10px] text-[color:var(--color-text-faint)] mb-1">{t('reports.gTarget')} ({cur()})</label>
+        <label className="block text-[11px] text-[color:var(--color-text-faint)] mb-1">{t('reports.gTarget')} ({cur()})</label>
         <input name="targetAmount" type="number" min="0" step="0.01" required className="w-full bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-lg px-2.5 py-1.5 text-xs text-[color:var(--color-text)] focus:outline-none focus:border-[color:var(--color-accent)]" />
       </div>
       <div className="w-36">
-        <label className="block text-[10px] text-[color:var(--color-text-faint)] mb-1">{t('reports.gDeadline')}</label>
+        <label className="block text-[11px] text-[color:var(--color-text-faint)] mb-1">{t('reports.gDeadline')}</label>
         <DateInput name="targetDate" value={targetDate} onValueChange={setTargetDate} className="!text-xs !py-1.5 pr-8" />
       </div>
       <button type="submit" disabled={pending} className="text-xs px-3 py-1.5 rounded-lg bg-[color:var(--color-accent)] text-black font-semibold hover:opacity-90 disabled:opacity-50">
@@ -1027,9 +1027,9 @@ function GoalItem({ g }: { g: GoalRow }) {
         <div className="min-w-0">
           <p className="text-xs font-semibold truncate flex items-center gap-1.5">
             {g.title}
-            {g.done && <span className="text-[10px] px-1.5 py-px rounded bg-[color:var(--color-accent)]/15 text-[color:var(--color-accent)]">{t('reports.gReached')}</span>}
+            {g.done && <span className="text-[11px] px-1.5 py-px rounded bg-[color:var(--color-accent)]/15 text-[color:var(--color-accent)]">{t('reports.gReached')}</span>}
           </p>
-          {g.category && <p className="text-[10px] text-[color:var(--color-text-faint)] mt-0.5">{g.category}</p>}
+          {g.category && <p className="text-[11px] text-[color:var(--color-text-faint)] mt-0.5">{g.category}</p>}
         </div>
         <button onClick={remove} disabled={pending} className="shrink-0 text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] transition-colors">
           <Trash2 size={13} />
@@ -1040,13 +1040,13 @@ function GoalItem({ g }: { g: GoalRow }) {
         <div className="h-full rounded-full transition-all" style={{ width: `${Math.max(g.pct, g.current > 0 ? 3 : 0)}%`, background: g.done ? 'var(--color-accent)' : 'var(--color-cyan)' }} />
       </div>
 
-      <div className="flex items-center justify-between text-[10px] text-[color:var(--color-text-dim)] mb-2" style={{ fontFamily: 'var(--font-mono)' }}>
+      <div className="flex items-center justify-between text-[11px] text-[color:var(--color-text-dim)] mb-2" style={{ fontFamily: 'var(--font-mono)' }}>
         <span>{money(g.current)} / {money(g.target)}</span>
         <span>{g.pct}%</span>
       </div>
 
       {!g.done && g.perMonth != null && (
-        <p className="text-[10px] text-[color:var(--color-text-faint)] mb-2">{t('reports.gPerMonth', { x: money(g.perMonth) })}</p>
+        <p className="text-[11px] text-[color:var(--color-text-faint)] mb-2">{t('reports.gPerMonth', { x: money(g.perMonth) })}</p>
       )}
 
       {!g.done && (
@@ -1099,7 +1099,7 @@ function SweepToGoal({ category, monthKey, amount, goals }: { category: string; 
       <button
         onClick={() => setOpen(true)}
         title={t('reports.sweepHint')}
-        className="mt-1 flex items-center gap-1 text-[10px] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-accent)] transition-colors"
+        className="mt-1 flex items-center gap-1 text-[11px] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-accent)] transition-colors"
         style={{ fontFamily: 'var(--font-mono)' }}
       >
         <Target size={10} /> {t('reports.sweepOffer', { x: label })}
@@ -1133,7 +1133,7 @@ function SweepToGoal({ category, monthKey, amount, goals }: { category: string; 
       >
         <X size={12} />
       </button>
-      {error && <p className="w-full text-[10px] text-[color:var(--color-red)]">{error}</p>}
+      {error && <p className="w-full text-[11px] text-[color:var(--color-red)]">{error}</p>}
     </div>
   );
 }
@@ -1141,14 +1141,14 @@ function SweepToGoal({ category, monthKey, amount, goals }: { category: string; 
 function Stat({ icon, label, value, sub, accent }: { icon: React.ReactNode; label: string; value: string; sub: string; accent?: string }) {
   return (
     <div className="bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-xl p-4">
-      <div className="flex items-center gap-1.5 text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider mb-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
+      <div className="flex items-center gap-1.5 text-[11px] text-[color:var(--color-text-faint)] mb-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
         {icon}
         {label}
       </div>
       <div className="text-2xl font-bold tracking-tight" style={{ fontFamily: 'var(--font-display)', color: accent }}>
         {value}
       </div>
-      <div className="text-[10px] text-[color:var(--color-text-faint)] mt-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
+      <div className="text-[11px] text-[color:var(--color-text-faint)] mt-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
         {sub}
       </div>
     </div>
@@ -1158,7 +1158,7 @@ function Stat({ icon, label, value, sub, accent }: { icon: React.ReactNode; labe
 function Card({ title, children, className }: { title: string; children: React.ReactNode; className?: string }) {
   return (
     <div className={`bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-2xl p-5 ${className ?? ''}`}>
-      <h2 className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-[0.15em] mb-4" style={{ fontFamily: 'var(--font-mono)' }}>
+      <h2 className="text-[11px] text-[color:var(--color-text-faint)] mb-4" style={{ fontFamily: 'var(--font-mono)' }}>
         {title}
       </h2>
       {children}
@@ -1168,5 +1168,6 @@ function Card({ title, children, className }: { title: string; children: React.R
 
 function Empty({ text }: { text?: string }) {
   const t = useT();
-  return <div className="h-[180px] flex items-center justify-center text-xs text-[color:var(--color-text-faint)]">{text ?? t('reports.noData')}</div>;
+  // Short: an empty chart is a line of text, not a chart-sized hole in the page.
+  return <div className="h-20 flex items-center justify-center text-center text-xs text-[color:var(--color-text-faint)]">{text ?? t('reports.noData')}</div>;
 }

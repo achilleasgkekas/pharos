@@ -21,7 +21,7 @@ export default function NotFound() {
         </div>
 
         <p
-          className="mb-4 text-[11px] uppercase tracking-[0.18em] text-[color:var(--color-text-faint)]"
+          className="mb-4 text-[11px] text-[color:var(--color-text-faint)]"
           style={{ fontFamily: 'var(--font-mono)' }}
         >
           Error 404 · off the map

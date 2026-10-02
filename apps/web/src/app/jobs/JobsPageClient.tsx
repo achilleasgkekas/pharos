@@ -89,7 +89,7 @@ export function JobsPageClient({
 
       {/* Start a job */}
       <div className="rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-4 mb-6">
-        <p className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)] mb-3" style={{ fontFamily: 'var(--font-mono)' }}>{t('jobs.startSection')}</p>
+        <p className="text-[11px] text-[color:var(--color-text-faint)] mb-3" style={{ fontFamily: 'var(--font-mono)' }}>{t('jobs.startSection')}</p>
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-2.5 min-w-0">
             <span className="grid place-items-center w-9 h-9 rounded-xl bg-[color:var(--color-cyan)]/10 text-[color:var(--color-cyan)] shrink-0">
@@ -135,7 +135,7 @@ export function JobsPageClient({
                       <span className="text-sm font-semibold text-[color:var(--color-text)] truncate" style={{ fontFamily: 'var(--font-body)' }}>{j.title}</span>
                       <StatusBadge status={j.status} />
                     </div>
-                    <div className="text-[10px] text-[color:var(--color-text-faint)]">
+                    <div className="text-[11px] text-[color:var(--color-text-faint)]">
                       {kindLabel} · {running ? t('jobs.started', { ago: relTime(j.createdAt, t) }) : j.finishedAt ? t('jobs.finished', { ago: relTime(j.finishedAt, t) }) : relTime(j.createdAt, t)}
                     </div>
                   </div>
@@ -150,21 +150,21 @@ export function JobsPageClient({
                     style={{ width: `${pct}%` }}
                   />
                 </div>
-                <div className="flex items-center justify-between text-[10px] text-[color:var(--color-text-faint)]">
+                <div className="flex items-center justify-between text-[11px] text-[color:var(--color-text-faint)]">
                   <span>
                     {j.done}/{j.total}{!running && j.total > 0 ? ` · ${t('jobs.okCount', { n: j.ok })}` : ''}
                   </span>
                   {running && <span className="truncate max-w-[55%]">{j.current ? `↻ ${j.current}` : t('jobs.starting')}</span>}
                 </div>
-                {j.error && <p className="mt-1 text-[10px] text-[color:var(--color-red)] truncate">{j.error}</p>}
+                {j.error && <p className="mt-1 text-[11px] text-[color:var(--color-red)] truncate">{j.error}</p>}
                 {!j.error && j.lastLabel && (
-                  <div className="flex items-center gap-1 mt-1 text-[10px] truncate">
+                  <div className="flex items-center gap-1 mt-1 text-[11px] truncate">
                     {j.lastOk ? <CheckCircle2 size={10} className="text-[color:var(--color-accent)] shrink-0" /> : <XCircle size={10} className="text-[color:var(--color-red)] shrink-0" />}
                     <span className="text-[color:var(--color-text-dim)] truncate">{j.lastLabel}{j.lastDetail ? ` — ${j.lastDetail}` : ''}</span>
                   </div>
                 )}
                 {j.aiStats && j.aiStats.runs > 0 && (
-                  <div className="flex items-center gap-1.5 mt-1.5 text-[10px] text-[color:var(--color-accent)] font-mono">
+                  <div className="flex items-center gap-1.5 mt-1.5 text-[11px] text-[color:var(--color-accent)] font-mono">
                     <Zap size={11} className="shrink-0" />
                     <span>
                       ${(j.aiStats.costMicros / 1_000_000).toFixed(4)} USD · {j.aiStats.tokens.toLocaleString()} tokens ({j.aiStats.runs} AI calls)
@@ -229,14 +229,14 @@ function JobDetailView({ d }: { d: JobDetail }) {
 
       <div>
         <div className="flex items-center justify-between mb-1.5">
-          <p className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
+          <p className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
             {hasOutcomes ? (failedOnly ? t('jobs.failedN', { n: failedResults.length }) : t('jobs.items', { n: baseRows.length })) : t('jobs.workList', { n: d.itemCount })}
           </p>
           {hasOutcomes && failedResults.length > 0 && (
             <button
               onClick={() => setFailedOnly((v) => !v)}
               className={cn(
-                'text-[10px] px-2 py-0.5 rounded-full border transition-colors',
+                'text-[11px] px-2 py-0.5 rounded-full border transition-colors',
                 failedOnly
                   ? 'border-[color:var(--color-red)]/40 text-[color:var(--color-red)] bg-[color:var(--color-red)]/10'
                   : 'border-[color:var(--color-border)] text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]'
@@ -264,7 +264,7 @@ function JobDetailView({ d }: { d: JobDetail }) {
                     <div className="text-xs text-[color:var(--color-text)] break-words">{r.label || '—'}</div>
                     {r.detail && (
                       <div
-                        className={cn('text-[10px] break-words mt-0.5', bad ? 'text-[color:var(--color-red)]' : 'text-[color:var(--color-text-faint)]')}
+                        className={cn('text-[11px] break-words mt-0.5', bad ? 'text-[color:var(--color-red)]' : 'text-[color:var(--color-text-faint)]')}
                         style={{ fontFamily: 'var(--font-mono)' }}
                       >
                         {bad ? '⚠ ' : ''}{r.detail}
@@ -277,7 +277,7 @@ function JobDetailView({ d }: { d: JobDetail }) {
           </div>
         )}
         {!hasOutcomes && d.status !== 'running' && (
-          <p className="text-[10px] text-[color:var(--color-text-faint)] mt-1.5">{t('jobs.olderJob')}</p>
+          <p className="text-[11px] text-[color:var(--color-text-faint)] mt-1.5">{t('jobs.olderJob')}</p>
         )}
       </div>
     </div>
@@ -288,7 +288,7 @@ function Stat({ label, value, tone }: { label: string; value: number; tone?: 'ok
   return (
     <div className={cn('rounded-lg border px-3 py-2 text-center', tone === 'ok' ? 'border-[color:var(--color-accent)]/30 bg-[color:var(--color-accent)]/5' : tone === 'bad' ? 'border-[color:var(--color-red)]/30 bg-[color:var(--color-red)]/5' : 'border-[color:var(--color-border)]')}>
       <div className={cn('text-xl font-bold', tone === 'ok' ? 'text-[color:var(--color-accent)]' : tone === 'bad' ? 'text-[color:var(--color-red)]' : 'text-[color:var(--color-text)]')} style={{ fontFamily: 'var(--font-display)' }}>{value}</div>
-      <div className="text-[10px] uppercase tracking-wide text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>{label}</div>
+      <div className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>{label}</div>
     </div>
   );
 }
@@ -296,8 +296,8 @@ function Stat({ label, value, tone }: { label: string; value: number; tone?: 'ok
 function StatusBadge({ status }: { status: 'running' | 'done' | 'error' }) {
   const t = useT();
   if (status === 'running')
-    return <span className="flex items-center gap-1 text-[10px] text-[color:var(--color-accent)]"><Loader2 size={10} className="animate-spin" /> {t('jobs.running')}</span>;
+    return <span className="flex items-center gap-1 text-[11px] text-[color:var(--color-accent)]"><Loader2 size={10} className="animate-spin" /> {t('jobs.running')}</span>;
   if (status === 'error')
-    return <span className="flex items-center gap-1 text-[10px] text-[color:var(--color-red)]"><XCircle size={10} /> {t('jobs.error')}</span>;
-  return <span className="flex items-center gap-1 text-[10px] text-[color:var(--color-text-faint)]"><CheckCircle2 size={10} className="text-[color:var(--color-accent)]" /> {t('jobs.done')}</span>;
+    return <span className="flex items-center gap-1 text-[11px] text-[color:var(--color-red)]"><XCircle size={10} /> {t('jobs.error')}</span>;
+  return <span className="flex items-center gap-1 text-[11px] text-[color:var(--color-text-faint)]"><CheckCircle2 size={10} className="text-[color:var(--color-accent)]" /> {t('jobs.done')}</span>;
 }

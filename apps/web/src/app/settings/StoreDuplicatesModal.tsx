@@ -121,9 +121,9 @@ export function StoreDuplicatesModal({ open, onClose }: { open: boolean; onClose
                           <span className="min-w-0 flex-1">
                             <span className="flex items-center gap-1.5 text-xs font-medium truncate">
                               {v.name}
-                              {isKeep && <span className="text-[9px] uppercase tracking-wider text-[color:var(--color-accent)]">{t('dup.keep')}</span>}
+                              {isKeep && <span className="text-[10px] text-[color:var(--color-accent)]">{t('dup.keep')}</span>}
                             </span>
-                            <span className="block text-[10px] text-[color:var(--color-text-faint)] truncate" style={{ fontFamily: 'var(--font-mono)' }}>
+                            <span className="block text-[11px] text-[color:var(--color-text-faint)] truncate" style={{ fontFamily: 'var(--font-mono)' }}>
                               {t('sd.variantStats', { receipts: v.receiptCount, items: v.itemCount })}
                               {v.inList ? ` · ${t('sd.inList')}` : ''}
                             </span>
