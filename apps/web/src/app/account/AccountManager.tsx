@@ -111,8 +111,11 @@ function SectionCard({
  * so there is one place for settings). `panel` picks the page: your profile and sign-in, or
  * the notifications that reach you personally.
  */
-export function AccountManager({ initialData, panel }: { initialData: AccountData; panel: 'account' | 'notifications' }) {
+export function AccountManager({ initialData, panel }: { initialData: AccountData; panel: 'account' | 'notifications' | 'topics' | 'channels' }) {
   const [account, setAccount] = useState<AccountData>(initialData);
+  // The Notifications page shows these two apart: what you follow first, where it lands later.
+  if (panel === 'topics') return <AlertTopicsSection account={account} onUpdate={(updated) => setAccount(updated)} />;
+  if (panel === 'channels') return <NotificationChannelsSection account={account} />;
   if (panel === 'notifications') {
     return (
       <div className="space-y-4">

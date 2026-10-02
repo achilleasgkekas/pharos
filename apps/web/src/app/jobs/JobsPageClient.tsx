@@ -7,6 +7,7 @@ import {
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { PAGE_MAIN, PageHeader, HeaderButton } from '@/components/ui/PageHeader';
+import { ActivityTabs } from '@/components/ui/ActivityTabs';
 import { Modal } from '@/components/ui/Modal';
 import { cn } from '@/components/ui/cn';
 import { getJobs, enqueueOnedriveSync, dismissJob, getJobDetail, type JobRow, type JobDetail, type JobItemResult } from '@/app/jobActions';
@@ -86,6 +87,7 @@ export function JobsPageClient({
           {t('common.refresh')}
         </HeaderButton>
       </PageHeader>
+      <ActivityTabs />
 
       {/* Start a job */}
       <div className="rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-4 mb-6">

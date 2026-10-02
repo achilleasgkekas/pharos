@@ -34,6 +34,14 @@ type Row = {
   savedId?: string;
 };
 
+const MAX_BYTES = 15 * 1024 * 1024;
+
+/** React masks a server error in production ("Minified React error #441"); say what it means. */
+function readable(e: unknown, fallback: string): string {
+  const msg = String((e as Error)?.message || e);
+  return /Minified React error|Server Components render|digest/i.test(msg) ? fallback : msg;
+}
+
 const fd = (file: File, extra: Record<string, string> = {}) => {
   const f = new FormData();
   f.set('file', file);
@@ -75,10 +83,14 @@ export function InboxDrop() {
     const list = Array.from(files ?? []).slice(0, 10);
     for (const file of list) {
       const id = nextId.current++;
+      if (file.size > MAX_BYTES) {
+        setRows((rs) => [...rs, { id, file, state: 'error', error: t('inbox.tooLarge') }]);
+        continue;
+      }
       setRows((rs) => [...rs, { id, file, state: 'reading' }]);
       classifyInboxFile(fd(file)).then(
         (r) => (r.ok ? patch(id, { state: 'ready', guess: r.guess }) : patch(id, { state: 'error', error: r.error })),
-        (e) => patch(id, { state: 'error', error: String((e as Error)?.message || e) })
+        (e) => patch(id, { state: 'error', error: readable(e, t('inbox.serverError')) })
       );
     }
   }
@@ -93,7 +105,7 @@ export function InboxDrop() {
         router.refresh();
       } else patch(row.id, { state: 'ready', error: r.error || t('inbox.saveFailed') });
     } catch (e) {
-      patch(row.id, { state: 'ready', error: String((e as Error)?.message || e) });
+      patch(row.id, { state: 'ready', error: readable(e, t('inbox.serverError')) });
     }
   }
 

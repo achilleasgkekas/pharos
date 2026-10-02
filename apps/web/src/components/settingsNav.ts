@@ -5,12 +5,10 @@
 import type { LucideIcon } from 'lucide-react';
 import {
   Activity,
-  Bell,
   BellRing,
   CreditCard,
   Database,
   HardDrive,
-  History,
   MessageSquareCode,
   Palette,
   Plug,
@@ -22,16 +20,14 @@ import {
   TrendingDown,
   Upload,
   UserRound,
-  Users,
 } from 'lucide-react';
 import type { TKey } from '@/lib/i18n';
 
 export type SettingsTabId =
   | 'account'
   | 'appearance'
-  | 'my-notifications'
+  | 'notifications'
   | 'general'
-  | 'alerts'
   | 'categories'
   | 'stores'
   | 'cards'
@@ -41,10 +37,7 @@ export type SettingsTabId =
   | 'storage'
   | 'backups'
   | 'import'
-  | 'notifications'
   | 'integrations'
-  | 'users'
-  | 'activity'
   | 'system'
   | 'about';
 
@@ -62,16 +55,16 @@ export const SETTINGS_GROUPS: { label: TKey; tabs: SettingsTab[] }[] = [
   {
     label: 'set.grpYou',
     tabs: [
-      { id: 'account', label: 'set.tabAccount', desc: 'set.descAccount', icon: UserRound },
+      { id: 'account', label: 'set.tabAccount', desc: 'set.descAccountPeople', icon: UserRound },
       { id: 'appearance', label: 'set.tabAppearance', desc: 'set.descAppearance', icon: Palette },
-      { id: 'my-notifications', label: 'set.tabMyNotifications', desc: 'set.descMyNotifications', icon: BellRing },
+      // One page for everything that reaches you: what, how early, and where (#notifications).
+      { id: 'notifications', label: 'set.tabNotifications', desc: 'set.descNotifications', icon: BellRing },
     ],
   },
   {
     label: 'set.grpWorkspace',
     tabs: [
       { id: 'general', label: 'set.tabGeneral', desc: 'set.descGeneral', icon: SlidersHorizontal },
-      { id: 'alerts', label: 'set.tabAlerts', desc: 'set.descAlerts', icon: Bell },
       { id: 'categories', label: 'set.tabCategories', desc: 'set.descCategories', icon: Tags },
       { id: 'stores', label: 'set.tabStores', desc: 'set.descStores', icon: Store },
       { id: 'cards', label: 'set.tabCards', desc: 'set.descCards', icon: CreditCard },
@@ -96,16 +89,12 @@ export const SETTINGS_GROUPS: { label: TKey; tabs: SettingsTab[] }[] = [
   {
     label: 'set.grpConnect',
     tabs: [
-      { id: 'notifications', label: 'set.tabChannels', desc: 'set.descChannels', icon: Bell },
       { id: 'integrations', label: 'set.tabIntegrations', desc: 'set.descIntegrations', icon: Plug },
     ],
   },
   {
     label: 'set.grpAdmin',
     tabs: [
-      { id: 'users', label: 'set.tabUsersAccess', desc: 'set.descUsers', icon: Users, adminOnly: true },
-      // P89 (#23): who added or trashed what. Every role may read it.
-      { id: 'activity', label: 'set.tabActivity', desc: 'set.descActivity', icon: History, multiUserOnly: true },
       // P77: host-level numbers (Mongo latency, volume free space, job queue).
       { id: 'system', label: 'set.tabSystem', desc: 'set.descSystem', icon: Activity, adminOnly: true },
       { id: 'about', label: 'set.tabAbout', desc: 'set.descAbout', icon: Server },
@@ -135,6 +124,13 @@ export function normalizeSettingsTab(raw: string | null | undefined): SettingsTa
     budget: 'general',
     theme: 'appearance',
     language: 'appearance',
+    // Merged pages: personal notifications, alert lead times and shared channels are one
+    // Notifications page; people and their activity sit on Account.
+    'my-notifications': 'notifications',
+    alerts: 'notifications',
+    channels: 'notifications',
+    users: 'account',
+    activity: 'account',
   };
   return ALIASES[raw] ?? null;
 }
