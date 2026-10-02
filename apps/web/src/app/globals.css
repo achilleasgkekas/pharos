@@ -145,10 +145,53 @@ html[data-sidebar='collapsed'] .sb-foot > * {
   to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
 }
 
-/* Beacon Sweep — a lighthouse beam rotates behind the AI bar while it's open. */
-@keyframes pharos-beam-spin {
-  to { transform: rotate(360deg); }
+/* Pharos scene behind the open AI bar (components/PharosScene). The beam is a long wedge
+   from the lamp; the loop sets its length, side, tilt and brightness. */
+.pharos-beam {
+  width: 150vmax;
+  height: 34vmax;
+  transform-origin: 0 50%;
+  clip-path: polygon(0 48.5%, 100% 0, 100% 100%, 0 51.5%);
+  background: linear-gradient(90deg,
+    color-mix(in srgb, #fff 70%, var(--color-cyan)) 0%,
+    color-mix(in srgb, var(--color-cyan) 45%, transparent) 14%,
+    color-mix(in srgb, var(--color-cyan) 14%, transparent) 45%,
+    transparent 80%);
+  mix-blend-mode: screen;
+  will-change: transform, opacity;
 }
+:root[data-theme="light"] .pharos-beam { mix-blend-mode: multiply; }
+.pharos-halo {
+  width: 120px;
+  height: 120px;
+  border-radius: 9999px;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(circle, color-mix(in srgb, #fff 85%, var(--color-cyan)) 0%, color-mix(in srgb, var(--color-cyan) 45%, transparent) 22%, transparent 65%);
+  will-change: transform, opacity;
+}
+.pharos-tower { left: 8%; }
+/* On a computer the sidebar stays lit, so the lighthouse stands in the page beside it. */
+@media (min-width: 1024px) { .pharos-tower { left: calc(var(--sidebar-w) + 6vw); } }
+.pharos-fog {
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--color-text) 9%, transparent), transparent);
+  filter: blur(18px);
+  animation: pharos-fog-drift 26s ease-in-out infinite alternate;
+}
+.pharos-fog-2 { animation-duration: 34s; animation-direction: alternate-reverse; }
+.pharos-wave { animation: pharos-wave 14s linear infinite; }
+.pharos-wave-2 { animation-duration: 9s; animation-direction: reverse; }
+@keyframes pharos-fog-drift {
+  from { transform: translateX(-6vw); }
+  to { transform: translateX(8vw); }
+}
+@keyframes pharos-wave {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pharos-fog, .pharos-wave { animation: none; }
+}
+
 /* Beacon pulse — an expanding ring radiating from the AI (Sparkles) toggle. */
 @keyframes pharos-beacon-pulse {
   0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-cyan) 60%, transparent); }

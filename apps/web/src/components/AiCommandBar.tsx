@@ -11,6 +11,7 @@ import { searchAll, type SearchHit } from '@/app/search-actions';
 import { cn } from '@/components/ui/cn';
 import { useLocale, useT } from './LocaleProvider';
 import { useSpeechInput } from './useSpeechInput';
+import { PharosScene } from './PharosScene';
 
 type Msg = ChatTurn & { actions?: { name: string; summary: string }[]; error?: boolean };
 type Mode = 'search' | 'ai';
@@ -193,6 +194,8 @@ export function AiCommandBar({ compact = false }: { compact?: boolean } = {}) {
   }
 
   const isAi = mode === 'ai';
+  // Each answer flashes the lighthouse once.
+  const answers = messages.filter((m) => m.role === 'assistant').length;
   // Beacon = AI mode + open: lightly light the page, float the bar to centre, and
   // sweep a lighthouse beam behind it (see the beacon backdrop + pulse rings below).
   const spotlight = isAi && open;
@@ -229,15 +232,18 @@ export function AiCommandBar({ compact = false }: { compact?: boolean } = {}) {
           aria-hidden
         />
       )}
-      {/* Beacon backdrop — a light dim only, no blur: the page stays alive behind the
-          sweeping beam. Click to close. */}
+      {/* Beacon backdrop: the page dims to a night sea with the lighthouse, whose beam
+          listens (turns to the box while you type, spins while the AI thinks, flashes on the
+          answer). Click to close. */}
       {spotlight && (
         <div
-          className="fixed inset-0 z-40 bg-[color:var(--color-bg)]/35"
-          style={{ animation: 'pharos-fade-in .15s ease-out' }}
+          className="fixed inset-0 z-40 bg-[color:var(--color-bg)]/80"
+          style={{ animation: 'pharos-fade-in .2s ease-out' }}
           onMouseDown={() => setOpen(false)}
           aria-hidden
-        />
+        >
+          <PharosScene mode={aiPending ? 'think' : value.trim() || speech.listening ? 'listen' : 'idle'} flashKey={answers} target={wrapRef} />
+        </div>
       )}
       <div
         ref={wrapRef}
@@ -254,24 +260,6 @@ export function AiCommandBar({ compact = false }: { compact?: boolean } = {}) {
       >
       {/* Bar */}
       <div className="relative group">
-        {/* Beacon Sweep — a rotating lighthouse beam radiates from behind the floating
-            bar (conic gradient on the PHAROS palette, masked to a soft halo). */}
-        {spotlight && (
-          <div
-            aria-hidden
-            className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[480px] h-[480px] overflow-hidden rounded-full"
-            style={{ maskImage: 'radial-gradient(circle, #000 6%, transparent 60%)', WebkitMaskImage: 'radial-gradient(circle, #000 6%, transparent 60%)' }}
-          >
-            <div
-              className="absolute inset-[-25%]"
-              style={{
-                background:
-                  'conic-gradient(from 0deg, transparent 0deg, color-mix(in srgb, var(--color-cyan) 34%, transparent) 12deg, color-mix(in srgb, var(--color-accent) 22%, transparent) 24deg, transparent 46deg, transparent 188deg, color-mix(in srgb, var(--color-purple) 16%, transparent) 202deg, transparent 224deg)',
-                animation: 'pharos-beam-spin 7s linear infinite',
-              }}
-            />
-          </div>
-        )}
         {/* Soft accent glow in AI mode (calmer when floating) */}
         {isAi && (
           <div className="absolute -inset-[1.5px] rounded-2xl bg-gradient-to-r from-[color:var(--color-accent)] via-[color:var(--color-cyan)] to-[color:var(--color-purple)] opacity-40 group-focus-within:opacity-75 blur-[2px] transition-opacity" />
