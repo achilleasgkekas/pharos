@@ -1,437 +1,419 @@
 'use client';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { usePathname, useSearchParams } from 'next/navigation';
+import { Suspense, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import {
-  ChevronDown,
-  Sun,
-  Moon,
+  ChevronLeft,
+  ChevronRight,
   Settings,
   LogOut,
-  UserRound,
   Activity,
   MessageSquare,
   Trash2,
   Home,
   Wallet,
-  CalendarDays,
   Plus,
-  Menu,
-  Search,
-  X,
   Receipt,
   ShoppingBasket,
   ArrowRight,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from 'lucide-react';
 import { cn } from './ui/cn';
 import { Modal } from './ui/Modal';
-import { useTheme } from './ThemeProvider';
 import { PharosMark } from './PharosMark';
 import { AiCommandBar } from './AiCommandBar';
 import { logoutAction } from '@/app/login/actions';
 import { useT } from './LocaleProvider';
-import { LanguageSwitcher } from './LanguageSwitcher';
 import { NotificationBell } from './NotificationBell';
+import { useAttributionNames } from './CreatedBy';
 import type { Role } from '@/lib/roles';
-import {
-  NAV_GROUPS,
-  MONEY_LINKS,
-  ACCOUNT_LINKS,
-  ALL_NAV_ITEMS,
-  navActive,
-  type NavGroup,
-} from '@/lib/nav';
+import type { TKey } from '@/lib/i18n';
+import { NAV_GROUPS, HOME_ITEM, navActive, navGroupOf, type NavGroup } from '@/lib/nav';
+import { normalizeSettingsTab, settingsHref, visibleSettingsGroups } from './settingsNav';
 
 type SessionUser = { name: string; role: Role };
 
-function NavGroupDropdown({ group }: { group: NavGroup }) {
-  const t = useT();
-  const pathname = usePathname();
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  const active = group.links.some((l) => navActive(pathname, l.href));
+/*
+ * The app shell (redesign, docs/ui-conventions.md):
+ *  - computer: a sidebar with every page by section (collapsible to icons), and a top bar
+ *    with search, the bell and the account menu. In Settings the sidebar lists the settings.
+ *  - phone: a top bar, the current section's pages as tabs under it, and a section bar at
+ *    the bottom (Home, Money, Shopping, House, Planner). No "More" page.
+ */
 
-  useEffect(() => {
-    function onDown(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    }
-    document.addEventListener('mousedown', onDown);
-    return () => document.removeEventListener('mousedown', onDown);
-  }, []);
+const LAST_KEY = (g: NavGroup) => `pharos.nav.last:${g.key}`;
+const LAST_EVENT = 'pharos:nav-last';
+const SIDEBAR_EVENT = 'pharos:sidebar';
 
+/** Subscribe to one of the shell's own window events (a stored choice that changed). */
+function onEvent(name: string) {
+  return (cb: () => void) => {
+    window.addEventListener(name, cb);
+    return () => window.removeEventListener(name, cb);
+  };
+}
+const subscribeSidebar = onEvent(SIDEBAR_EVENT);
+const subscribeLast = onEvent(LAST_EVENT);
+const sidebarCollapsed = () => document.documentElement.getAttribute('data-sidebar') === 'collapsed';
+/** The last page of every section, as one string so the snapshot compares by value. */
+function lastPagesSnapshot(): string {
+  try {
+    return NAV_GROUPS.map((g) => localStorage.getItem(LAST_KEY(g)) ?? '').join('\n');
+  } catch {
+    return '';
+  }
+}
+
+function initials(name: string): string {
+  const parts = name.trim().split(/[\s._-]+/).filter(Boolean);
+  const s = parts.length > 1 ? parts[0][0] + parts[1][0] : name.slice(0, 2);
+  return (s || 'U').toUpperCase();
+}
+
+// ─── Sidebar (computer) ─────────────────────────────────────────────────────
+
+function SidebarLink({ item, label, active }: { item: { href: string; icon: React.ComponentType<{ size?: number; className?: string }> }; label: string; active: boolean }) {
+  const Icon = item.icon;
   return (
-    <div ref={ref} className="relative">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className={cn(
-          'flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-sm font-medium transition-all',
-          active
-            ? 'text-[color:var(--color-accent)]'
-            : 'text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface)]'
-        )}
-      >
-        {t(group.key)}
-        <ChevronDown size={13} className={cn('transition-transform', open && 'rotate-180')} />
-      </button>
-      {open && (
-        <div className="absolute right-0 top-full mt-1 z-50 min-w-44 rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] shadow-2xl shadow-black/40 p-1">
-          {group.links.map((l) => {
-            const Icon = l.icon;
-            const isActive = navActive(pathname, l.href);
-            return (
-              <Link
-                key={l.href}
-                href={l.href}
-                prefetch={false}
-                onClick={() => setOpen(false)}
-                className={cn(
-                  'flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm transition-colors',
-                  isActive
-                    ? 'text-[color:var(--color-accent)] bg-[color:var(--color-surface-2)]'
-                    : 'text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface-2)]'
-                )}
-              >
-                <Icon size={15} /> {t(l.key)}
-              </Link>
-            );
-          })}
-        </div>
+    <Link
+      href={item.href}
+      prefetch={false}
+      title={label}
+      aria-current={active ? 'page' : undefined}
+      className={cn(
+        'flex items-center gap-3 h-[30px] px-3 rounded-lg text-sm transition-colors',
+        active
+          ? 'bg-[color:var(--color-surface-2)] text-[color:var(--color-text)] font-semibold shadow-[inset_2px_0_0_var(--color-accent)]'
+          : 'text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface)]'
       )}
-    </div>
+    >
+      <Icon size={17} className={cn('shrink-0', active && 'text-[color:var(--color-accent)]')} />
+      <span className="sb-label truncate">{label}</span>
+    </Link>
   );
 }
 
-function UserMenu({ user }: { user: SessionUser }) {
+function AppSidebarNav() {
   const t = useT();
   const pathname = usePathname();
-  const { theme, toggle } = useTheme();
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function onDown(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    }
-    document.addEventListener('mousedown', onDown);
-    return () => document.removeEventListener('mousedown', onDown);
-  }, []);
-
-  const menuRow =
-    'w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface-2)] transition-colors';
-
   return (
-    <div ref={ref} className="relative">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="flex items-center p-2 rounded-lg text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface)] transition-colors"
-        aria-label={t('nav.account')}
-      >
-        <UserRound size={17} />
-      </button>
-      {open && (
-        <div className="absolute right-0 top-full mt-1 z-50 min-w-52 rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] shadow-2xl shadow-black/40 p-1">
-          <div className="px-2.5 py-2 border-b border-[color:var(--color-border)] mb-1">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] flex items-center justify-center text-xs font-semibold text-[color:var(--color-accent)] shrink-0">
-                {(user.name || user.role || 'U').slice(0, 2).toUpperCase()}
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium truncate leading-tight">{user.name || t('nav.account')}</p>
-                <span className="inline-block mt-0.5 text-[10px] px-1.5 py-0.2 rounded font-mono font-medium tracking-wide uppercase bg-[color:var(--color-surface-2)] text-[color:var(--color-text-faint)] border border-[color:var(--color-border)]">
-                  {user.role}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <Link
-            href={'/account'}
-            prefetch={false}
-            onClick={() => setOpen(false)}
-            className={cn(menuRow, pathname.startsWith('/account') && 'text-[color:var(--color-accent)] font-medium')}
-          >
-            <UserRound size={15} /> {t('nav.account')}
-          </Link>
-          <Link
-            href={'/settings'}
-            prefetch={false}
-            onClick={() => setOpen(false)}
-            className={cn(menuRow, pathname.startsWith('/settings') && 'text-[color:var(--color-accent)]')}
-          >
-            <Settings size={15} /> {t('nav.settings')}
-          </Link>
-          <Link
-            href={'/jobs'}
-            prefetch={false}
-            onClick={() => setOpen(false)}
-            className={cn(menuRow, pathname.startsWith('/jobs') && 'text-[color:var(--color-accent)]')}
-          >
-            <Activity size={15} /> {t('nav.jobs')}
-          </Link>
-          <Link
-            href={'/history'}
-            prefetch={false}
-            onClick={() => setOpen(false)}
-            className={cn(menuRow, pathname.startsWith('/history') && 'text-[color:var(--color-accent)]')}
-          >
-            <MessageSquare size={15} /> {t('nav.history')}
-          </Link>
-          <Link
-            href={'/trash'}
-            prefetch={false}
-            onClick={() => setOpen(false)}
-            className={cn(menuRow, pathname.startsWith('/trash') && 'text-[color:var(--color-accent)]')}
-          >
-            <Trash2 size={15} /> {t('nav.trash')}
-          </Link>
-
-          <div className="my-1 border-t border-[color:var(--color-border)]" />
-          <LanguageSwitcher variant="row" />
-          <button type="button" onClick={toggle} className={menuRow}>
-            {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
-            {theme === 'dark' ? t('nav.lightMode') : t('nav.darkMode')}
-          </button>
-
-          <div className="my-1 border-t border-[color:var(--color-border)]" />
-          <form action={logoutAction}>
-            <button
-              type="submit"
-              className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm text-[color:var(--color-text-dim)] hover:text-[color:var(--color-red)] hover:bg-[color:var(--color-surface-2)] transition-colors"
-            >
-              <LogOut size={15} /> {t('nav.signOut')}
-            </button>
-          </form>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function MobileMoreSheet({
-  open,
-  onClose,
-  user,
-}: {
-  open: boolean;
-  onClose: () => void;
-  user?: SessionUser;
-}) {
-  const t = useT();
-  const pathname = usePathname();
-  const { theme, toggle } = useTheme();
-  const [search, setSearch] = useState('');
-
-  // Filter items across all nav items
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return null;
-    return ALL_NAV_ITEMS.filter((item) => {
-      const label = t(item.key).toLowerCase();
-      const href = item.href.toLowerCase();
-      return label.includes(q) || href.includes(q);
-    });
-  }, [search, t]);
-
-  const menuRow =
-    'w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface-2)] transition-colors';
-
-  return (
-    <Modal open={open} onClose={onClose} title={t('nav.more')} size="full">
-      <div className="space-y-6 pb-12">
-        {/* Search jump bar */}
-        <div className="relative">
-          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[color:var(--color-text-dim)] pointer-events-none" />
-          <input
-            type="search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder={t('nav.searchPages')}
-            className="w-full bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-xl pl-10 pr-9 py-2.5 text-sm text-[color:var(--color-text)] placeholder:text-[color:var(--color-text-dim)] focus:outline-none focus:border-[color:var(--color-accent)] transition-colors"
-          />
-          {search && (
-            <button
-              onClick={() => setSearch('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] p-0.5"
-              aria-label={t('common.clear')}
-            >
-              <X size={15} />
-            </button>
-          )}
-        </div>
-
-        {/* Filtered results */}
-        {filtered !== null ? (
+    <nav aria-label={t('nav.menu')} className="space-y-3">
+      <SidebarLink item={HOME_ITEM} label={t(HOME_ITEM.key)} active={pathname === '/'} />
+      {NAV_GROUPS.map((g) => (
+        <div key={g.key}>
+          <div className="sb-label px-3 mb-0.5 text-xs font-semibold text-[color:var(--color-text-faint)]">{t(g.key)}</div>
           <div>
-            {filtered.length === 0 ? (
-              <p className="text-center py-8 text-sm text-[color:var(--color-text-dim)]">{t('bar.noMatches')}</p>
-            ) : (
-              <div className="grid grid-cols-2 gap-2">
-                {filtered.map((item) => {
-                  const Icon = item.icon;
-                  const isActive = navActive(pathname, item.href);
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      prefetch={false}
-                      onClick={onClose}
-                      className={cn(
-                        'flex items-center gap-2.5 px-3 py-2.5 rounded-xl border text-sm font-medium transition-colors min-w-0',
-                        isActive
-                          ? 'border-[color:var(--color-accent)] bg-[color:var(--color-surface-2)] text-[color:var(--color-accent)]'
-                          : 'border-[color:var(--color-border)] bg-[color:var(--color-surface)] text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface-2)]'
-                      )}
-                    >
-                      <Icon size={16} className="shrink-0" />
-                      <span className="truncate">{t(item.key)}</span>
-                    </Link>
-                  );
-                })}
-              </div>
-            )}
+            {g.links.map((l) => (
+              <SidebarLink key={l.href} item={l} label={t(l.key)} active={navActive(pathname, l.href)} />
+            ))}
           </div>
+        </div>
+      ))}
+    </nav>
+  );
+}
+
+function SettingsSidebarNav({ role }: { role: Role }) {
+  const t = useT();
+  const params = useSearchParams();
+  const multiUser = useAttributionNames() !== null;
+  const current = normalizeSettingsTab(params.get('tab'));
+  const groups = visibleSettingsGroups({ isAdmin: role === 'admin', multiUser });
+  const ref = useRef<HTMLElement>(null);
+  // The list is taller than a laptop screen: keep the open page in view, so opening
+  // About or System status from a link does not leave the sidebar showing the top.
+  useEffect(() => {
+    ref.current?.querySelector('[aria-current="page"]')?.scrollIntoView({ block: 'nearest' });
+  }, [current]);
+  return (
+    <nav ref={ref} aria-label={t('nav.settings')} className="space-y-3">
+      <Link href="/" prefetch={false} title={t('set.backToApp')} className="flex items-center gap-3 h-9 px-3 rounded-lg text-sm font-medium text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface)] transition-colors">
+        <ChevronLeft size={17} className="shrink-0" /> <span className="sb-label">{t('set.backToApp')}</span>
+      </Link>
+      {groups.map((g) => (
+        <div key={g.label}>
+          <div className="sb-label px-3 mb-0.5 text-xs font-semibold text-[color:var(--color-text-faint)]">{t(g.label)}</div>
+          <div>
+            {g.tabs.map((tab) => (
+              <SidebarLink key={tab.id} item={{ href: settingsHref(tab.id), icon: tab.icon }} label={t(tab.label)} active={current === tab.id} />
+            ))}
+          </div>
+        </div>
+      ))}
+    </nav>
+  );
+}
+
+function Sidebar({ user }: { user?: SessionUser }) {
+  const t = useT();
+  const pathname = usePathname();
+  const collapsed = useSyncExternalStore(subscribeSidebar, sidebarCollapsed, () => false);
+  const inSettings = pathname.startsWith('/settings');
+
+  function toggle() {
+    const next = !collapsed;
+    if (next) document.documentElement.setAttribute('data-sidebar', 'collapsed');
+    else document.documentElement.removeAttribute('data-sidebar');
+    try {
+      localStorage.setItem('pharos.sidebar', next ? 'collapsed' : 'open');
+    } catch {
+      /* private mode */
+    }
+    window.dispatchEvent(new Event(SIDEBAR_EVENT));
+  }
+
+  return (
+    <aside className="hidden lg:flex fixed inset-y-0 left-0 z-40 w-[var(--sidebar-w)] flex-col border-r border-[color:var(--color-border)] bg-[color:var(--color-bg)]">
+      <Link href="/" prefetch={false} title="PHAROS" className="h-16 shrink-0 flex items-center gap-2.5 px-[26px] hover:opacity-80 transition-opacity">
+        <PharosMark size={22} className="text-[color:var(--color-accent)] shrink-0" />
+        <span className="sb-label tracking-[0.14em] text-[15px]" style={{ fontFamily: 'var(--font-display)', fontWeight: 700 }}>
+          PHAROS
+        </span>
+      </Link>
+      <div className="flex-1 min-h-0 overflow-y-auto thin-scrollbar px-3 pb-4">
+        {inSettings && user ? (
+          <Suspense fallback={null}>
+            <SettingsSidebarNav role={user.role} />
+          </Suspense>
         ) : (
-          <>
-            {/* Standard grouped navigation */}
-            <div className="space-y-6">
-              {NAV_GROUPS.map((g) => (
-                <div key={g.key}>
-                  <h3
-                    className="text-[11px] font-semibold uppercase tracking-wider text-[color:var(--color-text-faint)] mb-2 px-1"
-                    style={{ fontFamily: 'var(--font-mono)' }}
-                  >
-                    {t(g.key)}
-                  </h3>
-                  <div className="grid grid-cols-2 gap-2">
-                    {g.links.map((link) => {
-                      const Icon = link.icon;
-                      const isActive = navActive(pathname, link.href);
-                      return (
-                        <Link
-                          key={link.href}
-                          href={link.href}
-                          prefetch={false}
-                          onClick={onClose}
-                          className={cn(
-                            'flex items-center gap-2.5 px-3 py-2.5 rounded-xl border text-sm font-medium transition-colors min-w-0',
-                            isActive
-                              ? 'border-[color:var(--color-accent)] bg-[color:var(--color-surface-2)] text-[color:var(--color-accent)]'
-                              : 'border-[color:var(--color-border)] bg-[color:var(--color-surface)] text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface-2)]'
-                          )}
-                        >
-                          <Icon size={16} className="shrink-0" />
-                          <span className="truncate">{t(link.key)}</span>
-                        </Link>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Bottom account / settings / system section */}
-            <div className="pt-4 border-t border-[color:var(--color-border)] space-y-2">
-              <h3
-                className="text-[11px] font-semibold uppercase tracking-wider text-[color:var(--color-text-faint)] mb-2 px-1"
-                style={{ fontFamily: 'var(--font-mono)' }}
-              >
-                {t('nav.account')}
-              </h3>
-
-              {user && (
-                <div className="px-3 py-2 rounded-xl bg-[color:var(--color-surface)] border border-[color:var(--color-border)] mb-3 flex items-center justify-between">
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium truncate">{user.name}</p>
-                    <p className="text-[10px] text-[color:var(--color-text-faint)] uppercase" style={{ fontFamily: 'var(--font-mono)' }}>
-                      {user.role}
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-2">
-                {ACCOUNT_LINKS.map((link) => {
-                  const Icon = link.icon;
-                  const isActive = navActive(pathname, link.href);
-                  return (
-                    <Link
-                      key={link.href}
-                      href={link.href}
-                      prefetch={false}
-                      onClick={onClose}
-                      className={cn(
-                        'flex items-center gap-2.5 px-3 py-2.5 rounded-xl border text-sm font-medium transition-colors min-w-0',
-                        isActive
-                          ? 'border-[color:var(--color-accent)] bg-[color:var(--color-surface-2)] text-[color:var(--color-accent)]'
-                          : 'border-[color:var(--color-border)] bg-[color:var(--color-surface)] text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface-2)]'
-                      )}
-                    >
-                      <Icon size={16} className="shrink-0" />
-                      <span className="truncate">{t(link.key)}</span>
-                    </Link>
-                  );
-                })}
-              </div>
-
-              <div className="pt-2 space-y-1">
-                <LanguageSwitcher variant="row" />
-                <button type="button" onClick={toggle} className={menuRow}>
-                  {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
-                  {theme === 'dark' ? t('nav.lightMode') : t('nav.darkMode')}
-                </button>
-                <form action={logoutAction} className="pt-1">
-                  <button
-                    type="submit"
-                    className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm text-[color:var(--color-text-dim)] hover:text-[color:var(--color-red)] hover:bg-[color:var(--color-surface-2)] transition-colors"
-                  >
-                    <LogOut size={16} /> {t('nav.signOut')}
-                  </button>
-                </form>
-              </div>
-            </div>
-          </>
+          <AppSidebarNav />
         )}
       </div>
-    </Modal>
+      <div className="shrink-0 border-t border-[color:var(--color-border)] px-3 py-2 flex items-center gap-1">
+        {!inSettings && (
+          <div className="flex-1 min-w-0">
+            <SidebarLink item={{ href: '/settings', icon: Settings }} label={t('nav.settings')} active={false} />
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={toggle}
+          title={collapsed ? t('nav.expandSidebar') : t('nav.collapseSidebar')}
+          aria-label={collapsed ? t('nav.expandSidebar') : t('nav.collapseSidebar')}
+          className={cn('shrink-0 grid place-items-center w-10 h-10 rounded-lg text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface)] transition-colors', inSettings && 'ml-auto')}
+        >
+          {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+        </button>
+      </div>
+    </aside>
   );
 }
 
-function MobileQuickAddModal({
-  open,
-  onClose,
-}: {
-  open: boolean;
-  onClose: () => void;
-}) {
-  const t = useT();
+// ─── Account menu ───────────────────────────────────────────────────────────
 
-  const options = [
-    {
-      href: '/receipts?open=new',
-      icon: Receipt,
-      color: 'var(--color-purple)',
-      title: t('nav.scanReceipt'),
-      desc: t('home.dReceipts'),
-    },
-    {
-      href: '/expenses?open=new',
-      icon: Wallet,
-      color: 'var(--color-accent)',
-      title: t('nav.addExpense'),
-      desc: t('ex.balancesEmpty'),
-    },
-    {
-      href: '/shopping-list?open=new',
-      icon: ShoppingBasket,
-      color: 'var(--color-gold)',
-      title: t('nav.addShoppingItem'),
-      desc: t('home.dShoppingList'),
-    },
+const ACCOUNT_MENU: { href: string; key: TKey; icon: React.ComponentType<{ size?: number; className?: string }> }[] = [
+  { href: '/settings', key: 'nav.settings', icon: Settings },
+  { href: '/jobs', key: 'nav.jobs', icon: Activity },
+  { href: '/history', key: 'nav.history', icon: MessageSquare },
+  { href: '/trash', key: 'nav.trash', icon: Trash2 },
+];
+
+function AccountMenuItems({ user, onNavigate }: { user: SessionUser; onNavigate: () => void }) {
+  const t = useT();
+  const pathname = usePathname();
+  const row = 'w-full flex items-center gap-3 h-11 px-3 rounded-lg text-sm transition-colors';
+  return (
+    <div>
+      <Link
+        href={settingsHref('account')}
+        prefetch={false}
+        onClick={onNavigate}
+        className="flex items-center gap-3 px-3 py-2.5 mb-1 rounded-xl hover:bg-[color:var(--color-surface-2)] transition-colors"
+      >
+        <span className="w-10 h-10 shrink-0 rounded-full grid place-items-center text-sm font-bold bg-[color:var(--color-surface-2)] border border-[color:var(--color-border-light)]">
+          {initials(user.name)}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-semibold truncate">{user.name}</span>
+          <span className="block text-xs text-[color:var(--color-text-dim)] truncate">{t('nav.accountHint')}</span>
+        </span>
+        <ChevronRight size={16} className="shrink-0 text-[color:var(--color-text-faint)]" />
+      </Link>
+      <div className="border-t border-[color:var(--color-border)] pt-1">
+        {ACCOUNT_MENU.map((m) => {
+          const Icon = m.icon;
+          const active = navActive(pathname, m.href);
+          return (
+            <Link
+              key={m.href}
+              href={m.href}
+              prefetch={false}
+              onClick={onNavigate}
+              className={cn(row, active ? 'text-[color:var(--color-text)] font-semibold bg-[color:var(--color-surface-2)]' : 'text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface-2)]')}
+            >
+              <Icon size={17} className="shrink-0" /> {t(m.key)}
+            </Link>
+          );
+        })}
+      </div>
+      <form action={logoutAction} className="border-t border-[color:var(--color-border)] mt-1 pt-1">
+        <button type="submit" className={cn(row, 'text-[color:var(--color-text-dim)] hover:text-[color:var(--color-red)] hover:bg-[color:var(--color-surface-2)]')}>
+          <LogOut size={17} className="shrink-0" /> {t('nav.signOut')}
+        </button>
+      </form>
+    </div>
+  );
+}
+
+function AccountMenu({ user }: { user: SessionUser }) {
+  const t = useT();
+  const [mode, setMode] = useState<'closed' | 'dropdown' | 'sheet'>('closed');
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (mode !== 'dropdown') return;
+    function onDown(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setMode('closed');
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setMode('closed');
+    }
+    document.addEventListener('mousedown', onDown);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [mode]);
+
+  function toggle() {
+    if (mode !== 'closed') return setMode('closed');
+    setMode(window.matchMedia('(min-width: 1024px)').matches ? 'dropdown' : 'sheet');
+  }
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={toggle}
+        aria-label={t('nav.account')}
+        aria-expanded={mode !== 'closed'}
+        className="w-11 h-11 lg:w-10 lg:h-10 grid place-items-center rounded-full"
+      >
+        <span className="w-8 h-8 lg:w-9 lg:h-9 rounded-full grid place-items-center text-xs font-bold bg-[color:var(--color-surface-2)] border border-[color:var(--color-border-light)] hover:border-[color:var(--color-text-faint)] transition-colors">
+          {initials(user.name)}
+        </span>
+      </button>
+      {mode === 'dropdown' && (
+        <div className="absolute right-0 top-full mt-2 z-50 w-72 rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] shadow-2xl shadow-black/40 p-1.5">
+          <AccountMenuItems user={user} onNavigate={() => setMode('closed')} />
+        </div>
+      )}
+      <Modal open={mode === 'sheet'} onClose={() => setMode('closed')} title={t('nav.account')} size="sm">
+        <AccountMenuItems user={user} onNavigate={() => setMode('closed')} />
+      </Modal>
+    </div>
+  );
+}
+
+// ─── Phone: section tabs, section bar, quick add ────────────────────────────
+
+/** The pages of the current section as tabs under the phone's top bar. */
+function SectionTabs({ group }: { group: NavGroup }) {
+  const t = useT();
+  const pathname = usePathname();
+  const activeRef = useRef<HTMLAnchorElement>(null);
+  useEffect(() => {
+    activeRef.current?.scrollIntoView({ block: 'nearest', inline: 'center' });
+  }, [pathname]);
+  return (
+    <nav aria-label={t(group.key)} className="lg:hidden flex gap-1 overflow-x-auto no-scrollbar px-2 h-11 border-t border-[color:var(--color-border)]">
+      {group.links.map((l) => {
+        const active = navActive(pathname, l.href);
+        return (
+          <Link
+            key={l.href}
+            ref={active ? activeRef : undefined}
+            href={l.href}
+            prefetch={false}
+            aria-current={active ? 'page' : undefined}
+            className={cn(
+              'shrink-0 flex items-center px-3 text-sm whitespace-nowrap transition-colors',
+              active ? 'text-[color:var(--color-text)] font-semibold shadow-[inset_0_-2px_0_var(--color-accent)]' : 'text-[color:var(--color-text-dim)]'
+            )}
+          >
+            {t(l.key)}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
+
+function SectionBar() {
+  const t = useT();
+  const pathname = usePathname();
+  const current = navGroupOf(pathname);
+  const lastRaw = useSyncExternalStore(subscribeLast, lastPagesSnapshot, () => '');
+
+  // Remember the last page of each section, so its tab brings you back where you were.
+  useEffect(() => {
+    const g = navGroupOf(pathname);
+    if (!g) return;
+    try {
+      localStorage.setItem(LAST_KEY(g), pathname);
+    } catch {
+      return; /* private mode: every tab opens its section's first page */
+    }
+    window.dispatchEvent(new Event(LAST_EVENT));
+  }, [pathname]);
+
+  const lastList = lastRaw.split('\n');
+  const last: Record<string, string> = {};
+  NAV_GROUPS.forEach((grp, i) => {
+    const v = lastList[i];
+    if (v && grp.links.some((l) => navActive(v, l.href))) last[grp.key] = v;
+  });
+
+  const items: { key: string; href: string; label: string; icon: React.ComponentType<{ size?: number }>; active: boolean }[] = [
+    { key: 'home', href: '/', label: t('nav.home'), icon: Home, active: pathname === '/' },
+    ...NAV_GROUPS.map((g) => ({
+      key: g.key,
+      href: last[g.key] ?? g.links[0].href,
+      label: t(g.shortKey),
+      icon: g.icon,
+      active: current?.key === g.key,
+    })),
   ];
 
   return (
+    <nav
+      aria-label={t('nav.sections')}
+      className="lg:hidden fixed bottom-0 inset-x-0 z-40 grid grid-cols-5 border-t border-[color:var(--color-border)] bg-[color:var(--color-bg)]/95 backdrop-blur-md pb-[env(safe-area-inset-bottom)]"
+    >
+      {items.map((it) => {
+        const Icon = it.icon;
+        return (
+          <Link
+            key={it.key}
+            href={it.href}
+            prefetch={false}
+            aria-current={it.active ? 'page' : undefined}
+            className={cn(
+              'h-16 flex flex-col items-center justify-center gap-1 text-[11px] min-w-0 px-1 transition-colors',
+              it.active ? 'text-[color:var(--color-accent)] font-semibold' : 'text-[color:var(--color-text-dim)]'
+            )}
+          >
+            <Icon size={21} />
+            <span className="truncate max-w-full">{it.label}</span>
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
+
+function QuickAddSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const t = useT();
+  const options = [
+    { href: '/receipts?open=new', icon: Receipt, title: t('nav.scanReceipt'), desc: t('home.dReceipts') },
+    { href: '/expenses?open=new', icon: Wallet, title: t('nav.addExpense'), desc: t('ex.balancesEmpty') },
+    { href: '/shopping-list?open=new', icon: ShoppingBasket, title: t('nav.addShoppingItem'), desc: t('home.dShoppingList') },
+  ];
+  return (
     <Modal open={open} onClose={onClose} title={t('nav.quickAdd')} size="sm">
-      <div className="space-y-2.5 py-1">
+      <div className="space-y-2 py-1">
         {options.map((opt) => {
           const Icon = opt.icon;
           return (
@@ -439,24 +421,16 @@ function MobileQuickAddModal({
               key={opt.href}
               href={opt.href}
               onClick={onClose}
-              className="flex items-center gap-3.5 p-3 rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] hover:bg-[color:var(--color-surface-2)] hover:border-[color:var(--color-border-light)] transition-all group"
+              className="flex items-center gap-3.5 p-3 rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] hover:bg-[color:var(--color-surface-2)] transition-colors"
             >
-              <div
-                className="w-10 h-10 rounded-xl grid place-items-center shrink-0"
-                style={{
-                  color: opt.color,
-                  background: `color-mix(in srgb, ${opt.color} 15%, transparent)`,
-                }}
-              >
+              <div className="w-10 h-10 rounded-xl grid place-items-center shrink-0 bg-[color:var(--color-surface-2)] text-[color:var(--color-accent)]">
                 <Icon size={20} />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-[color:var(--color-text)] group-hover:text-[color:var(--color-accent)] transition-colors">
-                  {opt.title}
-                </p>
+                <p className="text-sm font-semibold">{opt.title}</p>
                 <p className="text-xs text-[color:var(--color-text-dim)] truncate">{opt.desc}</p>
               </div>
-              <ArrowRight size={16} className="text-[color:var(--color-text-faint)] group-hover:text-[color:var(--color-text)] shrink-0 transition-colors" />
+              <ArrowRight size={16} className="text-[color:var(--color-text-faint)] shrink-0" />
             </Link>
           );
         })}
@@ -465,176 +439,88 @@ function MobileQuickAddModal({
   );
 }
 
-export function SiteNav({ aiReady = false, user }: { aiReady?: boolean; user?: SessionUser }) {
+/** Phone only, on Home: the one place to add anything. List pages have their own "+". */
+function HomeQuickAdd() {
   const t = useT();
-  const pathname = usePathname();
-
-  const [notifOpen, setNotifOpen] = useState(false);
-  const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
-  const [quickAddOpen, setQuickAddOpen] = useState(false);
-
-  // Active states for bottom tab bar
-  const isHomeActive = pathname === '/';
-  const isMoneyActive = MONEY_LINKS.some((l) => navActive(pathname, l.href));
-  const isCalendarActive = navActive(pathname, '/calendar');
-  const isMoreActive =
-    mobileMoreOpen ||
-    (!isHomeActive && !isMoneyActive && !isCalendarActive);
-
+  const [open, setOpen] = useState(false);
   return (
     <>
-      <header className="sticky top-0 z-40 border-b border-[color:var(--color-border)] bg-[color:var(--color-bg)]">
-        <div className="max-w-[1400px] mx-auto px-4 py-2.5 flex items-center gap-3">
-          {/* Logo */}
-          <Link
-            href={'/'}
-            prefetch={false}
-            title="PHAROS · Personal Hub · Asset & Resource Oversight System"
-            className="flex items-center gap-2 shrink-0 hover:opacity-80 transition-opacity"
-          >
-            <PharosMark size={22} className="text-[color:var(--color-accent)] shrink-0" />
-            <span
-              className="hidden sm:inline tracking-[0.14em] uppercase"
-              style={{ fontFamily: 'var(--font-display)', fontWeight: 700 }}
-            >
-              Pharos
-            </span>
-          </Link>
-
-          {/* Central command bar */}
-          <div className="flex-1 flex justify-center min-w-0">
-            <AiCommandBar />
-          </div>
-
-          {/* Grouped links (desktop) */}
-          <nav className="hidden lg:flex items-center gap-0.5 shrink-0">
-            <Link
-              href="/"
-              prefetch={false}
-              className={cn(
-                'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm font-medium transition-all',
-                pathname === '/'
-                  ? 'text-[color:var(--color-accent)]'
-                  : 'text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface)]'
-              )}
-            >
-              <Home size={15} />
-              {t('nav.home')}
-            </Link>
-            {NAV_GROUPS.map((g) => (
-              <NavGroupDropdown key={g.key} group={g} />
-            ))}
-          </nav>
-
-          {/* Right actions */}
-          <div className="flex items-center gap-1 shrink-0">
-            <span
-              className={cn(
-                'hidden sm:flex items-center gap-1.5 text-[11px] mr-1',
-                aiReady ? 'text-[color:var(--color-accent)]' : 'text-[color:var(--color-text-faint)]'
-              )}
-              style={{ fontFamily: 'var(--font-mono)' }}
-              title={aiReady ? t('ai.reachable') : t('ai.notConfigured')}
-            >
-              <span
-                className={cn('h-1.5 w-1.5 rounded-full', aiReady ? 'bg-[color:var(--color-accent)]' : 'bg-[color:var(--color-text-faint)]')}
-              />
-              {aiReady ? t('ai.online') : t('ai.offline')}
-            </span>
-            {user && <NotificationBell open={notifOpen} onOpenChange={setNotifOpen} />}
-            {user && <UserMenu user={user} />}
-          </div>
-        </div>
-      </header>
-
-      {/* Mobile bottom tab bar (#368) */}
-      <nav
-        aria-label="Mobile navigation"
-        className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-[color:var(--color-bg)]/95 backdrop-blur-md border-t border-[color:var(--color-border)] px-2 pt-1 pb-[max(0.35rem,env(safe-area-inset-bottom))] flex items-center justify-around shadow-lg"
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-label={t('nav.quickAdd')}
+        className="lg:hidden fixed right-4 z-30 bottom-[calc(80px+env(safe-area-inset-bottom))] w-14 h-14 rounded-full grid place-items-center bg-[color:var(--color-accent)] text-[color:var(--color-on-accent)] shadow-[0_8px_24px_rgba(0,0,0,0.5)] active:scale-95 transition-transform"
       >
-        <Link
-          href="/"
-          prefetch={false}
-          className={cn(
-            'flex-1 flex flex-col items-center justify-center gap-0.5 py-1 px-1 rounded-lg text-[10px] font-medium transition-colors min-w-0',
-            isHomeActive
-              ? 'text-[color:var(--color-accent)] font-semibold'
-              : 'text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]'
-          )}
-        >
-          <Home size={19} />
-          <span className="truncate">{t('nav.home')}</span>
-        </Link>
-
-        <Link
-          href="/expenses"
-          prefetch={false}
-          className={cn(
-            'flex-1 flex flex-col items-center justify-center gap-0.5 py-1 px-1 rounded-lg text-[10px] font-medium transition-colors min-w-0',
-            isMoneyActive
-              ? 'text-[color:var(--color-accent)] font-semibold'
-              : 'text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]'
-          )}
-        >
-          <Wallet size={19} />
-          <span className="truncate">{t('nav.money')}</span>
-        </Link>
-
-        {/* Center Quick Add action */}
-        <button
-          type="button"
-          onClick={() => setQuickAddOpen(true)}
-          aria-label={t('nav.quickAdd')}
-          className="flex-1 flex flex-col items-center justify-center gap-0.5 py-1 px-1 text-[10px] font-medium text-[color:var(--color-accent)] group"
-        >
-          <div className="w-8 h-8 rounded-full bg-[color:var(--color-accent)] text-[color:var(--color-bg)] flex items-center justify-center shadow-md active:scale-95 group-hover:brightness-110 transition-all">
-            <Plus size={18} strokeWidth={2.5} />
-          </div>
-          <span className="truncate">{t('nav.quickAdd')}</span>
-        </button>
-
-        <Link
-          href="/calendar"
-          prefetch={false}
-          className={cn(
-            'flex-1 flex flex-col items-center justify-center gap-0.5 py-1 px-1 rounded-lg text-[10px] font-medium transition-colors min-w-0',
-            isCalendarActive
-              ? 'text-[color:var(--color-accent)] font-semibold'
-              : 'text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]'
-          )}
-        >
-          <CalendarDays size={19} />
-          <span className="truncate">{t('nav.calendar')}</span>
-        </Link>
-
-        <button
-          type="button"
-          onClick={() => setMobileMoreOpen(true)}
-          aria-label={t('nav.more')}
-          className={cn(
-            'flex-1 flex flex-col items-center justify-center gap-0.5 py-1 px-1 rounded-lg text-[10px] font-medium transition-colors min-w-0',
-            isMoreActive
-              ? 'text-[color:var(--color-accent)] font-semibold'
-              : 'text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]'
-          )}
-        >
-          <Menu size={19} />
-          <span className="truncate">{t('nav.more')}</span>
-        </button>
-      </nav>
-
-      {/* Mobile More Sheet */}
-      <MobileMoreSheet
-        open={mobileMoreOpen}
-        onClose={() => setMobileMoreOpen(false)}
-        user={user}
-      />
-
-      {/* Mobile Quick Add Modal */}
-      <MobileQuickAddModal
-        open={quickAddOpen}
-        onClose={() => setQuickAddOpen(false)}
-      />
+        <Plus size={24} strokeWidth={2.4} />
+      </button>
+      <QuickAddSheet open={open} onClose={() => setOpen(false)} />
     </>
   );
 }
+
+// ─── Top bar ────────────────────────────────────────────────────────────────
+
+/** What the phone's top bar calls the current page: its section, or the page itself. */
+function useMobileTitle(): string {
+  const t = useT();
+  const pathname = usePathname();
+  const group = navGroupOf(pathname);
+  if (group) return t(group.key);
+  const solo: { href: string; key: TKey }[] = [
+    { href: '/settings', key: 'nav.settings' },
+    { href: '/jobs', key: 'nav.jobs' },
+    { href: '/history', key: 'nav.history' },
+    { href: '/trash', key: 'nav.trash' },
+    { href: '/notifications', key: 'notif.title' },
+  ];
+  const hit = solo.find((s) => navActive(pathname, s.href));
+  return hit ? t(hit.key) : '';
+}
+
+export function SiteNav({ aiReady = false, user }: { aiReady?: boolean; user?: SessionUser }) {
+  const t = useT();
+  const pathname = usePathname();
+  const [notifOpen, setNotifOpen] = useState(false);
+  const group = navGroupOf(pathname);
+  const mobileTitle = useMobileTitle();
+
+  return (
+    <>
+      <Sidebar user={user} />
+      <header className="sticky top-0 z-30 border-b border-[color:var(--color-border)] bg-[color:var(--color-bg)]/95 backdrop-blur-md lg:pl-[var(--sidebar-w)]">
+        <div className="h-14 lg:h-16 flex items-center gap-1 lg:gap-2 pl-4 pr-2 lg:px-8">
+          <Link href="/" prefetch={false} className="lg:hidden flex items-center gap-2 min-w-0 shrink" aria-label="PHAROS">
+            <PharosMark size={22} className="text-[color:var(--color-accent)] shrink-0" />
+            {mobileTitle ? (
+              <span className="text-[17px] font-semibold truncate" style={{ fontFamily: 'var(--font-display)' }}>{mobileTitle}</span>
+            ) : (
+              <span className="tracking-[0.14em] text-sm" style={{ fontFamily: 'var(--font-display)', fontWeight: 700 }}>PHAROS</span>
+            )}
+          </Link>
+          <div className="hidden lg:flex flex-1 min-w-0">
+            <AiCommandBar />
+          </div>
+          <div className="flex-1 lg:hidden" />
+          <div className="lg:hidden">
+            <AiCommandBar compact />
+          </div>
+          <Link
+            href={settingsHref('ai')}
+            prefetch={false}
+            className={cn('hidden lg:flex items-center gap-1.5 text-xs px-2 h-10 rounded-lg hover:bg-[color:var(--color-surface)]', aiReady ? 'text-[color:var(--color-accent)]' : 'text-[color:var(--color-text-faint)]')}
+            title={aiReady ? t('ai.reachable') : t('ai.notConfigured')}
+          >
+            <span className={cn('h-1.5 w-1.5 rounded-full', aiReady ? 'bg-[color:var(--color-accent)]' : 'bg-[color:var(--color-text-faint)]')} />
+            {aiReady ? t('ai.online') : t('ai.offline')}
+          </Link>
+          {user && <NotificationBell open={notifOpen} onOpenChange={setNotifOpen} />}
+          {user && <AccountMenu user={user} />}
+        </div>
+        {group && <SectionTabs group={group} />}
+      </header>
+      <SectionBar />
+      {pathname === '/' && <HomeQuickAdd />}
+    </>
+  );
+}
+

@@ -69,7 +69,7 @@ export function ReconcilePanel({ statements }: { statements: StmtOption[] }) {
       {statements.length > 1 && (
         <div className="flex items-center gap-2 flex-wrap">
           <span
-            className="text-[10px] uppercase tracking-[0.15em] text-[color:var(--color-text-faint)]"
+            className="text-[11px] text-[color:var(--color-text-faint)]"
             style={{ fontFamily: 'var(--font-mono)' }}
           >
             {t('rec.pickStatement')}
@@ -160,7 +160,7 @@ export function ReconcilePanel({ statements }: { statements: StmtOption[] }) {
                     ) : (
                       <div className="mt-2 space-y-1.5">
                         <p
-                          className="text-[10px] uppercase tracking-wider text-[color:var(--color-cyan)]"
+                          className="text-[11px] text-[color:var(--color-cyan)]"
                           style={{ fontFamily: 'var(--font-mono)' }}
                         >
                           {tx.candidates.length === 1
@@ -182,7 +182,7 @@ export function ReconcilePanel({ statements }: { statements: StmtOption[] }) {
                                   {fmtDate(r.date, locale)} · {cur()}
                                   {r.total.toFixed(2)}
                                 </span>
-                                <span className="text-[10px] text-[color:var(--color-text-faint)] shrink-0">
+                                <span className="text-[11px] text-[color:var(--color-text-faint)] shrink-0">
                                   {c.dayDiff === 0 ? t('rec.dayExact') : t('rec.dayOff', { n: c.dayDiff })}
                                   {c.storeMatch ? ` · ${t('rec.storeHint')}` : ''}
                                 </span>

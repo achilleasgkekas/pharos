@@ -19,7 +19,7 @@ import { cn } from '@/components/ui/cn';
 import { shrinkImage } from '@/lib/clientImage';
 import { CardSelect } from '@/components/CardSelect';
 import { useOpenParam } from '@/components/useOpenParam';
-import { Camera } from 'lucide-react';
+import { PageFileDrop } from '@/components/ui/FileDrop';
 import type { SerializedReceipt, SerializedCard } from '@/types';
 import { uploadReceipt, updateReceipt, deleteReceipt, addReceiptItemsToLibrary, rescanReceipt, importEmailInbox, archiveReceipt } from './actions';
 import { OpenInOneDriveButton } from '@/components/OpenInOneDriveButton';
@@ -29,7 +29,7 @@ import { enqueueRescanReceipts, getBulkAiGuard } from '@/app/jobActions';
 import { estimateTaskCost } from '@/lib/claudePricing';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { NO_SPACE, matchesSpace, spaceFilterOptions } from '@/lib/spaceFilter';
-import { useLocale, useT } from '@/components/LocaleProvider';
+import { useLocale, useMoney, useT } from '@/components/LocaleProvider';
 import { DuplicatesModal } from './DuplicatesModal';
 import { useRouter } from 'next/navigation';
 import { compareNames } from '@/lib/i18n/format';
@@ -77,10 +77,8 @@ export function ReceiptsClient({
   const [selected, setSelected] = useState<SerializedReceipt | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadMsg, setUploadMsg] = useState<string | null>(null);
-  const [dragOver, setDragOver] = useState(false);
   const [storeFilter, setStoreFilter] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const cameraInputRef = useRef<HTMLInputElement>(null);
   const { isRunning, refresh } = useJobs();
   const rescanBusy = isRunning('rescan-receipts');
   const router = useRouter();
@@ -101,7 +99,7 @@ export function ReceiptsClient({
   const [categoryFilter, setCategoryFilter] = useState('');
   const [paymentFilter, setPaymentFilter] = useState('');
   const [spaceFilter, setSpaceFilter] = useState(''); // #146: same filter as Expenses
-  const [layout, setLayout] = useState<'grid' | 'list'>('grid');
+  const [layout, setLayout] = useState<'grid' | 'list'>('list');
 
   // Ingest the staged Gmail attachments (from scripts/extract-email-receipts.py) as
   // draft receipts. They then appear as "failed" → use "re-scan all" to AI-parse.
@@ -352,23 +350,24 @@ export function ReceiptsClient({
     setPaymentFilter('');
   };
 
-  // Shared filter controls — left sidebar (desktop) + drawer (mobile)
+  const searchBox = <Input icon={<Search size={15} />} type="search" placeholder={t('rc.searchPlaceholder')} aria-label={t('rc.searchPlaceholder')} value={search} onChange={(e) => setSearch(e.target.value)} />;
+  const statusSwitch = (
+    <FilterOptions
+      variant="segmented"
+      value={statusFilter}
+      onChange={setStatusFilter}
+      options={[
+        { value: 'all', label: t('common.all') },
+        { value: 'verified', label: t('rc.stVerified') },
+        { value: 'parsed', label: t('rc.stParsed') },
+        { value: 'failed', label: t('rc.stNeedsScan') },
+        { value: 'archived', label: t('rc.stArchived') },
+      ]}
+    />
+  );
+  // The rest of the filters: the panel under the filter row.
   const filterControls = (
-    <div className="space-y-4">
-      <Input icon={<Search size={14} />} placeholder={t('rc.searchPlaceholder')} value={search} onChange={(e) => setSearch(e.target.value)} />
-      <FilterSection label={t('common.status')}>
-        <FilterOptions
-          value={statusFilter}
-          onChange={setStatusFilter}
-          options={[
-            { value: 'all', label: t('common.all') },
-            { value: 'verified', label: t('rc.stVerified') },
-            { value: 'parsed', label: t('rc.stParsed') },
-            { value: 'failed', label: t('rc.stNeedsScan') },
-            { value: 'archived', label: t('rc.stArchived') },
-          ]}
-        />
-      </FilterSection>
+    <div>
       {stores.length > 0 && (
         <FilterSection label={t('v.fStore')}>
           <SearchableSelect value={storeFilter} onChange={setStoreFilter} options={stores} placeholder={t('it.allStores')} clearable size="sm" className="w-full" />
@@ -379,11 +378,11 @@ export function ReceiptsClient({
             dates (partial typing keeps the previous value), the active preset shown, and Clear. */}
         <div className="flex flex-col gap-1.5 min-w-0">
           <label className="block">
-            <span className="block text-[10px] text-[color:var(--color-text-faint)] mb-0.5">{t('rc.fltFrom')}</span>
+            <span className="block text-[11px] text-[color:var(--color-text-faint)] mb-0.5">{t('rc.fltFrom')}</span>
             <DateInput value={dateFrom} max={dateTo || undefined} onValueChange={setDateFrom} keepWhileTyping aria-label={t('rc.fltFrom')} className="py-1.5 text-xs" />
           </label>
           <label className="block">
-            <span className="block text-[10px] text-[color:var(--color-text-faint)] mb-0.5">{t('rc.fltTo')}</span>
+            <span className="block text-[11px] text-[color:var(--color-text-faint)] mb-0.5">{t('rc.fltTo')}</span>
             <DateInput value={dateTo} min={dateFrom || undefined} onValueChange={setDateTo} keepWhileTyping aria-label={t('rc.fltTo')} className="py-1.5 text-xs" />
           </label>
           {rangeInvalid && <p role="alert" className="text-[11px] text-[color:var(--color-red)]">{t('rc.fltRangeInvalid')}</p>}
@@ -403,7 +402,7 @@ export function ReceiptsClient({
                 aria-pressed={active}
                 onClick={() => applyDatePreset(k)}
                 className={cn(
-                  'text-[10px] px-2 py-1 rounded-md border transition-colors',
+                  'text-[11px] px-2 py-1 rounded-md border transition-colors',
                   active
                     ? 'border-[color:var(--color-accent)] text-[color:var(--color-accent)]'
                     : 'border-[color:var(--color-border)] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)] hover:border-[color:var(--color-accent)]'
@@ -418,7 +417,7 @@ export function ReceiptsClient({
             <button
               type="button"
               onClick={() => { setDateFrom(''); setDateTo(''); }}
-              className="text-[10px] px-2 py-1 rounded-md text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)] underline underline-offset-2"
+              className="text-[11px] px-2 py-1 rounded-md text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)] underline underline-offset-2"
               style={{ fontFamily: 'var(--font-mono)' }}
             >
               {t('common.clear')}
@@ -451,16 +450,18 @@ export function ReceiptsClient({
         </select>
       </FilterSection>
       {anyRFilter && (
-        <button onClick={resetRFilters} className="text-[0.65rem] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] underline" style={{ fontFamily: 'var(--font-mono)' }}>
-          {t('common.resetFilters')}
-        </button>
+        <div className="self-end">
+          <button onClick={resetRFilters} className="h-10 text-sm text-[color:var(--color-text-dim)] hover:text-[color:var(--color-red)] underline">
+            {t('common.resetFilters')}
+          </button>
+        </div>
       )}
     </div>
   );
 
   return (
     <main className={PAGE_MAIN}>
-      <PageHeader title={t('nav.receipts')} count={receipts.length}>
+      <PageHeader title={t('nav.receipts')} count={visible.length !== receipts.length ? `${visible.length} / ${receipts.length}` : receipts.length}>
         {importMsg && <span className="text-xs text-[color:var(--color-text-faint)]">{importMsg}</span>}
         {toVerify.length > 0 && (
           <HeaderButton tone="accent" icon={<Zap size={14} />} onClick={() => setQuickVerify(true)} title={t('rc.quickVerifyTitle')}>
@@ -481,93 +482,25 @@ export function ReceiptsClient({
           {t('rc.findDuplicates')}
         </HeaderButton>
         <ViewToggle value={layout} onChange={setLayout} />
-        <PrimaryAction icon={<Upload size={16} strokeWidth={2.5} />} onClick={() => !uploading && fileInputRef.current?.click()}>
+        <PrimaryAction icon={uploading ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} strokeWidth={2.5} />} onClick={() => !uploading && fileInputRef.current?.click()} disabled={uploading}>
           {t('common.add')}
         </PrimaryAction>
       </PageHeader>
+      <input ref={fileInputRef} type="file" accept="image/*,application/pdf,.pdf" multiple className="hidden" aria-label={t('common.add')} onChange={(e) => handleFiles(e.target.files)} />
+      <PageFileDrop onFiles={handleFiles} label={t('common.dropToUpload')} hint={ollamaUp ? t('rc.aiAutoParse') : t('rc.manualEntry')} disabled={uploading} />
 
-      <FilterLayout filters={filterControls} active={anyRFilter}>
-          {/* Dropzone */}
-          <div
-            onDragOver={(e) => {
-              e.preventDefault();
-              setDragOver(true);
-            }}
-            onDragLeave={() => setDragOver(false)}
-            onDrop={(e) => {
-              e.preventDefault();
-              setDragOver(false);
-              handleFiles(e.dataTransfer.files);
-            }}
-            onClick={() => !uploading && fileInputRef.current?.click()}
-            className={cn(
-              'border-2 border-dashed rounded-2xl p-8 mb-6 text-center cursor-pointer transition-all',
-              dragOver
-                ? 'border-[color:var(--color-accent)] bg-[color:var(--color-accent)]/3'
-                : 'border-[color:var(--color-border)] hover:border-[color:var(--color-border-light)]',
-              uploading && 'pointer-events-none opacity-70'
-            )}
-          >
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*,application/pdf,.pdf"
-              multiple
-              className="hidden"
-              onChange={(e) => handleFiles(e.target.files)}
-            />
-            {uploading ? (
-              <div className="flex flex-col items-center gap-2 text-[color:var(--color-cyan)]">
-                <Loader2 size={28} className="animate-spin" />
-                <p className="text-sm">{uploadMsg}</p>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center gap-2 text-[color:var(--color-text-dim)]">
-                <Upload size={28} />
-                <p className="text-sm font-medium text-[color:var(--color-text)]">
-                  {t('rc.dropReceipts')}
-                </p>
-                <p className="text-xs text-[color:var(--color-text-faint)]">
-                  {ollamaUp
-                    ? t('rc.aiAutoParse')
-                    : t('rc.manualEntry')}
-                </p>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    cameraInputRef.current?.click();
-                  }}
-                  className="mt-2 flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-text)] hover:border-[color:var(--color-accent)] transition-colors"
-                >
-                  <Camera size={14} /> {t('ex.takePhoto')}
-                </button>
-              </div>
-            )}
-            {/* Camera capture (opens the camera on mobile); resized client-side */}
-            <input
-              ref={cameraInputRef}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              className="hidden"
-              onChange={(e) => handleFiles(e.target.files)}
-            />
-          </div>
-
+      <FilterLayout search={searchBox} quick={statusSwitch} filters={filterControls} active={!!(storeFilter || sortBy !== 'recent' || dateFrom || dateTo || categoryFilter || paymentFilter || spaceFilter)}>
+          {uploading && (
+            <p role="status" className="mb-3 flex items-center gap-2 text-sm text-[color:var(--color-cyan)]">
+              <Loader2 size={15} className="animate-spin" /> {uploadMsg}
+            </p>
+          )}
           {uploadMsg && !uploading && (
             <div className="mb-4 text-sm text-[color:var(--color-red)] flex items-start gap-2">
               <AlertTriangle size={14} className="shrink-0 mt-0.5" />
               <span className="break-words">{uploadMsg}</span>
             </div>
           )}
-
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
-              {visible.length} {visible.length === 1 ? t('rc.receiptOne') : t('rc.receiptMany')}
-              {visible.length !== receipts.length ? ` / ${receipts.length}` : ''}
-            </span>
-          </div>
 
           {visible.length === 0 ? (
             <EmptyState icon={<ReceiptIcon />} title={receipts.length === 0 ? t('rc.emptyNone') : t('rc.emptyFiltered')} />
@@ -578,7 +511,7 @@ export function ReceiptsClient({
               ))}
             </div>
           ) : (
-            <div className="flex flex-col gap-2">
+            <div className="rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] overflow-hidden divide-y divide-[color:var(--color-border)]">
               {visible.map((r) => (
                 <ReceiptRow key={r._id} receipt={r} base={fx.base} onClick={() => setSelected(r)} />
               ))}
@@ -615,6 +548,7 @@ export function ReceiptsClient({
 function ReceiptRow({ receipt, base, onClick }: { receipt: SerializedReceipt; base: string; onClick: () => void }) {
   const locale = useLocale();
   const t = useT();
+  const money = useMoney();
   const isImage = receipt.fileType.startsWith('image/');
   const isHtml = receipt.fileType.includes('html');
   const empty = receipt.total === 0 && (receipt.lineItems?.length ?? 0) === 0;
@@ -630,9 +564,9 @@ function ReceiptRow({ receipt, base, onClick }: { receipt: SerializedReceipt; ba
   return (
     <button
       onClick={onClick}
-      className="group flex items-center gap-3 bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-xl px-3 py-2.5 text-left hover:border-[color:var(--color-border-light)] transition-all"
+      className="group w-full flex items-center gap-3 px-3 sm:px-4 py-2.5 text-left hover:bg-[color:var(--color-surface-2)] transition-colors"
     >
-      <div className="w-11 h-11 rounded-lg bg-[color:var(--color-surface-2)] overflow-hidden shrink-0 grid place-items-center text-[color:var(--color-text-faint)]">
+      <div className="w-10 h-10 rounded-lg bg-[color:var(--color-surface-2)] overflow-hidden shrink-0 grid place-items-center text-[color:var(--color-text-faint)]">
         {thumb ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={fileUrl(thumb)} alt={receipt.store} loading="lazy" className="w-full h-full object-cover object-top" />
@@ -643,10 +577,10 @@ function ReceiptRow({ receipt, base, onClick }: { receipt: SerializedReceipt; ba
         )}
       </div>
       <div className="min-w-0 flex-1">
-        <span className="font-semibold text-sm truncate block" style={{ fontFamily: 'var(--font-display)' }}>
+        <span className="font-semibold text-[15px] truncate block">
           {receipt.store || t('ex.unknown')}
         </span>
-        <span className="text-[10px] text-[color:var(--color-text-faint)] mt-0.5 flex items-center gap-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
+        <span className="text-xs text-[color:var(--color-text-dim)] mt-0.5 flex items-center gap-1.5">
           <span className="truncate">
             {isNaN(d.getTime()) ? '—' : formatRecordDay(receipt.date, locale)} · {receipt.lineItems?.length ?? 0} {t('it.items')}
             {receipt.fileType === 'pdf' ? ' · pdf' : isHtml ? ' · email' : ''}
@@ -657,8 +591,8 @@ function ReceiptRow({ receipt, base, onClick }: { receipt: SerializedReceipt; ba
       <div className="flex items-center gap-3 shrink-0">
         <FxBadge doc={receipt} base={base} />
         {receipt.total > 0 && (
-          <span className="font-extrabold text-[color:var(--color-accent)] text-base leading-none" style={{ fontFamily: 'var(--font-display)' }}>
-            {cur()}{receipt.total}
+          <span className="font-semibold text-[15px] leading-none tabular-nums">
+            {money(receipt.total)}
           </span>
         )}
         {status === 'archived' ? (
@@ -709,7 +643,7 @@ function ReceiptCard({
           <>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={fileUrl(receipt.thumbPath)} alt={receipt.store} loading="lazy" className="w-full h-full object-cover object-top" />
-            <span className="absolute bottom-2 left-2 text-[9px] font-bold px-1.5 py-0.5 rounded bg-black/60 text-white" style={{ fontFamily: 'var(--font-mono)' }}>
+            <span className="absolute bottom-2 left-2 text-[10px] font-bold px-1.5 py-0.5 rounded bg-black/60 text-white" style={{ fontFamily: 'var(--font-mono)' }}>
               PDF
             </span>
           </>
@@ -718,7 +652,7 @@ function ReceiptCard({
           // everything else (PDF without a thumbnail) keeps the document icon.
           <div className="flex flex-col items-center justify-center gap-2 text-[color:var(--color-text-faint)]">
             {isHtml ? <Mail size={34} strokeWidth={1.5} /> : <FileText size={36} strokeWidth={1.5} />}
-            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-black/60 text-white" style={{ fontFamily: 'var(--font-mono)' }}>
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-black/60 text-white" style={{ fontFamily: 'var(--font-mono)' }}>
               {isHtml ? 'EMAIL' : 'PDF'}
             </span>
           </div>
@@ -759,7 +693,7 @@ function ReceiptCard({
         </div>
         <div className="mt-1"><FxBadge doc={receipt} base={base} /></div>
         <div
-          className="text-[10px] text-[color:var(--color-text-faint)] mt-1 flex items-center gap-1.5 flex-wrap"
+          className="text-[11px] text-[color:var(--color-text-faint)] mt-1 flex items-center gap-1.5 flex-wrap"
           style={{ fontFamily: 'var(--font-mono)' }}
         >
           <span>
@@ -783,7 +717,7 @@ function ReturnBadge({ days }: { days?: number | null }) {
     <span
       title={t('rc.returnTip', { n: days })}
       className={cn(
-        'inline-flex items-center gap-0.5 px-1.5 py-px rounded border text-[9px] font-bold shrink-0',
+        'inline-flex items-center gap-0.5 px-1.5 py-px rounded border text-[10px] font-bold shrink-0',
         closing
           ? 'text-[color:var(--color-gold)] border-[color:var(--color-gold)]/25 bg-[color:var(--color-gold)]/8'
           : 'text-[color:var(--color-cyan)] border-[color:var(--color-cyan)]/20 bg-[color:var(--color-cyan)]/6'
@@ -1114,7 +1048,7 @@ function ReceiptDetailModal({
         style={{ fontFamily: 'var(--font-mono)' }}
       >
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wide">{t('rc.rescanLabel')}</span>
+          <span className="text-[11px] text-[color:var(--color-text-faint)]">{t('rc.rescanLabel')}</span>
           <button
             onClick={() => handleRescan(true)}
             disabled={pending}
@@ -1129,13 +1063,13 @@ function ReceiptDetailModal({
           >
             {t('rc.noOcr')}
           </button>
-          {rescanMsg && <span className="text-[10px] text-[color:var(--color-text-dim)] truncate max-w-[200px]">{rescanMsg}</span>}
+          {rescanMsg && <span className="text-[11px] text-[color:var(--color-text-dim)] truncate max-w-[200px]">{rescanMsg}</span>}
         </div>
         <div className="flex items-center gap-3 shrink-0">
           <CreatedBy id={receipt.createdBy} />
           <OpenInOneDriveButton filePath={receipt.filePath} />
           {receipt.aiModel && (
-            <span className="text-[10px] text-[color:var(--color-text-faint)] flex items-center gap-1">
+            <span className="text-[11px] text-[color:var(--color-text-faint)] flex items-center gap-1">
               <Sparkles size={10} /> {t('rc.parsedBy', { model: receipt.aiModel })}
             </span>
           )}
@@ -1268,14 +1202,14 @@ function ReceiptDetailModal({
           <div>
             <div className="flex items-center justify-between mb-2">
               <span
-                className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider"
+                className="text-[11px] text-[color:var(--color-text-faint)]"
                 style={{ fontFamily: 'var(--font-mono)' }}
               >
                 {t('rc.itemsCount', { n: form.lineItems.length })}
               </span>
               <button
                 onClick={addLine}
-                className="text-[10px] text-[color:var(--color-accent)] flex items-center gap-1 hover:opacity-80"
+                className="text-[11px] text-[color:var(--color-accent)] flex items-center gap-1 hover:opacity-80"
                 style={{ fontFamily: 'var(--font-mono)' }}
               >
                 <Plus size={11} /> {t('common.add')}
@@ -1336,7 +1270,7 @@ function ReceiptDetailModal({
                         value={li.name}
                         onChange={(e) => updateLine(i, 'name', e.target.value)}
                         placeholder={t('rc.rawTextPlaceholder')}
-                        className="flex-1 min-w-0 bg-transparent border-0 px-2 py-0.5 text-[10px] text-[color:var(--color-text-faint)] focus:outline-none focus:text-[color:var(--color-text-dim)]"
+                        className="flex-1 min-w-0 bg-transparent border-0 px-2 py-0.5 text-[11px] text-[color:var(--color-text-faint)] focus:outline-none focus:text-[color:var(--color-text-dim)]"
                         style={{ fontFamily: 'var(--font-mono)' }}
                       />
                       {/* P64: per-line spend category. Empty = untagged (the pre-P64 state),
@@ -1345,7 +1279,7 @@ function ReceiptDetailModal({
                         value={li.category}
                         onChange={(e) => updateLine(i, 'category', e.target.value)}
                         title={t('rc.lineCategory')}
-                        className="shrink-0 max-w-[9rem] bg-[color:var(--color-surface-3)] border border-[color:var(--color-border)] rounded-md px-1 py-0.5 text-[10px] text-[color:var(--color-text-dim)] focus:outline-none focus:border-[color:var(--color-accent)]"
+                        className="shrink-0 max-w-[9rem] bg-[color:var(--color-surface-3)] border border-[color:var(--color-border)] rounded-md px-1 py-0.5 text-[11px] text-[color:var(--color-text-dim)] focus:outline-none focus:border-[color:var(--color-accent)]"
                         style={{ fontFamily: 'var(--font-mono)' }}
                       >
                         <option value="">{t('rc.lineCategoryNone')}</option>
@@ -1357,7 +1291,7 @@ function ReceiptDetailModal({
                         ))}
                       </select>
                       <div
-                        className="shrink-0 flex items-center gap-1 text-[10px] text-[color:var(--color-text-faint)] whitespace-nowrap"
+                        className="shrink-0 flex items-center gap-1 text-[11px] text-[color:var(--color-text-faint)] whitespace-nowrap"
                         style={{ fontFamily: 'var(--font-mono)' }}
                       >
                         <span>{t('rc.netVatGross', { net: `${cur()}${net.toFixed(2)}`, vat: `${cur()}${vat.toFixed(2)}` })}</span>
@@ -1405,11 +1339,11 @@ function ReceiptDetailModal({
                 <PackagePlus size={14} /> {t('rc.addToInventory')}
               </Button>
               {addMsg && (
-                <p className="text-[10px] text-[color:var(--color-accent)] mt-1.5 text-center" style={{ fontFamily: 'var(--font-mono)' }}>
+                <p className="text-[11px] text-[color:var(--color-accent)] mt-1.5 text-center" style={{ fontFamily: 'var(--font-mono)' }}>
                   {addMsg}
                 </p>
               )}
-              <p className="text-[10px] text-[color:var(--color-text-faint)] mt-1 text-center">
+              <p className="text-[11px] text-[color:var(--color-text-faint)] mt-1 text-center">
                 {t('rc.addToInventoryHint')}
               </p>
             </div>

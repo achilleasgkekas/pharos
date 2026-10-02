@@ -113,7 +113,7 @@ export function UpdateChecker({ canEdit }: { canEdit: boolean }) {
         <div className="flex items-center justify-between text-sm pt-1">
           <span className="text-[color:var(--color-text-faint)]">
             {t('upd.toggle')}
-            <span className="block text-[10px] text-[color:var(--color-text-faint)] opacity-70">{t('upd.toggleHint')}</span>
+            <span className="block text-[11px] text-[color:var(--color-text-faint)] opacity-70">{t('upd.toggleHint')}</span>
           </span>
           <button
             type="button"

@@ -1,5 +1,6 @@
 'use client';
-import { PAGE_MAIN, PageHeader, HeaderButton, HeaderStat, PrimaryAction } from '@/components/ui/PageHeader';
+import { PAGE_MAIN, PageHeader, HeaderButton, HeaderTotals, PrimaryAction } from '@/components/ui/PageHeader';
+import { PageFileDrop, UploadButton } from '@/components/ui/FileDrop';
 import { Field } from '@/components/ui/Field';
 import { cur, currencySymbol, CURRENCIES } from "@/lib/money";
 import { todayLocal } from "@/lib/dates";
@@ -12,7 +13,6 @@ import {
   Layers,
   FileText,
   X,
-  Upload,
   Loader2,
   Sparkles,
   Link2,
@@ -134,8 +134,6 @@ export function StatementsClient({
   const [cardFilter, setCardFilter] = useState('all');
   const [uploading, setUploading] = useState(false);
   const [uploadMsg, setUploadMsg] = useState<string | null>(null);
-  const [dragOver, setDragOver] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function handlePdf(files: FileList | null) {
     if (!files || files.length === 0) return;
@@ -182,7 +180,6 @@ export function StatementsClient({
       setUploadMsg(`${t('st.error')}: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   }
 
@@ -238,48 +235,34 @@ export function StatementsClient({
 
   return (
     <main className={`min-w-0 ${PAGE_MAIN}`}>
-      <PageHeader title={t('nav.statements')} count={statements.length}>
-        {statements.length > 0 && <HeaderStat label={`${t('payments.due')}:`} value={`${money(balances.due)}`} color="var(--color-red)" />}
-        {statements.length > 0 && balances.credit > 0 && <HeaderStat label={`${t('payments.credit')}:`} value={`${money(balances.credit)}`} color="var(--color-accent)" />}
+      <PageHeader
+        title={t('nav.statements')}
+        count={statements.length}
+        summary={
+          statements.length > 0 && (
+            <HeaderTotals
+              items={[
+                { label: t('payments.due'), value: money(balances.due), tone: balances.due > 0 ? 'red' : undefined },
+                ...(balances.credit > 0 ? [{ label: t('payments.credit'), value: money(balances.credit), tone: 'accent' as const }] : []),
+              ]}
+            />
+          )
+        }
+      >
         {statements.length > 0 && (
-          <HeaderButton icon={<Link2 size={14} />} onClick={() => setShowReconcile(true)}>{t('rec.title')}</HeaderButton>
+          <HeaderButton icon={<Link2 size={15} />} onClick={() => setShowReconcile(true)}>{t('rec.title')}</HeaderButton>
         )}
-        <HeaderButton icon={<Wallet size={14} />} onClick={() => setShowCards(true)}>{t('st.cards', { n: cards.length })}</HeaderButton>
+        <HeaderButton icon={<Wallet size={15} />} onClick={() => setShowCards(true)}>{t('st.cards', { n: cards.length })}</HeaderButton>
+        <UploadButton onFiles={(f) => handlePdf(f)} accept="application/pdf,.pdf" label={t('st.importPdf')} busy={uploading} />
         <PrimaryAction onClick={() => setShowCreate(true)} />
       </PageHeader>
-
-      {/* PDF import dropzone */}
-      <div
-        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={(e) => { e.preventDefault(); setDragOver(false); handlePdf(e.dataTransfer.files); }}
-        onClick={() => !uploading && fileInputRef.current?.click()}
-        className={cn(
-          'border-2 border-dashed rounded-2xl p-6 mb-3 text-center cursor-pointer transition-all',
-          dragOver ? 'border-[color:var(--color-accent)] bg-[color:var(--color-accent)]/3' : 'border-[color:var(--color-border)] hover:border-[color:var(--color-border-light)]',
-          uploading && 'pointer-events-none opacity-70'
-        )}
-      >
-        <input ref={fileInputRef} type="file" accept="application/pdf,.pdf" multiple className="hidden" onChange={(e) => handlePdf(e.target.files)} />
-        {uploading ? (
-          <div className="flex flex-col items-center gap-2 text-[color:var(--color-cyan)]">
-            <Loader2 size={24} className="animate-spin" />
-            <p className="text-sm">{uploadMsg}</p>
-          </div>
-        ) : (
-          <div className="flex flex-col items-center gap-1.5 text-[color:var(--color-text-dim)]">
-            <Upload size={24} />
-            <p className="text-sm font-medium text-[color:var(--color-text)]">{t('st.importTitle')}</p>
-            <p className="text-xs text-[color:var(--color-text-faint)] flex items-center gap-1.5">
-              <Sparkles size={11} className={ollamaUp ? 'text-[color:var(--color-accent)]' : 'text-[color:var(--color-text-faint)]'} />
-              {ollamaUp ? t('st.aiExtracts') : t('st.ollamaOffline')}
-            </p>
-          </div>
-        )}
-      </div>
-      {uploadMsg && !uploading && (
-        <p className="text-xs text-[color:var(--color-text-dim)] mb-4 px-1" style={{ fontFamily: 'var(--font-mono)' }}>{uploadMsg}</p>
+      <PageFileDrop onFiles={(f) => handlePdf(f)} label={t('common.dropToUpload')} hint={ollamaUp ? t('st.aiExtracts') : t('st.ollamaOffline')} disabled={uploading} />
+      {uploading && (
+        <p role="status" className="mb-4 flex items-center gap-2 text-sm text-[color:var(--color-cyan)]">
+          <Loader2 size={15} className="animate-spin" /> {uploadMsg}
+        </p>
       )}
+      {uploadMsg && !uploading && <p role="status" className="text-sm text-[color:var(--color-text-dim)] mb-4">{uploadMsg}</p>}
 
       {/* Installment plans summary (active + completed) */}
       {plans.length > 0 && <InstallmentOverview plans={plans} items={items} itemMap={itemMap} />}
@@ -302,17 +285,14 @@ export function StatementsClient({
       {statements.length === 0 ? (
         <EmptyState icon={<CreditCardIcon />} title={t('st.empty')} />
       ) : (
-        <div className="space-y-8">
+        <div className="space-y-5">
           {byCard.map(([card, list]) => (
             <div key={card}>
-              <h2
-                className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-[0.2em] mb-3 flex items-center gap-2"
-                style={{ fontFamily: 'var(--font-mono)' }}
-              >
+              <h2 className="text-sm font-semibold mb-2 flex items-center gap-2">
                 {card}
                 <UtilizationBadge u={utilization.byLabel.get(card)} />
               </h2>
-              <div className="space-y-2">
+              <div className="rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] overflow-hidden divide-y divide-[color:var(--color-border)]">
                 {list.map((s) => (
                   <StatementRow key={s._id} statement={s} base={fx.base} onOpen={() => setActiveId(s._id)} />
                 ))}
@@ -376,7 +356,7 @@ function UtilizationBadge({ u, className }: { u?: CardUtilization; className?: s
   return (
     <span
       className={cn(
-        'shrink-0 px-1.5 py-0.5 rounded text-[9px] tracking-wider normal-case',
+        'shrink-0 px-1.5 py-0.5 rounded text-[10px] normal-case',
         u.level === 'ok' ? 'bg-[color:var(--color-surface-2)]' : 'font-semibold',
         className
       )}
@@ -437,13 +417,13 @@ function InstallmentOverview({
     <div className="mb-5 bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-2xl p-4">
       <div className="flex items-center gap-2 mb-3">
         <Layers size={14} className="text-[color:var(--color-purple)]" />
-        <h2 className="text-xs uppercase tracking-[0.15em] text-[color:var(--color-text-dim)]" style={{ fontFamily: 'var(--font-mono)' }}>
+        <h2 className="text-xs text-[color:var(--color-text-dim)]" style={{ fontFamily: 'var(--font-mono)' }}>
           {t('st.activePlans', { n: active.length })}
         </h2>
         {done.length > 0 && (
           <button
             onClick={() => setShowDone((v) => !v)}
-            className="ml-auto text-[10px] text-[color:var(--color-cyan)] hover:underline"
+            className="ml-auto text-[11px] text-[color:var(--color-cyan)] hover:underline"
             style={{ fontFamily: 'var(--font-mono)' }}
           >
             {showDone ? t('st.hideCompleted', { n: done.length }) : t('st.showCompleted', { n: done.length })}
@@ -463,7 +443,7 @@ function InstallmentOverview({
 
       {showDone && done.length > 0 && (
         <div className="mt-3 pt-3 border-t border-[color:var(--color-border)]">
-          <h3 className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-[0.15em] mb-2" style={{ fontFamily: 'var(--font-mono)' }}>
+          <h3 className="text-[11px] text-[color:var(--color-text-faint)] mb-2" style={{ fontFamily: 'var(--font-mono)' }}>
             {t('st.completed', { n: done.length })}
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 items-start">
@@ -557,7 +537,7 @@ function PlanCardLinkable({
             {linkedItems.map((x) => (
               <span
                 key={x.id}
-                className="inline-flex items-center gap-1 text-[10px] text-[color:var(--color-accent)] bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-md px-1.5 py-0.5"
+                className="inline-flex items-center gap-1 text-[11px] text-[color:var(--color-accent)] bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-md px-1.5 py-0.5"
                 style={{ fontFamily: 'var(--font-mono)' }}
               >
                 <Package size={9} className="shrink-0" />
@@ -583,9 +563,9 @@ function PlanCardLinkable({
                   <span className="truncate">{i.title}</span>
                 </button>
               ))}
-              {searchMatches.length === 0 && <p className="text-[10px] text-[color:var(--color-text-faint)] italic px-2 py-1">{t('stm.noMoreInventory')}</p>}
+              {searchMatches.length === 0 && <p className="text-[11px] text-[color:var(--color-text-faint)] italic px-2 py-1">{t('stm.noMoreInventory')}</p>}
             </div>
-            <button onClick={() => { setPicking(false); setQuery(''); }} className="text-[10px] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)] px-1">
+            <button onClick={() => { setPicking(false); setQuery(''); }} className="text-[11px] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)] px-1">
               {t('stm.cancelLower')}
             </button>
           </div>
@@ -597,7 +577,7 @@ function PlanCardLinkable({
                 onClick={() => addItem(item._id)}
                 disabled={pending}
                 title={t('stm.priceMatch', { price: `${money(price)}`, total: `${money0(plan.totalAmount)}` })}
-                className="inline-flex items-center gap-1 text-[10px] text-[color:var(--color-cyan)] bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-md px-1.5 py-0.5 hover:border-[color:var(--color-accent)] hover:text-[color:var(--color-accent)] transition-colors max-w-[160px]"
+                className="inline-flex items-center gap-1 text-[11px] text-[color:var(--color-cyan)] bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-md px-1.5 py-0.5 hover:border-[color:var(--color-accent)] hover:text-[color:var(--color-accent)] transition-colors max-w-[160px]"
                 style={{ fontFamily: 'var(--font-mono)' }}
               >
                 <Package size={9} className="shrink-0" />
@@ -607,7 +587,7 @@ function PlanCardLinkable({
             ))}
             <button
               onClick={() => setPicking(true)}
-              className="text-[10px] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-cyan)]"
+              className="text-[11px] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-cyan)]"
               style={{ fontFamily: 'var(--font-mono)' }}
             >
               <Link2 size={10} className="inline" /> {linkedItems.length ? t('stm.addProduct') : suggestions.length ? t('stm.other') : t('stm.linkProduct')}
@@ -659,7 +639,7 @@ function PlanMergeControl({ plan, allPlans }: { plan: InstallmentPlan; allPlans:
   if (open) {
     return (
       <div className="bg-[color:var(--color-surface-3)] rounded-lg p-2 space-y-1">
-        <p className="text-[10px] text-[color:var(--color-text-faint)] px-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
+        <p className="text-[11px] text-[color:var(--color-text-faint)] px-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
           {t('stm.mergeInto')}
         </p>
         <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('stm.searchPlans')} className={compactControlClass} />
@@ -677,9 +657,9 @@ function PlanMergeControl({ plan, allPlans }: { plan: InstallmentPlan; allPlans:
               </span>
             </button>
           ))}
-          {targets.length === 0 && <p className="text-[10px] text-[color:var(--color-text-faint)] italic px-2 py-1">{t('stm.noOtherPlans')}</p>}
+          {targets.length === 0 && <p className="text-[11px] text-[color:var(--color-text-faint)] italic px-2 py-1">{t('stm.noOtherPlans')}</p>}
         </div>
-        <button onClick={() => { setOpen(false); setQ(''); }} className="text-[10px] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)] px-1">
+        <button onClick={() => { setOpen(false); setQ(''); }} className="text-[11px] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)] px-1">
           {t('stm.cancelLower')}
         </button>
       </div>
@@ -690,7 +670,7 @@ function PlanMergeControl({ plan, allPlans }: { plan: InstallmentPlan; allPlans:
       <button
         onClick={() => setOpen(true)}
         disabled={pending || allPlans.length < 2}
-        className="inline-flex items-center gap-1 text-[10px] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-purple)] transition-colors disabled:opacity-40"
+        className="inline-flex items-center gap-1 text-[11px] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-purple)] transition-colors disabled:opacity-40"
         style={{ fontFamily: 'var(--font-mono)' }}
       >
         <GitMerge size={10} /> {t('stm.mergeIntoBtn')}
@@ -699,7 +679,7 @@ function PlanMergeControl({ plan, allPlans }: { plan: InstallmentPlan; allPlans:
         <button
           onClick={unmerge}
           disabled={pending}
-          className="text-[10px] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] transition-colors"
+          className="text-[11px] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] transition-colors"
           style={{ fontFamily: 'var(--font-mono)' }}
         >
           {t('stm.unmerge')}
@@ -729,9 +709,9 @@ function StatementRow({
   return (
     <button
       onClick={onOpen}
-      className="w-full flex items-center gap-3 px-4 py-3 text-left bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-xl hover:border-[color:var(--color-border-light)] hover:bg-[color:var(--color-surface-2)] transition-all"
+      className="w-full flex items-center gap-3 px-3 sm:px-4 py-3 text-left hover:bg-[color:var(--color-surface-2)] transition-colors"
     >
-      <span className="text-sm font-semibold" style={{ fontFamily: 'var(--font-mono)' }}>
+      <span className="text-[15px] font-semibold">
         {periodLabel(statement.period) || statement.period}
       </span>
       <div className="flex-1" />
@@ -739,7 +719,7 @@ function StatementRow({
       <FxBadge doc={statement} base={base} />
       {installmentCount > 0 && (
         <span
-          className="hidden sm:flex items-center gap-1 text-[10px] text-[color:var(--color-purple)]"
+          className="hidden sm:flex items-center gap-1 text-[11px] text-[color:var(--color-purple)]"
           style={{ fontFamily: 'var(--font-mono)' }}
         >
           <Layers size={11} /> {t('st.installments', { n: installmentCount })}
@@ -753,12 +733,12 @@ function StatementRow({
           {credit ? '+' : ''}{money(Math.abs(statement.totalAmount))}
         </div>
         {credit ? (
-          <div className="text-[10px] text-[color:var(--color-accent)]" style={{ fontFamily: 'var(--font-mono)' }}>
+          <div className="text-[11px] text-[color:var(--color-accent)]" style={{ fontFamily: 'var(--font-mono)' }}>
             {t('st.credit')}
           </div>
         ) : (
           remaining > 0.001 && (
-            <div className="text-[10px] text-[color:var(--color-red)]" style={{ fontFamily: 'var(--font-mono)' }}>
+            <div className="text-[11px] text-[color:var(--color-red)]" style={{ fontFamily: 'var(--font-mono)' }}>
               -{money(remaining)}
             </div>
           )
@@ -841,9 +821,9 @@ function StatementDetail({
       )}
 
       <dl className="grid min-w-0 gap-4 rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] p-4 sm:grid-cols-3">
-        <div><dt style={{ fontFamily: 'var(--font-mono)' }} className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)]">{t('payments.included')}</dt><dd className="mt-1.5 text-lg font-semibold tabular-nums text-[color:var(--color-accent)]" style={{ fontFamily: 'var(--font-display)' }}>{money(paymentSummary.paymentsIncluded)}</dd></div>
-        <div><dt style={{ fontFamily: 'var(--font-mono)' }} className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)]">{t('payments.additional')}</dt><dd className="mt-1.5 text-lg font-semibold tabular-nums text-[color:var(--color-accent)]" style={{ fontFamily: 'var(--font-display)' }}>{money(paymentSummary.additionalPaid)}</dd></div>
-        <div><dt style={{ fontFamily: 'var(--font-mono)' }} className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)]">{t('payments.due')}</dt><dd className="mt-1.5 text-lg font-semibold tabular-nums" style={{ fontFamily: 'var(--font-display)', color: paymentSummary.due > 0 ? 'var(--color-red)' : 'var(--color-accent)' }}>{money(paymentSummary.due)}</dd></div>
+        <div><dt style={{ fontFamily: 'var(--font-mono)' }} className="text-[11px] text-[color:var(--color-text-faint)]">{t('payments.included')}</dt><dd className="mt-1.5 text-lg font-semibold tabular-nums text-[color:var(--color-accent)]" style={{ fontFamily: 'var(--font-display)' }}>{money(paymentSummary.paymentsIncluded)}</dd></div>
+        <div><dt style={{ fontFamily: 'var(--font-mono)' }} className="text-[11px] text-[color:var(--color-text-faint)]">{t('payments.additional')}</dt><dd className="mt-1.5 text-lg font-semibold tabular-nums text-[color:var(--color-accent)]" style={{ fontFamily: 'var(--font-display)' }}>{money(paymentSummary.additionalPaid)}</dd></div>
+        <div><dt style={{ fontFamily: 'var(--font-mono)' }} className="text-[11px] text-[color:var(--color-text-faint)]">{t('payments.due')}</dt><dd className="mt-1.5 text-lg font-semibold tabular-nums" style={{ fontFamily: 'var(--font-display)', color: paymentSummary.due > 0 ? 'var(--color-red)' : 'var(--color-accent)' }}>{money(paymentSummary.due)}</dd></div>
       </dl>
       {/* Editable statement fields — same form for reading and writing */}
       <StatementForm
@@ -890,7 +870,7 @@ function StatementDetail({
             className="w-full h-[520px] rounded-lg border border-[color:var(--color-border)] bg-white"
             title={statementTitle(current)}
           />
-          <a href={fileUrl(current.filePath)} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-1.5 text-[10px] text-[color:var(--color-cyan)] hover:underline" style={{ fontFamily: 'var(--font-mono)' }}>
+          <a href={fileUrl(current.filePath)} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-1.5 text-[11px] text-[color:var(--color-cyan)] hover:underline" style={{ fontFamily: 'var(--font-mono)' }}>
             <FileText size={10} /> {t('stm.openNewTab')}
           </a>
         </div>
@@ -921,14 +901,14 @@ function TransactionList({
     <div>
       <div className="flex items-center justify-between mb-2">
         <span
-          className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider"
+          className="text-[11px] text-[color:var(--color-text-faint)]"
           style={{ fontFamily: 'var(--font-mono)' }}
         >
           {t('stm.transactions', { n: statement.transactions.length })}
         </span>
         <button
           onClick={() => setAdding((v) => !v)}
-          className="text-[10px] text-[color:var(--color-accent)] flex items-center gap-1 hover:opacity-80"
+          className="text-[11px] text-[color:var(--color-accent)] flex items-center gap-1 hover:opacity-80"
           style={{ fontFamily: 'var(--font-mono)' }}
         >
           <Plus size={11} /> {t('stm.add')}
@@ -988,20 +968,20 @@ function InstallmentEditor({ tx, statementId }: { tx: SerializedTransaction; sta
           onChange={(e) => setCur(e.target.value)}
           placeholder={t('stm.installmentNum')}
           inputMode="numeric"
-          className="w-8 bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded px-1 py-0.5 text-[10px] text-center focus:outline-none focus:border-[color:var(--color-accent)]"
+          className="w-8 bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded px-1 py-0.5 text-[11px] text-center focus:outline-none focus:border-[color:var(--color-accent)]"
         />
-        <span className="text-[10px] text-[color:var(--color-text-faint)]">/</span>
+        <span className="text-[11px] text-[color:var(--color-text-faint)]">/</span>
         <input
           value={tot}
           onChange={(e) => setTot(e.target.value)}
           placeholder={t('stm.installmentOf')}
           inputMode="numeric"
-          className="w-8 bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded px-1 py-0.5 text-[10px] text-center focus:outline-none focus:border-[color:var(--color-accent)]"
+          className="w-8 bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded px-1 py-0.5 text-[11px] text-center focus:outline-none focus:border-[color:var(--color-accent)]"
         />
-        <button onClick={save} disabled={pending} className="text-[10px] text-[color:var(--color-accent)] hover:opacity-80">
+        <button onClick={save} disabled={pending} className="text-[11px] text-[color:var(--color-accent)] hover:opacity-80">
           {t('stm.save')}
         </button>
-        <button onClick={() => setEditing(false)} className="text-[10px] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)]">
+        <button onClick={() => setEditing(false)} className="text-[11px] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)]">
           ×
         </button>
       </span>
@@ -1009,7 +989,7 @@ function InstallmentEditor({ tx, statementId }: { tx: SerializedTransaction; sta
   }
   if (tx.installmentInfo) {
     return (
-      <button onClick={open} className="inline-flex items-center gap-1 text-[10px] text-[color:var(--color-purple)] hover:opacity-80" style={{ fontFamily: 'var(--font-mono)' }}>
+      <button onClick={open} className="inline-flex items-center gap-1 text-[11px] text-[color:var(--color-purple)] hover:opacity-80" style={{ fontFamily: 'var(--font-mono)' }}>
         {t('stm.installmentCounter', { cur: tx.installmentInfo.currentInstallment, tot: tx.installmentInfo.totalInstallments })}
         <Pencil size={8} />
       </button>
@@ -1018,7 +998,7 @@ function InstallmentEditor({ tx, statementId }: { tx: SerializedTransaction; sta
   return (
     <button
       onClick={open}
-      className="text-[10px] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-cyan)] hover:underline transition-colors"
+      className="text-[11px] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-cyan)] hover:underline transition-colors"
       style={{ fontFamily: 'var(--font-mono)' }}
     >
       {t('stm.setInstallment')}
@@ -1048,7 +1028,7 @@ function TransactionRow({
   return (
     <div className="group bg-[color:var(--color-surface-2)] rounded-lg px-3 py-2">
       <div className="flex items-center gap-3">
-        <span className="text-[10px] text-[color:var(--color-text-faint)] tabular-nums shrink-0" style={{ fontFamily: 'var(--font-mono)' }}>
+        <span className="text-[11px] text-[color:var(--color-text-faint)] tabular-nums shrink-0" style={{ fontFamily: 'var(--font-mono)' }}>
           {formatDate(tx.date, locale, { day: '2-digit', month: '2-digit' })}
         </span>
         <div className="flex-1 min-w-0">
@@ -1056,12 +1036,12 @@ function TransactionRow({
           <span className="flex items-center gap-1.5 flex-wrap">
             <InstallmentEditor tx={tx} statementId={statementId} />
             {tx.category && tx.category !== 'uncategorized' && (
-              <span className="text-[10px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
+              <span className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
                 {tx.category}
               </span>
             )}
             {credit && (
-              <span className="text-[10px] text-[color:var(--color-accent)]" style={{ fontFamily: 'var(--font-mono)' }}>
+              <span className="text-[11px] text-[color:var(--color-accent)]" style={{ fontFamily: 'var(--font-mono)' }}>
                 {t('stm.paymentCredit')}
               </span>
             )}
@@ -1148,14 +1128,14 @@ function InstallmentLink({
           {linked.map((i) => (
             <span
               key={i._id}
-              className="inline-flex items-center gap-1 text-[10px] text-[color:var(--color-accent)]"
+              className="inline-flex items-center gap-1 text-[11px] text-[color:var(--color-accent)]"
               style={{ fontFamily: 'var(--font-mono)' }}
             >
               <Package size={11} className="shrink-0" />
               <span className="truncate max-w-[160px]">{i.title}</span>
             </span>
           ))}
-          <button onClick={clearAll} disabled={pending} className="text-[10px] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)]" style={{ fontFamily: 'var(--font-mono)' }}>
+          <button onClick={clearAll} disabled={pending} className="text-[11px] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)]" style={{ fontFamily: 'var(--font-mono)' }}>
             {t('stm.unlinkAll')}
           </button>
         </div>
@@ -1164,7 +1144,7 @@ function InstallmentLink({
       {!picking ? (
         <button
           onClick={() => setPicking(true)}
-          className="flex items-center gap-1 text-[10px] text-[color:var(--color-cyan)] hover:opacity-80"
+          className="flex items-center gap-1 text-[11px] text-[color:var(--color-cyan)] hover:opacity-80"
           style={{ fontFamily: 'var(--font-mono)' }}
         >
           <Link2 size={11} /> {msg || (linked.length ? t('stm.addProduct') : t('stm.linkToProduct'))}
@@ -1191,10 +1171,10 @@ function InstallmentLink({
               </button>
             ))}
             {matches.length === 0 && (
-              <p className="text-[10px] text-[color:var(--color-text-faint)] italic px-2 py-1">{t('stm.noProductsFound')}</p>
+              <p className="text-[11px] text-[color:var(--color-text-faint)] italic px-2 py-1">{t('stm.noProductsFound')}</p>
             )}
           </div>
-          <button onClick={() => { setPicking(false); setQuery(''); }} className="text-[10px] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)] px-1">
+          <button onClick={() => { setPicking(false); setQuery(''); }} className="text-[11px] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)] px-1">
             {t('stm.cancelLower')}
           </button>
         </div>
@@ -1229,7 +1209,7 @@ function AddTransactionForm({ statementId, onDone }: { statementId: string; onDo
       </div>
       <div className="flex items-center gap-2">
         <input name="category" placeholder={t('stm.category')} className={cn(compactControlClass, 'min-w-0 flex-1')} />
-        <label className="flex items-center gap-1.5 text-[10px] text-[color:var(--color-text-dim)] cursor-pointer" style={{ fontFamily: 'var(--font-mono)' }}>
+        <label className="flex items-center gap-1.5 text-[11px] text-[color:var(--color-text-dim)] cursor-pointer" style={{ fontFamily: 'var(--font-mono)' }}>
           <input type="checkbox" checked={installment} onChange={(e) => setInstallment(e.target.checked)} className="accent-[color:var(--color-purple)]" />
           {t('stm.installment')}
         </label>
@@ -1533,12 +1513,12 @@ function CardsManager({
             <div className="flex-1 min-w-0">
               <div className="text-sm font-semibold truncate flex items-center gap-1.5">
                 {c.name} {c.last4 && <span className="text-[color:var(--color-text-faint)]">···{c.last4}</span>}
-                <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-[color:var(--color-surface-3)] text-[color:var(--color-text-dim)]" style={{ fontFamily: 'var(--font-mono)' }}>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-[color:var(--color-surface-3)] text-[color:var(--color-text-dim)]" style={{ fontFamily: 'var(--font-mono)' }}>
                   {c.kind}
                 </span>
                 <UtilizationBadge u={utilization.byCardId.get(c._id)} />
               </div>
-              <div className="text-[10px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
+              <div className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
                 {c.bank || c.type}
                 {spend && ` · ${t('stm.charged', { amount: `${money(spend.total)}`, count: spend.count })}`}
                 {c.creditLimit > 0 && ` · ${t('stm.limit', { amount: `${money(c.creditLimit)}` })}`}
@@ -1667,7 +1647,7 @@ function CardForm({ card, onDone }: { card?: SerializedCard; onDone: () => void 
           {scanPending ? t('stm.scanning') : t('stm.scanCard')}
         </Button>
         {scanMsg && (
-          <p className="text-[10px] text-[color:var(--color-accent)] mt-1.5 text-center" style={{ fontFamily: 'var(--font-mono)' }}>
+          <p className="text-[11px] text-[color:var(--color-accent)] mt-1.5 text-center" style={{ fontFamily: 'var(--font-mono)' }}>
             {scanMsg}
           </p>
         )}

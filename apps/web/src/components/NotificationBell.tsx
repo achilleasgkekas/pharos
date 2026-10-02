@@ -217,16 +217,16 @@ export function NotificationBell({ open, onOpenChange }: { open: boolean; onOpen
           if (!open) refresh();
         }}
         className={cn(
-          'relative p-2 rounded-lg transition-colors',
-          open ? 'text-[color:var(--color-accent)] bg-[color:var(--color-surface)]' : 'text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface)]'
+          'relative grid place-items-center w-11 h-11 lg:w-10 lg:h-10 rounded-[10px] transition-colors',
+          open ? 'text-[color:var(--color-text)] bg-[color:var(--color-surface-2)]' : 'text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface)]'
         )}
         aria-label={t('notif.title')}
         title={t('notif.title')}
       >
-        <Bell size={17} />
+        <Bell size={19} />
         {unread > 0 && (
           <span
-            className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 grid place-items-center rounded-full bg-[color:var(--color-accent)] text-black text-[9px] font-bold"
+            className="absolute top-1 right-1 min-w-[16px] h-4 px-1 grid place-items-center rounded-full bg-[color:var(--color-accent)] text-black text-[10px] font-bold"
             style={{ fontFamily: 'var(--font-mono)' }}
           >
             {unread > 9 ? '9+' : unread}
@@ -243,11 +243,11 @@ export function NotificationBell({ open, onOpenChange }: { open: boolean; onOpen
             {items.length > 0 && (
               <div className="flex items-center gap-2.5">
                 {unread > 0 && (
-                  <button onClick={markAll} className="text-[10px] text-[color:var(--color-cyan)] hover:underline">
+                  <button onClick={markAll} className="text-[11px] text-[color:var(--color-cyan)] hover:underline">
                     {t('notif.markAllRead')}
                   </button>
                 )}
-                <button onClick={clearAll} className="text-[10px] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)]">
+                <button onClick={clearAll} className="text-[11px] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)]">
                   {t('notif.clearAll')}
                 </button>
               </div>
@@ -284,7 +284,7 @@ export function NotificationBell({ open, onOpenChange }: { open: boolean; onOpen
                     <span className="min-w-0 flex-1">
                       {heading && <span className="block text-sm font-medium truncate">{heading}</span>}
                       <span className="block text-xs text-[color:var(--color-text-dim)] truncate">{sub}</span>
-                      <span className="block text-[10px] text-[color:var(--color-text-faint)] mt-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
+                      <span className="block text-[11px] text-[color:var(--color-text-faint)] mt-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
                         {relTime(n.createdAt, t)}
                       </span>
                     </span>

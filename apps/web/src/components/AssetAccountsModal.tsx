@@ -70,7 +70,7 @@ export function AssetAccountsModal({
                 className="flex-1 min-w-0 bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-3 py-1.5 text-xs text-[color:var(--color-text)] focus:outline-none focus:border-[color:var(--color-accent)]"
               />
               <label className="flex items-center gap-1.5 bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-2.5 py-1.5">
-                <span className="text-[10px] text-[color:var(--color-text-faint)]">{cur()}</span>
+                <span className="text-[11px] text-[color:var(--color-text-faint)]">{cur()}</span>
                 <input
                   type="number"
                   min="0"

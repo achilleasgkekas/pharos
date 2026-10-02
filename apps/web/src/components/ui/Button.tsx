@@ -11,16 +11,16 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variants: Record<Variant, string> = {
-  primary:   'bg-[color:var(--color-accent)] text-black hover:opacity-90',
-  secondary: 'bg-[color:var(--color-surface-2)] border border-[color:var(--color-border-light)] text-[color:var(--color-text)] hover:border-[color:var(--color-accent)]',
+  primary:   'bg-[color:var(--color-accent)] text-[color:var(--color-on-accent)] hover:brightness-110',
+  secondary: 'bg-[color:var(--color-surface-2)] border border-[color:var(--color-border-light)] text-[color:var(--color-text)] hover:bg-[color:var(--color-surface-3)]',
   ghost:     'text-[color:var(--color-text-dim)] hover:bg-[color:var(--color-surface-2)] hover:text-[color:var(--color-text)]',
   danger:    'bg-[color:var(--color-red)]/13 border border-[color:var(--color-red)]/25 text-[color:var(--color-red)] hover:bg-[color:var(--color-red)]/19',
 };
 
 const sizes: Record<Size, string> = {
-  sm: 'text-xs px-3 py-1.5',
-  md: 'text-sm px-4 py-2',
-  lg: 'text-base px-5 py-2.5',
+  sm: 'text-xs px-3 h-8',
+  md: 'text-sm px-4 h-10',
+  lg: 'text-base px-5 h-11',
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
@@ -28,7 +28,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     <button
       ref={ref}
       className={cn(
-        'inline-flex items-center gap-2 rounded-lg font-semibold transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed',
+        'inline-flex items-center justify-center gap-2 rounded-[10px] font-semibold whitespace-nowrap transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed',
         variants[variant],
         sizes[size],
         className

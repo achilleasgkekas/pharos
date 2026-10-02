@@ -139,7 +139,7 @@ function JobsWidget({
               <div className="h-full rounded-full bg-[color:var(--color-accent)] transition-all" style={{ width: `${pct}%` }} />
             </div>
 
-            <div className="flex items-center justify-between text-[10px] text-[color:var(--color-text-faint)]">
+            <div className="flex items-center justify-between text-[11px] text-[color:var(--color-text-faint)]">
               <span>
                 {j.done}/{j.total}
                 {!running ? ` · ${j.ok} ok` : ''}
@@ -150,7 +150,7 @@ function JobsWidget({
             </div>
 
             {j.lastLabel && (
-              <div className="flex items-center gap-1 mt-1 text-[10px] truncate">
+              <div className="flex items-center gap-1 mt-1 text-[11px] truncate">
                 {j.lastOk ? (
                   <CheckCircle2 size={10} className="text-[color:var(--color-accent)] shrink-0" />
                 ) : (

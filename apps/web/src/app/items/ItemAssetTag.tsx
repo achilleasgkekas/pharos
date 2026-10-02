@@ -40,7 +40,7 @@ export function ItemAssetTag({ itemId, title, subtitle }: { itemId: string; titl
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
-        <p className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider" style={{ fontFamily: 'var(--font-mono)' }}>
+        <p className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
           {t('it.assetTag')}
         </p>
         <button

@@ -65,6 +65,7 @@ describe('UI conventions (#351, docs/ui-conventions.md)', () => {
       'components/FirstRunTour.tsx', // the guided tour draws its own spotlight
       'components/AiCommandBar.tsx', // the command bar's dimmed backdrop
       'components/SiteNav.tsx', // only mentions the command bar's backdrop in a comment
+      'components/ui/FileDrop.tsx', // the page-wide drop target shown while a file is dragged
     ];
     expect(offenders(/fixed inset-0/, allow), 'use <Modal> from components/ui/Modal').toEqual([]);
   });

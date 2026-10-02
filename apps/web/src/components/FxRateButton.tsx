@@ -65,19 +65,19 @@ export function FxRateButton({
         title={t('fx.marketRateHint')}
         className={cn(
           'inline-flex items-center gap-1 rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface)] text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:border-[color:var(--color-purple)]/50 disabled:opacity-40 whitespace-nowrap',
-          compact ? 'px-1.5 py-1 text-[10px]' : 'px-2 py-1 text-[11px]'
+          compact ? 'px-1.5 py-1 text-[11px]' : 'px-2 py-1 text-[11px]'
         )}
       >
         <RefreshCw size={11} className={pending ? 'animate-spin' : undefined} />
         {!compact && t('fx.marketRate')}
       </button>
       {error ? (
-        <span className="text-[10px] text-[color:var(--color-red)] truncate" title={error}>
+        <span className="text-[11px] text-[color:var(--color-red)] truncate" title={error}>
           {error}
         </span>
       ) : note ? (
         <span
-          className="text-[10px] text-[color:var(--color-text-faint)] truncate"
+          className="text-[11px] text-[color:var(--color-text-faint)] truncate"
           style={{ fontFamily: 'var(--font-mono)' }}
         >
           {note}

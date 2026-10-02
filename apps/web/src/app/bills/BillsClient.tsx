@@ -5,7 +5,7 @@ import { RECURRING_CYCLES, type RecurringCycle } from '@/lib/billingCycle';
 import { Trash2, Check, Undo2, Archive, ArchiveRestore, CalendarClock, RotateCw, Coins, FileText, X } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { PAGE_MAIN, PageHeader, HeaderStat, PrimaryAction, FilterLayout, FilterSection, FilterOptions } from '@/components/ui/PageHeader';
+import { PAGE_MAIN, PageHeader, HeaderTotals, PrimaryAction, FilterLayout, FilterSection, FilterOptions } from '@/components/ui/PageHeader';
 import { Input, controlClass } from '@/components/ui/Input';
 import { DateInput } from '@/components/ui/DateInput';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -148,33 +148,42 @@ export function BillsClient({
 
   return (
     <main className={PAGE_MAIN}>
-      <PageHeader title={t('nav.bills')} count={t('bill.openCount', { n: openBills.length })}>
-        {totalDue > 0 && <HeaderStat label={t('bill.toPay')} value={money(totalDue)} color="var(--color-text)" />}
-        {noRateCount > 0 && <HeaderStat label="need a rate" value={noRateCount} color="var(--color-gold)" />}
-        {overdueCount > 0 && <HeaderStat label={t('bill.stOverdue')} value={overdueCount} color="var(--color-red)" />}
+      <PageHeader
+        title={t('nav.bills')}
+        count={t('bill.openCount', { n: openBills.length })}
+        summary={
+          (totalDue > 0 || overdueCount > 0 || noRateCount > 0) && (
+            <HeaderTotals
+              items={[
+                ...(totalDue > 0 ? [{ label: t('bill.toPay'), value: money(totalDue) }] : []),
+                ...(overdueCount > 0 ? [{ label: t('bill.stOverdue'), value: overdueCount, tone: 'red' as const }] : []),
+                ...(noRateCount > 0 ? [{ label: 'need a rate', value: noRateCount, tone: 'gold' as const }] : []),
+              ]}
+            />
+          )
+        }
+      >
         <PrimaryAction onClick={() => setShowCreate(true)} />
       </PageHeader>
 
       <FilterLayout
-        active={filter !== 'open' || !!spaceFilter}
+        active={!!spaceFilter}
+        quick={<FilterOptions variant="segmented" value={filter} onChange={setFilter} options={FILTERS.map((f) => ({ value: f.key, label: f.label }))} />}
         filters={
-          <div className="space-y-4">
-            <FilterSection label={t('common.status')}>
-              <FilterOptions value={filter} onChange={setFilter} options={FILTERS.map((f) => ({ value: f.key, label: f.label }))} />
-            </FilterSection>
-            {/* #146: hidden until a space is named, like the space field on the form. */}
-            {spaces.length > 0 && (
+          // #146: hidden until a space is named, like the space field on the form.
+          spaces.length > 0 ? (
+            <div>
               <FilterSection label={t('ex.space')}>
                 <SearchableSelect value={spaceFilter} onChange={setSpaceFilter} options={spaceFilterOptions(spaces)} labels={{ [NO_SPACE]: t('ex.spaceNone') }} placeholder={t('ex.allSpaces')} clearable size="sm" className="w-full" />
               </FilterSection>
-            )}
-          </div>
+            </div>
+          ) : undefined
         }
       >
       {visible.length === 0 ? (
         <EmptyState icon={<FileText />} title={bills.length === 0 ? t('bill.empty') : t('ex.emptyFiltered')} />
       ) : (
-        <div className="space-y-2">
+        <div className="rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] overflow-hidden divide-y divide-[color:var(--color-border)]">
           {visible.map(({ b, status, partPaid, remaining }) => (
             <BillRow
               key={b._id}
@@ -236,29 +245,26 @@ function BillRow({
   const progress = partPaid && !noRate && total > 0 ? Math.min(100, Math.round((paidSoFar / total) * 100)) : 0;
   return (
     <div
-      className={cn(
-        'flex items-center gap-3 px-3 py-2.5 rounded-xl border bg-[color:var(--color-surface)]',
-        status === 'paid' ? 'border-[color:var(--color-border)] opacity-70' : 'border-[color:var(--color-border-light)]'
-      )}
+      className={cn('flex items-center gap-3 px-3 sm:px-4 py-2.5 hover:bg-[color:var(--color-surface-2)] transition-colors', status === 'paid' && 'opacity-70')}
     >
       <button onClick={onOpen} className="flex-1 min-w-0 text-left">
         <div className="flex items-center gap-2">
-          <p className="text-[10px] uppercase tracking-[0.14em] text-[color:var(--color-text-faint)] flex items-center gap-1" style={{ fontFamily: 'var(--font-mono)' }}>
-            <CalendarClock size={11} /> {bill.vendor || bill.category || t('bill.fallback')}
+          <p className="text-xs text-[color:var(--color-text-dim)] flex items-center gap-1 min-w-0 truncate">
+            <CalendarClock size={12} className="shrink-0" /> {bill.vendor || bill.category || t('bill.fallback')}
           </p>
           {bill.cycle && (
-            <span className="inline-flex items-center gap-0.5 text-[9px] px-1 py-0.5 rounded text-[color:var(--color-text-faint)] bg-[color:var(--color-surface-2)]" style={{ fontFamily: 'var(--font-mono)' }}>
+            <span className="inline-flex items-center gap-0.5 text-[10px] px-1 py-0.5 rounded text-[color:var(--color-text-faint)] bg-[color:var(--color-surface-2)]" style={{ fontFamily: 'var(--font-mono)' }}>
               <RotateCw size={9} /> {cycleLabel(bill.cycle, t)}
             </span>
           )}
         </div>
-        <p className="font-semibold text-[color:var(--color-text)] truncate mt-0.5">{bill.title}</p>
-        <p className="text-[11px] text-[color:var(--color-text-dim)]" style={{ fontFamily: 'var(--font-mono)' }}>
+        <p className="text-[15px] font-semibold text-[color:var(--color-text)] truncate">{bill.title}</p>
+        <p className="text-xs text-[color:var(--color-text-dim)]">
           {dueLabel(bill, locale, t)}
         </p>
         {/* P61: how far along a part-paid bill is, without stealing the urgency chip. */}
         {partPaid && noRate && (
-          <p className="mt-1.5 text-[10px] text-[color:var(--color-cyan)]" style={{ fontFamily: 'var(--font-mono)' }}>
+          <p className="mt-1.5 text-[11px] text-[color:var(--color-cyan)]" style={{ fontFamily: 'var(--font-mono)' }}>
             {money(paidSoFar)} paid so far
           </p>
         )}
@@ -267,24 +273,24 @@ function BillRow({
             <div className="h-1 w-24 rounded-full bg-[color:var(--color-surface-2)] overflow-hidden">
               <div className="h-full rounded-full bg-[color:var(--color-cyan)]" style={{ width: `${progress}%` }} />
             </div>
-            <span className="text-[10px] text-[color:var(--color-cyan)]" style={{ fontFamily: 'var(--font-mono)' }}>
+            <span className="text-[11px] text-[color:var(--color-cyan)]" style={{ fontFamily: 'var(--font-mono)' }}>
               {t('bill.partProgress', { paid: money(paidSoFar), total: money(total) })}
             </span>
           </div>
         )}
       </button>
       <div className="text-right shrink-0">
-        <p className={cn('font-bold', status === 'paid' ? 'text-[color:var(--color-text-faint)]' : 'text-[color:var(--color-text)]')} style={{ fontFamily: 'var(--font-display)' }}>
+        <p className={cn('text-[15px] font-semibold tabular-nums', status === 'paid' ? 'text-[color:var(--color-text-faint)]' : 'text-[color:var(--color-text)]')}>
           {/* The headline figure is what is still owed once instalments exist. */}
           {noRate ? printed : money(partPaid ? (remaining ?? 0) : bill.amount || 0)}
         </p>
         {noRate && status !== 'paid' && (
-          <p className="text-[10px] text-[color:var(--color-gold)]" style={{ fontFamily: 'var(--font-mono)' }}>
+          <p className="text-[11px] text-[color:var(--color-gold)]" style={{ fontFamily: 'var(--font-mono)' }}>
             needs a rate · not in total
           </p>
         )}
         {partPaid && !noRate && (
-          <p className="text-[10px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
+          <p className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
             {t('bill.leftOf', { total: money(total) })}
           </p>
         )}
@@ -302,7 +308,7 @@ function BillRow({
           disabled={pending}
           title={t('bill.markPaid')}
           aria-label={t('bill.markPaid')}
-          className="shrink-0 h-9 w-9 flex items-center justify-center rounded-lg border border-[color:var(--color-border)] text-[color:var(--color-accent)] hover:bg-[color:var(--color-accent)]/10 disabled:opacity-50"
+          className="shrink-0 h-10 w-10 flex items-center justify-center rounded-[10px] border border-[color:var(--color-border-light)] text-[color:var(--color-accent)] hover:bg-[color:var(--color-accent)]/10 disabled:opacity-50"
         >
           <Check size={16} strokeWidth={2.5} />
         </button>
@@ -486,7 +492,7 @@ function BillForm({
 
       {bill && (
         <div className="pt-4 border-t border-[color:var(--color-border)] space-y-3">
-          <p className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
+          <p className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
             {t('bill.payment')}
           </p>
           {isPaid ? (

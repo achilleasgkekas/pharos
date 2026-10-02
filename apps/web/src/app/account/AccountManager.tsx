@@ -90,9 +90,9 @@ function SectionCard({
   headerAction?: React.ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-5 space-y-4">
-      <div className="flex items-start justify-between gap-4">
-        <div className="space-y-0.5">
+    <div className="rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-4 sm:p-5 space-y-4 min-w-0">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="space-y-0.5 min-w-0 flex-1 basis-56">
           <h2 className="text-sm font-semibold flex items-center gap-2 text-[color:var(--color-text)]">
             {icon && <span className="text-[color:var(--color-accent)]">{icon}</span>}
             {title}
@@ -106,98 +106,33 @@ function SectionCard({
   );
 }
 
-export function AccountManager({
-  initialData,
-  embedded: _embedded = false,
-}: {
-  initialData: AccountData;
-  embedded?: boolean;
-}) {
-  const t = useT();
-  const [activeTab, setActiveTab] = useState<'profile' | 'notifications'>('profile');
+/**
+ * Your own account, shown inside Settings › You (the redesign moved it out of its own page,
+ * so there is one place for settings). `panel` picks the page: your profile and sign-in, or
+ * the notifications that reach you personally.
+ */
+export function AccountManager({ initialData, panel }: { initialData: AccountData; panel: 'account' | 'notifications' }) {
   const [account, setAccount] = useState<AccountData>(initialData);
-
-  return (
-    <div className="space-y-6">
-      {/* Hero Profile Header */}
-      <div className="rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-5 md:p-6 shadow-sm">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] flex items-center justify-center text-lg font-bold text-[color:var(--color-accent)] shrink-0 shadow-inner">
-              {(account.user.name || account.user.username || 'U').slice(0, 2).toUpperCase()}
-            </div>
-            <div className="space-y-1 min-w-0">
-              <div className="flex items-center gap-2.5 flex-wrap">
-                <h2 className="text-xl font-bold text-[color:var(--color-text)] tracking-tight">
-                  {account.user.name || account.user.username}
-                </h2>
-                <span className="text-[10px] px-2 py-0.5 rounded-full font-mono font-semibold uppercase tracking-wider bg-[color:var(--color-accent)]/10 text-[color:var(--color-accent)] border border-[color:var(--color-accent)]/30">
-                  {account.user.role}
-                </span>
-              </div>
-              <p className="text-xs text-[color:var(--color-text-dim)] flex items-center gap-2">
-                <span className="font-mono">@{account.user.username}</span>
-                {account.user.email && (
-                  <>
-                    <span>•</span>
-                    <span className="truncate">{account.user.email}</span>
-                  </>
-                )}
-              </p>
-            </div>
-          </div>
-
-          {/* Sub-navigation tabs */}
-          <div className="flex items-center gap-1 bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] p-1 rounded-xl self-start sm:self-center">
-            <button
-              type="button"
-              onClick={() => setActiveTab('profile')}
-              className={cn(
-                'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer',
-                activeTab === 'profile'
-                  ? 'bg-[color:var(--color-surface)] text-[color:var(--color-accent)] shadow-sm font-semibold'
-                  : 'text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]'
-              )}
-            >
-              <UserRound size={14} />
-              {t('account.tabProfile')}
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('notifications')}
-              className={cn(
-                'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer',
-                activeTab === 'notifications'
-                  ? 'bg-[color:var(--color-surface)] text-[color:var(--color-accent)] shadow-sm font-semibold'
-                  : 'text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]'
-              )}
-            >
-              <Bell size={14} />
-              {t('account.tabNotifications')}
-              {account.hasCustomSubscriptions && (
-                <span className="w-1.5 h-1.5 rounded-full bg-[color:var(--color-accent)]" />
-              )}
-            </button>
-          </div>
-        </div>
+  if (panel === 'notifications') {
+    return (
+      <div className="space-y-4">
+        <NotificationChannelsSection account={account} />
+        <AlertTopicsSection account={account} onUpdate={(updated) => setAccount(updated)} />
       </div>
-
-      {/* Tab Panels */}
-      {activeTab === 'profile' ? (
-        <div className="space-y-5">
-          <ProfileDetailsSection account={account} onUpdate={(updated) => setAccount(updated)} />
-          <PasswordSection />
-          <MfaSection />
-          <UiPreferencesSection />
-        </div>
-      ) : (
-        <div className="space-y-5">
-          <NotificationChannelsSection account={account} />
-          <AlertTopicsSection account={account} onUpdate={(updated) => setAccount(updated)} />
-        </div>
-      )}
+    );
+  }
+  return (
+    <div className="space-y-4">
+      <ProfileDetailsSection account={account} onUpdate={(updated) => setAccount(updated)} />
+      <PasswordSection />
+      <MfaSection />
     </div>
   );
+}
+
+/** Settings › You › Appearance & language: theme and language for this browser. */
+export function AppearancePanel() {
+  return <UiPreferencesSection />;
 }
 
 // ─── 1. Profile Details Section ────────────────────────────────────────────────
@@ -305,7 +240,7 @@ function ProfileDetailsSection({
       ) : (
         <div className="grid gap-4 sm:grid-cols-3 pt-1">
           <div className="rounded-lg bg-[color:var(--color-surface-2)]/60 border border-[color:var(--color-border)] p-3">
-            <span className="text-[11px] text-[color:var(--color-text-faint)] block uppercase tracking-wider font-mono">
+            <span className="text-[11px] text-[color:var(--color-text-faint)] block font-mono">
               {t('account.displayName')}
             </span>
             <span className="text-sm font-medium text-[color:var(--color-text)] mt-0.5 block truncate">
@@ -313,7 +248,7 @@ function ProfileDetailsSection({
             </span>
           </div>
           <div className="rounded-lg bg-[color:var(--color-surface-2)]/60 border border-[color:var(--color-border)] p-3">
-            <span className="text-[11px] text-[color:var(--color-text-faint)] block uppercase tracking-wider font-mono">
+            <span className="text-[11px] text-[color:var(--color-text-faint)] block font-mono">
               {t('account.username')}
             </span>
             <span className="text-sm font-medium text-[color:var(--color-text)] mt-0.5 block font-mono truncate">
@@ -321,7 +256,7 @@ function ProfileDetailsSection({
             </span>
           </div>
           <div className="rounded-lg bg-[color:var(--color-surface-2)]/60 border border-[color:var(--color-border)] p-3">
-            <span className="text-[11px] text-[color:var(--color-text-faint)] block uppercase tracking-wider font-mono">
+            <span className="text-[11px] text-[color:var(--color-text-faint)] block font-mono">
               {t('account.email')}
             </span>
             <span className="text-sm font-medium text-[color:var(--color-text)] mt-0.5 block truncate">
@@ -534,7 +469,7 @@ function MfaSection() {
         status && (
           <span
             className={cn(
-              'text-[10px] px-2 py-0.5 rounded-full font-mono font-semibold uppercase tracking-wider',
+              'text-[11px] px-2 py-0.5 rounded-full font-mono font-semibold',
               status.enabled
                 ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/30'
                 : 'bg-[color:var(--color-surface-2)] text-[color:var(--color-text-faint)] border border-[color:var(--color-border)]'
@@ -606,10 +541,10 @@ function MfaSection() {
                 <div className="flex flex-col sm:flex-row items-center gap-4">
                   {uri && <QrCode value={uri} size={140} />}
                   <div className="space-y-2 min-w-0 flex-1">
-                    <span className="text-[11px] text-[color:var(--color-text-faint)] font-mono uppercase">
+                    <span className="text-[11px] text-[color:var(--color-text-faint)] font-mono">
                       {t('set.twoFactorManualKey')}
                     </span>
-                    <p className="font-mono text-xs bg-[color:var(--color-surface)] p-2 rounded-lg border border-[color:var(--color-border)] select-all break-all">
+                    <p className="font-code text-xs bg-[color:var(--color-surface)] p-2 rounded-lg border border-[color:var(--color-border)] select-all break-all">
                       {secret}
                     </p>
                   </div>
@@ -628,7 +563,7 @@ function MfaSection() {
                       value={code}
                       onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
                       placeholder="123456"
-                      className={cn(controlClass, 'font-mono text-center tracking-widest text-base')}
+                      className={cn(controlClass, 'font-mono text-center text-base')}
                     />
                     <button
                       type="button"
@@ -658,7 +593,7 @@ function MfaSection() {
                     {copiedCodes ? t('cal.copied') : 'Copy'}
                   </button>
                 </div>
-                <div className="grid grid-cols-2 gap-2 font-mono text-xs bg-[color:var(--color-surface)] p-3 rounded-lg border border-[color:var(--color-border)]">
+                <div className="grid grid-cols-2 gap-2 font-code text-xs bg-[color:var(--color-surface)] p-3 rounded-lg border border-[color:var(--color-border)]">
                   {recoveryCodes.map((rc, idx) => (
                     <span key={idx} className="select-all text-[color:var(--color-text)]">
                       {rc}
@@ -787,7 +722,7 @@ function NotificationChannelsSection({
               </h3>
               <span
                 className={cn(
-                  'text-[10px] px-2 py-0.2 rounded-full font-mono uppercase',
+                  'text-[11px] px-2 py-0.2 rounded-full font-mono',
                   account.user.email
                     ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/30'
                     : 'bg-[color:var(--color-surface)] text-[color:var(--color-text-faint)] border border-[color:var(--color-border)]'
@@ -944,13 +879,13 @@ function AlertTopicsSection({
           </span>
           <span
             className={cn(
-              'px-2 py-0.5 rounded font-mono text-[10px] font-semibold uppercase',
+              'px-2 py-0.5 rounded font-mono text-[11px] font-semibold',
               isCustom
                 ? 'bg-[color:var(--color-accent)]/10 text-[color:var(--color-accent)] border border-[color:var(--color-accent)]/30'
                 : 'bg-[color:var(--color-surface-2)] text-[color:var(--color-text-faint)] border border-[color:var(--color-border)]'
             )}
           >
-            {isCustom ? 'Custom' : 'Workspace'}
+            {isCustom ? t('account.badgeCustom') : t('set.grpWorkspace')}
           </span>
         </div>
 
@@ -968,12 +903,12 @@ function AlertTopicsSection({
                   <h3 className="text-xs font-semibold text-[color:var(--color-text)]">
                     {t(group.titleKey)}
                   </h3>
-                  <span className="text-[10px] text-[color:var(--color-text-faint)] font-mono ml-auto">
+                  <span className="text-[11px] text-[color:var(--color-text-faint)] font-mono ml-auto">
                     {groupAlerts.filter((a) => types[a.key]).length}/{groupAlerts.length}
                   </span>
                 </div>
 
-                <div className="grid gap-2 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   {groupAlerts.map((at) => {
                     const isOverridden = isCustom && types[at.key] !== account.workspaceNotifyTypes[at.key];
                     return (
@@ -991,8 +926,8 @@ function AlertTopicsSection({
                             {t(`alert.${at.key}` as TKey)}
                           </span>
                           {isOverridden && (
-                            <span className="text-[9px] font-mono text-[color:var(--color-accent)] uppercase tracking-wider block">
-                              override
+                            <span className="text-[11px] font-mono text-[color:var(--color-accent)] block">
+                              {t('account.badgeOverride')}
                             </span>
                           )}
                         </div>

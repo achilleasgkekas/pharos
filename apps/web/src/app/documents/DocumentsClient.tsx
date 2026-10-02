@@ -115,8 +115,8 @@ export function DocumentsClient({ documents, leadDays }: { documents: Serialized
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-semibold text-sm truncate" style={{ fontFamily: 'var(--font-display)' }}>{d.title}</span>
-                    {d.type && <span className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>{d.type}</span>}
-                    {d.holder && <span className="text-[10px] text-[color:var(--color-text-dim)]">· {d.holder}</span>}
+                    {d.type && <span className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>{d.type}</span>}
+                    {d.holder && <span className="text-[11px] text-[color:var(--color-text-dim)]">· {d.holder}</span>}
                   </div>
                   <div className="flex items-center gap-2 flex-wrap text-[11px] text-[color:var(--color-text-faint)] mt-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
                     <span>{t('doc.expShort', { date: fmtDate(d.expiryDate, locale) })}</span>

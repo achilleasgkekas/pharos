@@ -164,7 +164,7 @@ export function CsvImportModal({ kind, fx, onClose, onImported }: Props) {
             ) : (
               <p className="text-xs">{t('csv.dropHint')}</p>
             )}
-            <p className="text-[10px] text-[color:var(--color-text-faint)]">{t('csv.formats')}</p>
+            <p className="text-[11px] text-[color:var(--color-text-faint)]">{t('csv.formats')}</p>
           </div>
         </div>
 
@@ -178,7 +178,7 @@ export function CsvImportModal({ kind, fx, onClose, onImported }: Props) {
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 {mappedFields.map(({ field, required }) => (
                   <div key={field}>
-                    <p className="text-[10px] text-[color:var(--color-text-dim)] mb-1" style={{ fontFamily: 'var(--font-mono)' }}>
+                    <p className="text-[11px] text-[color:var(--color-text-dim)] mb-1" style={{ fontFamily: 'var(--font-mono)' }}>
                       {t(`csv.f_${field}` as Parameters<typeof t>[0])}{required && ' *'}
                     </p>
                     <select
@@ -209,7 +209,7 @@ export function CsvImportModal({ kind, fx, onClose, onImported }: Props) {
               </label>
             </div>
             {!signSplit && (
-              <p className="text-[10px] text-[color:var(--color-text-faint)]">{t('csv.allAsKind', { kind: kind === 'income' ? t('nav.income') : t('nav.expenses') })}</p>
+              <p className="text-[11px] text-[color:var(--color-text-faint)]">{t('csv.allAsKind', { kind: kind === 'income' ? t('nav.income') : t('nav.expenses') })}</p>
             )}
 
             {/* Multi-currency (P9): one rate per foreign code found in the file. */}
@@ -219,7 +219,7 @@ export function CsvImportModal({ kind, fx, onClose, onImported }: Props) {
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                   {foreignCodes.map((code) => (
                     <div key={code}>
-                      <p className="text-[10px] text-[color:var(--color-text-dim)] mb-1" style={{ fontFamily: 'var(--font-mono)' }}>
+                      <p className="text-[11px] text-[color:var(--color-text-dim)] mb-1" style={{ fontFamily: 'var(--font-mono)' }}>
                         {t('csv.fxRateFor', { code, base: normalizeCurrency(fx.base) || 'EUR' })}
                       </p>
                       <input
@@ -236,7 +236,7 @@ export function CsvImportModal({ kind, fx, onClose, onImported }: Props) {
                     </div>
                   ))}
                 </div>
-                <p className="mt-1.5 text-[10px] text-[color:var(--color-text-faint)]">{t('csv.fxRatesHint')}</p>
+                <p className="mt-1.5 text-[11px] text-[color:var(--color-text-faint)]">{t('csv.fxRatesHint')}</p>
               </div>
             )}
 
@@ -249,7 +249,7 @@ export function CsvImportModal({ kind, fx, onClose, onImported }: Props) {
                 <div className="overflow-x-auto rounded-xl border border-[color:var(--color-border)]">
                   <table className="w-full text-xs">
                     <thead>
-                      <tr className="text-left text-[10px] uppercase text-[color:var(--color-text-faint)] border-b border-[color:var(--color-border)]" style={{ fontFamily: 'var(--font-mono)' }}>
+                      <tr className="text-left text-[11px] text-[color:var(--color-text-faint)] border-b border-[color:var(--color-border)]" style={{ fontFamily: 'var(--font-mono)' }}>
                         <th className="px-3 py-2">{t('csv.f_date')}</th>
                         <th className="px-3 py-2">{t('csv.f_vendor')}</th>
                         <th className="px-3 py-2 text-right">{t('csv.f_amount')}</th>
