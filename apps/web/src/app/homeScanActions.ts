@@ -19,7 +19,7 @@ export type HomeScanResult =
 
 export async function scanHomeDocument(kind: HomeScanKind, formData: FormData): Promise<HomeScanResult> {
   await assertCanWrite();
-  if (!(kind in FEATURE)) return { ok: false, error: 'Unknown scan' };
+  if (kind !== 'document' && kind !== 'bill' && kind !== 'meter') return { ok: false, error: 'Unknown scan' };
   return withRequestTenant(async (): Promise<HomeScanResult> => {
     if (!(await isFeatureEnabled(FEATURE[kind]))) return { ok: false, error: 'This scan (AI) is turned off. Turn it on in Settings → AI.' };
     const file = formData.get('file');
