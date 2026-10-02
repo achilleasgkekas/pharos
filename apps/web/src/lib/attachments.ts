@@ -1,6 +1,6 @@
 // Files and links on a record: the client-safe half (kinds and link validation).
 
-export const ATTACHMENT_KINDS = ['item', 'document', 'bill', 'subscription', 'task'] as const;
+export const ATTACHMENT_KINDS = ['item', 'document', 'bill', 'subscription', 'task', 'voucher'] as const;
 export type AttachmentKind = (typeof ATTACHMENT_KINDS)[number];
 
 /** An http(s) URL, trimmed, or '' for anything else (javascript:, data:, a bare word). */

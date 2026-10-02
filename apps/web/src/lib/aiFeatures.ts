@@ -20,6 +20,7 @@ export type AiFeatureKey =
   | 'giftIdeas'
   | 'reportSummary'
   | 'savingsPlan'
+  | 'inbox'
   | 'commandBar';
 
 export type AiFeatureStatus = 'disabled' | 'no-provider' | 'ready';
@@ -43,6 +44,7 @@ export const AI_FEATURES: { key: AiFeatureKey; label: string; description: strin
   { key: 'giftIdeas', label: 'Gift ideas', description: 'Suggest gifts for a birthday or nameday, to add to the wishlist.', area: 'Shopping & items' },
   { key: 'reportSummary', label: 'Report summary', description: 'Explain the period in a few sentences on the Reports page, when you ask for it.', area: 'Insights' },
   { key: 'savingsPlan', label: 'Savings plan', description: 'Turn a savings goal into a few steps with amounts, from what you earn, spend and pay.', area: 'Insights' },
+  { key: 'inbox', label: 'AI inbox', description: 'Drop any file on Home; it says where it belongs and saves it there with the file.', area: 'Assistant' },
   { key: 'commandBar', label: 'AI command bar', description: 'Natural-language assistant in the top bar (add expenses, items, tasks…).', area: 'Assistant' },
 ];
 

@@ -6,6 +6,8 @@ export type ReadingLike = {
   space: string;
   readingAt: string;
   value: number;
+  /** The meter photo the reading came from (storage path), if any. */
+  photoPath?: string;
 };
 
 export type ReadingWithConsumption = ReadingLike & { consumption: number | null };

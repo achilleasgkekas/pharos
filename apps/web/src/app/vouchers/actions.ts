@@ -59,8 +59,9 @@ export async function createVoucher(formData: FormData) {
   return withRequestTenant(async () => {
     await connectDB();
     const Voucher = await currentModel(VoucherModel);
-    await Voucher.create({ ...raw, expiresAt: safeDateOrNull(raw.expiresAt), used: false });
+    const v = await Voucher.create({ ...raw, expiresAt: safeDateOrNull(raw.expiresAt), used: false });
     revalidatePath('/vouchers');
+    return { id: String(v._id) };
   });
 }
 

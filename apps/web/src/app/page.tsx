@@ -23,6 +23,8 @@ import { cookies } from 'next/headers';
 import { PAGE_MAIN } from '@/components/ui/PageHeader';
 import { getServerT } from '@/lib/i18n/server';
 import { categoryLabel } from '@/lib/categories';
+import { InboxDrop } from '@/components/InboxDrop';
+import { aiFeatureStatus } from '@/lib/aiFeatures.server';
 import type { TFunc, TKey } from '@/lib/i18n';
 
 export const dynamic = 'force-dynamic';
@@ -175,7 +177,7 @@ function greetingKey(now: Date, timeZone?: string): TKey {
 
 export default async function HomePage() {
   const [{ t, locale }, timeZone] = await Promise.all([getServerT(), viewerTimeZone()]);
-  const d = await getDashboard(locale);
+  const [d, inbox] = await Promise.all([getDashboard(locale), withRequestTenant(() => aiFeatureStatus('inbox'))]);
   const now = new Date();
   const money = (n: number) => formatMoney(n, d.currency, locale);
   const when = (date: string) => {
@@ -223,6 +225,8 @@ export default async function HomePage() {
         doneLabel={t('home.onbDone')}
         steps={onboardingSteps(d.onboarding, t)}
       />
+
+      {inbox !== 'disabled' && <InboxDrop />}
 
       <div className={`${card} grid grid-cols-2 lg:grid-cols-4 gap-px overflow-hidden bg-[color:var(--color-border)] mb-4`}>
         {kpis.map((k) => (

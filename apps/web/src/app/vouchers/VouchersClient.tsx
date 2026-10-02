@@ -17,6 +17,8 @@ import type { SerializedVoucher } from '@/types';
 import { useT } from '@/components/LocaleProvider';
 import type { TKey } from '@/lib/i18n';
 import { createVoucher, updateVoucher, deleteVoucher, toggleVoucherUsed, scanVoucherText, scanVoucherImage } from './actions';
+import { addAttachmentFiles } from '@/app/attachmentActions';
+import { RecordAttachments } from '@/components/RecordAttachments';
 import { compareNames } from '@/lib/i18n/format';
 import { useLocale } from '@/components/LocaleProvider';
 
@@ -138,6 +140,9 @@ export function VouchersClient({ vouchers }: { vouchers: SerializedVoucher[] }) 
       {editing && (
         <Modal open onClose={() => setEditing(null)} title={editing.title} size="xl">
           <VoucherForm voucher={editing} onSuccess={() => setEditing(null)} onDeleted={() => setEditing(null)} />
+          <div className="mt-5 border-t border-[color:var(--color-border)] pt-4">
+            <RecordAttachments kind="voucher" id={editing._id} attachments={editing.attachments ?? []} />
+          </div>
         </Modal>
       )}
     </main>
@@ -322,6 +327,7 @@ function VoucherForm({ voucher, onSuccess, onDeleted }: { voucher?: SerializedVo
   // ── AI scan: paste text or upload a coupon image → prefill the form ──
   const [aiText, setAiText] = useState('');
   const [aiMsg, setAiMsg] = useState<string | null>(null);
+  const [scannedFile, setScannedFile] = useState<File | null>(null);
   const aiFileRef = useRef<HTMLInputElement>(null);
 
   function applyParsed(d: { title: string; code: string; store: string; discount: string; expiresAt: string; url: string; notes: string }) {
@@ -357,8 +363,10 @@ function VoucherForm({ voucher, onSuccess, onDeleted }: { voucher?: SerializedVo
       const fd = new FormData();
       fd.set('file', f);
       const r = await scanVoucherImage(fd);
-      if (r.ok) applyParsed(r.data);
-      else setAiMsg(r.error);
+      if (r.ok) {
+        applyParsed(r.data);
+        setScannedFile(f); // kept with the voucher once it is saved
+      } else setAiMsg(r.error);
     });
   }
 
@@ -370,7 +378,14 @@ function VoucherForm({ voucher, onSuccess, onDeleted }: { voucher?: SerializedVo
     startTransition(async () => {
       try {
         if (voucher) await updateVoucher(voucher._id, fd);
-        else await createVoucher(fd);
+        else {
+          const created = await createVoucher(fd);
+          if (scannedFile && created?.id) {
+            const files = new FormData();
+            files.append('files', scannedFile);
+            await addAttachmentFiles('voucher', created.id, files);
+          }
+        }
         onSuccess();
       } catch (err) {
         setError((err as Error).message || 'Save failed');
