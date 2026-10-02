@@ -35,7 +35,6 @@ import {
   type CardUtilizationIndex,
 } from '@/lib/cardUtilization';
 import { computeInstallmentPlans, suggestPlanMerges, shortMonth, type InstallmentPlan } from '@/lib/installments';
-import { InstallmentPlanCard } from '@/components/InstallmentPlanCard';
 import { useOpenParam } from '@/components/useOpenParam';
 import {
   createStatement,
@@ -48,11 +47,7 @@ import {
   linkInstallmentToItem,
   unlinkInstallment,
   setTransactionInstallment,
-  linkPlanToItem,
-  unlinkPlanByKey,
-  removeItemFromPlanByKey,
   bindInstallmentGroup,
-  unbindInstallmentGroup,
   rescanStatement,
 } from './actions';
 import { OWNED_STATUSES } from '@/lib/itemStatus';
@@ -74,6 +69,7 @@ import {
 } from '@/lib/fx';
 import { formatDate } from '@/lib/i18n/format';
 import { RescanControl } from '@/components/RescanControl';
+import { PlanTile } from './PlanTile';
 import { CategoryBadge } from '@/components/CategoryBadge';
 
 export type ItemOption = {
@@ -84,6 +80,9 @@ export type ItemOption = {
   status: string;
   currentPrice: number;
   purchasedPrice: number | null;
+  purchasedAt?: string | null;
+  purchasedFrom?: string;
+  photos?: string[];
 };
 
 
@@ -624,9 +623,9 @@ function InstallmentOverview({
       </div>
 
       {active.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 items-start">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-start">
           {active.map((p) => (
-            <PlanCardLinkable key={p.key} plan={p} items={items} itemMap={itemMap} linkedItemIds={linkedItemIds} allPlans={plans} />
+            <PlanTile key={p.key} plan={p} items={items} itemMap={itemMap} linkedElsewhere={linkedItemIds} allPlans={plans} />
           ))}
         </div>
       ) : (
@@ -638,244 +637,12 @@ function InstallmentOverview({
           <h3 className="text-[11px] text-[color:var(--color-text-faint)] mb-2" style={{ fontFamily: 'var(--font-mono)' }}>
             {t('st.completed', { n: done.length })}
           </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 items-start">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-start">
             {done.map((p) => (
-              <PlanCardLinkable key={p.key} plan={p} items={items} itemMap={itemMap} linkedItemIds={linkedItemIds} allPlans={plans} compact />
+              <PlanTile key={p.key} plan={p} items={items} itemMap={itemMap} linkedElsewhere={linkedItemIds} allPlans={plans} />
             ))}
           </div>
         </div>
-      )}
-    </div>
-  );
-}
-
-/** A plan card in the overview, with a link/unlink control + price-based product
- *  suggestions (works for active AND completed plans). */
-function PlanCardLinkable({
-  plan,
-  items,
-  itemMap,
-  linkedItemIds,
-  allPlans,
-  compact,
-}: {
-  plan: InstallmentPlan;
-  items: ItemOption[];
-  itemMap: Map<string, ItemOption>;
-  linkedItemIds: Set<string>;
-  allPlans: InstallmentPlan[];
-  compact?: boolean;
-}) {
-  const money = useMoney();
-  const money0 = (n: number) => money(n, undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-  const t = useT();
-  const confirm = useConfirm();
-  const [pending, startTransition] = useTransition();
-  const [picking, setPicking] = useState(false);
-  const [query, setQuery] = useState('');
-
-  const linkedItems = plan.itemIds.map((id) => ({ id, title: itemMap.get(id)?.title ?? t("stm.product") }));
-  const planItemSet = useMemo(() => new Set(plan.itemIds), [plan.itemIds]);
-
-  // Owned products, not already on ANY plan, whose price ≈ this plan's total (±15%).
-  const suggestions = useMemo(() => {
-    if (!(plan.totalAmount > 0)) return [];
-    return items
-      .filter((i) => (OWNED_STATUSES as readonly string[]).includes(i.status) && !linkedItemIds.has(i._id))
-      .map((i) => ({ item: i, price: i.purchasedPrice ?? i.currentPrice }))
-      .filter((x) => x.price > 0 && Math.abs(x.price - plan.totalAmount) / plan.totalAmount <= 0.15)
-      .sort((a, b) => Math.abs(a.price - plan.totalAmount) - Math.abs(b.price - plan.totalAmount))
-      .slice(0, 3);
-  }, [plan, items, linkedItemIds]);
-
-  const searchMatches = useMemo(() => {
-    if (!picking) return [];
-    const q = query.trim().toLowerCase();
-    const owned = items.filter(
-      (i) => (OWNED_STATUSES as readonly string[]).includes(i.status) && !planItemSet.has(i._id)
-    );
-    return (q ? owned.filter((i) => i.title.toLowerCase().includes(q)) : owned).slice(0, 8);
-  }, [items, query, picking, planItemSet]);
-
-  function addItem(itemId: string) {
-    startTransition(async () => {
-      await linkPlanToItem(plan.signature, itemId);
-      setPicking(false);
-      setQuery('');
-    });
-  }
-  async function removeItem(itemId: string) {
-    if (!(await confirm({ title: t('stm.removeProduct'), message: t('payments.confirmUnlink'), confirmLabel: t('common.delete'), danger: true }))) return;
-    startTransition(async () => {
-      await removeItemFromPlanByKey(plan.signature, itemId);
-    });
-  }
-  async function clearAll() {
-    if (!(await confirm({ title: t('stm.clearAll'), message: t('payments.confirmUnlink'), confirmLabel: t('common.delete'), danger: true }))) return;
-    startTransition(async () => {
-      await unlinkPlanByKey(plan.signature);
-    });
-  }
-
-  return (
-    <div className={cn("min-w-0", compact && 'opacity-80')}>
-      <InstallmentPlanCard plan={plan} itemTitles={linkedItems.map((x) => x.title)} compact={compact} />
-      <details className="mt-3 min-w-0 rounded-lg border border-[color:var(--color-border)] p-3 [&_button]:min-h-11 [&_button]:px-3 [&_button]:text-xs">
-        <summary className="cursor-pointer py-2 text-xs text-[color:var(--color-cyan)]" style={{ fontFamily: 'var(--font-mono)' }}>{t('payments.manage')}</summary>
-        <div className="mt-3 space-y-4">
-        {/* Linked products — one removable chip each. A single charge can cover several. */}
-        {linkedItems.length > 0 && (
-          <div className="flex flex-wrap gap-1">
-            {linkedItems.map((x) => (
-              <span
-                key={x.id}
-                className="inline-flex items-center gap-1 text-[11px] text-[color:var(--color-accent)] bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-md px-1.5 py-0.5"
-                style={{ fontFamily: 'var(--font-mono)' }}
-              >
-                <Package size={9} className="shrink-0" />
-                <span className="truncate max-w-[120px]">{x.title}</span>
-                <button onClick={() => removeItem(x.id)} disabled={pending} title={t('stm.removeProduct')} className="hover:text-[color:var(--color-red)] shrink-0">×</button>
-              </span>
-            ))}
-          </div>
-        )}
-
-        {picking ? (
-          <div className="bg-[color:var(--color-surface-3)] rounded-lg p-2 space-y-1">
-            <input autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t('stm.searchInventory')} className={compactControlClass} />
-            <div className="max-h-32 overflow-y-auto space-y-0.5">
-              {searchMatches.map((i) => (
-                <button
-                  key={i._id}
-                  onClick={() => addItem(i._id)}
-                  disabled={pending}
-                  className="w-full text-left text-[11px] px-2 py-1 rounded hover:bg-[color:var(--color-surface)] flex items-center gap-1.5 disabled:opacity-50"
-                >
-                  <Package size={11} className="text-[color:var(--color-text-faint)] shrink-0" />
-                  <span className="truncate">{i.title}</span>
-                </button>
-              ))}
-              {searchMatches.length === 0 && <p className="text-[11px] text-[color:var(--color-text-faint)] italic px-2 py-1">{t('stm.noMoreInventory')}</p>}
-            </div>
-            <button onClick={() => { setPicking(false); setQuery(''); }} className="text-[11px] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)] px-1">
-              {t('stm.cancelLower')}
-            </button>
-          </div>
-        ) : (
-          <div className="flex flex-wrap items-center gap-1.5">
-            {suggestions.map(({ item, price }) => (
-              <button
-                key={item._id}
-                onClick={() => addItem(item._id)}
-                disabled={pending}
-                title={t('stm.priceMatch', { price: `${money(price)}`, total: `${money0(plan.totalAmount)}` })}
-                className="inline-flex items-center gap-1 text-[11px] text-[color:var(--color-cyan)] bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-md px-1.5 py-0.5 hover:border-[color:var(--color-accent)] hover:text-[color:var(--color-accent)] transition-colors max-w-[160px]"
-                style={{ fontFamily: 'var(--font-mono)' }}
-              >
-                <Package size={9} className="shrink-0" />
-                <span className="truncate">{item.title}</span>
-                <span className="text-[color:var(--color-text-faint)] shrink-0">{money(price)}</span>
-              </button>
-            ))}
-            <button
-              onClick={() => setPicking(true)}
-              className="text-[11px] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-cyan)]"
-              style={{ fontFamily: 'var(--font-mono)' }}
-            >
-              <Link2 size={10} className="inline" /> {linkedItems.length ? t('stm.addProduct') : suggestions.length ? t('stm.other') : t('stm.linkProduct')}
-            </button>
-          </div>
-        )}
-        <div className="border-t border-[color:var(--color-border)] pt-3"><PlanMergeControl plan={plan} allPlans={allPlans} /></div>
-        {linkedItems.length > 0 && <div className="border-t border-[color:var(--color-border)] pt-3">
-          <Button variant="danger" size="sm" onClick={clearAll} disabled={pending} className="w-full justify-center min-h-11">{t('stm.clearAll')}</Button>
-        </div>}
-        </div>
-      </details>
-    </div>
-  );
-}
-
-/** Merge two installment plans the bank printed with different wording across
- *  statements ("QUEST ONLINE" vs "QUEST ONLINE KALLITHEA") into one payoff plan. */
-function PlanMergeControl({ plan, allPlans }: { plan: InstallmentPlan; allPlans: InstallmentPlan[] }) {
-  const money = useMoney();
-  const money0 = (n: number) => money(n, undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-  const t = useT();
-  const confirm = useConfirm();
-  const [pending, startTransition] = useTransition();
-  const [open, setOpen] = useState(false);
-  const [q, setQ] = useState('');
-
-  const targets = useMemo(() => {
-    const others = allPlans.filter((p) => p.key !== plan.key);
-    const query = q.trim().toLowerCase();
-    return (query ? others.filter((p) => p.label.toLowerCase().includes(query)) : others).slice(0, 8);
-  }, [allPlans, plan.key, q]);
-
-  async function merge(targetKey: string) {
-    if (!(await confirm({ title: t('stm.mergeIntoBtn'), message: t('payments.confirmMerge'), confirmLabel: t('stm.mergeIntoBtn') }))) return;
-    startTransition(async () => {
-      await bindInstallmentGroup(plan.key, targetKey);
-      setOpen(false);
-      setQ('');
-    });
-  }
-  async function unmerge() {
-    if (!(await confirm({ title: t('stm.unmerge'), message: t('payments.confirmMerge'), confirmLabel: t('stm.unmerge') }))) return;
-    startTransition(async () => {
-      await unbindInstallmentGroup(plan.key);
-    });
-  }
-
-  if (open) {
-    return (
-      <div className="bg-[color:var(--color-surface-3)] rounded-lg p-2 space-y-1">
-        <p className="text-[11px] text-[color:var(--color-text-faint)] px-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
-          {t('stm.mergeInto')}
-        </p>
-        <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('stm.searchPlans')} className={compactControlClass} />
-        <div className="max-h-32 overflow-y-auto space-y-0.5">
-          {targets.map((p) => (
-            <button
-              key={p.key}
-              onClick={() => merge(p.key)}
-              disabled={pending}
-              className="w-full text-left text-[11px] px-2 py-1 rounded hover:bg-[color:var(--color-surface)] flex items-center justify-between gap-2 disabled:opacity-50"
-            >
-              <span className="truncate">{p.label}</span>
-              <span className="text-[color:var(--color-text-faint)] shrink-0" style={{ fontFamily: 'var(--font-mono)' }}>
-                {money0(p.perAmount)} · {p.paidInstallments}/{p.totalInstallments}
-              </span>
-            </button>
-          ))}
-          {targets.length === 0 && <p className="text-[11px] text-[color:var(--color-text-faint)] italic px-2 py-1">{t('stm.noOtherPlans')}</p>}
-        </div>
-        <button onClick={() => { setOpen(false); setQ(''); }} className="text-[11px] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)] px-1">
-          {t('stm.cancelLower')}
-        </button>
-      </div>
-    );
-  }
-  return (
-    <div className="flex items-center gap-2">
-      <button
-        onClick={() => setOpen(true)}
-        disabled={pending || allPlans.length < 2}
-        className="inline-flex items-center gap-1 text-[11px] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-purple)] transition-colors disabled:opacity-40"
-        style={{ fontFamily: 'var(--font-mono)' }}
-      >
-        <GitMerge size={10} /> {t('stm.mergeIntoBtn')}
-      </button>
-      {plan.merged && (
-        <button
-          onClick={unmerge}
-          disabled={pending}
-          className="text-[11px] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] transition-colors"
-          style={{ fontFamily: 'var(--font-mono)' }}
-        >
-          {t('stm.unmerge')}
-        </button>
       )}
     </div>
   );

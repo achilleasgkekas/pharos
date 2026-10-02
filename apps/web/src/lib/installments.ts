@@ -241,3 +241,27 @@ export function suggestPlanMerges(plans: InstallmentPlan[]): [InstallmentPlan, I
   }
   return out;
 }
+
+export type PlanMatchItem = { _id: string; title: string; purchasedPrice: number | null; currentPrice: number; purchasedAt?: string | null; purchasedFrom?: string };
+
+const tokens = (s: string) => new Set(normalizeInstallmentDesc(s).split(' ').filter((w) => w.length >= 3 && !/^\d+$/.test(w)));
+
+/** How likely an item is the thing an installment plan paid for, 0..100: the price against the
+ *  plan total (most of it), the purchase month against the month of installment 1, and a word
+ *  shared between the plan's merchant line and the item's title or shop. */
+export function planItemMatch(plan: Pick<InstallmentPlan, 'totalAmount' | 'label' | 'signature' | 'firstDate'>, item: PlanMatchItem): number {
+  const price = item.purchasedPrice ?? item.currentPrice;
+  const pricePart = price > 0 && plan.totalAmount > 0 ? Math.max(0, 1 - Math.abs(price - plan.totalAmount) / plan.totalAmount / 0.25) : 0;
+  const origin = plan.signature.split('|')[2] || (plan.firstDate || '').slice(0, 7);
+  let datePart = 0;
+  if (origin && item.purchasedAt) {
+    const [oy, om] = origin.split('-').map(Number);
+    const d = new Date(item.purchasedAt);
+    const diff = Math.abs(d.getUTCFullYear() * 12 + d.getUTCMonth() - (oy * 12 + om - 1));
+    datePart = diff === 0 ? 1 : diff === 1 ? 0.7 : diff === 2 ? 0.4 : 0;
+  }
+  const a = tokens(plan.label);
+  const b = tokens(`${item.title} ${item.purchasedFrom ?? ''}`);
+  const namePart = [...a].some((w) => b.has(w)) ? 1 : 0;
+  return Math.round(100 * (0.55 * pricePart + 0.3 * datePart + 0.15 * namePart));
+}

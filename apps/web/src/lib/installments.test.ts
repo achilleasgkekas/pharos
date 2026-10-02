@@ -9,6 +9,7 @@ import {
   plansForItem,
   shortMonth,
   suggestPlanMerges,
+  planItemMatch,
 } from './installments';
 import type { SerializedStatement, SerializedTransaction } from '@/types';
 
@@ -392,5 +393,21 @@ describe('plan label', () => {
   it('uses the description when the bank put the amount in the purchase column', () => {
     const s = [mkStmt('2026-07', 'Visa', [mkTx({ date: '2026-07-10', amount: 40, description: 'QUEST ONLINE ΔΟΣΗ 3/12', current: 3, total: 12, originalPurchase: '480.00' })])];
     expect(computeInstallmentPlans(s)[0].label).toBe('QUEST ONLINE');
+  });
+});
+
+describe('planItemMatch', () => {
+  const plan = { totalAmount: 600, label: 'PLAISIO COMPUTERS', signature: 'plaisio computers|6|2026-03', firstDate: '2026-03-10' };
+  it('scores a same-price item bought that month from that shop near 100', () => {
+    expect(planItemMatch(plan, { _id: 'a', title: 'Laptop', purchasedPrice: 600, currentPrice: 0, purchasedAt: '2026-03-08', purchasedFrom: 'Plaisio' })).toBe(100);
+  });
+  it('drops with price distance and with months apart', () => {
+    const near = planItemMatch(plan, { _id: 'a', title: 'Laptop', purchasedPrice: 630, currentPrice: 0, purchasedAt: '2026-04-01' });
+    const far = planItemMatch(plan, { _id: 'b', title: 'Laptop', purchasedPrice: 900, currentPrice: 0, purchasedAt: '2025-01-01' });
+    expect(near).toBeGreaterThan(50);
+    expect(far).toBe(0);
+  });
+  it('uses the current price when there is no purchase price', () => {
+    expect(planItemMatch(plan, { _id: 'c', title: 'x', purchasedPrice: null, currentPrice: 600 })).toBe(55);
   });
 });

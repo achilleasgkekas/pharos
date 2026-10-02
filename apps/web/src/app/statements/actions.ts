@@ -12,7 +12,8 @@ import { isFeatureEnabled } from '@/lib/aiFeatures.server';
 import { safeDate, safeDateOrNull } from '@/lib/dates';
 import { normalizeLast4, detectCardType, buildCardLabel } from '@/lib/cards';
 import { mirrorFileToRemote } from '@/lib/mirror';
-import { installmentSignature } from '@/lib/installments';
+import { installmentSignature, installmentGroupKey } from '@/lib/installments';
+import { Item as ItemModel } from '@/models/Item';
 import { getAppSettings } from '@/lib/appSettings';
 import { resolveStatementAmounts, toPrinted, convertToBase } from '@/lib/fx';
 import type { SerializedTransaction, SerializedStatement } from '@/types';
@@ -438,6 +439,7 @@ export async function linkPlanToItem(
   signature: string,
   itemId: string
 ): Promise<{ ok: boolean; linked: number }> {
+  await assertCanWrite();
   return withRequestTenant(async () => {
     await connectDB();
     const linked = await addItemBySignature(signature, itemId);
@@ -451,6 +453,7 @@ export async function removeItemFromPlanByKey(
   signature: string,
   itemId: string
 ): Promise<{ ok: boolean }> {
+  await assertCanWrite();
   return withRequestTenant(async () => {
     await connectDB();
     await removeItemBySignature(signature, itemId);
@@ -464,6 +467,7 @@ export async function unlinkInstallment(
   statementId: string,
   transactionId: string
 ): Promise<{ ok: boolean }> {
+  await assertCanWrite();
   return withRequestTenant(async () => {
     await connectDB();
     const Statement = await currentModel(StatementModel);
@@ -480,12 +484,83 @@ export async function unlinkInstallment(
 
 /** Clear ALL product links from an installment plan by its signature. */
 export async function unlinkPlanByKey(signature: string): Promise<{ ok: boolean }> {
+  await assertCanWrite();
   return withRequestTenant(async () => {
     await connectDB();
     await clearLinkBySignature(signature);
     revalidateInstallments();
     return { ok: true };
   });
+}
+
+/** Set exactly which products an installment plan paid for. `planKey` is the plan's grouping
+ *  key, so a merged plan (differently worded lines bound together) is updated on every line. */
+export async function setPlanItems(planKey: string, itemIds: string[]): Promise<{ ok: boolean; error?: string }> {
+  await assertCanWrite();
+  const ids = [...new Set((Array.isArray(itemIds) ? itemIds : []).map(String))].filter((x) => Types.ObjectId.isValid(x)).slice(0, 20);
+  if (!planKey) return { ok: false, error: 'No plan' };
+  return withRequestTenant(async () => {
+    await connectDB();
+    const Statement = await currentModel(StatementModel);
+    for (const s of await Statement.find()) {
+      let changed = false;
+      for (const t of s.transactions) {
+        if (!t.installmentInfo) continue;
+        if (installmentGroupKey(t as unknown as SerializedTransaction, s.period) !== planKey) continue;
+        t.matchedItemIds = ids.map((x) => new Types.ObjectId(x)) as unknown as typeof t.matchedItemIds;
+        changed = true;
+      }
+      if (changed) {
+        s.markModified('transactions');
+        await s.save();
+      }
+    }
+    revalidateInstallments();
+    return { ok: true };
+  });
+}
+
+const PlanItemSchema = z.object({
+  title: z.string().trim().min(1).max(200),
+  price: z.coerce.number().nonnegative().max(10_000_000),
+  purchasedAt: z.string().max(40).optional(),
+  store: z.string().trim().max(100).optional(),
+});
+
+/** No product for this purchase yet: make one in the inventory from the plan and link it. */
+export async function createItemFromPlan(planKey: string, input: z.input<typeof PlanItemSchema>): Promise<{ ok: boolean; id?: string; error?: string }> {
+  await assertCanWrite();
+  const parsed = PlanItemSchema.safeParse(input);
+  if (!planKey || !parsed.success) return { ok: false, error: 'Invalid product' };
+  const d = parsed.data;
+  const id = await withRequestTenant(async () => {
+    await connectDB();
+    const Item = await currentModel(ItemModel);
+    const item = await Item.create({
+      title: d.title,
+      status: 'received',
+      category: 'other',
+      purchasedPrice: Math.round(d.price * 100) / 100,
+      currentPrice: Math.round(d.price * 100) / 100,
+      purchasedAt: safeDateOrNull(d.purchasedAt ?? ''),
+      purchasedFrom: d.store ?? '',
+      notes: '',
+    });
+    return String(item._id);
+  });
+  // Keep the products already on the plan and add the new one.
+  const existing = await withRequestTenant(async () => {
+    const Statement = await currentModel(StatementModel);
+    for (const s of await Statement.find()) {
+      for (const t of s.transactions) {
+        if (t.installmentInfo && installmentGroupKey(t as unknown as SerializedTransaction, s.period) === planKey) return (t.matchedItemIds ?? []).map(String);
+      }
+    }
+    return [] as string[];
+  });
+  const r = await setPlanItems(planKey, [...existing, id]);
+  revalidatePath('/items');
+  return r.ok ? { ok: true, id } : { ok: false, error: r.error };
 }
 
 // ─── Internal signature-based mutators (matchedItemIds is an array) ──────────
