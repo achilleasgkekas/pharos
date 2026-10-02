@@ -2619,6 +2619,20 @@ export const en = {
   "common.removeFilter": "Remove filter: {name}",
   "reports.subsPerMonth": "Subscriptions per month",
   "reports.subsPerYear": "{x} a year",
+  "it.catNetwork": "Network",
+  "it.catStorage": "Storage",
+  "it.catCompute": "Computers",
+  "it.catAudio": "Audio",
+  "it.catVideo": "Video",
+  "it.catMobile": "Mobile",
+  "it.catPeripheral": "Peripherals",
+  "it.catConsumable": "Consumables",
+  "it.catOther": "Other",
+  "it.tabBasics": "Details",
+  "it.tabPrices": "Prices & links",
+  "it.tabFiles": "Documents & tag",
+  "it.tabMore": "More",
+  "it.fromStore": "from {store}",
 } as const;
 
 export type Dict = Record<keyof typeof en, string>;

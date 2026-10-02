@@ -77,6 +77,13 @@ Each item can hold specs, notes, tags, a location, a category, one or more
 the same product can be sold in several shops, an item aggregates multiple store
 links and prices rather than duplicating the product.
 
+Opening an item shows a summary on top (photo, price, status, quick actions) and
+four tabs below it: **Details**, **Prices & links**, **Documents & tag** (manuals and
+the printable QR label) and **More** (serial, build, service schedule, lending,
+custom attributes, warranty claims). One Save button keeps every tab's edits.
+Lists and cards show prices with two decimals, the category in your language with
+an icon, the sale price for sold items, and the warranty only on things you still own.
+
 Highlights:
 
 - **Builds.** Give related items the same **build / project** name (a PC build, a

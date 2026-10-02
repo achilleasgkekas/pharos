@@ -125,7 +125,7 @@ export function ItemPhotoGallery({
           type="button"
           onClick={() => inputRef.current?.click()}
           disabled={uploading || fetching}
-          className="h-40 sm:h-48 w-full rounded-2xl border border-dashed border-[color:var(--color-border-light)] hover:border-[color:var(--color-text-faint)] hover:text-[color:var(--color-text-dim)] bg-[color:var(--color-surface)] flex flex-col items-center justify-center gap-2 text-[color:var(--color-text-faint)] transition-colors"
+          className="h-28 sm:h-48 w-full rounded-2xl border border-dashed border-[color:var(--color-border-light)] hover:border-[color:var(--color-text-faint)] hover:text-[color:var(--color-text-dim)] bg-[color:var(--color-surface)] flex flex-col items-center justify-center gap-2 text-[color:var(--color-text-faint)] transition-colors"
         >
           <input ref={inputRef} type="file" accept="image/*" multiple capture="environment" className="hidden" onChange={(e) => handleFiles(e.target.files)} />
           {uploading ? <Loader2 size={28} className="animate-spin" /> : <ImagePlus size={28} />}
