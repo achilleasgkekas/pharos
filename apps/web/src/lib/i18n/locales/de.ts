@@ -2728,4 +2728,6 @@ export const de: Partial<Dict> = {
   "pl.onOther": "in anderem Plan",
   "pl.selected": "{n} ausgewählt",
   "pl.merge": "Gleicher Kauf wie ein anderer Plan…",
+  "bar.aiOpenElsewhere": "Ask Pharos ist offen",
+  "bar.aiPanelTitle": "Frag Pharos",
 };

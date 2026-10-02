@@ -2824,6 +2824,8 @@ export const en = {
   "pl.onOther": "on another plan",
   "pl.selected": "{n} selected",
   "pl.merge": "Same purchase as another plan…",
+  "bar.aiOpenElsewhere": "Ask Pharos is open",
+  "bar.aiPanelTitle": "Ask Pharos",
 } as const;
 
 export type Dict = Record<keyof typeof en, string>;

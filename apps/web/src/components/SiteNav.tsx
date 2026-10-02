@@ -380,7 +380,7 @@ function SectionBar() {
   return (
     <nav
       aria-label={t('nav.sections')}
-      className="lg:hidden fixed bottom-0 inset-x-0 z-40 grid grid-cols-5 border-t border-[color:var(--color-border)] bg-[color:var(--color-bg)]/95 backdrop-blur-md pb-[env(safe-area-inset-bottom)]"
+      className="pharos-mobile-chrome lg:hidden fixed bottom-0 inset-x-0 z-40 grid grid-cols-5 border-t border-[color:var(--color-border)] bg-[color:var(--color-bg)]/95 backdrop-blur-md pb-[env(safe-area-inset-bottom)]"
     >
       {items.map((it) => {
         const Icon = it.icon;
@@ -449,7 +449,7 @@ function HomeQuickAdd() {
         type="button"
         onClick={() => setOpen(true)}
         aria-label={t('nav.quickAdd')}
-        className="lg:hidden fixed right-4 z-30 bottom-[calc(80px+env(safe-area-inset-bottom))] w-14 h-14 rounded-full grid place-items-center bg-[color:var(--color-accent)] text-[color:var(--color-on-accent)] shadow-[0_8px_24px_rgba(0,0,0,0.5)] active:scale-95 transition-transform"
+        className="pharos-mobile-chrome lg:hidden fixed right-4 z-30 bottom-[calc(80px+env(safe-area-inset-bottom))] w-14 h-14 rounded-full grid place-items-center bg-[color:var(--color-accent)] text-[color:var(--color-on-accent)] shadow-[0_8px_24px_rgba(0,0,0,0.5)] active:scale-95 transition-transform"
       >
         <Plus size={24} strokeWidth={2.4} />
       </button>
