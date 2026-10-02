@@ -151,6 +151,15 @@ describe('runPriceScrape', () => {
     expect(owned.links[0].price).toBe(900); // not reached this run
   });
 
+  it('settles a stale headline price on items the run did not check (replaces the Recompute button)', async () => {
+    const stale = makeItemDoc({ _id: 'stale', status: 'received', currentPrice: 475, lastPriceCheckAt: new Date(Date.now() - 86_400_000), links: [{ label: 'S', url: 'https://shop.example/o', price: 300 }] });
+    itemFind.mockResolvedValue([stale]);
+    const r = await runPriceScrape();
+    expect(r.scanned).toBe(0);
+    expect(stale.currentPrice).toBe(300);
+    expect(stale.save).toHaveBeenCalledTimes(1);
+  });
+
   it('skips an owned item that was price-checked within the last week', async () => {
     const owned = makeItemDoc({ _id: 'owned', status: 'received', lastPriceCheckAt: new Date(Date.now() - 86_400_000), links: [{ label: 'S', url: 'https://shop.example/o', price: 900 }] });
     itemFind.mockResolvedValue([owned]);

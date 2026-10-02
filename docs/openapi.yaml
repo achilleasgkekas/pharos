@@ -390,22 +390,6 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
 
-  /items/{id}/convert-to-task:
-    parameters:
-      - $ref: '#/components/parameters/Id'
-    post:
-      tags: [Items]
-      summary: Convert an item into a task
-      description: Creates a Task seeded from this item (title, price, links, tag `shopping`). The item is left untouched.
-      responses:
-        '200':
-          description: Created task.
-          content:
-            application/json:
-              schema: { type: object, additionalProperties: true }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '404': { $ref: '#/components/responses/NotFound' }
-
   /items/{id}/plans:
     parameters:
       - $ref: '#/components/parameters/Id'

@@ -1,11 +1,9 @@
 'use server';
-import { cur } from "@/lib/money";
 import { connectDB } from '@/lib/db';
 import { Item as ItemModel } from '@/models/Item';
 import { AppConfig as AppConfigModel } from '@/models/AppConfig';
 import { Receipt as ReceiptModel } from '@/models/Receipt';
 import { Statement as StatementModel } from '@/models/Statement';
-import { Task as TaskModel } from '@/models/Task';
 import { Store as StoreModel } from '@/models/Store';
 import { withRequestTenant } from '@/lib/tenancy/request';
 import { currentModel } from '@/lib/tenancy/connection';
@@ -1043,47 +1041,6 @@ export async function aiFillInfo(
   });
 }
 
-function escapeHtml(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
-
-/**
- * Convert an item into a standalone task. Copies the product's URLs (and prices)
- * into the task's notes — no link back to the item, no mutation of the item.
- */
-export async function convertItemToTask(itemId: string): Promise<{ ok: boolean; taskId?: string; error?: string }> {
-  await assertCanWrite();
-  return withRequestTenant(async () => {
-  await connectDB();
-  const Item = await currentModel(ItemModel);
-  const Task = await currentModel(TaskModel);
-  const item = await Item.findById(itemId).lean();
-  if (!item) return { ok: false, error: 'Item not found' };
-
-  const links = ((item.links ?? []) as { label?: string; url?: string; price?: number | null }[]).filter((l) => l.url);
-  const linksHtml = links.length
-    ? `<ul>${links
-        .map((l) => {
-          const u = escapeHtml(l.url || '');
-          const label = escapeHtml(l.label || l.url || 'Link');
-          const price = l.price ? ` — ${cur()}${l.price}` : '';
-          return `<li><a href="${u}" target="_blank" rel="noopener noreferrer">${label}</a>${price}</li>`;
-        })
-        .join('')}</ul>`
-    : '<p>(no links)</p>';
-  const priceLine = item.currentPrice > 0 ? `<p>Price: <strong>${cur()}${item.currentPrice}</strong></p>` : '';
-  const content = `<p>From product: <strong>${escapeHtml(item.title)}</strong></p>${priceLine}${linksHtml}`;
-
-  const task = await Task.create({
-    title: item.title,
-    content,
-    tags: ['shopping'],
-    status: 'todo',
-  });
-  revalidatePath('/tasks');
-  return { ok: true, taskId: String(task._id) };
-  });
-}
 
 export type ImportItemResult =
   | {
@@ -2203,6 +2160,9 @@ export async function runPriceScrape(): Promise<{
       }
     }
 
+    // Items this run did not touch can still carry a stale headline price; settle them all.
+    await recomputeLowestPrices(Item).catch(() => 0);
+
     safeRevalidate('/items');
     safeRevalidate('/shopping');
     return { ok: true, scanned, itemsChanged, linksChecked, drops, errors, linksFound };
@@ -2210,15 +2170,11 @@ export async function runPriceScrape(): Promise<{
 }
 
 /**
- * One-time maintenance: recompute every item's currentPrice from its links + price
- * history (lowest known). Fixes stale/seeded headline prices (e.g. a €475 with no
- * store behind it) so the big number always reflects real, tracked prices.
+ * Keep every item's headline price on its lowest known price (links + price history). Runs at
+ * the end of each price scrape, so a stale or seeded figure (a €475 with no store behind it)
+ * corrects itself without a button. Caller supplies the tenant context and the model.
  */
-export async function recomputeAllItemPrices(): Promise<{ ok: boolean; updated: number }> {
-  await assertCanWrite();
-  return withRequestTenant(async () => {
-  await connectDB();
-  const Item = await currentModel(ItemModel);
+async function recomputeLowestPrices(Item: typeof ItemModel): Promise<number> {
   const items = await Item.find();
   let updated = 0;
   for (const it of items) {
@@ -2229,8 +2185,5 @@ export async function recomputeAllItemPrices(): Promise<{ ok: boolean; updated: 
       updated++;
     }
   }
-  revalidatePath('/items');
-  revalidatePath('/shopping');
-  return { ok: true, updated };
-  });
+  return updated;
 }

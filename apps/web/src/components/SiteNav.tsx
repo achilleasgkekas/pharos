@@ -180,9 +180,9 @@ function Sidebar({ user }: { user?: SessionUser }) {
           <AppSidebarNav />
         )}
       </div>
-      <div className="shrink-0 border-t border-[color:var(--color-border)] px-3 py-2 flex items-center gap-1">
+      <div className="sb-foot shrink-0 border-t border-[color:var(--color-border)] px-3 py-2 flex items-center gap-1">
         {!inSettings && (
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 w-full">
             <SidebarLink item={{ href: '/settings', icon: Settings }} label={t('nav.settings')} active={false} />
           </div>
         )}

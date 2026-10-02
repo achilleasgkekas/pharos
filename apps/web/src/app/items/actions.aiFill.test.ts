@@ -87,7 +87,7 @@ vi.mock('@/lib/appSettings', () => ({ getAppSettings: vi.fn(async () => ({ curre
 vi.mock('@/lib/money', () => ({ cur: () => '€' }));
 vi.mock('next/cache', () => ({ revalidatePath: (p: string) => revalidatePathMock(p) }));
 
-import { fetchItemPhotos, aiFillItem, aiFillItemsBulk, aiFillSpecs, aiFillInfo, convertItemToTask } from './actions';
+import { fetchItemPhotos, aiFillItem, aiFillItemsBulk, aiFillSpecs, aiFillInfo } from './actions';
 
 function makeItem(overrides: Record<string, any> = {}) {
   return {
@@ -518,47 +518,6 @@ describe('aiFillInfo', () => {
     expect(r.filled).toEqual([]);
     expect(r.ok).toBe(true);
     expect(item.aiFilledAt).toBeUndefined();
-  });
-});
-
-describe('convertItemToTask', () => {
-  function queueItemLean(value: any) {
-    itemFindById.mockReturnValueOnce({ lean: async () => value });
-  }
-
-  it('reports item-not-found and never creates a task', async () => {
-    queueItemLean(null);
-    const r = await convertItemToTask('i1');
-    expect(r).toEqual({ ok: false, error: 'Item not found' });
-    expect(taskCreate).not.toHaveBeenCalled();
-  });
-
-  it('builds an HTML task body with price line + linked-list of store links', async () => {
-    queueItemLean({ title: 'RTX 5080', currentPrice: 999, links: [{ label: 'Skroutz', url: 'https://skroutz.gr/x', price: 999 }] });
-    const r = await convertItemToTask('i1');
-    expect(r).toEqual({ ok: true, taskId: 'task1' });
-    const doc = taskCreate.mock.calls[0][0];
-    expect(doc.title).toBe('RTX 5080');
-    expect(doc.tags).toEqual(['shopping']);
-    expect(doc.status).toBe('todo');
-    expect(doc.content).toBe(
-      '<p>From product: <strong>RTX 5080</strong></p><p>Price: <strong>€999</strong></p><ul><li><a href="https://skroutz.gr/x" target="_blank" rel="noopener noreferrer">Skroutz</a> — €999</li></ul>'
-    );
-    expect(revalidatePathMock).toHaveBeenCalledWith('/tasks');
-  });
-
-  it('shows "(no links)" and skips the price line when there are none / price is 0', async () => {
-    queueItemLean({ title: 'Widget', currentPrice: 0, links: [] });
-    await convertItemToTask('i1');
-    const doc = taskCreate.mock.calls[0][0];
-    expect(doc.content).toBe('<p>From product: <strong>Widget</strong></p><p>(no links)</p>');
-  });
-
-  it('HTML-escapes the title', async () => {
-    queueItemLean({ title: 'A & B <script> "x"', currentPrice: 0, links: [] });
-    await convertItemToTask('i1');
-    const doc = taskCreate.mock.calls[0][0];
-    expect(doc.content).toContain('A &amp; B &lt;script&gt; &quot;x&quot;');
   });
 });
 
