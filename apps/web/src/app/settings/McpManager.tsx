@@ -5,7 +5,7 @@ import { getMcpStatus, generateApiToken, revokeApiToken } from './mcpActions';
 import { useT } from '@/components/LocaleProvider';
 import { FIELD_LABEL } from '@/components/ui/Field';
 
-const codeCls = 'flex-1 min-w-0 text-xs bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-3 py-2 truncate';
+const codeCls = 'flex-1 min-w-0 flex items-center min-h-10 text-xs bg-[color:var(--color-surface-2)] border border-[color:var(--color-border-light)] rounded-[10px] px-3 py-2 truncate';
 const iconBtn = 'shrink-0 p-2 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:border-[color:var(--color-accent)] transition-colors';
 
 /** Settings card: a per-user bearer token + connector URL for the remote MCP server. */

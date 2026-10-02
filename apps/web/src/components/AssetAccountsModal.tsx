@@ -5,6 +5,8 @@ import { Plus, X, Loader2 } from 'lucide-react';
 import { cur } from '@/lib/money';
 import { useT, useMoney } from '@/components/LocaleProvider';
 import { saveAssetAccounts } from '@/app/settings/actions';
+import { compactControlClass } from '@/components/ui/Input';
+import { cn } from '@/components/ui/cn';
 
 export function AssetAccountsModal({
   open,
@@ -67,7 +69,7 @@ export function AssetAccountsModal({
                   setRows((p) => p.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))
                 }
                 placeholder={t('set.accountNamePlaceholder')}
-                className="flex-1 min-w-0 bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-3 py-1.5 text-xs text-[color:var(--color-text)] focus:outline-none focus:border-[color:var(--color-accent)]"
+                className={cn(compactControlClass, 'flex-1 min-w-0')}
               />
               <label className="flex items-center gap-1.5 bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-2.5 py-1.5">
                 <span className="text-[11px] text-[color:var(--color-text-faint)]">{cur()}</span>

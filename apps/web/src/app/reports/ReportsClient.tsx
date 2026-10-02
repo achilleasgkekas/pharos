@@ -31,6 +31,8 @@ import { applyFxRate, applyFxRateToCurrency } from './fxActions';
 import { FxRateButton } from '@/components/FxRateButton';
 import { createGoal, addGoalContribution, deleteGoal, sweepBudgetLeftoverToGoal } from './goalsActions';
 import { formatDate } from '@/lib/i18n/format';
+import { compactControlClass } from '@/components/ui/Input';
+import { cn } from '@/components/ui/cn';
 
 const PALETTE = ['#00ff88', '#00d4ff', '#ffd93d', '#a55eea', '#ff4757', '#00b894', '#fdcb6e', '#6c5ce7'];
 
@@ -256,7 +258,7 @@ function FxCurrencyGroup({ currency, rows, base }: { currency: string; rows: FxI
             onChange={(e) => setRate(e.target.value)}
             placeholder={t('reports.fxRate')}
             aria-label={t('reports.fxRateHint', { code: currency, base })}
-            className="w-24 bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-lg px-2 py-1 text-xs text-[color:var(--color-text)] focus:outline-none focus:border-[color:var(--color-gold)]"
+            className={cn(compactControlClass, 'w-24')}
             style={{ fontFamily: 'var(--font-mono)' }}
           />
           {/* P9 phase 2: fill the group's rate from the ECB feed. Latest fixing, not a
@@ -330,7 +332,7 @@ function FxIssueLine({ row, base, fallbackRate }: { row: FxIssueRow; base: strin
           onChange={(e) => setRate(e.target.value)}
           placeholder={fallbackRate > 0 ? String(fallbackRate) : t('reports.fxRate')}
           aria-label={t('reports.fxRateHint', { code: row.currency, base })}
-          className="w-20 bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-2 py-1 text-xs text-[color:var(--color-text)] focus:outline-none focus:border-[color:var(--color-gold)]"
+          className={cn(compactControlClass, 'w-20')}
           style={{ fontFamily: 'var(--font-mono)' }}
         />
         <button
@@ -979,11 +981,11 @@ function NewGoalForm({ onDone }: { onDone: () => void }) {
     <form action={submit} className="mb-4 p-3 rounded-xl bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] flex flex-wrap gap-2 items-end">
       <div className="flex-1 min-w-[140px]">
         <label className="block text-[11px] text-[color:var(--color-text-faint)] mb-1">{t('reports.gTitle')}</label>
-        <input name="title" required placeholder={t('reports.gTitlePlaceholder')} className="w-full bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-lg px-2.5 py-1.5 text-xs text-[color:var(--color-text)] focus:outline-none focus:border-[color:var(--color-accent)]" />
+        <input name="title" required placeholder={t('reports.gTitlePlaceholder')} className={cn(compactControlClass, 'w-full')} />
       </div>
       <div className="w-28">
         <label className="block text-[11px] text-[color:var(--color-text-faint)] mb-1">{t('reports.gTarget')} ({cur()})</label>
-        <input name="targetAmount" type="number" min="0" step="0.01" required className="w-full bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-lg px-2.5 py-1.5 text-xs text-[color:var(--color-text)] focus:outline-none focus:border-[color:var(--color-accent)]" />
+        <input name="targetAmount" type="number" min="0" step="0.01" required className={cn(compactControlClass, 'w-full')} />
       </div>
       <div className="w-36">
         <label className="block text-[11px] text-[color:var(--color-text-faint)] mb-1">{t('reports.gDeadline')}</label>
@@ -1059,7 +1061,7 @@ function GoalItem({ g }: { g: GoalRow }) {
             onChange={(e) => setAmount(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && contribute()}
             placeholder={t('reports.gAddAmount')}
-            className="flex-1 min-w-0 bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-lg px-2 py-1 text-[11px] text-[color:var(--color-text)] focus:outline-none focus:border-[color:var(--color-accent)]"
+            className={cn(compactControlClass, 'flex-1 min-w-0')}
           />
           <button onClick={contribute} disabled={pending} className="shrink-0 text-[11px] px-2 py-1 rounded-lg bg-[color:var(--color-accent)]/10 text-[color:var(--color-accent)] hover:bg-[color:var(--color-accent)]/20 disabled:opacity-50">
             <Plus size={12} />
@@ -1112,7 +1114,7 @@ function SweepToGoal({ category, monthKey, amount, goals }: { category: string; 
       <select
         value={goalId}
         onChange={(e) => setGoalId(e.target.value)}
-        className="min-w-0 flex-1 bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-2 py-1 text-[11px] text-[color:var(--color-text)] focus:outline-none focus:border-[color:var(--color-accent)]"
+        className={cn(compactControlClass, 'min-w-0 flex-1')}
       >
         {goals.map((g) => (
           <option key={g._id} value={g._id}>{g.title}</option>

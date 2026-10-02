@@ -453,7 +453,7 @@ function TaskCreateForm({ onClose }: { onClose: () => void }) {
           onChange={set('content')}
           rows={8}
           placeholder={t('tk.notesPlaceholder')}
-          className="w-full bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[color:var(--color-accent)] resize-y"
+          className={cn(controlClass, 'w-full resize-y')}
         />
       </div>
       <div className="flex gap-2 pt-2 border-t border-[color:var(--color-border)]">
@@ -674,7 +674,7 @@ function TaskDetailModal({ task, onClose }: { task: SerializedTask; onClose: () 
             onChange={set('content')}
             rows={6}
             placeholder={t('tk.notesPlaceholder')}
-            className="w-full bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[color:var(--color-accent)] resize-y"
+            className={cn(controlClass, 'w-full resize-y')}
           />
         </div>
 

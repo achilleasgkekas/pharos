@@ -86,6 +86,26 @@ describe('UI conventions (#351, docs/ui-conventions.md)', () => {
     ).toEqual([]);
   });
 
+  it('draws every form field with the shared field classes', () => {
+    // A field (input, select, textarea) that spells out its own border and fill drifts from the
+    // others in height, radius and focus colour: the "every dropdown looks different" problem.
+    // Inline, borderless fields (the command bar, a task title) are not boxes and are exempt.
+    const out: string[] = [];
+    for (const f of FILES) {
+      if (f.rel.startsWith('components/ui/')) continue;
+      const re = /<(input|select|textarea)\b[^>]*?className="([^"]*)"/gs;
+      for (const m of f.text.matchAll(re)) {
+        const cls = m[2];
+        if (/type="color"/.test(m[0])) continue; // a colour swatch, not a text box
+        if (/\bborder\b/.test(cls) && /bg-\[color:var\(--color-surface/.test(cls) && !/border-0|bg-transparent/.test(cls)) {
+          const line = f.text.slice(0, m.index).split('\n').length;
+          out.push(`${f.rel}:${line}  <${m[1]} className="${cls.slice(0, 80)}…"`);
+        }
+      }
+    }
+    expect(out, 'use controlClass / compactControlClass / filterControlClass from components/ui/Input').toEqual([]);
+  });
+
   it('takes dates through DateInput, in the app language\'s order', () => {
     // A native date input shows the operating system's order (mm/dd/yyyy on a US machine).
     expect(offenders(/type="date"/, ['components/ui/DateInput.tsx']), 'use <DateInput value onValueChange />').toEqual([]);

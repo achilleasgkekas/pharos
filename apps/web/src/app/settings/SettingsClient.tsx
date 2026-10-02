@@ -9,7 +9,7 @@ import { getAccountData, type AccountData } from '@/app/account/actions';
 import { cn } from '@/components/ui/cn';
 import { PAGE_MAIN, PageHeader, HeaderTotals } from '@/components/ui/PageHeader';
 import { Badge } from '@/components/ui/Badge';
-import { Input, controlClass } from '@/components/ui/Input';
+import { Input, compactControlClass, controlClass } from '@/components/ui/Input';
 import { Field, FIELD_LABEL } from '@/components/ui/Field';
 import { useConfirm, usePrompt } from '@/components/ui/ConfirmDialog';
 import { saveAiConfig, pullOllamaModel, testAnthropic, saveStore, deleteStore, setAiConfirmBulk, saveCategoryRules, setAiEnabled, setAiFeature, fetchProviderModels, dismissAiModelNotices, getLiveAiSpendAction, type LiveAiSpendData } from './actions';
@@ -1408,7 +1408,8 @@ function ScraperAiSettings({ scraperAi, installed, hasAnthropicKey }: { scraperA
       <p className="text-[11px] text-[color:var(--color-text-dim)] -mt-1 mb-1">
         {t('set.scraperIntro')}
       </p>
-      <Row label={t('set.provider')}>
+      <div>
+        <div className={FIELD_LABEL}>{t('set.provider')}</div>
         <div className="flex gap-1.5">
           {([
             { v: 'ollama', label: 'Ollama', icon: <Server size={13} /> },
@@ -1429,7 +1430,7 @@ function ScraperAiSettings({ scraperAi, installed, hasAnthropicKey }: { scraperA
             </button>
           ))}
         </div>
-      </Row>
+      </div>
 
       {provider === 'ollama' ? (
         <Field label={t('set.scraperModel')}>
@@ -1635,7 +1636,7 @@ function PromptEditor({ entry }: { entry: PromptEditorEntry }) {
             onChange={(e) => setText(e.target.value)}
             rows={14}
             spellCheck={false}
-            className="w-full bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-3 py-2 text-xs leading-relaxed focus:outline-none focus:border-[color:var(--color-accent)] resize-y"
+            className={cn(compactControlClass, 'w-full resize-y')}
             style={{ fontFamily: 'var(--font-code)' }}
           />
           <div className="flex items-center gap-2 flex-wrap">
@@ -1884,7 +1885,8 @@ function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Inf
         {t('set.fileStorageDesc')}
       </p>
 
-      <Row label={t('set.backend')}>
+      <div>
+        <div className={FIELD_LABEL}>{t('set.backend')}</div>
         <div className="flex gap-1.5 flex-wrap">
           {([
             { v: 'local', label: t('set.localOnly'), icon: <HardDrive size={13} /> },
@@ -1907,7 +1909,7 @@ function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Inf
             </button>
           ))}
         </div>
-      </Row>
+      </div>
 
       {backend === 'onedrive' && <OnedriveWizard connected={storage.onedriveConnected} account={storage.onedriveAccount} />}
 
@@ -1983,7 +1985,8 @@ function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Inf
           <p className="text-[11px] text-[color:var(--color-text-faint)] -mt-1">
             {t('set.secondDestHelp')}
           </p>
-          <Row label={t('set.backend')}>
+          <div>
+            <div className={FIELD_LABEL}>{t('set.backend')}</div>
             <div className="flex gap-1.5 flex-wrap">
               {([
                 { v: '' as const, label: 'None' },
@@ -2004,7 +2007,7 @@ function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Inf
                 </button>
               ))}
             </div>
-          </Row>
+          </div>
           {(m2Backend === 'smb' || m2Backend === 'ftp') && (
             <div className="grid sm:grid-cols-2 gap-3">
               <Field label={t('set.hostIp')}>
@@ -2163,8 +2166,7 @@ function CategoryRulesManager({ settings }: { settings: AppSettings }) {
   );
   const [msg, setMsg] = useState<string | null>(null);
   const cats = settings.expenseCategories;
-  const cellCls =
-    'bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-2.5 py-1.5 text-xs text-[color:var(--color-text)] focus:outline-none focus:border-[color:var(--color-accent)]';
+  const cellCls = cn(compactControlClass, 'w-auto');
 
   function set(i: number, patch: Partial<RuleRow>) {
     setRows((p) => p.map((x, j) => (j === i ? { ...x, ...patch } : x)));
@@ -3148,10 +3150,11 @@ function ImapImportManager({ imap }: { imap: ImapInfo }) {
         <Field label={t('set.imapFolder')}>
           <input value={folder} onChange={(e) => setFolder(e.target.value)} placeholder="INBOX" className={controlClass} style={{ fontFamily: 'var(--font-code)' }} />
         </Field>
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-[color:var(--color-text-dim)]">{t('set.imapSecure')}</span>
-          <Switch label={t('set.imapSecure')} checked={secure} onChange={setSecure} />
-        </div>
+        <Field label={t('set.imapSecure')}>
+          <div className="flex items-center justify-end min-h-10 rounded-[10px] border border-[color:var(--color-border-light)] bg-[color:var(--color-surface-2)] px-3">
+            <Switch label={t('set.imapSecure')} checked={secure} onChange={setSecure} />
+          </div>
+        </Field>
       </div>
       <p className="text-[11px] text-[color:var(--color-text-faint)]">{t('set.imapAppPasswordHint')}</p>
 
@@ -3563,12 +3566,8 @@ function UsersManager({ currentUserId }: { currentUserId: string }) {
                 {u.id === currentUserId && <span className="text-[11px] text-[color:var(--color-accent)] ml-2" style={{ fontFamily: 'var(--font-mono)' }}>{t('set.you')}</span>}
               </div>
               {/* P31: three roles do not fit a two-way toggle, so the chip became a select. */}
-              <select value={u.role} onChange={(e) => changeRole(u, e.target.value as Role)} title={t('set.toggleRole')}
-                style={{ fontFamily: 'var(--font-mono)' }}
-                className={cn('text-[11px] px-2 py-0.5 rounded-full border bg-transparent cursor-pointer',
-                  u.role === 'admin' ? 'border-[color:var(--color-accent)] text-[color:var(--color-accent)]'
-                    : u.role === 'viewer' ? 'border-[color:var(--color-cyan)] text-[color:var(--color-cyan)]'
-                    : 'border-[color:var(--color-border)] text-[color:var(--color-text-dim)]')}>
+              <select value={u.role} onChange={(e) => changeRole(u, e.target.value as Role)} title={t('set.toggleRole')} aria-label={t('set.toggleRole')}
+                className={cn(compactControlClass, 'w-auto')}>
                 <option value="viewer">{t('set.viewer')}</option>
                 <option value="member">{t('set.member')}</option>
                 <option value="admin">{t('set.admin')}</option>

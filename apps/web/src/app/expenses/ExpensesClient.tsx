@@ -1,5 +1,5 @@
 'use client';
-import { cur, currencySymbol, CURRENCIES } from '@/lib/money';
+import { cur, currencySymbol, CURRENCIES, moneyField } from '@/lib/money';
 import { CreatedBy } from '@/components/CreatedBy';
 import { isForeignCurrency, normalizeCurrency, convertToBase, deriveFxRate, sumBase } from '@/lib/fx';
 import { FxBadge } from '@/components/FxBadge';
@@ -617,7 +617,8 @@ function toForm(e: SerializedExpense, base: string): FormState {
   const foreign = isForeignCurrency(e.currency, base);
   return {
     kind: e.kind, vendor: e.vendor, category: e.category, space: e.space || '', taxDeductible: e.taxDeductible, taxCategory: e.taxCategory || '',
-    amount: String((foreign ? e.origAmount || e.amount : e.amount) ?? ''),
+    // Money with its cents ("51.30", not "51.3"), as everywhere else it is shown.
+    amount: moneyField(foreign ? e.origAmount || e.amount : e.amount),
     currency: foreign ? normalizeCurrency(e.currency) : base,
     fxRate: foreign && e.fxRate ? String(e.fxRate) : '',
     date: e.date ? e.date.slice(0, 10) : '', period: e.period, recurring: e.recurring, recurringCycle: e.recurringCycle, series: e.series || '',
@@ -681,13 +682,17 @@ function FormFields({ form, set, cards, vendors, categories, spaces, fx, seriesB
         </Field>
       </div>
       {foreign && <FxFields form={form} set={set} base={fx.base} />}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 items-end">
-        <div className="flex items-center justify-between gap-2 rounded-lg border border-[color:var(--color-border)] px-3 py-2">
-          <span className="text-xs font-medium flex items-center gap-1.5"><Repeat size={13} className="text-[color:var(--color-purple)]" /> {t('ex.recurring')}</span>
-          <button type="button" role="switch" aria-label={t('ex.recurring')} aria-checked={form.recurring} onClick={() => set({ recurring: !form.recurring })} className={cn('relative w-9 h-5 rounded-full transition-colors shrink-0', form.recurring ? 'bg-[color:var(--color-accent)]' : 'bg-[color:var(--color-surface-3)] border border-[color:var(--color-border)]')}>
-            <span className={cn('absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform', form.recurring && 'translate-x-4')} />
-          </button>
-        </div>
+      {/* Every cell has a label on top and a field-high control, so the row lines up even
+          though Period carries a hint underneath. */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 items-start">
+        <Field label={t('ex.recurring')}>
+          <div className="flex items-center justify-between gap-2 min-h-10 rounded-[10px] border border-[color:var(--color-border-light)] bg-[color:var(--color-surface-2)] px-3">
+            <Repeat size={15} className="text-[color:var(--color-purple)]" />
+            <button type="button" role="switch" aria-label={t('ex.recurring')} aria-checked={form.recurring} onClick={() => set({ recurring: !form.recurring })} className={cn('relative w-9 h-5 rounded-full transition-colors shrink-0', form.recurring ? 'bg-[color:var(--color-accent)]' : 'bg-[color:var(--color-surface-3)] border border-[color:var(--color-border)]')}>
+              <span className={cn('absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform', form.recurring && 'translate-x-4')} />
+            </button>
+          </div>
+        </Field>
         <Field label={t('ex.fCycle')}>
           <select value={form.recurringCycle} onChange={(e) => set({ recurringCycle: e.target.value as FormState['recurringCycle'] })} className={controlClass} disabled={!form.recurring}>
             {CYCLES.map((c) => <option key={c} value={c}>{c ? t(`cyc.${c}` as TKey) : '—'}</option>)}
@@ -988,10 +993,10 @@ function ExpenseDetail({ expense, cards, vendors, categories, spaces, fx, series
       </div>
       {error && <p role="alert" className="mt-3 text-xs text-[color:var(--color-red)]">{error}</p>}
       <div className="flex items-center gap-2 pt-4 mt-4 border-t border-[color:var(--color-border)] flex-wrap">
-        <Button onClick={() => save(true)} disabled={pending || !!blocked}>{pending ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />} {t('common.confirm')}</Button>
-        <button onClick={() => save(form.verified)} disabled={pending || !!blocked} className="text-xs px-3 py-2 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] hover:border-[color:var(--color-accent)]">{t('common.save')}</button>
+        <Button variant="primary" onClick={() => save(true)} disabled={pending || !!blocked}>{pending ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />} {t('common.confirm')}</Button>
+        <Button onClick={() => save(form.verified)} disabled={pending || !!blocked}>{t('common.save')}</Button>
         <CreatedBy id={expense.createdBy} />
-        <button onClick={doDelete} disabled={pending} className="ml-auto flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-red)] hover:border-[color:var(--color-red)]"><Trash2 size={13} /> {t('common.delete')}</button>
+        <Button variant="danger" onClick={doDelete} disabled={pending} className="ml-auto"><Trash2 size={15} /> {t('common.delete')}</Button>
       </div>
     </Modal>
   );

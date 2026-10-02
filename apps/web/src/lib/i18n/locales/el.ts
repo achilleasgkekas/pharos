@@ -2542,4 +2542,6 @@ export const el: Partial<Dict> = {
   "set.liveSpend": "Κόστος AI",
   "set.viewRunHistory": "Όλες οι κλήσεις στο Ιστορικό AI",
   "set.capReached": "Έφτασες το όριο κόστους: οι κλήσεις σε cloud AI μπλοκάρονται μέχρι να το αυξήσεις ή να αλλάξει ο μήνας.",
+  "it.photoAdd": "Πρόσθεσε φωτογραφίες",
+  "it.photoUploading": "Ανέβασμα…",
 };

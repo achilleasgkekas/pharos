@@ -1,5 +1,5 @@
 'use client';
-import { cur, currencySymbol, CURRENCIES } from "@/lib/money";
+import { cur, currencySymbol, CURRENCIES, moneyField } from "@/lib/money";
 import { BILLING_CYCLES, monthlyEquivalent, isBillingCycle } from '@/lib/billingCycle';
 // The countdown lives with the roll-forward that keeps `nextRenewal` from going stale, so
 // the badge and the derived date can never disagree about the day a renewal stops being today.
@@ -601,7 +601,7 @@ function SubForm({ sub, cards, spaces = [], fx, onSuccess, onDeleted }: { sub?: 
     name: sub?.name ?? '',
     provider: sub?.provider ?? '',
     category: sub?.category ?? 'other',
-    amount: String((wasForeign ? sub?.origAmount || sub?.amount : sub?.amount) ?? ''),
+    amount: moneyField(wasForeign ? sub?.origAmount || sub?.amount : sub?.amount),
     currency: wasForeign ? normalizeCurrency(sub?.currency) : normalizeCurrency(fx.base) || 'EUR',
     fxRate: wasForeign && sub?.fxRate ? String(sub.fxRate) : '',
     billingCycle: sub?.billingCycle ?? 'monthly',
@@ -779,7 +779,7 @@ function SubForm({ sub, cards, spaces = [], fx, onSuccess, onDeleted }: { sub?: 
           value={form.notes}
           onChange={set('notes')}
           rows={2}
-          className="w-full bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[color:var(--color-accent)] resize-none"
+          className={cn(controlClass, 'w-full resize-none')}
         />
       </Field>
       <div className="flex gap-3 pt-2">
@@ -787,8 +787,8 @@ function SubForm({ sub, cards, spaces = [], fx, onSuccess, onDeleted }: { sub?: 
           {pending ? t('v.saving') : sub ? t('common.save') : t('v.create')}
         </Button>
         {sub && onDeleted && (
-          <Button type="button" variant="danger" size="sm" className="ml-auto" onClick={handleDelete} disabled={pending}>
-            <Trash2 size={13} /> {t('common.delete')}
+          <Button type="button" variant="danger" className="ml-auto" onClick={handleDelete} disabled={pending}>
+            <Trash2 size={15} /> {t('common.delete')}
           </Button>
         )}
       </div>

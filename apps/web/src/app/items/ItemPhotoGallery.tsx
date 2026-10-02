@@ -125,11 +125,11 @@ export function ItemPhotoGallery({
           type="button"
           onClick={() => inputRef.current?.click()}
           disabled={uploading || fetching}
-          className="aspect-[4/3] w-full rounded-2xl border-2 border-dashed border-[color:var(--color-border)] hover:border-[color:var(--color-accent)] bg-[color:var(--color-surface)] flex flex-col items-center justify-center gap-2 text-[color:var(--color-text-faint)] transition-colors"
+          className="h-40 sm:h-48 w-full rounded-2xl border border-dashed border-[color:var(--color-border-light)] hover:border-[color:var(--color-text-faint)] hover:text-[color:var(--color-text-dim)] bg-[color:var(--color-surface)] flex flex-col items-center justify-center gap-2 text-[color:var(--color-text-faint)] transition-colors"
         >
           <input ref={inputRef} type="file" accept="image/*" multiple capture="environment" className="hidden" onChange={(e) => handleFiles(e.target.files)} />
           {uploading ? <Loader2 size={28} className="animate-spin" /> : <ImagePlus size={28} />}
-          <span className="text-xs">{uploading ? 'Uploading…' : 'Add product photos'}</span>
+          <span className="text-xs">{uploading ? t('it.photoUploading') : t('it.photoAdd')}</span>
         </button>
         <div className="flex items-center gap-2 flex-wrap">
           {fetchBtn}

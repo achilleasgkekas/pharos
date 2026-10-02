@@ -80,3 +80,9 @@ export function cur(): string {
   if (key) return _tenantSymbols.get(key) ?? _symbol;
   return _symbol;
 }
+
+/** A stored amount as the text of an amount field: two decimals ("51.30", not "51.3"),
+ *  blank when there is none. */
+export function moneyField(n: number | null | undefined): string {
+  return n == null || !Number.isFinite(Number(n)) ? '' : Number(n).toFixed(2);
+}
