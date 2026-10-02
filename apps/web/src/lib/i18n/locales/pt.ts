@@ -2585,4 +2585,13 @@ export const pt: Partial<Dict> = {
   "sub.nextMonth": "{month}",
   "sub.avgMonth": "média por mês",
   "sub.yearAhead": "O que pagas cada mês, os próximos 12",
+  "st.tabMonths": "Meses",
+  "st.tabInstallments": "Parcelas",
+  "st.tabUpcoming": "Próximos meses",
+  "st.nextMonthInst": "Parcelas em {month}",
+  "st.sameQ": "É a mesma compra?",
+  "st.sameHint": "Mesmo cartão, valor, número de parcelas e mês da compra, mas o banco escreveu de outra forma.",
+  "st.sameYes": "Sim, juntar",
+  "st.sameNo": "Não, são diferentes",
+  "stm.breakdown": "Como o saldo se forma",
 };

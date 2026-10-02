@@ -2681,6 +2681,15 @@ export const en = {
   "sub.nextMonth": "{month}",
   "sub.avgMonth": "avg. per month",
   "sub.yearAhead": "What you pay each month, the next 12 months",
+  "st.tabMonths": "Months",
+  "st.tabInstallments": "Installments",
+  "st.tabUpcoming": "Next months",
+  "st.nextMonthInst": "Installments in {month}",
+  "st.sameQ": "Is it the same purchase?",
+  "st.sameHint": "Same card, amount, number of installments and purchase month, but the bank wrote it differently.",
+  "st.sameYes": "Yes, merge",
+  "st.sameNo": "No, they are different",
+  "stm.breakdown": "How the balance adds up",
 } as const;
 
 export type Dict = Record<keyof typeof en, string>;

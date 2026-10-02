@@ -2585,4 +2585,13 @@ export const fr: Partial<Dict> = {
   "sub.nextMonth": "{month}",
   "sub.avgMonth": "moy. par mois",
   "sub.yearAhead": "Ce que tu paies chaque mois, les 12 prochains",
+  "st.tabMonths": "Mois",
+  "st.tabInstallments": "Échéances",
+  "st.tabUpcoming": "Mois à venir",
+  "st.nextMonthInst": "Échéances en {month}",
+  "st.sameQ": "Est-ce le même achat ?",
+  "st.sameHint": "Même carte, montant, nombre d’échéances et mois d’achat, mais la banque l’a écrit autrement.",
+  "st.sameYes": "Oui, fusionner",
+  "st.sameNo": "Non, ils sont différents",
+  "stm.breakdown": "Comment le solde se calcule",
 };

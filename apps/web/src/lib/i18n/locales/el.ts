@@ -2616,4 +2616,13 @@ export const el: Partial<Dict> = {
   "sub.nextMonth": "{month}",
   "sub.avgMonth": "μ.ο. ανά μήνα",
   "sub.yearAhead": "Τι πληρώνεις κάθε μήνα, τους επόμενους 12",
+  "st.tabMonths": "Μήνες",
+  "st.tabInstallments": "Δόσεις",
+  "st.tabUpcoming": "Επόμενοι μήνες",
+  "st.nextMonthInst": "Δόσεις {month}",
+  "st.sameQ": "Είναι η ίδια αγορά;",
+  "st.sameHint": "Ίδια κάρτα, ποσό, αριθμός δόσεων και μήνας αγοράς, αλλά η τράπεζα το έγραψε αλλιώς.",
+  "st.sameYes": "Ναι, ένωσέ τες",
+  "st.sameNo": "Όχι, είναι διαφορετικές",
+  "stm.breakdown": "Πώς βγαίνει το υπόλοιπο",
 };

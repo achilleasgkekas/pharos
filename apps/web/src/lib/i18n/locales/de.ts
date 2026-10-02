@@ -2585,4 +2585,13 @@ export const de: Partial<Dict> = {
   "sub.nextMonth": "{month}",
   "sub.avgMonth": "Ø pro Monat",
   "sub.yearAhead": "Was du jeden Monat zahlst, die nächsten 12 Monate",
+  "st.tabMonths": "Monate",
+  "st.tabInstallments": "Raten",
+  "st.tabUpcoming": "Nächste Monate",
+  "st.nextMonthInst": "Raten im {month}",
+  "st.sameQ": "Ist das derselbe Kauf?",
+  "st.sameHint": "Gleiche Karte, Betrag, Ratenzahl und Kaufmonat, aber die Bank hat es anders geschrieben.",
+  "st.sameYes": "Ja, zusammenführen",
+  "st.sameNo": "Nein, sie sind verschieden",
+  "stm.breakdown": "Wie sich der Saldo ergibt",
 };
