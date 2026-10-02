@@ -573,8 +573,20 @@ Highlights:
 
 ## Reports
 
-Analytics (`/reports`) over your data with a selectable window (6 / 12 / 24
-months):
+Analytics (`/reports`), in five tabs (`?tab=`): **Overview** (the period's spending,
+income, what was left over and receipts, each with its change against the previous
+period; cash flow; month in review; safe-to-spend), **Spending** (receipts per month,
+expenses by category, spending by store, biggest purchases, year over year), **Goals**,
+**Subscriptions** and **Assets & debts** (net worth, inventory value, warranties, card
+payments, installments).
+
+- **Period.** This month, last month, the last 3 / 6 / 12 months, this year, last year,
+  or any run of months (`?period=custom&from=2026-01&to=2026-03`). Every figure is
+  compared with the run of the same length just before it ("+12%" next to it). Old
+  `?months=6|12|24` links still work.
+- **Click for the records.** A category or store row, a KPI tile or a month in a chart
+  opens Expenses, Income or Receipts filtered to it (`?category=`, `?store=`,
+  `?from=YYYY-MM&to=YYYY-MM`). The filters show as chips above the list, each with a ✕.
 
 - **Month in Review (P3)** — a deterministic narrative digest at the top of the
   reports page that summarizes the current month: total spent, income, net
@@ -589,8 +601,8 @@ months):
   depreciation estimate (see below) rather than raw purchase cost.
 - monthly spend, cash flow (income vs expense), spend by store,
 - inventory value by category (depreciated), subscriptions by category,
-- **budgets** (per-category targets set in Settings, with progress bars that turn
-  red when over),
+- **budgets**: no longer set in the app (#379); a budget card still shows for an
+  install that has budgets saved from before,
 - **savings goals (P12)** — set a target amount and optional deadline for money you
   want to save (e.g., "€5000 for new laptop by 2026-12-31"), track progress with a
   bar and a computed monthly contribution rate needed to hit the deadline, and add

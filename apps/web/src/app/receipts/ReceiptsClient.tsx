@@ -31,8 +31,10 @@ import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { NO_SPACE, matchesSpace, spaceFilterOptions } from '@/lib/spaceFilter';
 import { useLocale, useMoney, useT } from '@/components/LocaleProvider';
 import { DuplicatesModal } from './DuplicatesModal';
-import { useRouter } from 'next/navigation';
-import { compareNames } from '@/lib/i18n/format';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { monthRangeDays } from '@/lib/reportPeriod';
+import { compareNames, formatDate } from '@/lib/i18n/format';
+import { FilterChips } from '@/components/ui/FilterChips';
 import { recordDay, formatRecordDay } from '@/lib/recordDay';
 
 function fileUrl(filePath: string) {
@@ -77,7 +79,14 @@ export function ReceiptsClient({
   const [selected, setSelected] = useState<SerializedReceipt | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadMsg, setUploadMsg] = useState<string | null>(null);
-  const [storeFilter, setStoreFilter] = useState('');
+  // A link from Reports opens the list already filtered: ?store=…&from=YYYY-MM&to=YYYY-MM.
+  const params = useSearchParams();
+  const linkRange = (() => {
+    const from = params.get('from') ?? '';
+    const to = params.get('to') ?? from;
+    return /^\d{4}-\d{2}$/.test(from) && /^\d{4}-\d{2}$/.test(to) ? monthRangeDays({ from, to }) : null;
+  })();
+  const [storeFilter, setStoreFilter] = useState(() => params.get('store') ?? '');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { isRunning, refresh } = useJobs();
   const rescanBusy = isRunning('rescan-receipts');
@@ -91,8 +100,8 @@ export function ReceiptsClient({
   const [sortBy, setSortBy] = useState<'recent' | 'oldest' | 'total-desc' | 'total-asc' | 'store'>('recent');
   // A receipt is a dated purchase, so "when" and "what kind" are the two questions the
   // list could not answer before: there was only store + status + a substring search.
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  const [dateFrom, setDateFrom] = useState(() => linkRange?.dateFrom ?? '');
+  const [dateTo, setDateTo] = useState(() => linkRange?.dateTo ?? '');
   // #355: typed dates skip the picker's min/max, so a From after the To is caught here and shown,
   // instead of silently emptying the list.
   const rangeInvalid = !!(dateFrom && dateTo && dateFrom > dateTo);
@@ -490,6 +499,18 @@ export function ReceiptsClient({
       <PageFileDrop onFiles={handleFiles} label={t('common.dropToUpload')} hint={ollamaUp ? t('rc.aiAutoParse') : t('rc.manualEntry')} disabled={uploading} />
 
       <FilterLayout search={searchBox} quick={statusSwitch} filters={filterControls} active={!!(storeFilter || sortBy !== 'recent' || dateFrom || dateTo || categoryFilter || paymentFilter || spaceFilter)}>
+          <FilterChips
+            chips={[
+              storeFilter && { label: storeFilter, onClear: () => setStoreFilter('') },
+              (dateFrom || dateTo) && !rangeInvalid && {
+                label: [dateFrom, dateTo].filter(Boolean).map((d) => formatDate(d, locale)).join(' – '),
+                onClear: () => {
+                  setDateFrom('');
+                  setDateTo('');
+                },
+              },
+            ]}
+          />
           {uploading && (
             <p role="status" className="mb-3 flex items-center gap-2 text-sm text-[color:var(--color-cyan)]">
               <Loader2 size={15} className="animate-spin" /> {uploadMsg}
