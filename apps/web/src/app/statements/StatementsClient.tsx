@@ -4,7 +4,7 @@ import { PageFileDrop, UploadButton } from '@/components/ui/FileDrop';
 import { Field } from '@/components/ui/Field';
 import { cur, currencySymbol, CURRENCIES } from "@/lib/money";
 import { todayLocal } from "@/lib/dates";
-import { useState, useTransition, useMemo, useRef } from 'react';
+import { useState, useTransition, useMemo, useRef, useSyncExternalStore } from 'react';
 import {
   Plus,
   Pencil,
@@ -34,7 +34,7 @@ import {
   type CardUtilization,
   type CardUtilizationIndex,
 } from '@/lib/cardUtilization';
-import { computeInstallmentPlans, type InstallmentPlan } from '@/lib/installments';
+import { computeInstallmentPlans, suggestPlanMerges, shortMonth, type InstallmentPlan } from '@/lib/installments';
 import { InstallmentPlanCard } from '@/components/InstallmentPlanCard';
 import { useOpenParam } from '@/components/useOpenParam';
 import {
@@ -86,6 +86,19 @@ export type ItemOption = {
 };
 
 
+const NOT_SAME_KEY = 'pharosStatementsNotSame';
+const subscribeNotSame = (cb: () => void) => {
+  window.addEventListener(NOT_SAME_KEY, cb);
+  return () => window.removeEventListener(NOT_SAME_KEY, cb);
+};
+const readNotSame = () => {
+  try {
+    return localStorage.getItem(NOT_SAME_KEY) || '[]';
+  } catch {
+    return '[]';
+  }
+};
+
 function fileUrl(filePath: string) {
   return `/api/files/${filePath.split('/').map(encodeURIComponent).join('/')}`;
 }
@@ -125,12 +138,32 @@ export function StatementsClient({
 }) {
   const money = useMoney();
   const t = useT();
+  const locale = useLocale();
   const statements = useMemo(() => statementsWithCurrentCards(storedStatements, cards), [storedStatements, cards]);
   const fx: FxCtx = { base: baseCurrency, enabled: multiCurrency };
   const [showCreate, setShowCreate] = useState(false);
   const [showCards, setShowCards] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [cardFilter, setCardFilter] = useState('all');
+  const [tab, setTab] = useState<'months' | 'installments' | 'upcoming'>('months');
+  // "Not the same purchase" answers, kept in this browser so a dismissed pair stays dismissed.
+  const notSameRaw = useSyncExternalStore(subscribeNotSame, readNotSame, () => '[]');
+  const notSame = useMemo(() => {
+    try {
+      const raw = JSON.parse(notSameRaw);
+      return Array.isArray(raw) ? raw.filter((x): x is string => typeof x === 'string') : [];
+    } catch {
+      return [];
+    }
+  }, [notSameRaw]);
+  function dismissPair(id: string) {
+    try {
+      localStorage.setItem(NOT_SAME_KEY, JSON.stringify([...new Set([...notSame, id])].slice(-200)));
+    } catch {
+      // not saved: the pair comes back on the next visit
+    }
+    window.dispatchEvent(new Event(NOT_SAME_KEY));
+  }
   const [uploading, setUploading] = useState(false);
   const [uploadMsg, setUploadMsg] = useState<string | null>(null);
 
@@ -224,7 +257,28 @@ export function StatementsClient({
   // `balances` above — the latest statement per card — so the badge can never contradict the
   // figure printed next to it. Keyed by card, so narrowing to one card changes which badges
   // are drawn, never what any one of them says.
-  const utilization = useMemo(() => buildCardUtilization(cards, visible), [cards, visible]);
+  const utilization = useMemo(() => buildCardUtilization(cards, statements), [cards, statements]);
+  // Per-card tile figures, from each card's latest statement (same rule as `balances`).
+  const cardTiles = useMemo(
+    () =>
+      cardLabels.map((label) => {
+        const p = cardBalanceSummary(statements.filter((s) => s.card === label));
+        return { label, due: p.due, credit: p.credit };
+      }),
+    [cardLabels, statements]
+  );
+  const nextMonth = paymentReport.forecast[0];
+  const nextMonthLabel = nextMonth ? formatDate(`${nextMonth.period}-01T12:00:00Z`, locale, { month: 'long' }) : '';
+  const nextMonthTotal = (label: string) =>
+    nextMonth ? nextMonth.lines.filter((l) => !label || l.card === label).reduce((n, l) => n + l.amount, 0) : 0;
+  const visiblePlans = useMemo(
+    () => (effectiveCardFilter === 'all' ? plans : plans.filter((p) => p.card === effectiveCardFilter)),
+    [plans, effectiveCardFilter]
+  );
+  const mergePairs = useMemo(
+    () => suggestPlanMerges(visiblePlans).filter(([a, b]) => !notSame.includes(`${a.key}::${b.key}`)),
+    [visiblePlans, notSame]
+  );
   const active = activeId ? statements.find((s) => s._id === activeId) ?? null : null;
 
   // Deep-link from global search
@@ -260,47 +314,96 @@ export function StatementsClient({
       )}
       {uploadMsg && !uploading && <p role="status" className="text-sm text-[color:var(--color-text-dim)] mb-4">{uploadMsg}</p>}
 
-      {/* Installment plans summary (active + completed) */}
-      {plans.length > 0 && <InstallmentOverview plans={plans} items={items} itemMap={itemMap} />}
-
-      {/* Card filter chips */}
-      {cardLabels.length > 1 && (
-        <div className="flex gap-2 mb-5 overflow-x-auto pb-1">
-          <FilterChip active={effectiveCardFilter === 'all'} onClick={() => setCardFilter('all')}>
-            {t('st.allCards')}
-          </FilterChip>
-          {cardLabels.map((c) => (
-            <FilterChip key={c} active={effectiveCardFilter === c} onClick={() => setCardFilter(c)}>
-              {c}
-            </FilterChip>
-          ))}
-        </div>
-      )}
-
-      {/* Empty */}
       {statements.length === 0 ? (
         <EmptyState icon={<CreditCardIcon />} title={t('st.empty')} />
       ) : (
-        <div className="space-y-5">
-          {byCard.map(([card, list]) => (
-            <div key={card}>
-              <h2 className="text-sm font-semibold mb-2 flex items-center gap-2">
-                {card}
-                <UtilizationBadge u={utilization.byLabel.get(card)} />
-              </h2>
-              <div className="rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] overflow-hidden divide-y divide-[color:var(--color-border)]">
-                {list.map((s) => (
-                  <StatementRow key={s._id} statement={s} base={fx.base} onOpen={() => setActiveId(s._id)} />
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+        <>
+          {/* One tile per card: what it owes now and what installments the next month brings.
+              A tile is also the card filter for the three tabs below. */}
+          <div className="mb-5 grid gap-2 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+            {cardLabels.length > 1 && (
+              <CardTile
+                label={t('st.allCards')}
+                due={balances.due}
+                credit={balances.credit}
+                next={nextMonthTotal('')}
+                nextLabel={nextMonthLabel}
+                active={effectiveCardFilter === 'all'}
+                onClick={() => setCardFilter('all')}
+              />
+            )}
+            {cardTiles.map((c) => (
+              <CardTile
+                key={c.label}
+                label={c.label}
+                due={c.due}
+                credit={c.credit}
+                next={nextMonthTotal(c.label)}
+                nextLabel={nextMonthLabel}
+                util={utilization.byLabel.get(c.label)}
+                active={cardLabels.length === 1 || effectiveCardFilter === c.label}
+                onClick={() => setCardFilter(effectiveCardFilter === c.label ? 'all' : c.label)}
+              />
+            ))}
+          </div>
 
-      {/* Full-screen detail */}
-      <div className="my-6"><StatementPaymentReport report={paymentReport} /></div>
-      <p className="mb-4 text-xs leading-relaxed text-[color:var(--color-text-dim)]">{t('payments.limitsNote')}</p>
+          <div role="tablist" aria-label={t('nav.statements')} className="mb-4 flex gap-1 overflow-x-auto no-scrollbar border-b border-[color:var(--color-border)]">
+            {([
+              ['months', t('st.tabMonths')],
+              ['installments', `${t('st.tabInstallments')}${visiblePlans.some((p) => !p.done) ? ` · ${visiblePlans.filter((p) => !p.done).length}` : ''}`],
+              ['upcoming', t('st.tabUpcoming')],
+            ] as const).map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                role="tab"
+                aria-selected={tab === key}
+                onClick={() => setTab(key)}
+                className={cn(
+                  'shrink-0 px-3 py-2 text-sm border-b-2 -mb-px transition-colors whitespace-nowrap',
+                  tab === key ? 'border-[color:var(--color-accent)] text-[color:var(--color-text)] font-semibold' : 'border-transparent text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]'
+                )}
+              >
+                {label}
+                {key === 'installments' && mergePairs.length > 0 && <span className="ml-1.5 inline-block h-2 w-2 rounded-full bg-[color:var(--color-gold)] align-middle" aria-label={t('st.sameQ')} />}
+              </button>
+            ))}
+          </div>
+
+          {tab === 'months' && (
+            <div className="space-y-5">
+              {byCard.map(([card, list]) => (
+                <div key={card}>
+                  {byCard.length > 1 && <h2 className="text-sm font-semibold mb-2">{card}</h2>}
+                  <div className="rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] overflow-hidden divide-y divide-[color:var(--color-border)]">
+                    {list.map((s) => (
+                      <StatementRow key={s._id} statement={s} base={fx.base} onOpen={() => setActiveId(s._id)} />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {tab === 'installments' && (
+            <>
+              <MergeSuggestions pairs={mergePairs} onDismiss={dismissPair} />
+              {visiblePlans.length > 0 ? (
+                <InstallmentOverview plans={visiblePlans} items={items} itemMap={itemMap} />
+              ) : (
+                <p className="text-sm text-[color:var(--color-text-dim)]">{t('st.noPlans')}</p>
+              )}
+            </>
+          )}
+
+          {tab === 'upcoming' && (
+            <>
+              <StatementPaymentReport report={paymentReport} cardLabel={effectiveCardFilter === 'all' ? '' : effectiveCardFilter} hideHistory />
+              <p className="mt-4 text-xs leading-relaxed text-[color:var(--color-text-dim)]">{t('payments.limitsNote')}</p>
+            </>
+          )}
+        </>
+      )}
 
       {active && (
         <Modal open onClose={() => setActiveId(null)} title={statementTitle(active)} size="xl">
@@ -368,20 +471,115 @@ function UtilizationBadge({ u, className }: { u?: CardUtilization; className?: s
   );
 }
 
-function FilterChip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+/** A card at the top of the page: what it owes now and the installments next month brings. */
+function CardTile({
+  label,
+  due,
+  credit,
+  next,
+  nextLabel,
+  util,
+  active,
+  onClick,
+}: {
+  label: string;
+  due: number;
+  credit: number;
+  next: number;
+  nextLabel: string;
+  util?: CardUtilization;
+  active: boolean;
+  onClick: () => void;
+}) {
+  const money = useMoney();
+  const t = useT();
   return (
     <button
+      type="button"
       onClick={onClick}
+      aria-pressed={active}
       className={cn(
-        'shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap',
+        'min-w-0 rounded-2xl border p-3.5 text-left transition-colors',
         active
-          ? 'bg-[color:var(--color-accent)] text-black'
-          : 'bg-[color:var(--color-surface)] text-[color:var(--color-text-dim)] border border-[color:var(--color-border)] hover:text-[color:var(--color-text)]'
+          ? 'border-[color:var(--color-accent)] bg-[color:var(--color-surface)]'
+          : 'border-[color:var(--color-border)] bg-[color:var(--color-surface)] hover:border-[color:var(--color-border-light)]'
       )}
-      style={{ fontFamily: 'var(--font-mono)' }}
     >
-      {children}
+      <div className="flex min-w-0 items-center gap-2">
+        <CreditCardIcon size={14} className="shrink-0 text-[color:var(--color-text-faint)]" />
+        <span className="min-w-0 flex-1 truncate text-sm font-semibold">{label}</span>
+        <UtilizationBadge u={util} />
+      </div>
+      <div className="mt-2 flex items-end justify-between gap-3">
+        <div>
+          <div className="text-[11px] text-[color:var(--color-text-faint)]">{credit > 0 ? t('payments.credit') : t('payments.due')}</div>
+          <div
+            className="text-lg font-semibold tabular-nums"
+            style={{ fontFamily: 'var(--font-display)', color: credit > 0 ? 'var(--color-accent)' : due > 0 ? 'var(--color-red)' : undefined }}
+          >
+            {money(credit > 0 ? credit : due)}
+          </div>
+        </div>
+        {next > 0 && (
+          <div className="text-right">
+            <div className="text-[11px] text-[color:var(--color-text-faint)]">{t('st.nextMonthInst', { month: nextLabel })}</div>
+            <div className="text-sm font-semibold tabular-nums text-[color:var(--color-purple)]" style={{ fontFamily: 'var(--font-display)' }}>
+              {money(next)}
+            </div>
+          </div>
+        )}
+      </div>
     </button>
+  );
+}
+
+/** "Is it the same purchase?" for two plans that look like one purchase printed with
+ *  different wording. Yes merges them (the old wording into the latest); No hides the pair. */
+function MergeSuggestions({ pairs, onDismiss }: { pairs: [InstallmentPlan, InstallmentPlan][]; onDismiss: (id: string) => void }) {
+  const money = useMoney();
+  const t = useT();
+  const locale = useLocale();
+  const [pending, startTransition] = useTransition();
+  if (!pairs.length) return null;
+  const line = (p: InstallmentPlan) =>
+    `${money(p.perAmount)} × ${p.totalInstallments} · ${shortMonth(p.firstDate, locale)}${p.lastDate.slice(0, 7) !== p.firstDate.slice(0, 7) ? ` – ${shortMonth(p.lastDate, locale)}` : ''}`;
+  return (
+    <div className="mb-4 space-y-2">
+      {pairs.map(([a, b]) => (
+        <div
+          key={`${a.key}::${b.key}`}
+          className="rounded-2xl border border-[color:var(--color-gold)]/40 bg-[color:var(--color-surface)] p-3.5"
+        >
+          <p className="flex items-center gap-2 text-sm font-semibold">
+            <GitMerge size={14} className="text-[color:var(--color-gold)]" /> {t('st.sameQ')}
+          </p>
+          <p className="mt-0.5 text-xs text-[color:var(--color-text-dim)]">{t('st.sameHint')}</p>
+          <div className="mt-2.5 grid gap-2 sm:grid-cols-2">
+            {[a, b].map((p) => (
+              <div key={p.key} className="min-w-0 rounded-xl bg-[color:var(--color-surface-2)] px-3 py-2">
+                <div className="truncate text-sm">{p.label}</div>
+                <div className="text-[11px] tabular-nums text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
+                  {line(p)}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-3 flex gap-2">
+            <Button
+              size="sm"
+              variant="primary"
+              disabled={pending}
+              onClick={() => startTransition(async () => { await bindInstallmentGroup(a.key, b.key); })}
+            >
+              {t('st.sameYes')}
+            </Button>
+            <Button size="sm" variant="ghost" disabled={pending} onClick={() => onDismiss(`${a.key}::${b.key}`)}>
+              {t('st.sameNo')}
+            </Button>
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -818,6 +1016,24 @@ function StatementDetail({
         <div><dt style={{ fontFamily: 'var(--font-mono)' }} className="text-[11px] text-[color:var(--color-text-faint)]">{t('payments.additional')}</dt><dd className="mt-1.5 text-lg font-semibold tabular-nums text-[color:var(--color-accent)]" style={{ fontFamily: 'var(--font-display)' }}>{money(paymentSummary.additionalPaid)}</dd></div>
         <div><dt style={{ fontFamily: 'var(--font-mono)' }} className="text-[11px] text-[color:var(--color-text-faint)]">{t('payments.due')}</dt><dd className="mt-1.5 text-lg font-semibold tabular-nums" style={{ fontFamily: 'var(--font-display)', color: paymentSummary.due > 0 ? 'var(--color-red)' : 'var(--color-accent)' }}>{money(paymentSummary.due)}</dd></div>
       </dl>
+      {/* How the bank got to the closing balance. Lived in a second "history" list on the page. */}
+      <details className="-mt-2 rounded-xl border border-[color:var(--color-border)] px-4 py-2.5">
+        <summary className="cursor-pointer text-xs text-[color:var(--color-cyan)]">{t('stm.breakdown')}</summary>
+        <dl className="mt-3 grid min-w-0 gap-3 grid-cols-2 sm:grid-cols-4">
+          {([
+            ['payments.opening', paymentSummary.opening, false],
+            ['payments.charges', paymentSummary.charges, false],
+            ['payments.otherCredits', paymentSummary.otherCredits, true],
+            ['payments.closing', paymentSummary.closing, false],
+          ] as const).map(([k, v, green]) => (
+            <div key={k} className="min-w-0">
+              <dt className="text-[11px] text-[color:var(--color-text-faint)]">{t(k)}</dt>
+              <dd className="mt-1 text-sm font-semibold tabular-nums" style={{ fontFamily: 'var(--font-display)', color: green ? 'var(--color-accent)' : undefined }}>{money(v)}</dd>
+            </div>
+          ))}
+        </dl>
+        <p className="mt-3 text-[11px] leading-relaxed text-[color:var(--color-text-dim)]">{t('payments.summaryNote')}</p>
+      </details>
       {/* Editable statement fields — same form for reading and writing */}
       <StatementForm
         key={`form-${rev}`}

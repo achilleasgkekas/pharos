@@ -2585,4 +2585,13 @@ export const nl: Partial<Dict> = {
   "sub.nextMonth": "{month}",
   "sub.avgMonth": "gem. per maand",
   "sub.yearAhead": "Wat je elke maand betaalt, de komende 12",
+  "st.tabMonths": "Maanden",
+  "st.tabInstallments": "Termijnen",
+  "st.tabUpcoming": "Komende maanden",
+  "st.nextMonthInst": "Termijnen in {month}",
+  "st.sameQ": "Is dit dezelfde aankoop?",
+  "st.sameHint": "Zelfde kaart, bedrag, aantal termijnen en aankoopmaand, maar de bank schreef het anders.",
+  "st.sameYes": "Ja, samenvoegen",
+  "st.sameNo": "Nee, ze zijn verschillend",
+  "stm.breakdown": "Hoe het saldo is opgebouwd",
 };

@@ -8,6 +8,7 @@ import {
   computeInstallmentPlans,
   plansForItem,
   shortMonth,
+  suggestPlanMerges,
 } from './installments';
 import type { SerializedStatement, SerializedTransaction } from '@/types';
 
@@ -331,5 +332,65 @@ describe('shortMonth', () => {
   it('returns empty string for an invalid date', () => {
     expect(shortMonth('not-a-date')).toBe('');
     expect(shortMonth('')).toBe('');
+  });
+});
+
+describe('suggestPlanMerges', () => {
+  // QUEST ONLINE bought 2026-01 in 6 x 20: the bank printed it one way for 3 months, then another.
+  const renamed = () => [
+    mkStmt('2026-01', 'Visa', [mkTx({ date: '2026-01-10', amount: 20, current: 1, total: 6, originalPurchase: 'QUEST ONLINE' })]),
+    mkStmt('2026-02', 'Visa', [mkTx({ date: '2026-02-10', amount: 20, current: 2, total: 6, originalPurchase: 'QUEST ONLINE' })]),
+    mkStmt('2026-03', 'Visa', [mkTx({ date: '2026-03-10', amount: 20, current: 3, total: 6, originalPurchase: 'QUEST ONLINE KALLITHEA' })]),
+    mkStmt('2026-04', 'Visa', [mkTx({ date: '2026-04-10', amount: 20, current: 4, total: 6, originalPurchase: 'QUEST ONLINE KALLITHEA' })]),
+  ];
+
+  it('pairs the old wording with the new one', () => {
+    const pairs = suggestPlanMerges(computeInstallmentPlans(renamed()));
+    expect(pairs).toHaveLength(1);
+    expect(pairs[0][0].label).toBe('QUEST ONLINE');
+    expect(pairs[0][1].label).toBe('QUEST ONLINE KALLITHEA');
+  });
+
+  it('leaves two purchases charged in the same months apart', () => {
+    const s = [
+      mkStmt('2026-01', 'Visa', [
+        mkTx({ date: '2026-01-10', amount: 20, current: 1, total: 6, originalPurchase: 'SHOP A' }),
+        mkTx({ date: '2026-01-10', amount: 20, current: 1, total: 6, originalPurchase: 'SHOP B' }),
+      ]),
+    ];
+    expect(suggestPlanMerges(computeInstallmentPlans(s))).toEqual([]);
+  });
+
+  it('needs the same card, installment count, amount and purchase month', () => {
+    const base = renamed();
+    const otherCard = base.map((s, i) => (i >= 2 ? { ...s, card: 'Master' } : s));
+    expect(suggestPlanMerges(computeInstallmentPlans(otherCard))).toEqual([]);
+    const otherAmount = base.map((s, i) => (i >= 2 ? { ...s, transactions: s.transactions.map((t) => ({ ...t, amount: 25 })) } : s));
+    expect(suggestPlanMerges(computeInstallmentPlans(otherAmount))).toEqual([]);
+    const otherOrigin = [
+      ...base.slice(0, 2),
+      mkStmt('2026-03', 'Visa', [mkTx({ date: '2026-03-10', amount: 20, current: 1, total: 6, originalPurchase: 'QUEST ONLINE KALLITHEA' })]),
+    ];
+    expect(suggestPlanMerges(computeInstallmentPlans(otherOrigin))).toEqual([]);
+  });
+
+  it('suggests nothing once they are merged', () => {
+    const s = renamed();
+    const plans = computeInstallmentPlans(s);
+    const [old, current] = suggestPlanMerges(plans)[0];
+    const bound = s.map((st) => ({
+      ...st,
+      transactions: st.transactions.map((t) =>
+        t.installmentInfo && installmentGroupKey(t, st.period) === old.key ? { ...t, installmentInfo: { ...t.installmentInfo, planKey: current.key } } : t
+      ),
+    }));
+    expect(suggestPlanMerges(computeInstallmentPlans(bound))).toEqual([]);
+  });
+});
+
+describe('plan label', () => {
+  it('uses the description when the bank put the amount in the purchase column', () => {
+    const s = [mkStmt('2026-07', 'Visa', [mkTx({ date: '2026-07-10', amount: 40, description: 'QUEST ONLINE ΔΟΣΗ 3/12', current: 3, total: 12, originalPurchase: '480.00' })])];
+    expect(computeInstallmentPlans(s)[0].label).toBe('QUEST ONLINE');
   });
 });

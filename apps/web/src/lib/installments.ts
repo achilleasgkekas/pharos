@@ -132,7 +132,9 @@ export function computeInstallmentPlans(statements: SerializedStatement[]): Inst
         key,
         signature: sig,
         itemIds: new Set<string>(),
-        label: originalPurchase || tx.description,
+        // Some banks print the purchase total in the "original purchase" column ("480.00"):
+        // the merchant name in the description reads better.
+        label: originalPurchase && !/^[\d\s.,€$£-]+$/.test(originalPurchase) ? originalPurchase : tx.description.replace(/\s*(?:δοση\s*)?\d+\s*\/\s*\d+\s*$/i, '').trim() || originalPurchase || tx.description,
         card: s.card,
         totalInstallments: 0,
         paidInstallments: 0,
@@ -205,4 +207,37 @@ export function plansForItem(plans: InstallmentPlan[], itemId: string): Installm
 /** Month label like "Jun 2026" for compact UI. */
 export function shortMonth(iso: string, locale = 'en'): string {
   return formatDate(iso, locale, { month: 'short', year: 'numeric' });
+}
+
+const monthIndex = (iso: string) => {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? NaN : d.getUTCFullYear() * 12 + d.getUTCMonth();
+};
+
+/** Two plans that look like one purchase the bank printed with different wording across
+ *  statements: same card, same number of installments, the same monthly amount, the same
+ *  purchase month, and charges in months that never overlap (two identical purchases bought
+ *  together would overlap). The first plan of each pair is the older wording, merged into
+ *  the second (the latest wording). */
+export function suggestPlanMerges(plans: InstallmentPlan[]): [InstallmentPlan, InstallmentPlan][] {
+  const out: [InstallmentPlan, InstallmentPlan][] = [];
+  const used = new Set<string>();
+  const origin = (p: InstallmentPlan) => p.signature.split('|')[2] || '';
+  const sorted = [...plans].sort((a, b) => a.lastDate.localeCompare(b.lastDate));
+  for (let i = 0; i < sorted.length; i++) {
+    const a = sorted[i];
+    if (used.has(a.key) || !origin(a) || !(a.totalInstallments > 0)) continue;
+    for (let j = i + 1; j < sorted.length; j++) {
+      const b = sorted[j];
+      if (used.has(b.key) || b.card !== a.card || b.totalInstallments !== a.totalInstallments) continue;
+      if (origin(b) !== origin(a)) continue;
+      if (Math.abs(a.perAmount - b.perAmount) > Math.max(0.05, a.perAmount * 0.02)) continue;
+      if (monthIndex(a.lastDate) >= monthIndex(b.firstDate)) continue; // overlapping months: two purchases
+      out.push([a, b]);
+      used.add(a.key);
+      used.add(b.key);
+      break;
+    }
+  }
+  return out;
 }

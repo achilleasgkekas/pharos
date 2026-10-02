@@ -7,32 +7,36 @@ import type { StatementPaymentReport as Report } from '@/lib/statementPayments';
 import { compactControlClass } from '@/components/ui/Input';
 import { cn } from '@/components/ui/cn';
 
-export function StatementPaymentReport({ report }: { report: Report }) {
+/** `cardLabel` hands the card choice to the caller (the Statements card tiles): the report then
+ *  draws no selector of its own and filters by that card's label ('' = all cards). */
+export function StatementPaymentReport({ report, cardLabel, hideHistory = false }: { report: Report; cardLabel?: string; hideHistory?: boolean }) {
   const t = useT(), locale = useLocale();
-  const [card, setCard] = useState('');
+  const [picked, setPicked] = useState('');
   const cards = new Map<string, string>();
   report.history.forEach(r => cards.set(r.cardKey, r.card));
   report.forecast.forEach(m => m.lines.forEach(l => cards.set(l.cardKey, l.card)));
-  const selectedCard = cards.has(card) ? card : '';
+  const controlled = cardLabel !== undefined;
+  const selectedCard = cards.has(picked) ? picked : '';
+  const onCard = (l: { cardKey: string; card: string }) => (controlled ? !cardLabel || l.card === cardLabel : !selectedCard || l.cardKey === selectedCard);
   const money = (n: number) => `${cur()}${n.toFixed(2)}`;
   const month = (key: string) => formatDate(`${key}-01T12:00:00Z`, locale, { month: 'long', year: 'numeric' });
-  const history = report.history.filter(r => !selectedCard || r.cardKey === selectedCard);
+  const history = report.history.filter(onCard);
   // Nothing on any card yet (no statements, no installments): a dozen "€0.00" months only
   // pushed the rest of the page down.
   if (report.history.length === 0 && report.forecast.every(m => m.lines.length === 0)) return null;
   return <section className="min-w-0 space-y-4 rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-4 sm:p-5">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <h2 className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>{t('payments.title')}</h2>
-      <select aria-label={t('st.cards', { n: cards.size })} value={selectedCard} onChange={e => setCard(e.target.value)} className={cn(compactControlClass, 'min-w-0 max-w-full')}>
+      {!controlled && <select aria-label={t('st.cards', { n: cards.size })} value={selectedCard} onChange={e => setPicked(e.target.value)} className={cn(compactControlClass, 'min-w-0 max-w-full')}>
         <option value="">{t('st.allCards')}</option>
         {[...cards].map(([id,label]) => <option key={id} value={id}>{label}</option>)}
-      </select>
+      </select>}
     </div>
     <p className="text-xs leading-relaxed text-[color:var(--color-text-dim)]">{t('payments.forecastNote')}</p>
     <h3 className="text-[11px] text-[color:var(--color-purple)]" style={{ fontFamily: 'var(--font-mono)' }}>{t('payments.forecast', { n: report.forecast.length })}</h3>
     <div className="grid min-w-0 gap-2 sm:grid-cols-2 lg:grid-cols-3">
       {report.forecast.map(m => {
-        const lines = m.lines.filter(l => !selectedCard || l.cardKey === selectedCard);
+        const lines = m.lines.filter(onCard);
         const amount = lines.reduce((n,l) => n+l.amount,0);
         return <details key={m.period} className="min-w-0 rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] p-3 open:border-[color:var(--color-border-light)]">
           <summary className="cursor-pointer text-xs leading-7 text-[color:var(--color-text-dim)]"><span>{month(m.period)}</span><strong className="ml-3 whitespace-nowrap tabular-nums text-sm text-[color:var(--color-purple)]" style={{ fontFamily: 'var(--font-display)' }}>{money(amount)}</strong></summary>
@@ -45,6 +49,7 @@ export function StatementPaymentReport({ report }: { report: Report }) {
         </details>;
       })}
     </div>
+    {!hideHistory && <>
     <h3 className="border-t border-[color:var(--color-border)] pt-4 text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>{t('payments.history')}</h3>
     <p className="text-xs leading-relaxed text-[color:var(--color-text-dim)]">{t('payments.summaryNote')}</p>
     <div className="space-y-2">
@@ -55,5 +60,6 @@ export function StatementPaymentReport({ report }: { report: Report }) {
         </dl>
       </details>)}
     </div>
+    </>}
   </section>;
 }
