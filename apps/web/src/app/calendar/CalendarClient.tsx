@@ -1,6 +1,6 @@
 'use client';
-import { PAGE_MAIN, PageHeader, HeaderStat, ViewToggle } from '@/components/ui/PageHeader';
-import { useState, useEffect, useTransition } from 'react';
+import { PAGE_MAIN, PageHeader, HeaderStat } from '@/components/ui/PageHeader';
+import { useState, useTransition } from 'react';
 import Link from 'next/link';
 import { useLocale, useMoney, useT } from '@/components/LocaleProvider';
 import type { TKey } from '@/lib/i18n';
@@ -14,7 +14,6 @@ import {
   Receipt,
   Target,
   CalendarDays,
-  LayoutGrid,
   ChevronLeft,
   ChevronRight,
   ExternalLink,
@@ -25,7 +24,6 @@ import {
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
-import { Badge } from '@/components/ui/Badge';
 import { cn } from '@/components/ui/cn';
 import { formatDate } from '@/lib/i18n/format';
 import { dayOf } from '@/lib/calendarDay';
@@ -34,7 +32,9 @@ import { markBillPaid } from '@/app/bills/actions';
 import { reviewSubscription } from '@/app/subscriptions/actions';
 import { useRouter } from 'next/navigation';
 
-export type Kind = 'renewal' | 'installments' | 'bill' | 'payable' | 'income' | 'goal' | 'warranty' | 'voucher';
+// spent / earned / receipt are recorded (behind today); the rest are what is coming.
+export type Kind = 'renewal' | 'installments' | 'bill' | 'payable' | 'income' | 'goal' | 'warranty' | 'voucher' | 'spent' | 'earned' | 'receipt';
+const RECORDED: Kind[] = ['spent', 'earned', 'receipt'];
 
 export type Entry = {
   id?: string;
@@ -47,7 +47,8 @@ export type Entry = {
   details?: EntryDetails;
 };
 
-export type MonthBlock = { key: string; label: string; entries: Entry[]; out: number; inc: number };
+/** out = still to pay, spent = recorded expenses, rec = receipts, inc = income (recorded or expected). */
+export type MonthBlock = { key: string; label: string; entries: Entry[]; out: number; inc: number; rec: number; spent: number };
 
 const mono = { fontFamily: 'var(--font-mono)' } as const;
 const display = { fontFamily: 'var(--font-display)' } as const;
@@ -61,24 +62,27 @@ const KIND_META: Record<Kind, { icon: React.ReactNode; color: string; labelKey: 
   goal: { icon: <Target size={15} />, color: 'var(--color-purple)', labelKey: 'cal.lblGoal' },
   warranty: { icon: <ShieldCheck size={15} />, color: 'var(--color-cyan)', labelKey: 'cal.lblItem' },
   voucher: { icon: <Ticket size={15} />, color: 'var(--color-gold)', labelKey: 'cal.lblVoucher' },
+  spent: { icon: <Wallet size={15} />, color: 'var(--color-text-dim)', labelKey: 'cal.lblSpent' },
+  earned: { icon: <Banknote size={15} />, color: 'var(--color-accent)', labelKey: 'cal.lblIncome' },
+  receipt: { icon: <Receipt size={15} />, color: 'var(--color-cyan)', labelKey: 'cal.lblReceipt' },
 };
 
-type View = 'month' | 'agenda';
-const VIEWS: { id: View; icon: React.ReactNode }[] = [
-  { id: 'month', icon: <LayoutGrid size={15} /> },
-  { id: 'agenda', icon: <CalendarDays size={15} /> },
-];
+const isIncome = (k: Kind) => k === 'income' || k === 'earned';
+
+/** 650 stays "650", 51.3 reads "51.30". */
+const exact = (n: number): Intl.NumberFormatOptions =>
+  Number.isInteger(n) ? { minimumFractionDigits: 0, maximumFractionDigits: 0 } : { minimumFractionDigits: 2, maximumFractionDigits: 2 };
 
 const dayMonth = (value: string, locale: string) =>
   formatDate(value, locale, { day: 'numeric', month: 'short', timeZone: 'UTC' });
 
 function Amount({ e }: { e: Entry }) {
   const money = useMoney();
-  const fmt = (n: number) => money(n, undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  const fmt = (n: number) => money(n, undefined, exact(n));
   if (e.amount == null) return null;
   return (
-    <span className={cn('font-bold', e.kind === 'income' && 'text-[color:var(--color-accent)]')} style={display}>
-      {e.kind === 'income' ? '+' : ''}
+    <span className={cn('font-bold', isIncome(e.kind) && 'text-[color:var(--color-accent)]')} style={display}>
+      {isIncome(e.kind) ? '+' : ''}
       {fmt(e.amount)}
     </span>
   );
@@ -86,7 +90,6 @@ function Amount({ e }: { e: Entry }) {
 
 /** One agenda row (icon · label/sub · date · amount). */
 function EntryRow({ e, onClick }: { e: Entry; onClick: () => void }) {
-  const locale = useLocale();
   const meta = KIND_META[e.kind];
   return (
     <button
@@ -106,10 +109,7 @@ function EntryRow({ e, onClick }: { e: Entry; onClick: () => void }) {
           {e.sub}
         </p>
       </div>
-      <span className="text-[11px] text-[color:var(--color-text-faint)] shrink-0 w-20 text-right" style={mono}>
-        {e.pinned ? 'monthly' : dayMonth(e.date, locale)}
-      </span>
-      <span className="shrink-0 w-20 text-right text-sm">
+      <span className="shrink-0 text-right text-sm">
         <Amount e={e} />
       </span>
     </button>
@@ -119,6 +119,9 @@ function EntryRow({ e, onClick }: { e: Entry; onClick: () => void }) {
 /** Monday-first short weekday names in the app language (5 Jan 2026 was a Monday). */
 const weekdays = (locale: string) =>
   Array.from({ length: 7 }, (_, i) => formatDate(new Date(2026, 0, 5 + i), locale, { weekday: 'short' }));
+
+/** Chips drawn in a day cell on a computer; the rest are counted ("+2") and listed in the panel. */
+const CHIPS_PER_DAY = 3;
 
 function MonthGrid({
   month,
@@ -130,17 +133,13 @@ function MonthGrid({
   const t = useT();
   const locale = useLocale();
   const money = useMoney();
-  const fmt = (n: number) => money(n, undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  const fmt = (n: number) => money(n, undefined, exact(n));
   const [y, mo] = month.key.split('-').map(Number); // mo = 1-12
   const first = new Date(y, mo - 1, 1);
   const firstWeekday = (first.getDay() + 6) % 7; // Mon = 0
   const daysInMonth = new Date(y, mo, 0).getDate();
   const today = new Date();
   const isThisMonth = today.getFullYear() === y && today.getMonth() === mo - 1;
-
-  const [selectedDay, setSelectedDay] = useState<number | null>(() =>
-    isThisMonth ? today.getDate() : 1
-  );
 
   const pinned = month.entries.filter((e) => e.pinned);
   const byDay = new Map<number, Entry[]>();
@@ -150,145 +149,127 @@ function MonthGrid({
     if (!byDay.has(day)) byDay.set(day, []);
     byDay.get(day)!.push(e);
   }
+  // Open on today, else on the first day that has something.
+  const [selectedDay, setSelectedDay] = useState<number>(() =>
+    isThisMonth ? today.getDate() : [...byDay.keys()].sort((p, q) => p - q)[0] ?? 1
+  );
 
   const cells: (number | null)[] = [];
   for (let i = 0; i < firstWeekday; i++) cells.push(null);
   for (let d = 1; d <= daysInMonth; d++) cells.push(d);
   while (cells.length % 7 !== 0) cells.push(null);
 
-  const selectedDayEvents = selectedDay ? byDay.get(selectedDay) ?? [] : [];
+  const dayEvents = byDay.get(selectedDay) ?? [];
+  const dayOut = dayEvents.filter((e) => !isIncome(e.kind)).reduce((n, e) => n + (e.amount ?? 0), 0);
+  const dayIn = dayEvents.filter((e) => isIncome(e.kind)).reduce((n, e) => n + (e.amount ?? 0), 0);
 
   return (
-    <div>
-      {pinned.length > 0 && (
-        <div className="flex flex-wrap gap-2 mb-3">
-          {pinned.map((e, i) => {
-            const meta = KIND_META[e.kind];
+    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
+      <div className="min-w-0">
+        <div className="grid grid-cols-7 gap-1">
+          {weekdays(locale).map((w) => (
+            <div key={w} className="text-[11px] text-[color:var(--color-text-faint)] text-center pb-1" style={mono}>
+              {w}
+            </div>
+          ))}
+          {cells.map((day, i) => {
+            const events = day ? byDay.get(day) ?? [] : [];
+            const isToday = isThisMonth && day === today.getDate();
+            const isSelected = selectedDay === day;
+            const isPast = day != null && new Date(y, mo - 1, day) < new Date(today.getFullYear(), today.getMonth(), today.getDate());
             return (
               <button
                 type="button"
                 key={i}
-                onClick={() => onSelectEntry(e)}
-                className="inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-lg border hover:brightness-110 transition-all cursor-pointer text-left"
-                style={{
-                  ...mono,
-                  color: meta.color,
-                  borderColor: `color-mix(in srgb, ${meta.color} 40%, transparent)`,
-                  background: `color-mix(in srgb, ${meta.color} 10%, transparent)`,
-                }}
-              >
-                {meta.icon} {e.label}
-                {e.amount != null && (
-                  <b>
-                    {' '}
-                    {fmt(e.amount)}
-                    {t('cal.perMo')}
-                  </b>
+                disabled={!day}
+                onClick={() => day && setSelectedDay(day)}
+                aria-pressed={isSelected}
+                aria-label={day ? `${dayMonth(`${month.key}-${String(day).padStart(2, '0')}`, locale)}${events.length ? ` · ${events.length}` : ''}` : undefined}
+                className={cn(
+                  'min-h-[54px] sm:min-h-[84px] rounded-lg border p-1 sm:p-1.5 flex flex-col gap-1 text-left transition-all',
+                  day
+                    ? 'bg-[color:var(--color-surface)] border-[color:var(--color-border)] cursor-pointer hover:border-[color:var(--color-border-light)]'
+                    : 'border-transparent pointer-events-none',
+                  isPast && 'bg-[color:var(--color-surface)]/50',
+                  isSelected && 'ring-1 ring-[color:var(--color-accent)] border-[color:var(--color-accent)]',
+                  isToday && !isSelected && 'border-[color:var(--color-accent)]/50'
                 )}
+              >
+                {day && (
+                  <span
+                    className={cn('text-[11px] font-semibold', isToday ? 'text-[color:var(--color-accent)]' : 'text-[color:var(--color-text-faint)]')}
+                    style={mono}
+                  >
+                    {day}
+                  </span>
+                )}
+
+                {/* Phone: dots */}
+                <span className="flex flex-wrap gap-1 sm:hidden">
+                  {events.slice(0, 6).map((e, j) => (
+                    <span key={j} className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: KIND_META[e.kind].color }} />
+                  ))}
+                </span>
+
+                {/* Computer: a few chips, then a count */}
+                <span className="hidden sm:flex flex-col gap-1 min-w-0">
+                  {events.slice(0, CHIPS_PER_DAY).map((e, j) => {
+                    const meta = KIND_META[e.kind];
+                    return (
+                      <span
+                        key={j}
+                        title={`${e.label}${e.sub ? ` · ${e.sub}` : ''}${e.amount != null ? ` · ${fmt(e.amount)}` : ''}`}
+                        className={cn('text-[11px] leading-tight px-1.5 py-0.5 rounded truncate', RECORDED.includes(e.kind) && 'opacity-80')}
+                        style={{ color: meta.color, background: `color-mix(in srgb, ${meta.color} 14%, transparent)` }}
+                      >
+                        {e.amount != null && <b>{isIncome(e.kind) ? '+' : ''}{fmt(e.amount)} </b>}
+                        {e.label}
+                      </span>
+                    );
+                  })}
+                  {events.length > CHIPS_PER_DAY && (
+                    <span className="text-[10px] text-[color:var(--color-text-faint)] px-1" style={mono}>
+                      {t('cal.more', { n: events.length - CHIPS_PER_DAY })}
+                    </span>
+                  )}
+                </span>
               </button>
             );
           })}
         </div>
-      )}
-
-      <div className="grid grid-cols-7 gap-1">
-        {weekdays(locale).map((w) => (
-          <div
-            key={w}
-            className="text-[11px] text-[color:var(--color-text-faint)] text-center pb-1"
-            style={mono}
-          >
-            {w}
-          </div>
-        ))}
-        {cells.map((day, i) => {
-          const events = day ? byDay.get(day) ?? [] : [];
-          const isToday = isThisMonth && day === today.getDate();
-          const isSelected = selectedDay === day;
-          return (
-            <div
-              key={i}
-              onClick={() => day && setSelectedDay(day)}
-              className={cn(
-                'min-h-[58px] sm:min-h-[78px] rounded-lg border p-1 sm:p-1.5 flex flex-col gap-1 transition-all',
-                day
-                  ? 'bg-[color:var(--color-surface)] border-[color:var(--color-border)] cursor-pointer hover:border-[color:var(--color-border-light)]'
-                  : 'border-transparent pointer-events-none',
-                isSelected && 'ring-1 ring-[color:var(--color-accent)] border-[color:var(--color-accent)]',
-                isToday && !isSelected && 'border-[color:var(--color-accent)]/50'
-              )}
-            >
-              {day && (
-                <span
-                  className={cn(
-                    'text-[11px] font-semibold',
-                    isToday ? 'text-[color:var(--color-accent)]' : 'text-[color:var(--color-text-faint)]'
-                  )}
-                  style={mono}
-                >
-                  {day}
-                </span>
-              )}
-
-              {/* Phone dots (sm:hidden) */}
-              <div className="flex flex-wrap gap-1 sm:hidden">
-                {events.map((e, j) => {
-                  const meta = KIND_META[e.kind];
-                  return (
-                    <span
-                      key={j}
-                      className="w-1.5 h-1.5 rounded-full shrink-0"
-                      style={{ background: meta.color }}
-                      title={`${e.label} · ${e.sub}`}
-                    />
-                  );
-                })}
-              </div>
-
-              {/* Desktop chips (hidden sm:flex) */}
-              <div className="hidden sm:flex flex-col gap-1">
-                {events.map((e, j) => {
-                  const meta = KIND_META[e.kind];
-                  return (
-                    <button
-                      type="button"
-                      key={j}
-                      onClick={(ev) => {
-                        ev.stopPropagation();
-                        onSelectEntry(e);
-                      }}
-                      title={`${e.label} · ${e.sub}${e.amount != null ? ` · ${fmt(e.amount)}` : ''}`}
-                      className="text-[11px] leading-tight px-1.5 py-1 rounded truncate text-left cursor-pointer hover:brightness-125 transition-all"
-                      style={{ color: meta.color, background: `color-mix(in srgb, ${meta.color} 14%, transparent)` }}
-                    >
-                      {e.amount != null && <b>{e.kind === 'income' ? '+' : ''}{fmt(e.amount)} </b>}
-                      {e.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })}
       </div>
 
-      {/* Selected day events list on phone (#356: dots + day list under grid) */}
-      {selectedDay != null && (
-        <div className="sm:hidden mt-4 pt-3 border-t border-[color:var(--color-border)]">
-          <h3 className="text-xs font-semibold text-[color:var(--color-text-dim)] mb-2" style={mono}>
-            {dayMonth(`${month.key}-${String(selectedDay).padStart(2, '0')}`, locale)}
+      {/* The selected day, beside the grid on a computer and under it on a phone */}
+      <aside className="min-w-0 rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-3.5 lg:sticky lg:top-20">
+        <div className="mb-2.5 flex items-baseline justify-between gap-2">
+          <h3 className="text-sm font-semibold">
+            {formatDate(new Date(y, mo - 1, selectedDay), locale, { weekday: 'long', day: 'numeric', month: 'long' })}
           </h3>
-          {selectedDayEvents.length === 0 ? (
-            <p className="text-xs text-[color:var(--color-text-faint)] italic py-2">{t('cal.nothingScheduled')}</p>
-          ) : (
+          <span className="text-[11px] tabular-nums" style={mono}>
+            {dayOut > 0 && <span className="text-[color:var(--color-red)]">{fmt(dayOut)}</span>}
+            {dayIn > 0 && <span className="ml-2 text-[color:var(--color-accent)]">+{fmt(dayIn)}</span>}
+          </span>
+        </div>
+        {dayEvents.length === 0 ? (
+          <p className="text-xs text-[color:var(--color-text-faint)] italic py-2">{t('cal.nothingScheduled')}</p>
+        ) : (
+          <div className="space-y-1.5">
+            {dayEvents.map((e, idx) => (
+              <EntryRow key={idx} e={e} onClick={() => onSelectEntry(e)} />
+            ))}
+          </div>
+        )}
+        {pinned.length > 0 && (
+          <div className="mt-3 border-t border-[color:var(--color-border)] pt-3">
+            <p className="mb-1.5 text-[11px] text-[color:var(--color-text-faint)]" style={mono}>{t('cal.thisMonth')}</p>
             <div className="space-y-1.5">
-              {selectedDayEvents.map((e, idx) => (
+              {pinned.map((e, idx) => (
                 <EntryRow key={idx} e={e} onClick={() => onSelectEntry(e)} />
               ))}
             </div>
-          )}
-        </div>
-      )}
+          </div>
+        )}
+      </aside>
     </div>
   );
 }
@@ -312,7 +293,7 @@ function EventDetailModal({
 
   const d = entry.details;
   const meta = KIND_META[entry.kind];
-  const fmt = (n: number) => money(n, undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  const fmt = (n: number) => money(n, undefined, exact(n));
 
   function copyText(val: string) {
     if (!val) return;
@@ -573,121 +554,77 @@ function EventDetailModal({
   );
 }
 
-export function CalendarClient({ months, dueThisMonth }: { months: MonthBlock[]; dueThisMonth: number }) {
+export function CalendarClient({ months, dueThisMonth, currentIndex = 0 }: { months: MonthBlock[]; dueThisMonth: number; currentIndex?: number }) {
   const money = useMoney();
-  const fmt = (n: number) => money(n, undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  const fmt = (n: number) => money(n, undefined, exact(n));
   const t = useT();
-  const [view, setView] = useState<View>('month');
-  const [monthIdx, setMonthIdx] = useState(0);
+  const [monthIdx, setMonthIdx] = useState(Math.min(currentIndex, Math.max(0, months.length - 1)));
   const [selectedEntry, setSelectedEntry] = useState<Entry | null>(null);
-
-  useEffect(() => {
-    const saved = typeof window !== 'undefined' ? (window.localStorage.getItem('calendarView') as View | null) : null;
-    if (saved && VIEWS.some((v) => v.id === saved)) setView(saved);
-  }, []);
-  function go(v: View) {
-    setView(v);
-    try {
-      window.localStorage.setItem('calendarView', v);
-    } catch {
-      /* private mode */
-    }
-  }
 
   const empty = months.every((m) => m.entries.length === 0);
   const m = months[monthIdx];
+  const past = monthIdx < currentIndex;
 
   return (
     <main className={PAGE_MAIN}>
-      <PageHeader title={t('nav.calendar')} count={t('cal.next3')}>
+      <PageHeader title={t('nav.calendar')}>
         <HeaderStat label={t('cal.dueThisMonth')} value={fmt(dueThisMonth)} color="var(--color-gold)" />
-        <ViewToggle
-          value={view}
-          onChange={go}
-          options={VIEWS.map((v) => ({ value: v.id, icon: v.icon, title: t(`cal.${v.id}` as TKey) }))}
-        />
       </PageHeader>
 
       {empty ? (
         <EmptyState icon={<CalendarDays />} title={t('cal.empty')} />
-      ) : view === 'month' ? (
+      ) : (
         <section>
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between gap-2 mb-3">
             <button
               onClick={() => setMonthIdx((i) => Math.max(0, i - 1))}
               disabled={monthIdx === 0}
+              aria-label={t('cal.prevMonth')}
               className="p-1.5 rounded-lg text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface-2)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             >
               <ChevronLeft size={18} />
             </button>
-            <div className="text-center">
+            <div className="text-center min-w-0">
               <h2 className="text-sm font-bold" style={mono}>
                 {m.label}
               </h2>
               <span className="text-[11px] text-[color:var(--color-text-faint)]" style={mono}>
-                {m.out > 0 && (
-                  <>
-                    {t('cal.out')} <span className="text-[color:var(--color-red)]">{fmt(m.out)}</span>
-                  </>
-                )}
-                {m.inc > 0 && (
-                  <>
-                    {' '}
-                    · {t('cal.in')} <span className="text-[color:var(--color-accent)]">{fmt(m.inc)}</span>
-                  </>
-                )}
-                {m.out === 0 && m.inc === 0 && t('cal.nothingDue')}
+                {[
+                  m.spent > 0 && <span key="s">{t('cal.spent')} <span className="text-[color:var(--color-red)]">{fmt(m.spent)}</span></span>,
+                  m.rec > 0 && <span key="r">{t('cal.receipts')} <span className="text-[color:var(--color-cyan)]">{fmt(m.rec)}</span></span>,
+                  m.out > 0 && <span key="o">{t('cal.out')} <span className="text-[color:var(--color-gold)]">{fmt(m.out)}</span></span>,
+                  m.inc > 0 && <span key="i">{t('cal.in')} <span className="text-[color:var(--color-accent)]">{fmt(m.inc)}</span></span>,
+                ]
+                  .filter(Boolean)
+                  .flatMap((x, i) => (i ? [' · ', x] : [x]))}
+                {m.out === 0 && m.inc === 0 && m.rec === 0 && m.spent === 0 && t(past ? 'cal.nothingRecorded' : 'cal.nothingDue')}
               </span>
             </div>
-            <button
-              onClick={() => setMonthIdx((i) => Math.min(months.length - 1, i + 1))}
-              disabled={monthIdx >= months.length - 1}
-              className="p-1.5 rounded-lg text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface-2)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-            >
-              <ChevronRight size={18} />
-            </button>
+            <div className="flex items-center gap-1">
+              {monthIdx !== currentIndex && (
+                <button
+                  onClick={() => setMonthIdx(currentIndex)}
+                  className="rounded-lg px-2 py-1 text-[11px] text-[color:var(--color-cyan)] hover:bg-[color:var(--color-surface-2)]"
+                  style={mono}
+                >
+                  {t('cal.today')}
+                </button>
+              )}
+              <button
+                onClick={() => setMonthIdx((i) => Math.min(months.length - 1, i + 1))}
+                disabled={monthIdx >= months.length - 1}
+                aria-label={t('cal.nextMonth')}
+                className="p-1.5 rounded-lg text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface-2)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              >
+                <ChevronRight size={18} />
+              </button>
+            </div>
           </div>
-          <MonthGrid month={m} onSelectEntry={setSelectedEntry} />
+          <MonthGrid key={m.key} month={m} onSelectEntry={setSelectedEntry} />
         </section>
-      ) : (
-        months.map((mb) => (
-          <section key={mb.key} className="mb-6">
-            <div className="flex items-baseline justify-between mb-2 pb-1.5 border-b border-[color:var(--color-border)]">
-              <h2 className="text-sm font-bold" style={mono}>
-                {mb.label}
-              </h2>
-              <span className="text-[11px] text-[color:var(--color-text-faint)]" style={mono}>
-                {mb.out > 0 && (
-                  <>
-                    {t('cal.out')} <span className="text-[color:var(--color-red)]">{fmt(mb.out)}</span>
-                  </>
-                )}
-                {mb.inc > 0 && (
-                  <>
-                    {' '}
-                    · {t('cal.in')} <span className="text-[color:var(--color-accent)]">{fmt(mb.inc)}</span>
-                  </>
-                )}
-              </span>
-            </div>
-            {mb.entries.length === 0 ? (
-              <p className="text-xs text-[color:var(--color-text-faint)] italic py-2">{t('cal.nothingScheduled')}</p>
-            ) : (
-              <div className="space-y-1.5">
-                {mb.entries.map((e, i) => (
-                  <EntryRow key={i} e={e} onClick={() => setSelectedEntry(e)} />
-                ))}
-              </div>
-            )}
-          </section>
-        ))
       )}
 
-      {/* Inline Event Detail Modal (#356) */}
-      <EventDetailModal
-        entry={selectedEntry}
-        onClose={() => setSelectedEntry(null)}
-      />
+      <EventDetailModal entry={selectedEntry} onClose={() => setSelectedEntry(null)} />
     </main>
   );
 }

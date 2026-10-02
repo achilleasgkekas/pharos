@@ -981,7 +981,7 @@ export const de: Partial<Dict> = {
   'cal.empty': 'Nichts geplant. Verlängerungen, Raten, wiederkehrende Rechnungen und Abläufe erscheinen hier.',
   'cal.nothingDue': 'nichts fällig',
   'cal.nothingScheduled': 'Nichts geplant.',
-  'cal.out': 'aus',
+  'cal.out': 'zu zahlen',
   'cal.in': 'ein',
 
   'v.activeCount': '{n} aktiv',
@@ -2609,4 +2609,13 @@ export const de: Partial<Dict> = {
   "af.savingsPlanDesc": "Macht aus einem Sparziel ein paar Schritte mit Beträgen, aus Einnahmen, Ausgaben und Zahlungen.",
   "ex.tabToPay": "Zu zahlen",
   "ex.toPayHint": "Rechnungen, die du noch zahlen musst. Als bezahlt markiert, erscheint sie einmal unter Ausgaben.",
+  "cal.more": "+{n} weitere",
+  "cal.thisMonth": "Diesen Monat",
+  "cal.prevMonth": "Vorheriger Monat",
+  "cal.nextMonth": "Nächster Monat",
+  "cal.spent": "Ausgegeben",
+  "cal.receipts": "Belege",
+  "cal.nothingRecorded": "Nichts erfasst",
+  "cal.lblSpent": "Ausgabe",
+  "cal.lblReceipt": "Beleg",
 };

@@ -981,7 +981,7 @@ export const pt: Partial<Dict> = {
   'cal.empty': 'Nada agendado. Renovações, prestações, faturas recorrentes e expirações aparecerão aqui.',
   'cal.nothingDue': 'nada a pagar',
   'cal.nothingScheduled': 'Nada agendado.',
-  'cal.out': 'saídas',
+  'cal.out': 'a pagar',
   'cal.in': 'entradas',
 
   'v.activeCount': '{n} ativos',
@@ -2609,4 +2609,13 @@ export const pt: Partial<Dict> = {
   "af.savingsPlanDesc": "Transforma uma meta de poupança em alguns passos com valores, a partir do que ganha, gasta e paga.",
   "ex.tabToPay": "A pagar",
   "ex.toPayHint": "Contas que ainda tem de pagar. Marcada como paga, fica registada uma vez em Despesas.",
+  "cal.more": "+{n} mais",
+  "cal.thisMonth": "Este mês",
+  "cal.prevMonth": "Mês anterior",
+  "cal.nextMonth": "Mês seguinte",
+  "cal.spent": "Gasto",
+  "cal.receipts": "Recibos",
+  "cal.nothingRecorded": "Nada registado",
+  "cal.lblSpent": "Despesa",
+  "cal.lblReceipt": "Recibo",
 };

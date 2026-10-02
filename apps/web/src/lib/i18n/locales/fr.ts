@@ -981,7 +981,7 @@ export const fr: Partial<Dict> = {
   'cal.empty': "Rien de prévu. Renouvellements, échéances, factures récurrentes et expirations apparaîtront ici.",
   'cal.nothingDue': 'rien à payer',
   'cal.nothingScheduled': 'Rien de prévu.',
-  'cal.out': 'sorties',
+  'cal.out': 'à payer',
   'cal.in': 'entrées',
 
   'v.activeCount': '{n} actifs',
@@ -2609,4 +2609,13 @@ export const fr: Partial<Dict> = {
   "af.savingsPlanDesc": "Transforme un objectif d’épargne en quelques étapes chiffrées, selon vos revenus, dépenses et paiements.",
   "ex.tabToPay": "À payer",
   "ex.toPayHint": "Factures encore à payer. Marquée payée, elle est notée une fois dans Dépenses.",
+  "cal.more": "+{n} de plus",
+  "cal.thisMonth": "Ce mois-ci",
+  "cal.prevMonth": "Mois précédent",
+  "cal.nextMonth": "Mois suivant",
+  "cal.spent": "Dépensé",
+  "cal.receipts": "Tickets",
+  "cal.nothingRecorded": "Rien d’enregistré",
+  "cal.lblSpent": "Dépense",
+  "cal.lblReceipt": "Ticket",
 };
