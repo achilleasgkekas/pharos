@@ -55,7 +55,7 @@ function isKind(v: unknown): v is FxIssueKind {
  * calendar as well as its own module's list.
  */
 function revalidateMoneyRoutes() {
-  for (const p of ['/reports', '/', '/expenses', '/income', '/receipts', '/items', '/shopping', '/subscriptions', '/statements', '/bills', '/calendar']) {
+  for (const p of ['/reports', '/', '/expenses', '/income', '/receipts', '/items', '/shopping', '/subscriptions', '/statements', '/expenses/to-pay', '/calendar']) {
     revalidatePath(p);
   }
 }

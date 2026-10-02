@@ -2607,4 +2607,6 @@ export const es: Partial<Dict> = {
   "sav.aiNote": "Hecho con tus registros: un mes normal, gasto por categoría, suscripciones y cuotas. Revísalo antes de actuar.",
   "af.savingsPlan": "Plan de ahorro",
   "af.savingsPlanDesc": "Convierte una meta de ahorro en unos pasos con importes, según lo que ganas, gastas y pagas.",
+  "ex.tabToPay": "Por pagar",
+  "ex.toPayHint": "Facturas que aún debes pagar. Al marcarla pagada, se anota una vez en Gastos.",
 };

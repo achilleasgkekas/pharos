@@ -2607,4 +2607,6 @@ export const fr: Partial<Dict> = {
   "sav.aiNote": "Fait à partir de vos données : un mois normal, dépenses par catégorie, abonnements et échéances. Vérifiez avant d’agir.",
   "af.savingsPlan": "Plan d’épargne",
   "af.savingsPlanDesc": "Transforme un objectif d’épargne en quelques étapes chiffrées, selon vos revenus, dépenses et paiements.",
+  "ex.tabToPay": "À payer",
+  "ex.toPayHint": "Factures encore à payer. Marquée payée, elle est notée une fois dans Dépenses.",
 };

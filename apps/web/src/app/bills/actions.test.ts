@@ -72,7 +72,7 @@ vi.mock('@/lib/tenancy/connection', () => ({ currentModel: async () => billModel
 vi.mock('@/models/Bill', () => ({ Bill: {} }));
 vi.mock('@/app/expenses/actions', () => ({ addExpense: addExpenseMock }));
 vi.mock('@/lib/appSettings', () => ({ getAppSettings: getAppSettingsMock }));
-vi.mock('next/cache', () => ({ revalidatePath: (p: string) => revalidatePathMock(p) }));
+vi.mock('next/cache', () => ({ revalidatePath: (...a: unknown[]) => revalidatePathMock(...a) }));
 
 import { billPaidExpenseId, billPaymentExpenseId, billPaymentId } from '@/lib/billExpenseId';
 import {
@@ -167,9 +167,9 @@ describe('createBill', () => {
     expect(billCreate).not.toHaveBeenCalled();
   });
 
-  it('revalidates /bills after a successful create, not on a validation failure', async () => {
+  it('revalidates the Expenses pages after a successful create, not on a validation failure', async () => {
     await createBill(formData({ title: 'X', dueDate: '01/01/2027' }));
-    expect(revalidatePathMock).toHaveBeenCalledWith('/bills');
+    expect(revalidatePathMock).toHaveBeenCalledWith('/expenses', 'layout');
     revalidatePathMock.mockClear();
     await createBill(formData({}));
     expect(revalidatePathMock).not.toHaveBeenCalled();
@@ -200,9 +200,9 @@ describe('updateBill', () => {
     expect(billFindByIdAndUpdate).not.toHaveBeenCalled();
   });
 
-  it('revalidates /bills after a successful update', async () => {
+  it('revalidates the Expenses pages after a successful update', async () => {
     await updateBill('bill1', formData({ title: 'X', dueDate: '01/01/2027' }));
-    expect(revalidatePathMock).toHaveBeenCalledWith('/bills');
+    expect(revalidatePathMock).toHaveBeenCalledWith('/expenses', 'layout');
   });
 
   // #34: lowering the total below what the instalments already cover used to leave paidAt
@@ -243,7 +243,7 @@ describe('setBillArchived', () => {
     const res = await setBillArchived('bill1', true);
     expect(res).toEqual({ ok: true });
     expect(billFindByIdAndUpdate).toHaveBeenCalledWith('bill1', { archived: true });
-    expect(revalidatePathMock).toHaveBeenCalledWith('/bills');
+    expect(revalidatePathMock).toHaveBeenCalledWith('/expenses', 'layout');
   });
 
   it('sets archived:false', async () => {
@@ -260,7 +260,7 @@ describe('deleteBill', () => {
     const [filter, update] = billUpdateOne.mock.calls[0];
     expect(filter).toEqual({ _id: 'bill1' });
     expect(update.$set.deletedAt).toBeInstanceOf(Date);
-    expect(revalidatePathMock).toHaveBeenCalledWith('/bills');
+    expect(revalidatePathMock).toHaveBeenCalledWith('/expenses', 'layout');
   });
 });
 
@@ -285,7 +285,7 @@ describe('markBillPaid', () => {
     expect((update.paidAt as Date).getTime()).toBeGreaterThanOrEqual(before);
     expect(update.linkedExpenseId).toBe('exp-old');
     expect(addExpenseMock).not.toHaveBeenCalled(); // no logExpense opt-in
-    expect(revalidatePathMock).toHaveBeenCalledWith('/bills');
+    expect(revalidatePathMock).toHaveBeenCalledWith('/expenses', 'layout');
   });
 
   it('an explicit opts.paidDate is parsed via safeDateOrNull', async () => {
@@ -544,7 +544,7 @@ describe('markBillUnpaid', () => {
     const res = await markBillUnpaid('b1');
     expect(res).toEqual({ ok: true });
     expect(billFindByIdAndUpdate).toHaveBeenCalledWith('b1', { paidAt: null });
-    expect(revalidatePathMock).toHaveBeenCalledWith('/bills');
+    expect(revalidatePathMock).toHaveBeenCalledWith('/expenses', 'layout');
   });
 });
 

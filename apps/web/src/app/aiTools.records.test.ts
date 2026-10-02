@@ -157,7 +157,7 @@ describe('update_record', () => {
   it('refreshes only the pages that type appears on', async () => {
     await execute('update_record', { type: 'bill', id: ID, fields: { title: 'x' } });
 
-    expect(revalidated).toEqual(['/bills']);
+    expect(revalidated).toEqual(['/expenses/to-pay']);
   });
 });
 

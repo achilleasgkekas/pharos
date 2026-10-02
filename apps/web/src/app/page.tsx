@@ -138,7 +138,7 @@ const KIND: Record<AgendaKind, { label: TKey; href: string }> = {
   renewal: { label: 'cal.lblSubscription', href: '/subscriptions' },
   installments: { label: 'cal.lblInstallments', href: '/statements' },
   bill: { label: 'cal.lblBill', href: '/expenses' },
-  payable: { label: 'cal.lblBill', href: '/bills' },
+  payable: { label: 'cal.lblBill', href: '/expenses/to-pay' },
   income: { label: 'cal.lblIncome', href: '/income' },
   goal: { label: 'cal.lblGoal', href: '/savings' },
   warranty: { label: 'cal.subWarranty', href: '/items' },

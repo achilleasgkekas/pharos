@@ -1,38 +1,9 @@
-import { connectDB } from '@/lib/db';
-import { Bill as BillModel } from '@/models/Bill';
-import { withRequestTenant } from '@/lib/tenancy/request';
-import { currentModel } from '@/lib/tenancy/connection';
-import { getAppSettings } from '@/lib/appSettings';
-import { BillsClient } from './BillsClient';
-import type { SerializedBill } from '@/types';
-import { aiFeatureStatus } from '@/lib/aiFeatures.server';
+import { redirect } from 'next/navigation';
 
-export const dynamic = 'force-dynamic';
-
-async function getData(): Promise<{ bills: SerializedBill[]; categories: string[]; spaces: string[]; baseCurrency: string; multiCurrency: boolean; scanOn: boolean }> {
-  // Read through the same tenant seam the bill actions write through, so SaaS mode never
-  // shows the default tenant's bills next to another tenant's writes. Self-hosted: no-op.
-  return withRequestTenant(async () => {
-    await connectDB();
-    const Bill = await currentModel(BillModel);
-    const [bills, settings, scan] = await Promise.all([
-      // Unpaid first, then soonest due — the order you triage bills in.
-      Bill.find().sort({ paidAt: 1, dueDate: 1 }).lean(),
-      getAppSettings(),
-      aiFeatureStatus('bills'),
-    ]);
-    return {
-      bills: JSON.parse(JSON.stringify(bills)),
-      categories: settings.expenseCategories,
-      spaces: settings.spaces ?? [], // #14: the same per-property tags the Expenses form uses
-      baseCurrency: settings.currency,
-      multiCurrency: settings.multiCurrency, // P9: off = no per-bill currency controls at all
-      scanOn: scan === 'ready',
-    };
-  });
-}
-
-export default async function BillsPage() {
-  const { bills, categories, spaces, baseCurrency, multiCurrency, scanOn } = await getData();
-  return <BillsClient bills={bills} categories={categories} spaces={spaces} baseCurrency={baseCurrency} multiCurrency={multiCurrency} scanOn={scanOn} />;
+// Bills live in Expenses now, as the "To pay" tab. Old links (bookmarks, notifications,
+// ?open=<id> deep links) keep working.
+export default async function BillsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const sp = await searchParams;
+  const open = typeof sp.open === 'string' && /^[a-f0-9]{24}$/i.test(sp.open) ? `?open=${sp.open}` : '';
+  redirect(`/expenses/to-pay${open}`);
 }

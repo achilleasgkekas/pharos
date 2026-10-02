@@ -2607,4 +2607,6 @@ export const de: Partial<Dict> = {
   "sav.aiNote": "Aus deinen Einträgen: ein normaler Monat, Ausgaben nach Kategorie, Abos und Raten. Prüfe es, bevor du handelst.",
   "af.savingsPlan": "Sparplan",
   "af.savingsPlanDesc": "Macht aus einem Sparziel ein paar Schritte mit Beträgen, aus Einnahmen, Ausgaben und Zahlungen.",
+  "ex.tabToPay": "Zu zahlen",
+  "ex.toPayHint": "Rechnungen, die du noch zahlen musst. Als bezahlt markiert, erscheint sie einmal unter Ausgaben.",
 };

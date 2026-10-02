@@ -53,7 +53,7 @@ const SOURCES: Source[] = [
     href: (d) => open(d.kind === 'income' ? '/income' : '/expenses', d),
   },
   { model: Receipt as unknown as Model<never>, fields: 'store', type: () => 'receipt', title: (d) => str(d.store), href: (d) => open('/receipts', d) },
-  { model: Bill as unknown as Model<never>, fields: 'title', type: () => 'bill', title: (d) => str(d.title), href: (d) => open('/bills', d) },
+  { model: Bill as unknown as Model<never>, fields: 'title', type: () => 'bill', title: (d) => str(d.title), href: (d) => open('/expenses/to-pay', d) },
   { model: Subscription as unknown as Model<never>, fields: 'name', type: () => 'subscription', title: (d) => str(d.name), href: (d) => open('/subscriptions', d) },
   { model: Voucher as unknown as Model<never>, fields: 'title', type: () => 'voucher', title: (d) => str(d.title), href: (d) => open('/vouchers', d) },
   { model: Task as unknown as Model<never>, fields: 'title', type: () => 'task', title: (d) => str(d.title), href: (d) => open('/tasks', d) },

@@ -203,7 +203,7 @@ async function computeAlerts(): Promise<Alert[]> {
       kind: 'bill',
       title: b.title,
       body: remaining === null ? `${days}|${Number(b.origAmount) || 0}|${b.currency}` : `${days}|${remaining}`,
-      href: '/bills',
+      href: '/expenses/to-pay',
     });
   }
 

@@ -2607,4 +2607,6 @@ export const nl: Partial<Dict> = {
   "sav.aiNote": "Op basis van je gegevens: een normale maand, uitgaven per categorie, abonnementen en termijnen. Controleer het voor je iets doet.",
   "af.savingsPlan": "Spaarplan",
   "af.savingsPlanDesc": "Maakt van een spaardoel een paar stappen met bedragen, op basis van inkomen, uitgaven en betalingen.",
+  "ex.tabToPay": "Te betalen",
+  "ex.toPayHint": "Rekeningen die je nog moet betalen. Markeer er een als betaald en hij komt één keer bij Uitgaven.",
 };

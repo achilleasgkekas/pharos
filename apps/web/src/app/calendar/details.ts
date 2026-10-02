@@ -73,7 +73,7 @@ export function buildBillDetails(b: any, remaining: number | null, baseCurrency:
     dueDate: dueDateStr,
     paid: !!b.paidAt,
     partialPayments: payments,
-    editUrl: b._id ? `/bills?open=${b._id}` : '/bills',
+    editUrl: b._id ? `/expenses/to-pay?open=${b._id}` : '/expenses/to-pay',
   };
 }
 

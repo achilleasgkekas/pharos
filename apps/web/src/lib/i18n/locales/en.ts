@@ -2703,6 +2703,8 @@ export const en = {
   "sav.aiNote": "Built from your records: a normal month, spend by category, subscriptions and installments. Check it before you act on it.",
   "af.savingsPlan": "Savings plan",
   "af.savingsPlanDesc": "Turn a savings goal into a few steps with amounts, from what you earn, spend and pay.",
+  "ex.tabToPay": "To pay",
+  "ex.toPayHint": "Bills you still have to pay. Mark one paid and it is logged in Expenses, once.",
 } as const;
 
 export type Dict = Record<keyof typeof en, string>;

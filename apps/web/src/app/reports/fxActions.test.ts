@@ -143,7 +143,7 @@ import { applyFxRate, applyFxRateToCurrency } from './fxActions';
 
 const MONEY_ROUTES = [
   '/reports', '/', '/expenses', '/income', '/receipts', '/items', '/shopping',
-  '/subscriptions', '/statements', '/bills', '/calendar',
+  '/subscriptions', '/statements', '/expenses/to-pay', '/calendar',
 ];
 
 beforeEach(() => {

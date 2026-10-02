@@ -1,4 +1,5 @@
 'use client';
+import { ExpenseTabs } from './ExpenseTabs';
 import { cur, currencySymbol, CURRENCIES, moneyField } from '@/lib/money';
 import { CreatedBy } from '@/components/CreatedBy';
 import { isForeignCurrency, normalizeCurrency, convertToBase, deriveFxRate, sumBase } from '@/lib/fx';
@@ -57,9 +58,9 @@ function statusOf(e: SerializedExpense): Status {
  *  already-long prop lists below grow by a single entry. */
 type FxCtx = { base: string; enabled: boolean };
 
-type Props = { kind: 'income' | 'expense'; expenses: SerializedExpense[]; cards: SerializedCard[]; vendors: string[]; ollamaUp: boolean; categories: string[]; spaces: string[]; baseCurrency: string; multiCurrency: boolean };
+type Props = { kind: 'income' | 'expense'; expenses: SerializedExpense[]; cards: SerializedCard[]; vendors: string[]; ollamaUp: boolean; categories: string[]; spaces: string[]; baseCurrency: string; multiCurrency: boolean; toPay?: number };
 
-export function ExpensesClient({ kind, expenses, cards, vendors, ollamaUp, categories, spaces, baseCurrency, multiCurrency }: Props) {
+export function ExpensesClient({ kind, expenses, cards, vendors, ollamaUp, categories, spaces, baseCurrency, multiCurrency, toPay = 0 }: Props) {
   const locale = useLocale();
   const fx: FxCtx = { base: baseCurrency, enabled: multiCurrency };
   const router = useRouter();
@@ -326,6 +327,7 @@ export function ExpensesClient({ kind, expenses, cards, vendors, ollamaUp, categ
         <ViewToggle value={layout} onChange={setLayout} />
         <PrimaryAction onClick={() => setCreating(true)} />
       </PageHeader>
+      {!isIncome && <ExpenseTabs toPay={toPay} />}
       <PageFileDrop onFiles={handleFiles} label={t('common.dropToUpload')} hint={ollamaUp ? t('ex.aiReads') : t('ex.manualEntry')} disabled={uploading} />
 
       <FilterLayout search={searchBox} quick={statusSwitch} filters={filterControls} active={catFilter !== '' || spaceFilter !== '' || sortBy !== 'recent'}>

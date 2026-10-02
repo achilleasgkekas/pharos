@@ -48,7 +48,7 @@ describe('fxIssueHref', () => {
     expect(fxIssueHref('statement', 'st1')).toBe('/statements?open=st1');
     // P9 slice 8: /bills honours ?open= too (useOpenParam in BillsClient), so this link
     // actually lands in the bill's edit form rather than just the list.
-    expect(fxIssueHref('bill', 'bl1')).toBe('/bills?open=bl1');
+    expect(fxIssueHref('bill', 'bl1')).toBe('/expenses/to-pay?open=bl1');
   });
 });
 

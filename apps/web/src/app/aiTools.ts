@@ -71,7 +71,7 @@ const REVALIDATE: Record<EditableType, string[]> = {
   subscription: ['/subscriptions'],
   expense: ['/expenses', '/income'],
   voucher: ['/vouchers'],
-  bill: ['/bills'],
+  bill: ['/expenses/to-pay'],
   goal: ['/reports'],
   shoppinglist: ['/shopping-list'],
 };

@@ -1,4 +1,5 @@
 'use client';
+import { ExpenseTabs } from '@/app/expenses/ExpenseTabs';
 import { ymd } from '@/lib/calendarDay';
 import { useState, useTransition, useMemo } from 'react';
 import { RECURRING_CYCLES, type RecurringCycle } from '@/lib/billingCycle';
@@ -156,8 +157,7 @@ export function BillsClient({
   return (
     <main className={PAGE_MAIN}>
       <PageHeader
-        title={t('nav.bills')}
-        count={t('bill.openCount', { n: openBills.length })}
+        title={t('nav.expenses')}
         summary={
           (totalDue > 0 || overdueCount > 0 || noRateCount > 0) && (
             <HeaderTotals
@@ -172,6 +172,8 @@ export function BillsClient({
       >
         <PrimaryAction onClick={() => setShowCreate(true)} />
       </PageHeader>
+      <ExpenseTabs toPay={openBills.length} />
+      <p className="-mt-1 mb-4 text-xs text-[color:var(--color-text-dim)]">{t('ex.toPayHint')}</p>
 
       <FilterLayout
         active={!!spaceFilter}

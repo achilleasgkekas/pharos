@@ -21,7 +21,7 @@ type AttachmentDoc = { attachments: Record<string, unknown>[]; markModified(p: s
 const MODELS: Record<AttachmentKind, { model: Model<never>; paths: string[] }> = {
   item: { model: Item as unknown as Model<never>, paths: ['/items', '/shopping'] },
   document: { model: Document as unknown as Model<never>, paths: ['/documents'] },
-  bill: { model: Bill as unknown as Model<never>, paths: ['/bills'] },
+  bill: { model: Bill as unknown as Model<never>, paths: ['/expenses/to-pay'] },
   subscription: { model: Subscription as unknown as Model<never>, paths: ['/subscriptions'] },
   task: { model: Task as unknown as Model<never>, paths: ['/tasks'] },
 };

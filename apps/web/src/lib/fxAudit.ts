@@ -72,7 +72,7 @@ export function fxIssueHref(kind: FxIssueKind, id: string): string {
     item: '/items',
     subscription: '/subscriptions',
     statement: '/statements',
-    bill: '/bills',
+    bill: '/expenses/to-pay',
   };
   return `${route[kind]}?open=${id}`;
 }

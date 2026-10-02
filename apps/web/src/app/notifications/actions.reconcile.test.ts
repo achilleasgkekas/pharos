@@ -297,7 +297,7 @@ describe('generateNotifications — bill alert kind', () => {
     state.bills = [{ _id: 'b1', title: 'ΔΕΗ λογαριασμός', vendor: 'ΔΕΗ', amount: 84.2, dueDate: '2026-07-23' }]; // 3 days out, window 5
     await generateNotifications();
     expect(notificationInsertMany).toHaveBeenCalledWith([
-      expect.objectContaining({ dedupeKey: 'bill:b1:2026-07-23', kind: 'bill', title: 'ΔΕΗ λογαριασμός', body: '3|84.2', href: '/bills' }),
+      expect.objectContaining({ dedupeKey: 'bill:b1:2026-07-23', kind: 'bill', title: 'ΔΕΗ λογαριασμός', body: '3|84.2', href: '/expenses/to-pay' }),
     ]);
   });
 
