@@ -32,7 +32,7 @@ export function BookmarkletManager() {
 
   return (
     <div className="space-y-3" style={{ fontFamily: 'inherit' }}>
-      <p className="text-sm text-[color:var(--color-text-dim)]">{t('bm.intro')}</p>
+      <p className="text-xs text-[color:var(--color-text-dim)]">{t('bm.intro')}</p>
       <div className="flex items-center gap-2 flex-wrap">
         <a
           ref={linkRef}

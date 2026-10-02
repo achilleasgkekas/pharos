@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { User as UserIcon, Lock, Check, ArrowRight, Sparkles, SkipForward, Sun, Moon } from 'lucide-react';
 import { createFirstAdmin, saveSetupBasics, saveSetupAi, finishWithoutAi } from './actions';
 import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
+import { Input, controlClass } from '@/components/ui/Input';
 import { PharosMark } from '@/components/PharosMark';
 import { useTheme } from '@/components/ThemeProvider';
 import { CURRENCIES } from '@/lib/money';
@@ -15,8 +15,7 @@ import { claudePrice, formatModelPrice } from '@/lib/claudePricing';
 
 const STEPS = ['Account', 'Basics', 'AI', 'Done'];
 
-const SELECT_CLS =
-  'w-full bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg text-sm text-[color:var(--color-text)] px-3 py-2 focus:outline-none focus:border-[color:var(--color-accent)]';
+const SELECT_CLS = controlClass;
 
 type Provider = 'ollama' | 'anthropic' | 'openai' | 'gemini' | 'openrouter' | 'custom';
 const PROVIDERS: { id: Provider; label: string; needsKey: boolean; modelHint: string }[] = [

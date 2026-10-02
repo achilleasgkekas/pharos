@@ -1,5 +1,5 @@
 'use client';
-import { cur, currencySymbol, CURRENCIES } from '@/lib/money';
+import { cur, currencySymbol, CURRENCIES, moneyField } from '@/lib/money';
 import { CreatedBy } from '@/components/CreatedBy';
 import { isForeignCurrency, normalizeCurrency, convertToBase, deriveFxRate, sumBase } from '@/lib/fx';
 import { FxBadge } from '@/components/FxBadge';
@@ -20,7 +20,9 @@ import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { useOpenParam } from '@/components/useOpenParam';
 import { cn } from '@/components/ui/cn';
 import { shrinkImage } from '@/lib/clientImage';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { inPeriod, monthRangeLabel } from '@/lib/reportPeriod';
+import { FilterChips } from '@/components/ui/FilterChips';
 import type { SerializedExpense, SerializedCard } from '@/types';
 import { uploadExpense, updateExpense, addExpense, deleteExpense, rescanExpense, settlePerson, bulkUpdateExpenses } from './actions';
 import { equalSplit, splitTotals, computeBalances, type SplitEntry } from '@/lib/split';
@@ -74,8 +76,15 @@ export function ExpensesClient({ kind, expenses, cards, vendors, ollamaUp, categ
   const [showBalances, setShowBalances] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadMsg, setUploadMsg] = useState<string | null>(null);
-  const [search, setSearch] = useState('');
-  const [catFilter, setCatFilter] = useState('');
+  // A link from Reports opens the list already filtered: ?category=…&from=YYYY-MM&to=YYYY-MM.
+  const params = useSearchParams();
+  const [search, setSearch] = useState(() => params.get('q') ?? '');
+  const [catFilter, setCatFilter] = useState(() => params.get('category') ?? '');
+  const [monthRange, setMonthRange] = useState<{ from: string; to: string } | null>(() => {
+    const from = params.get('from') ?? '';
+    const to = params.get('to') ?? from;
+    return /^\d{4}-\d{2}$/.test(from) && /^\d{4}-\d{2}$/.test(to) ? { from, to } : null;
+  });
   const [spaceFilter, setSpaceFilter] = useState('');
   const [taxOnly, setTaxOnly] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'all' | Status>('all');
@@ -138,13 +147,15 @@ export function ExpensesClient({ kind, expenses, cards, vendors, ollamaUp, categ
   const hasSpaces = spaces.length > 0;
   const balances = useMemo(() => computeBalances(expenses), [expenses]);
   const totalOwedToYou = useMemo(() => balances.reduce((s, b) => s + b.owed, 0), [balances]);
-  const anyFilter = !!(catFilter || spaceFilter || taxOnly || statusFilter !== 'all' || search || sortBy !== 'recent');
-  function resetFilters() { setCatFilter(''); setSpaceFilter(''); setTaxOnly(false); setStatusFilter('all'); setSearch(''); setSortBy('recent'); }
+  const anyFilter = !!(catFilter || monthRange || spaceFilter || taxOnly || statusFilter !== 'all' || search || sortBy !== 'recent');
+  function resetFilters() { setCatFilter(''); setMonthRange(null); setSpaceFilter(''); setTaxOnly(false); setStatusFilter('all'); setSearch(''); setSortBy('recent'); }
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
     const out = expenses.filter((e) => {
       if (catFilter && e.category !== catFilter) return false;
+      // The month a record counts in, as on Reports: its period, else its date.
+      if (monthRange && !inPeriod(/^\d{4}-\d{2}$/.test(e.period || '') ? e.period : e.date.slice(0, 7), monthRange.from, monthRange.to)) return false;
       if (!matchesSpace(e.space, spaceFilter)) return false;
       if (taxOnly && !e.taxDeductible) return false;
       if (statusFilter !== 'all' && statusOf(e) !== statusFilter) return false;
@@ -160,7 +171,7 @@ export function ExpensesClient({ kind, expenses, cards, vendors, ollamaUp, categ
         default: return new Date(b.date).getTime() - new Date(a.date).getTime();
       }
     });
-  }, [expenses, search, catFilter, spaceFilter, taxOnly, statusFilter, sortBy]);
+  }, [expenses, search, catFilter, monthRange, spaceFilter, taxOnly, statusFilter, sortBy]);
 
   const selectAllFiltered = () => setSelectedIds(new Set(visible.map((e) => e._id)));
 
@@ -324,6 +335,14 @@ export function ExpensesClient({ kind, expenses, cards, vendors, ollamaUp, categ
             </p>
           )}
           {!uploading && uploadMsg && <p role="status" className="mb-3 text-sm text-[color:var(--color-accent)]">{uploadMsg}</p>}
+          {(monthRange || catFilter) && (
+            <FilterChips
+              chips={[
+                monthRange && { label: monthRangeLabel(monthRange, locale), onClear: () => setMonthRange(null) },
+                catFilter && { label: catFilter, onClear: () => setCatFilter('') },
+              ]}
+            />
+          )}
           {visible.length === 0 ? (
             <EmptyState icon={isIncome ? <Banknote /> : <Wallet />} title={expenses.length === 0 ? t('ex.emptyNone', { label: label.toLowerCase() }) : t('ex.emptyFiltered')} />
           ) : layout === 'grid' ? (
@@ -617,7 +636,8 @@ function toForm(e: SerializedExpense, base: string): FormState {
   const foreign = isForeignCurrency(e.currency, base);
   return {
     kind: e.kind, vendor: e.vendor, category: e.category, space: e.space || '', taxDeductible: e.taxDeductible, taxCategory: e.taxCategory || '',
-    amount: String((foreign ? e.origAmount || e.amount : e.amount) ?? ''),
+    // Money with its cents ("51.30", not "51.3"), as everywhere else it is shown.
+    amount: moneyField(foreign ? e.origAmount || e.amount : e.amount),
     currency: foreign ? normalizeCurrency(e.currency) : base,
     fxRate: foreign && e.fxRate ? String(e.fxRate) : '',
     date: e.date ? e.date.slice(0, 10) : '', period: e.period, recurring: e.recurring, recurringCycle: e.recurringCycle, series: e.series || '',
@@ -681,13 +701,17 @@ function FormFields({ form, set, cards, vendors, categories, spaces, fx, seriesB
         </Field>
       </div>
       {foreign && <FxFields form={form} set={set} base={fx.base} />}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 items-end">
-        <div className="flex items-center justify-between gap-2 rounded-lg border border-[color:var(--color-border)] px-3 py-2">
-          <span className="text-xs font-medium flex items-center gap-1.5"><Repeat size={13} className="text-[color:var(--color-purple)]" /> {t('ex.recurring')}</span>
-          <button type="button" role="switch" aria-label={t('ex.recurring')} aria-checked={form.recurring} onClick={() => set({ recurring: !form.recurring })} className={cn('relative w-9 h-5 rounded-full transition-colors shrink-0', form.recurring ? 'bg-[color:var(--color-accent)]' : 'bg-[color:var(--color-surface-3)] border border-[color:var(--color-border)]')}>
-            <span className={cn('absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform', form.recurring && 'translate-x-4')} />
-          </button>
-        </div>
+      {/* Every cell has a label on top and a field-high control, so the row lines up even
+          though Period carries a hint underneath. */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 items-start">
+        <Field label={t('ex.recurring')}>
+          <div className="flex items-center justify-between gap-2 min-h-10 rounded-[10px] border border-[color:var(--color-border-light)] bg-[color:var(--color-surface-2)] px-3">
+            <Repeat size={15} className="text-[color:var(--color-purple)]" />
+            <button type="button" role="switch" aria-label={t('ex.recurring')} aria-checked={form.recurring} onClick={() => set({ recurring: !form.recurring })} className={cn('relative w-9 h-5 rounded-full transition-colors shrink-0', form.recurring ? 'bg-[color:var(--color-accent)]' : 'bg-[color:var(--color-surface-3)] border border-[color:var(--color-border)]')}>
+              <span className={cn('absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform', form.recurring && 'translate-x-4')} />
+            </button>
+          </div>
+        </Field>
         <Field label={t('ex.fCycle')}>
           <select value={form.recurringCycle} onChange={(e) => set({ recurringCycle: e.target.value as FormState['recurringCycle'] })} className={controlClass} disabled={!form.recurring}>
             {CYCLES.map((c) => <option key={c} value={c}>{c ? t(`cyc.${c}` as TKey) : '—'}</option>)}
@@ -988,10 +1012,10 @@ function ExpenseDetail({ expense, cards, vendors, categories, spaces, fx, series
       </div>
       {error && <p role="alert" className="mt-3 text-xs text-[color:var(--color-red)]">{error}</p>}
       <div className="flex items-center gap-2 pt-4 mt-4 border-t border-[color:var(--color-border)] flex-wrap">
-        <Button onClick={() => save(true)} disabled={pending || !!blocked}>{pending ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />} {t('common.confirm')}</Button>
-        <button onClick={() => save(form.verified)} disabled={pending || !!blocked} className="text-xs px-3 py-2 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] hover:border-[color:var(--color-accent)]">{t('common.save')}</button>
+        <Button variant="primary" onClick={() => save(true)} disabled={pending || !!blocked}>{pending ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />} {t('common.confirm')}</Button>
+        <Button onClick={() => save(form.verified)} disabled={pending || !!blocked}>{t('common.save')}</Button>
         <CreatedBy id={expense.createdBy} />
-        <button onClick={doDelete} disabled={pending} className="ml-auto flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-red)] hover:border-[color:var(--color-red)]"><Trash2 size={13} /> {t('common.delete')}</button>
+        <Button variant="danger" onClick={doDelete} disabled={pending} className="ml-auto"><Trash2 size={15} /> {t('common.delete')}</Button>
       </div>
     </Modal>
   );

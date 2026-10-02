@@ -3,7 +3,7 @@ import { PAGE_MAIN, PageHeader, HeaderButton, ViewToggle, PrimaryAction, FilterL
 import { DateInput } from '@/components/ui/DateInput';
 import { Field } from '@/components/ui/Field';
 import { CreatedBy } from '@/components/CreatedBy';
-import { cur, currencySymbol, CURRENCIES } from "@/lib/money";
+import { cur, currencySymbol, CURRENCIES, moneyField } from "@/lib/money";
 import { matchesQuery, haystack, fold, sameLabel } from '@/lib/searchText';
 import { isForeignCurrency, normalizeCurrency, convertToBase, deriveFxRate, formatMoney, toPrinted } from '@/lib/fx';
 import { FxBadge } from '@/components/FxBadge';
@@ -12,7 +12,7 @@ import { useState, useTransition, useRef, useMemo } from 'react';
 import { Upload, Sparkles, Trash2, CheckCircle2, AlertTriangle, Plus, X, FileText, Loader2, PackagePlus, Mail, Search, Archive, Zap, Undo2, Copy, Receipt as ReceiptIcon } from 'lucide-react';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Button } from '@/components/ui/Button';
-import { Input, filterControlClass } from '@/components/ui/Input';
+import { Input, compactControlClass, controlClass, filterControlClass } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { cn } from '@/components/ui/cn';
@@ -31,8 +31,10 @@ import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { NO_SPACE, matchesSpace, spaceFilterOptions } from '@/lib/spaceFilter';
 import { useLocale, useMoney, useT } from '@/components/LocaleProvider';
 import { DuplicatesModal } from './DuplicatesModal';
-import { useRouter } from 'next/navigation';
-import { compareNames } from '@/lib/i18n/format';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { monthRangeDays } from '@/lib/reportPeriod';
+import { compareNames, formatDate } from '@/lib/i18n/format';
+import { FilterChips } from '@/components/ui/FilterChips';
 import { recordDay, formatRecordDay } from '@/lib/recordDay';
 
 function fileUrl(filePath: string) {
@@ -77,7 +79,14 @@ export function ReceiptsClient({
   const [selected, setSelected] = useState<SerializedReceipt | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadMsg, setUploadMsg] = useState<string | null>(null);
-  const [storeFilter, setStoreFilter] = useState('');
+  // A link from Reports opens the list already filtered: ?store=…&from=YYYY-MM&to=YYYY-MM.
+  const params = useSearchParams();
+  const linkRange = (() => {
+    const from = params.get('from') ?? '';
+    const to = params.get('to') ?? from;
+    return /^\d{4}-\d{2}$/.test(from) && /^\d{4}-\d{2}$/.test(to) ? monthRangeDays({ from, to }) : null;
+  })();
+  const [storeFilter, setStoreFilter] = useState(() => params.get('store') ?? '');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { isRunning, refresh } = useJobs();
   const rescanBusy = isRunning('rescan-receipts');
@@ -91,8 +100,8 @@ export function ReceiptsClient({
   const [sortBy, setSortBy] = useState<'recent' | 'oldest' | 'total-desc' | 'total-asc' | 'store'>('recent');
   // A receipt is a dated purchase, so "when" and "what kind" are the two questions the
   // list could not answer before: there was only store + status + a substring search.
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  const [dateFrom, setDateFrom] = useState(() => linkRange?.dateFrom ?? '');
+  const [dateTo, setDateTo] = useState(() => linkRange?.dateTo ?? '');
   // #355: typed dates skip the picker's min/max, so a From after the To is caught here and shown,
   // instead of silently emptying the list.
   const rangeInvalid = !!(dateFrom && dateTo && dateFrom > dateTo);
@@ -490,6 +499,18 @@ export function ReceiptsClient({
       <PageFileDrop onFiles={handleFiles} label={t('common.dropToUpload')} hint={ollamaUp ? t('rc.aiAutoParse') : t('rc.manualEntry')} disabled={uploading} />
 
       <FilterLayout search={searchBox} quick={statusSwitch} filters={filterControls} active={!!(storeFilter || sortBy !== 'recent' || dateFrom || dateTo || categoryFilter || paymentFilter || spaceFilter)}>
+          <FilterChips
+            chips={[
+              storeFilter && { label: storeFilter, onClear: () => setStoreFilter('') },
+              (dateFrom || dateTo) && !rangeInvalid && {
+                label: [dateFrom, dateTo].filter(Boolean).map((d) => formatDate(d, locale)).join(' – '),
+                onClear: () => {
+                  setDateFrom('');
+                  setDateTo('');
+                },
+              },
+            ]}
+          />
           {uploading && (
             <p role="status" className="mb-3 flex items-center gap-2 text-sm text-[color:var(--color-cyan)]">
               <Loader2 size={15} className="animate-spin" /> {uploadMsg}
@@ -855,11 +876,11 @@ function ReceiptDetailModal({
   const buildForm = (r: SerializedReceipt): EditState => {
     const foreign = isForeignCurrency(r.currency, fx.base);
     const rate = foreign ? r.fxRate || 0 : 0;
-    const printed = (n: number) => toPrinted(n, rate).toString();
+    const printed = (n: number) => moneyField(toPrinted(n, rate));
     return {
       store: r.store,
       date: recordDay(r.date),
-      total: (foreign ? r.origAmount || r.total : r.total).toString(),
+      total: moneyField(foreign ? r.origAmount || r.total : r.total),
       subtotal: printed(r.subtotal || 0),
       vatAmount: printed(r.vatAmount || 0),
       warrantyMonths: (r.warrantyMonths ?? 24).toString(),
@@ -1151,7 +1172,7 @@ function ReceiptDetailModal({
                   value={form.currency}
                   onChange={(e) => setForm((p) => ({ ...p, currency: e.target.value }))}
                   aria-label={t('ex.fCurrency')}
-                  className="shrink-0 bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-md px-2 py-2 text-xs focus:outline-none focus:border-[color:var(--color-accent)]"
+                  className={cn(compactControlClass, 'shrink-0')}
                   style={{ fontFamily: 'var(--font-mono)' }}
                 >
                   {currencyCodes(fx.base).map((c) => <option key={c} value={c}>{c}</option>)}
@@ -1229,14 +1250,14 @@ function ReceiptDetailModal({
                         value={li.refinedName}
                         onChange={(e) => updateLine(i, 'refinedName', e.target.value)}
                         placeholder={t('rc.itemNamePlaceholder')}
-                        className="flex-1 min-w-0 bg-[color:var(--color-surface-3)] border border-[color:var(--color-border)] rounded-md px-2 py-1.5 text-xs font-medium focus:outline-none focus:border-[color:var(--color-accent)]"
+                        className={cn(compactControlClass, 'flex-1 min-w-0 font-medium')}
                       />
                       <input
                         value={li.qty}
                         onChange={(e) => updateLine(i, 'qty', e.target.value)}
                         type="number"
                         title="quantity"
-                        className="w-10 bg-[color:var(--color-surface-3)] border border-[color:var(--color-border)] rounded-md px-1 py-1.5 text-xs text-center focus:outline-none focus:border-[color:var(--color-accent)]"
+                        className={cn(compactControlClass, 'w-14 shrink-0 text-center')}
                       />
                       <input
                         value={li.price}
@@ -1244,13 +1265,13 @@ function ReceiptDetailModal({
                         type="number"
                         step="0.01"
                         title="unit price (excl. VAT)"
-                        className="w-16 bg-[color:var(--color-surface-3)] border border-[color:var(--color-border)] rounded-md px-2 py-1.5 text-xs text-right focus:outline-none focus:border-[color:var(--color-accent)]"
+                        className={cn(compactControlClass, 'w-20 shrink-0 text-right')}
                       />
                       <select
                         value={li.vatRate}
                         onChange={(e) => updateLine(i, 'vatRate', e.target.value)}
                         title="VAT %"
-                        className="w-14 bg-[color:var(--color-surface-3)] border border-[color:var(--color-border)] rounded-md px-1 py-1.5 text-xs focus:outline-none focus:border-[color:var(--color-accent)]"
+                        className={cn(compactControlClass, 'w-[4.75rem] shrink-0')}
                       >
                         <option value="24">24%</option>
                         <option value="13">13%</option>
@@ -1270,7 +1291,7 @@ function ReceiptDetailModal({
                         value={li.name}
                         onChange={(e) => updateLine(i, 'name', e.target.value)}
                         placeholder={t('rc.rawTextPlaceholder')}
-                        className="flex-1 min-w-0 bg-transparent border-0 px-2 py-0.5 text-[11px] text-[color:var(--color-text-faint)] focus:outline-none focus:text-[color:var(--color-text-dim)]"
+                        className="flex-1 min-w-[7rem] bg-transparent border-0 px-2 py-0.5 text-[11px] text-[color:var(--color-text-faint)] focus:outline-none focus:text-[color:var(--color-text-dim)]"
                         style={{ fontFamily: 'var(--font-mono)' }}
                       />
                       {/* P64: per-line spend category. Empty = untagged (the pre-P64 state),
@@ -1279,7 +1300,7 @@ function ReceiptDetailModal({
                         value={li.category}
                         onChange={(e) => updateLine(i, 'category', e.target.value)}
                         title={t('rc.lineCategory')}
-                        className="shrink-0 max-w-[9rem] bg-[color:var(--color-surface-3)] border border-[color:var(--color-border)] rounded-md px-1 py-0.5 text-[11px] text-[color:var(--color-text-dim)] focus:outline-none focus:border-[color:var(--color-accent)]"
+                        className={cn(compactControlClass, 'shrink-0 max-w-[9rem]')}
                         style={{ fontFamily: 'var(--font-mono)' }}
                       >
                         <option value="">{t('rc.lineCategoryNone')}</option>
@@ -1302,7 +1323,7 @@ function ReceiptDetailModal({
                           type="number"
                           step="0.01"
                           title="line total WITH VAT (edits the net back)"
-                          className="w-16 bg-[color:var(--color-surface-3)] border border-[color:var(--color-border)] rounded-md px-1.5 py-1 text-[11px] text-right text-[color:var(--color-text)] focus:outline-none focus:border-[color:var(--color-accent)]"
+                          className={cn(compactControlClass, 'w-20 shrink-0 text-right')}
                         />
                       </div>
                     </div>
@@ -1322,7 +1343,7 @@ function ReceiptDetailModal({
               value={form.notes}
               onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
               rows={2}
-              className="w-full bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[color:var(--color-accent)] resize-none"
+              className={cn(controlClass, 'w-full resize-none')}
             />
           </Field>
 
@@ -1352,19 +1373,19 @@ function ReceiptDetailModal({
           {/* Actions */}
           {saveError && <p role="alert" className="text-xs text-[color:var(--color-red)]">{saveError}</p>}
           <div className="flex flex-wrap gap-2 pt-2 border-t border-[color:var(--color-border)]">
-            <Button variant="primary" size="sm" onClick={() => save(true)} disabled={pending || !!dateBlocked}>
-              <CheckCircle2 size={13} /> {receipt.verified ? t('common.save') : t('common.confirm')}
+            <Button variant="primary" onClick={() => save(true)} disabled={pending || !!dateBlocked}>
+              <CheckCircle2 size={15} /> {receipt.verified ? t('common.save') : t('common.confirm')}
             </Button>
             {receipt.verified && (
-              <Button variant="secondary" size="sm" onClick={() => save(false)} disabled={pending || !!dateBlocked}>
+              <Button variant="secondary" onClick={() => save(false)} disabled={pending || !!dateBlocked}>
                 {t('rc.unverify')}
               </Button>
             )}
-            <Button variant="ghost" size="sm" onClick={handleArchive} disabled={pending} title={receipt.archived ? t('rc.unarchiveTitle') : t('rc.archiveTitle')}>
-              <Archive size={13} /> {receipt.archived ? t('rc.unarchive') : t('rc.notReceipt')}
+            <Button variant="ghost" onClick={handleArchive} disabled={pending} title={receipt.archived ? t('rc.unarchiveTitle') : t('rc.archiveTitle')}>
+              <Archive size={15} /> {receipt.archived ? t('rc.unarchive') : t('rc.notReceipt')}
             </Button>
-            <Button variant="danger" size="sm" onClick={handleDelete} disabled={pending} className="ml-auto">
-              <Trash2 size={13} /> {t('common.delete')}
+            <Button variant="danger" onClick={handleDelete} disabled={pending} className="ml-auto">
+              <Trash2 size={15} /> {t('common.delete')}
             </Button>
           </div>
         </div>

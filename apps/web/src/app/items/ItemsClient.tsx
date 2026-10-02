@@ -11,7 +11,7 @@ import { Search, Plus, Trash2, X, Loader2, Sparkles, Link2, ExternalLink, Wand2,
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { RecomputePricesButton } from './RecomputePricesButton';
-import { Input, controlClass, filterControlClass } from '@/components/ui/Input';
+import { Input, compactControlClass, controlClass, filterControlClass } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { PricePanel } from '@/components/PricePanel';
@@ -164,8 +164,7 @@ const FLAG_DEFS: { key: string; label: string; test: (i: SerializedItem, market:
 const BULK_TAG_CONFIRM_AT = 40;
 
 
-const textareaClass =
-  'w-full bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-4 py-2 text-sm text-[color:var(--color-text)] placeholder:text-[color:var(--color-text-faint)] focus:outline-none focus:border-[color:var(--color-accent)] transition-colors resize-none';
+const textareaClass = cn(controlClass, 'resize-y');
 
 /** Warranty status → label + color for the list badge. */
 function warrantyState(until: string | null, t: TFunc): { label: string; color: string } | null {
@@ -2931,13 +2930,13 @@ function ItemForm({
                 value={l.label}
                 onChange={(e) => updateLink(i, 'label', e.target.value)}
                 placeholder={t('it.fLinkLabel')}
-                className="w-32 bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:border-[color:var(--color-accent)]"
+                className={cn(compactControlClass, 'w-32')}
               />
               <input
                 value={l.url}
                 onChange={(e) => updateLink(i, 'url', e.target.value)}
                 placeholder={t('it.fLinkUrl')}
-                className="flex-1 min-w-0 bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:border-[color:var(--color-accent)]"
+                className={cn(compactControlClass, 'flex-1 min-w-0')}
                 style={{ fontFamily: 'var(--font-mono)' }}
               />
               <input
@@ -2948,7 +2947,7 @@ function ItemForm({
                 onChange={(e) => updateLink(i, 'price', e.target.value)}
                 placeholder={cur()}
                 title={t('it.priceAtStore')}
-                className="w-20 shrink-0 bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-md px-2.5 py-1.5 text-xs text-[color:var(--color-accent)] focus:outline-none focus:border-[color:var(--color-accent)]"
+                className={cn(compactControlClass, 'w-20 shrink-0')}
                 style={{ fontFamily: 'var(--font-mono)' }}
               />
               <button
@@ -2993,14 +2992,14 @@ function ItemForm({
                 onChange={(e) => updateCustomField(i, 'key', e.target.value)}
                 placeholder={t('it.fCustomFieldKey')}
                 maxLength={MAX_KEY_LENGTH}
-                className="w-32 bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:border-[color:var(--color-accent)]"
+                className={cn(compactControlClass, 'w-32')}
               />
               <input
                 value={f.value}
                 onChange={(e) => updateCustomField(i, 'value', e.target.value)}
                 placeholder={t('it.fCustomFieldValue')}
                 maxLength={MAX_VALUE_LENGTH}
-                className="flex-1 min-w-0 bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:border-[color:var(--color-accent)]"
+                className={cn(compactControlClass, 'flex-1 min-w-0')}
                 style={{ fontFamily: 'var(--font-mono)' }}
               />
               <button
@@ -3049,13 +3048,13 @@ function ItemForm({
                     onChange={(e) => updateClaim(i, 'ref', e.target.value)}
                     placeholder={t('it.fClaimRef')}
                     maxLength={MAX_CLAIM_REF_LENGTH}
-                    className="w-36 bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:border-[color:var(--color-accent)]"
+                    className={cn(compactControlClass, 'w-36')}
                     style={{ fontFamily: 'var(--font-mono)' }}
                   />
                   <select
                     value={c.status}
                     onChange={(e) => updateClaim(i, 'status', e.target.value)}
-                    className="flex-1 min-w-0 bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:border-[color:var(--color-accent)]"
+                    className={cn(compactControlClass, 'flex-1 min-w-0')}
                     style={{ fontFamily: 'var(--font-mono)' }}
                   >
                     {CLAIM_STATUSES.map((st) => (
@@ -3090,7 +3089,7 @@ function ItemForm({
                     onChange={(e) => updateClaim(i, 'trackingNumber', e.target.value)}
                     placeholder={t('it.fClaimTracking')}
                     maxLength={MAX_CLAIM_TRACKING_LENGTH}
-                    className="flex-1 min-w-[8rem] bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:border-[color:var(--color-accent)]"
+                    className={cn(compactControlClass, 'flex-1 min-w-[8rem]')}
                     style={{ fontFamily: 'var(--font-mono)' }}
                   />
                 </div>
@@ -3100,7 +3099,7 @@ function ItemForm({
                   placeholder={t('it.fClaimNotes')}
                   maxLength={MAX_CLAIM_NOTES_LENGTH}
                   rows={2}
-                  className="w-full bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:border-[color:var(--color-accent)] resize-y"
+                  className={cn(compactControlClass, 'w-full resize-y')}
                 />
               </div>
             ))}
@@ -3122,8 +3121,8 @@ function ItemForm({
           </Button>
         )}
         {onDelete && (
-          <Button type="button" variant="danger" size="sm" className="ml-auto" onClick={onDelete} disabled={deletePending}>
-            <Trash2 size={13} /> {t('common.delete')}
+          <Button type="button" variant="danger" className="ml-auto" onClick={onDelete} disabled={deletePending}>
+            <Trash2 size={15} /> {t('common.delete')}
           </Button>
         )}
       </div>

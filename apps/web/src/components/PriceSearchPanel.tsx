@@ -14,6 +14,7 @@ import type { StoreSearchOutcome } from '@/lib/storeSearch';
 import { useT } from '@/components/LocaleProvider';
 import { estimateTaskCost, formatTaskCost } from '@/lib/claudePricing';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { compactControlClass, controlClass } from '@/components/ui/Input';
 
 function linkHost(url: string): string {
   try {
@@ -158,7 +159,7 @@ export function PriceSearchPanel({
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && !searching && query.trim() && runSearch()}
             placeholder="what to search for"
-            className="flex-1 min-w-0 text-sm px-3 py-2 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] focus:border-[color:var(--color-accent)] outline-none"
+            className={cn(controlClass, 'flex-1 min-w-0')}
           />
           <Button variant="primary" onClick={runSearch} disabled={searching || !query.trim()}>
             {searching ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />} Search
@@ -313,7 +314,7 @@ export function PriceSearchPanel({
               onChange={(e) => setDirectUrl(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && !addingDirect && directUrl.trim() && addDirectLink()}
               placeholder="https://example-shop.com/product/..."
-              className="flex-1 min-w-0 text-xs px-3 py-2 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] focus:border-[color:var(--color-accent)] outline-none"
+              className={cn(compactControlClass, 'flex-1 min-w-0')}
             />
             <Button
               variant="secondary"

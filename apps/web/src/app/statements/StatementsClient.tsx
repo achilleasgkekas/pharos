@@ -22,7 +22,7 @@ import {
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Button } from '@/components/ui/Button';
 import { DateInput } from '@/components/ui/DateInput';
-import { Input, controlClass, compactControlClass } from '@/components/ui/Input';
+import { Input, compactControlClass, controlClass } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { cn } from '@/components/ui/cn';
@@ -36,7 +36,6 @@ import {
 } from '@/lib/cardUtilization';
 import { computeInstallmentPlans, type InstallmentPlan } from '@/lib/installments';
 import { InstallmentPlanCard } from '@/components/InstallmentPlanCard';
-import { ReconcilePanel } from './ReconcilePanel';
 import { useOpenParam } from '@/components/useOpenParam';
 import {
   createStatement,
@@ -129,7 +128,6 @@ export function StatementsClient({
   const fx: FxCtx = { base: baseCurrency, enabled: multiCurrency };
   const [showCreate, setShowCreate] = useState(false);
   const [showCards, setShowCards] = useState(false);
-  const [showReconcile, setShowReconcile] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [cardFilter, setCardFilter] = useState('all');
   const [uploading, setUploading] = useState(false);
@@ -249,9 +247,6 @@ export function StatementsClient({
           )
         }
       >
-        {statements.length > 0 && (
-          <HeaderButton icon={<Link2 size={15} />} onClick={() => setShowReconcile(true)}>{t('rec.title')}</HeaderButton>
-        )}
         <HeaderButton icon={<Wallet size={15} />} onClick={() => setShowCards(true)}>{t('st.cards', { n: cards.length })}</HeaderButton>
         <UploadButton onFiles={(f) => handlePdf(f)} accept="application/pdf,.pdf" label={t('st.importPdf')} busy={uploading} />
         <PrimaryAction onClick={() => setShowCreate(true)} />
@@ -328,9 +323,6 @@ export function StatementsClient({
         <CardsManager cards={cards} statements={statements} utilization={utilization} />
       </Modal>
 
-      <Modal open={showReconcile} onClose={() => setShowReconcile(false)} title={t('rec.title')} size="lg">
-        <ReconcilePanel statements={statements.map((s) => ({ _id: s._id, card: s.card, period: s.period }))} />
-      </Modal>
     </main>
   );
 }
@@ -968,7 +960,7 @@ function InstallmentEditor({ tx, statementId }: { tx: SerializedTransaction; sta
           onChange={(e) => setCur(e.target.value)}
           placeholder={t('stm.installmentNum')}
           inputMode="numeric"
-          className="w-8 bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded px-1 py-0.5 text-[11px] text-center focus:outline-none focus:border-[color:var(--color-accent)]"
+          className={cn(compactControlClass, 'w-8 text-center')}
         />
         <span className="text-[11px] text-[color:var(--color-text-faint)]">/</span>
         <input
@@ -976,7 +968,7 @@ function InstallmentEditor({ tx, statementId }: { tx: SerializedTransaction; sta
           onChange={(e) => setTot(e.target.value)}
           placeholder={t('stm.installmentOf')}
           inputMode="numeric"
-          className="w-8 bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded px-1 py-0.5 text-[11px] text-center focus:outline-none focus:border-[color:var(--color-accent)]"
+          className={cn(compactControlClass, 'w-8 text-center')}
         />
         <button onClick={save} disabled={pending} className="text-[11px] text-[color:var(--color-accent)] hover:opacity-80">
           {t('stm.save')}
@@ -1364,7 +1356,7 @@ function StatementForm({
           value={form.notes}
           onChange={set('notes')}
           rows={2}
-          className="w-full bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[color:var(--color-accent)] resize-none"
+          className={cn(controlClass, 'w-full resize-none')}
         />
       </Field>
       <div className="flex gap-3 pt-2">
@@ -1372,8 +1364,8 @@ function StatementForm({
           {pending ? t('common.saving') : statement ? t('common.save') : t('stm.create')}
         </Button>
         {onDelete && (
-          <Button type="button" variant="danger" size="sm" className="ml-auto" onClick={onDelete} disabled={deletePending}>
-            <Trash2 size={13} /> {t('common.delete')}
+          <Button type="button" variant="danger" className="ml-auto" onClick={onDelete} disabled={deletePending}>
+            <Trash2 size={15} /> {t('common.delete')}
           </Button>
         )}
       </div>
@@ -1696,10 +1688,10 @@ function CardForm({ card, onDone }: { card?: SerializedCard; onDone: () => void 
         </Field>
       </div>
       <Field label={t('stm.color')}>
-        <input type="color" value={form.color} onChange={set('color')} className="w-full h-9 bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg cursor-pointer" />
+        <input type="color" value={form.color} onChange={set('color')} className="w-full h-10 p-1 bg-[color:var(--color-surface-2)] border border-[color:var(--color-border-light)] rounded-[10px] cursor-pointer" />
       </Field>
       <div className="flex gap-2 pt-2">
-        <Button type="submit" variant="primary" size="sm" disabled={pending}>
+        <Button type="submit" variant="primary" disabled={pending}>
           {pending ? '...' : card ? t('stm.update') : t('stm.create')}
         </Button>
         <Button type="button" variant="ghost" size="sm" onClick={onDone}>{t('stm.back')}</Button>
