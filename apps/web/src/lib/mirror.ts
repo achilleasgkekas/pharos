@@ -3,7 +3,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { getStorageConfig } from './storageConfig';
 import { pushToRemote } from './remoteStorage';
-import { uploadToOnedrive, downloadFromOnedrive, createShareLink } from './onedrive';
+import { uploadToOnedrive, downloadFromOnedrive } from './onedrive';
 import { readFile, resolveWithinStorage } from './storage';
 import { renderStoragePath } from './storagePath';
 import { markRemoteSync } from './syncState';
@@ -109,20 +109,6 @@ export async function recacheFromRemote(meta: MirrorMeta, filePath: string): Pro
   }
 }
 
-/** An anonymous view-only OneDrive link for a mirrored file — powers "Open in OneDrive".
- *  Returns null for non-OneDrive backends or when the mirror is off. */
-export async function shareLinkFor(meta: MirrorMeta, filePath: string): Promise<string | null> {
-  try {
-    if (!filePath) return null;
-    const s = await getStorageConfig();
-    if (s.backend !== 'onedrive') return null;
-    const r = await createShareLink(remoteRelPath(s, meta, filePath));
-    return r.ok ? r.url ?? null : null;
-  } catch {
-    return null;
-  }
-}
-
 /**
  * Find the document that owns a stored file and re-cache it from OneDrive. Lets the
  * file-serving route recover a missing local file without the caller knowing the
@@ -144,28 +130,6 @@ export async function recacheByPath(relativePath: string): Promise<Buffer | null
 
   const ex = await Expense.findOne({ filePath: relativePath }).select('vendor date amount').lean();
   if (ex) return recacheFromRemote({ kind: 'expenses', store: ex.vendor, date: ex.date, total: ex.amount, id: ex._id }, relativePath);
-
-  return null;
-}
-
-/** Reverse-look-up the owning document for a stored file and return an anonymous
- *  view-only OneDrive link. Counterpart to recacheByPath for the "Open in OneDrive"
- *  action. Null if no owner / non-OneDrive backend / link creation fails. */
-export async function shareLinkByPath(relativePath: string): Promise<string | null> {
-  const { connectDB } = await import('./db');
-  const { Receipt } = await import('@/models/Receipt');
-  const { Statement } = await import('@/models/Statement');
-  const { Expense } = await import('@/models/Expense');
-  await connectDB();
-
-  const rc = await Receipt.findOne({ filePath: relativePath }).select('store date total').lean();
-  if (rc) return shareLinkFor({ kind: 'receipts', store: rc.store, date: rc.date, total: rc.total, id: rc._id }, relativePath);
-
-  const st = await Statement.findOne({ filePath: relativePath }).select('card statementDate totalAmount').lean();
-  if (st) return shareLinkFor({ kind: 'statements', store: st.card, date: st.statementDate, total: st.totalAmount, id: st._id }, relativePath);
-
-  const ex = await Expense.findOne({ filePath: relativePath }).select('vendor date amount').lean();
-  if (ex) return shareLinkFor({ kind: 'expenses', store: ex.vendor, date: ex.date, total: ex.amount, id: ex._id }, relativePath);
 
   return null;
 }

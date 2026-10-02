@@ -22,7 +22,7 @@ import { useOpenParam } from '@/components/useOpenParam';
 import { PageFileDrop } from '@/components/ui/FileDrop';
 import type { SerializedReceipt, SerializedCard } from '@/types';
 import { uploadReceipt, updateReceipt, deleteReceipt, addReceiptItemsToLibrary, rescanReceipt, importEmailInbox, archiveReceipt } from './actions';
-import { OpenInOneDriveButton } from '@/components/OpenInOneDriveButton';
+import { RescanControl } from '@/components/RescanControl';
 import { QuickVerify } from './QuickVerify';
 import { useJobs } from '@/components/JobsProvider';
 import { enqueueRescanReceipts, getBulkAiGuard } from '@/app/jobActions';
@@ -914,11 +914,11 @@ function ReceiptDetailModal({
 
   // Re-run the AI scan on the stored file. The action returns the updated receipt,
   // so we re-sync the form (store/total/items) in place — no reopening needed.
-  function handleRescan(useOcr: boolean) {
+  function handleRescan(forceOcr: boolean) {
     setRescanMsg(t('rc.rescanning'));
     startTransition(async () => {
       try {
-        const r = await rescanReceipt(receipt._id, useOcr);
+        const r = await rescanReceipt(receipt._id, forceOcr ? true : 'auto');
         if (r.ok && r.receipt) setForm(buildForm(r.receipt));
         setRescanMsg(
           r.ok && r.aiUsed ? t('rc.rescannedOk', { model: r.model || '' }) : t('rc.rescanFailed', { err: r.aiError || r.error || 'no result' })
@@ -1069,26 +1069,11 @@ function ReceiptDetailModal({
         style={{ fontFamily: 'var(--font-mono)' }}
       >
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-[11px] text-[color:var(--color-text-faint)]">{t('rc.rescanLabel')}</span>
-          <button
-            onClick={() => handleRescan(true)}
-            disabled={pending}
-            className="text-[11px] px-2.5 py-1 rounded-md border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] text-[color:var(--color-cyan)] hover:border-[color:var(--color-accent)] hover:text-[color:var(--color-accent)] disabled:opacity-50"
-          >
-            <Sparkles size={10} className="inline mr-0.5" /> {t('rc.ocr')}
-          </button>
-          <button
-            onClick={() => handleRescan(false)}
-            disabled={pending}
-            className="text-[11px] px-2.5 py-1 rounded-md border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] text-[color:var(--color-text-dim)] hover:border-[color:var(--color-border-light)] hover:text-[color:var(--color-text)] disabled:opacity-50"
-          >
-            {t('rc.noOcr')}
-          </button>
+          <RescanControl onRescan={handleRescan} pending={pending} />
           {rescanMsg && <span className="text-[11px] text-[color:var(--color-text-dim)] truncate max-w-[200px]">{rescanMsg}</span>}
         </div>
         <div className="flex items-center gap-3 shrink-0">
           <CreatedBy id={receipt.createdBy} />
-          <OpenInOneDriveButton filePath={receipt.filePath} />
           {receipt.aiModel && (
             <span className="text-[11px] text-[color:var(--color-text-faint)] flex items-center gap-1">
               <Sparkles size={10} /> {t('rc.parsedBy', { model: receipt.aiModel })}

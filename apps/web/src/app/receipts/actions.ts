@@ -398,12 +398,12 @@ export type RescanResult = {
 /**
  * Re-run the AI parse on a receipt's stored file and overwrite the parsed fields.
  * `useOcr` forces the OCR path (rasterize PDF / Tesseract image → text model);
- * otherwise uses embedded PDF text or the vision model. Resets `verified` so the
+ * `false` uses embedded PDF text or the vision model; `'auto'` picks the way an upload does. Resets `verified` so the
  * user re-checks the fresh result. Used from the receipt detail + bulk re-scan.
  */
 export async function rescanReceipt(
   id: string,
-  useOcr: boolean,
+  useOcr: boolean | 'auto',
   opts?: { jobId?: string }
 ): Promise<RescanResult> {
   await assertCanWrite();
@@ -414,7 +414,7 @@ export async function rescanReceipt(
  *  `withRequestTenant` by both `rescanReceipt` and `rescanReceiptsBulk`). */
 async function rescanReceiptOne(
   id: string,
-  useOcr: boolean,
+  useOcr: boolean | 'auto',
   opts?: { jobId?: string }
 ): Promise<RescanResult> {
   await connectDB();
@@ -435,7 +435,7 @@ async function rescanReceiptOne(
     bytes,
     ext,
     isPdf,
-    useOcr ? 'ocr' : 'no-ocr',
+    useOcr === 'auto' ? 'auto' : useOcr ? 'ocr' : 'no-ocr',
     {
       feature: 'receipts',
       record: { type: 'receipt', id },

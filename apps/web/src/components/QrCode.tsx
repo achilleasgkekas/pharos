@@ -47,9 +47,10 @@ export function QrCode({ value, size = 176, label }: { value: string; size?: num
 
   return (
     <div className="flex flex-col items-center gap-2">
+      {/* A thumbnail-sized code keeps a thin quiet zone; the full-size one keeps the roomy frame. */}
       <div
-        className="rounded-lg bg-white p-3"
-        style={{ width: size + 24, height: size + 24 }}
+        className={size < 80 ? 'rounded-md bg-white p-1' : 'rounded-lg bg-white p-3'}
+        style={{ width: size + (size < 80 ? 8 : 24), height: size + (size < 80 ? 8 : 24) }}
         aria-busy={!src}
       >
         {src ? (

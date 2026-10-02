@@ -30,7 +30,7 @@ import { paymentSplitTotal, paymentSplitRemainder, paymentSplitsBalance, balance
 import { RECURRING_CYCLES } from '@/lib/billingCycle';
 import { CsvImportModal } from './CsvImportModal';
 import { ExpenseDuplicatesModal } from './ExpenseDuplicatesModal';
-import { OpenInOneDriveButton } from '@/components/OpenInOneDriveButton';
+import { RescanControl } from '@/components/RescanControl';
 import { useLocale, useT, useMoney } from '@/components/LocaleProvider';
 import type { TKey } from '@/lib/i18n';
 import { formatDate, compareNames } from '@/lib/i18n/format';
@@ -982,11 +982,7 @@ function ExpenseDetail({ expense, cards, vendors, categories, spaces, fx, series
     <Modal open onClose={onClose} title={expense.vendor ? `${expense.vendor}${expense.series ? ` · ${expense.series}` : ''}` : t('ex.recordFallback')} size="2xl">
       {expense.filePath && (
         <div className="flex items-center gap-2 mb-3 pb-3 border-b border-[color:var(--color-border)] text-xs flex-wrap">
-          <span className="text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>{t('ex.rescan')}</span>
-          <button onClick={() => doRescan(false)} disabled={pending} className="px-2 py-1 rounded-md bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-accent)] hover:border-[color:var(--color-accent)]">{t('ex.rescanText')}</button>
-          <button onClick={() => doRescan(true)} disabled={pending} className="px-2 py-1 rounded-md bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-cyan)] hover:border-[color:var(--color-cyan)]">{t('ex.rescanOcr')}</button>
-          {pending && <Loader2 size={13} className="animate-spin" />}
-          <OpenInOneDriveButton filePath={expense.filePath} />
+          <RescanControl onRescan={doRescan} pending={pending} />
           {seriesCount > 1 && <span className="ml-auto text-[color:var(--color-purple)] flex items-center gap-1"><Repeat size={12} /> {t('ex.inSeries', { n: seriesCount })}</span>}
         </div>
       )}
