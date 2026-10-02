@@ -11,7 +11,6 @@ import { searchAll, type SearchHit } from '@/app/search-actions';
 import { cn } from '@/components/ui/cn';
 import { useLocale, useT } from './LocaleProvider';
 import { useSpeechInput } from './useSpeechInput';
-import { PharosScene } from './PharosScene';
 
 type Msg = ChatTurn & { actions?: { name: string; summary: string }[]; error?: boolean };
 type Mode = 'search' | 'ai';
@@ -72,8 +71,11 @@ export function AiCommandBar({ compact = false }: { compact?: boolean } = {}) {
     } catch {}
   }, []);
 
-  // Close the panel on an outside click.
+  // Close the search results on an outside click. The Ask Pharos panel stays open while the
+  // page beside it is used; its own close button and Escape close it.
+  const aiPanelOpen = mode === 'ai' && open;
   useEffect(() => {
+    if (aiPanelOpen) return;
     function onDown(e: MouseEvent) {
       if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
         setOpen(false);
@@ -82,7 +84,7 @@ export function AiCommandBar({ compact = false }: { compact?: boolean } = {}) {
     }
     document.addEventListener('mousedown', onDown);
     return () => document.removeEventListener('mousedown', onDown);
-  }, [compact]);
+  }, [compact, aiPanelOpen]);
 
   // Escape closes the panel (and the phone's overlay); Ctrl/Cmd+K jumps into the box. The
   // shell mounts a computer bar and a phone bar, so each answers only on its own screen size.
@@ -131,7 +133,7 @@ export function AiCommandBar({ compact = false }: { compact?: boolean } = {}) {
     setValue('');
     setHits([]);
     setOpen(true);
-    // AI mode is a focused, full-screen "spotlight" — drop the cursor straight in.
+    // Switching to AI drops the cursor straight in.
     if (m === 'ai') setTimeout(() => inputRef.current?.focus(), 0);
     try {
       localStorage.setItem('pharosSearchMode', m);
@@ -194,11 +196,17 @@ export function AiCommandBar({ compact = false }: { compact?: boolean } = {}) {
   }
 
   const isAi = mode === 'ai';
-  // Each answer flashes the lighthouse once.
-  const answers = messages.filter((m) => m.role === 'assistant').length;
-  // Beacon = AI mode + open: lightly light the page, float the bar to centre, and
-  // sweep a lighthouse beam behind it (see the beacon backdrop + pulse rings below).
-  const spotlight = isAi && open;
+  // Where the AI conversation lives: under the box (inline), in a side panel, or in a dock
+  // at the bottom of the page. The page never moves or dims for it.
+  // The conversation opens in a side panel (full screen on a phone), so the page stays usable.
+  const floating = isAi && open;
+  useEffect(() => {
+    if (!floating) return;
+    document.body.dataset.aiFloating = '';
+    return () => {
+      delete document.body.dataset.aiFloating;
+    };
+  }, [floating]);
   const ph = isAi ? (speech.listening ? t('bar.micListening') : t('bar.aiPlaceholder')) : t('bar.searchPlaceholder');
   const pending = isAi ? aiPending : searchPending;
 
@@ -219,45 +227,8 @@ export function AiCommandBar({ compact = false }: { compact?: boolean } = {}) {
     );
   }
 
-  return (
+  const barEl = (
     <>
-      {compact && !spotlight && (
-        <div
-          className="fixed inset-0 z-40 bg-black/60"
-          style={{ animation: 'pharos-fade-in .15s ease-out' }}
-          onMouseDown={() => {
-            setOpen(false);
-            setExpanded(false);
-          }}
-          aria-hidden
-        />
-      )}
-      {/* Beacon backdrop: the page dims to a night sea with the lighthouse, whose beam
-          listens (turns to the box while you type, spins while the AI thinks, flashes on the
-          answer). Click to close. */}
-      {spotlight && (
-        <div
-          className="fixed inset-0 z-40 bg-[color:var(--color-bg)]/80"
-          style={{ animation: 'pharos-fade-in .2s ease-out' }}
-          onMouseDown={() => setOpen(false)}
-          aria-hidden
-        >
-          <PharosScene mode={aiPending ? 'think' : value.trim() || speech.listening ? 'listen' : 'idle'} flashKey={answers} target={wrapRef} />
-        </div>
-      )}
-      <div
-        ref={wrapRef}
-        className={cn(
-          // Open (AI): a full-width sheet near the top on mobile, a centred card on
-          // larger screens. Plain opacity fade — no jump, no transform conflict.
-          spotlight
-            ? 'fixed z-50 top-3 inset-x-3 sm:inset-x-auto sm:top-[12vh] sm:left-1/2 sm:-translate-x-1/2 sm:w-[640px]'
-            : compact
-              ? 'fixed z-50 top-2 inset-x-2'
-              : 'relative w-full max-w-xl'
-        )}
-        style={spotlight ? { animation: 'pharos-fade-in .16s ease-out both' } : undefined}
-      >
       {/* Bar */}
       <div className="relative group">
         {/* Soft accent glow in AI mode (calmer when floating) */}
@@ -290,7 +261,7 @@ export function AiCommandBar({ compact = false }: { compact?: boolean } = {}) {
               onClick={() => switchMode('ai')}
               title={t('bar.aiTitle')}
               // While the beacon is open, the AI toggle pulses a beacon ring.
-              style={spotlight ? { animation: 'pharos-beacon-pulse 1.8s ease-out infinite' } : undefined}
+              style={isAi && open ? { animation: 'pharos-beacon-pulse 1.8s ease-out infinite' } : undefined}
               className={cn(
                 'grid place-items-center w-6 h-6 rounded-md transition-colors',
                 isAi ? 'bg-[color:var(--color-cyan)]/15 text-[color:var(--color-cyan)]' : 'text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)]'
@@ -379,9 +350,10 @@ export function AiCommandBar({ compact = false }: { compact?: boolean } = {}) {
         </div>
       </div>
 
-      {/* Panel — AI conversation */}
-      {open && isAi && (
-        <div className="absolute left-0 right-0 top-full mt-2 z-50 rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] shadow-2xl shadow-black/40 overflow-hidden">
+    </>
+  );
+  const threadEl = (
+    <>
           {speech.error && (
             <p role="alert" className="px-4 pt-3 text-xs text-[color:var(--color-gold)]">{t(speech.error)}</p>
           )}
@@ -399,7 +371,7 @@ export function AiCommandBar({ compact = false }: { compact?: boolean } = {}) {
               ))}
             </div>
           )}
-          <div ref={threadRef} className={cn('max-h-[50vh] overflow-y-auto p-3 space-y-2.5 text-left', messages.length === 0 && !aiPending && 'hidden')}>
+          <div className={cn('p-3 space-y-2.5 text-left', messages.length === 0 && !aiPending && 'hidden')}>
             {messages.map((m, i) => (
               <div key={i} className={cn('flex', m.role === 'user' ? 'justify-end' : 'justify-start')}>
                 <div
@@ -433,8 +405,58 @@ export function AiCommandBar({ compact = false }: { compact?: boolean } = {}) {
               </div>
             )}
           </div>
-        </div>
+    </>
+  );
+  // A stand-in for the box in the top bar while the conversation lives in the side panel or
+  // the bottom dock; clicking it brings the cursor back to the real box.
+  const standIn = (
+    <button
+      type="button"
+      onClick={() => inputRef.current?.focus()}
+      className="flex h-11 w-full items-center gap-2 rounded-2xl border border-[color:var(--color-cyan)]/40 bg-[color:var(--color-surface)] px-3 text-left text-sm text-[color:var(--color-text-faint)]"
+    >
+      <Sparkles size={14} className="text-[color:var(--color-cyan)]" /> {t('bar.aiOpenElsewhere')}
+    </button>
+  );
+
+  return (
+    <>
+      {compact && !floating && (
+        <div
+          className="fixed inset-0 z-40 bg-black/60"
+          style={{ animation: 'pharos-fade-in .15s ease-out' }}
+          onMouseDown={() => {
+            setOpen(false);
+            setExpanded(false);
+          }}
+          aria-hidden
+        />
       )}
+      <div ref={wrapRef} className={cn(floating ? (compact ? '' : 'relative w-full max-w-xl') : compact ? 'fixed z-50 top-2 inset-x-2' : 'relative w-full max-w-xl')}>
+        {!floating && barEl}
+
+        {/* Side panel: a conversation column on the right; the page stays usable on the left */}
+        {floating && (
+          <>
+            {!compact && standIn}
+            <aside
+              className="fixed inset-0 z-[70] flex flex-col bg-[color:var(--color-surface)] sm:inset-auto sm:bottom-0 sm:right-0 sm:top-0 sm:w-[420px] sm:border-l sm:border-[color:var(--color-border)] sm:shadow-2xl sm:shadow-black/50"
+              style={{ animation: 'pharos-slide-in .2s ease-out both' }}
+              aria-label={t('bar.aiTitle')}
+            >
+              <header className="flex items-center gap-2 border-b border-[color:var(--color-border)] px-4 py-3">
+                <span className="grid h-8 w-8 place-items-center rounded-xl bg-[color:var(--color-cyan)]/12 text-[color:var(--color-cyan)]"><Sparkles size={16} /></span>
+                <span className="flex-1 text-sm font-semibold">{t('bar.aiPanelTitle')}</span>
+                {messages.length > 0 && (
+                  <button type="button" onClick={resetAi} title={t('bar.newConversation')} className="p-1.5 text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)]"><RotateCcw size={15} /></button>
+                )}
+                <button type="button" onClick={() => { setOpen(false); if (compact) setExpanded(false); }} aria-label={t('common.close')} className="p-1.5 text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)]"><X size={17} /></button>
+              </header>
+              <div ref={threadRef} className="min-h-0 flex-1 overflow-y-auto">{threadEl}</div>
+              <div className="border-t border-[color:var(--color-border)] p-3">{barEl}</div>
+            </aside>
+          </>
+        )}
 
       {/* Panel — search results */}
       {open && !isAi && value.trim().length >= 2 && (

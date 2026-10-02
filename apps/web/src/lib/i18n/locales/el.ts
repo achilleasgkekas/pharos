@@ -2759,4 +2759,6 @@ export const el: Partial<Dict> = {
   "pl.onOther": "σε άλλες δόσεις",
   "pl.selected": "{n} επιλεγμένα",
   "pl.merge": "Ίδια αγορά με άλλες δόσεις…",
+  "bar.aiOpenElsewhere": "Το Ask Pharos είναι ανοιχτό",
+  "bar.aiPanelTitle": "Ρώτα το Pharos",
 };

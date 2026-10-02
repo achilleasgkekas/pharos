@@ -2728,4 +2728,6 @@ export const fr: Partial<Dict> = {
   "pl.onOther": "sur un autre plan",
   "pl.selected": "{n} sélectionnés",
   "pl.merge": "Même achat qu’un autre plan…",
+  "bar.aiOpenElsewhere": "Ask Pharos est ouvert",
+  "bar.aiPanelTitle": "Demandez à Pharos",
 };
