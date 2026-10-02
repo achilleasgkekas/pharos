@@ -124,7 +124,7 @@ tokens, paths and URLs. No all-caps labels.
 
 - An icon-only button has an `aria-label` (and a `title` for mouse users).
 - One `h1` per page, rendered by `PageHeader`.
-- The E2E run checks `/`, `/items`, `/expenses`, `/bills`, `/settings` and `/login` with axe
+- The E2E run checks `/`, `/items`, `/expenses`, `/expenses/to-pay`, `/settings` and `/login` with axe
   for serious and critical issues.
 
 ## Checking a change

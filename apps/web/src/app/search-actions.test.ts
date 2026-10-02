@@ -213,7 +213,7 @@ describe('searchAll — the late-arriving modules (P66)', () => {
     );
     const [hit] = await searchAll('ΔΕΗ');
 
-    expect(hit).toMatchObject({ type: 'bill', id: 'b1', title: 'ΔΕΗ ρεύμα', href: '/bills?open=b1' });
+    expect(hit).toMatchObject({ type: 'bill', id: 'b1', title: 'ΔΕΗ ρεύμα', href: '/expenses/to-pay?open=b1' });
     expect(hit.subtitle).toContain('due 10/08/2026');
     expect(hit.subtitle).toContain('ΔΕΗ');
   });

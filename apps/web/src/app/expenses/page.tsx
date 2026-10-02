@@ -8,6 +8,7 @@ import { currentModel } from '@/lib/tenancy/connection';
 import { serializeExpense } from './lib';
 import { generateDueRecurring } from './actions';
 import { ExpensesClient } from './ExpensesClient';
+import { getExpenseTabCounts } from './tabCounts';
 import type { SerializedCard } from '@/types';
 
 export const dynamic = 'force-dynamic';
@@ -66,6 +67,6 @@ export async function getExpenseData(kind: 'income' | 'expense') {
 }
 
 export default async function ExpensesPage() {
-  const data = await getExpenseData('expense');
-  return <ExpensesClient kind="expense" {...data} />;
+  const [data, counts] = await Promise.all([getExpenseData('expense'), getExpenseTabCounts()]);
+  return <ExpensesClient kind="expense" {...data} toPay={counts.toPay} />;
 }

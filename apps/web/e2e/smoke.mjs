@@ -21,7 +21,7 @@ if (SHOTS) mkdirSync(SHOTS, { recursive: true });
 const shotName = (path, tag) => `${SHOTS}/${tag}-${path === '/' ? 'home' : path.slice(1).replace(/\//g, '_')}.png`;
 
 const PAGES = [
-  '/', '/items', '/shopping', '/shopping-list', '/receipts', '/expenses', '/income', '/bills',
+  '/', '/items', '/shopping', '/shopping-list', '/receipts', '/expenses', '/expenses/to-pay', '/income', '/bills',
   '/utilities', '/vehicles', '/statements', '/subscriptions', '/vouchers', '/calendar', '/tasks',
   '/documents', '/special-dates', '/savings', '/reports', '/jobs', '/history', '/trash', '/settings',
 ];

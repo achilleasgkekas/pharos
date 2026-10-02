@@ -2607,4 +2607,6 @@ export const it: Partial<Dict> = {
   "sav.aiNote": "Dai tuoi dati: un mese normale, spese per categoria, abbonamenti e rate. Controllalo prima di agire.",
   "af.savingsPlan": "Piano di risparmio",
   "af.savingsPlanDesc": "Trasforma un obiettivo di risparmio in pochi passi con importi, da entrate, spese e pagamenti.",
+  "ex.tabToPay": "Da pagare",
+  "ex.toPayHint": "Bollette ancora da pagare. Segnata pagata, viene registrata una volta in Spese.",
 };

@@ -10,7 +10,7 @@ import {
 
 // Extracted from apps/web/e2e/smoke.mjs
 const SMOKE_PAGES = [
-  '/', '/items', '/shopping', '/shopping-list', '/receipts', '/expenses', '/income', '/bills',
+  '/', '/items', '/shopping', '/shopping-list', '/receipts', '/expenses', '/income',
   '/utilities', '/vehicles', '/statements', '/subscriptions', '/vouchers', '/calendar', '/tasks',
   '/documents', '/special-dates', '/savings', '/reports', '/jobs', '/history', '/trash', '/settings',
 ];
@@ -21,6 +21,12 @@ describe('Navigation structure (#367)', () => {
     for (const page of SMOKE_PAGES) {
       expect(reachableHrefs.has(page), `Page ${page} missing from navigation`).toBe(true);
     }
+  });
+
+  it('puts the bills ("To pay") under Expenses, not in the menu of their own', () => {
+    expect(ALL_NAV_ITEMS.some((i) => i.href === '/bills')).toBe(false);
+    expect(navActive('/expenses/to-pay', '/expenses')).toBe(true);
+    expect(navGroupOf('/expenses/to-pay')?.key).toBe('nav.money');
   });
 
   it('contains no duplicate hrefs across all nav items', () => {

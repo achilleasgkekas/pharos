@@ -2607,4 +2607,6 @@ export const pt: Partial<Dict> = {
   "sav.aiNote": "Feito com os seus registros: um mês normal, gastos por categoria, assinaturas e parcelas. Confira antes de agir.",
   "af.savingsPlan": "Plano de poupança",
   "af.savingsPlanDesc": "Transforma uma meta de poupança em alguns passos com valores, a partir do que ganha, gasta e paga.",
+  "ex.tabToPay": "A pagar",
+  "ex.toPayHint": "Contas que ainda tem de pagar. Marcada como paga, fica registada uma vez em Despesas.",
 };

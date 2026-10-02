@@ -94,7 +94,7 @@ await flow('add an expense', async () => {
 
 // ── Bills: mark paid → expense ────────────────────────────────────────────
 await flow('mark a bill paid and log it as an expense', async () => {
-  await open('/bills');
+  await open('/expenses/to-pay');
   await newButton().click();
   const dialog = page.getByRole('dialog');
   await dialog.locator('input[name=title]').fill(`Power ${TAG}`);
@@ -110,7 +110,7 @@ await flow('mark a bill paid and log it as an expense', async () => {
   await detail.getByRole('button', { name: 'Mark paid' }).click();
   await detail.waitFor({ state: 'hidden' });
 
-  await open('/bills');
+  await open('/expenses/to-pay');
   await page.getByRole('button', { name: 'Paid', exact: true }).click();
   await page.getByText(`Power ${TAG}`).first().waitFor();
   await open('/expenses');
@@ -245,7 +245,7 @@ await flow('export an encrypted backup through the passphrase dialog', async () 
 // Serious and critical axe violations only, on the pages people use most. Colour contrast is
 // left out for now: the dark theme's faint text is a known design debt, and gating on it here
 // would make this check red for reasons unrelated to the PR under test.
-const A11Y_PAGES = ['/login', '/', '/items', '/expenses', '/bills', '/settings'];
+const A11Y_PAGES = ['/login', '/', '/items', '/expenses', '/expenses/to-pay', '/settings'];
 for (const path of A11Y_PAGES) {
   await flow(`accessibility: ${path}`, async () => {
     if (path === '/login') {

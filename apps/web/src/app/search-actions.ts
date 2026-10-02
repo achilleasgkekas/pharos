@@ -230,7 +230,7 @@ export async function searchAll(query: string): Promise<SearchHit[]> {
         id,
         title: b.title,
         subtitle: `Bill · ${b.paidAt ? 'paid' : `due ${due}`} · ${cur()}${b.amount ?? 0}${b.vendor ? ` · ${b.vendor}` : ''}`,
-        href: `/bills?open=${id}`,
+        href: `/expenses/to-pay?open=${id}`,
       });
     }
     for (const g of goals) {

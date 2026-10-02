@@ -88,7 +88,7 @@ export async function createBill(formData: FormData): Promise<{ ok: boolean; id?
     await connectDB();
     const Bill = await currentModel(BillModel);
     const created = await Bill.create({ ...raw, ...(await resolveBillFx(raw)), space: (raw.space ?? '').trim(), dueDate: due, paidAt: null, archived: false });
-    revalidatePath('/bills');
+    revalidatePath('/expenses', 'layout');
     return { ok: true, id: created?._id ? String(created._id) : undefined };
   });
 }
@@ -120,7 +120,7 @@ export async function updateBill(id: string, formData: FormData): Promise<{ ok: 
     // missing. Until then its instalments could not be compared with its printed amount, so
     // they never settled it; now that `amount` is base currency they can.
     await settleIfCoveredByPayments(id, await baseCurrency());
-    revalidatePath('/bills');
+    revalidatePath('/expenses', 'layout');
     return { ok: true };
   });
 }
@@ -149,7 +149,7 @@ export async function settleBillsCoveredByPayments(ids: string[]): Promise<void>
     await connectDB();
     const base = await baseCurrency();
     for (const id of ids) await settleIfCoveredByPayments(id, base);
-    revalidatePath('/bills');
+    revalidatePath('/expenses', 'layout');
   });
 }
 
@@ -159,7 +159,7 @@ export async function setBillArchived(id: string, archived: boolean): Promise<{ 
     await connectDB();
     const Bill = await currentModel(BillModel);
     await Bill.findByIdAndUpdate(id, { archived });
-    revalidatePath('/bills');
+    revalidatePath('/expenses', 'layout');
     return { ok: true };
   });
 }
@@ -171,7 +171,7 @@ export async function deleteBill(id: string): Promise<{ ok: boolean }> {
     const Bill = await currentModel(BillModel);
     // Soft delete → Trash (Settings → Storage & data). Purge happens from there.
     await Bill.updateOne({ _id: id }, { $set: { deletedAt: new Date() } });
-    revalidatePath('/bills');
+    revalidatePath('/expenses', 'layout');
     return { ok: true };
   });
 }
@@ -256,7 +256,7 @@ export async function markBillPaid(
 
   await Bill.findByIdAndUpdate(id, { paidAt, linkedExpenseId });
 
-  revalidatePath('/bills');
+  revalidatePath('/expenses', 'layout');
   return { ok: true };
   });
 }
@@ -269,7 +269,7 @@ export async function markBillUnpaid(id: string): Promise<{ ok: boolean }> {
     await connectDB();
     const Bill = await currentModel(BillModel);
     await Bill.findByIdAndUpdate(id, { paidAt: null });
-    revalidatePath('/bills');
+    revalidatePath('/expenses', 'layout');
     return { ok: true };
   });
 }
@@ -376,7 +376,7 @@ export async function logBillPayment(
     // a foreign bill still waiting for its exchange rate is never settled by them.
     const after = await Bill.findById(id).lean();
     const settled = !!after && billIsSettledByPayments(after, await baseCurrency());
-    revalidatePath('/bills');
+    revalidatePath('/expenses', 'layout');
     // A repeat that finds the bill already settled leaves its paidAt alone.
     return { ok: true as const, settled, settle: settled && !after?.paidAt, paidOn: settled ? paidOn.toISOString() : '' };
   });
@@ -421,7 +421,7 @@ export async function removeBillPayment(id: string, paymentId: string): Promise<
     if (after?.paidAt && wasSettledByPayments && !billIsSettledByPayments(after, base)) {
       await Bill.updateOne({ _id: id }, { $set: { paidAt: null } });
     }
-    revalidatePath('/bills');
+    revalidatePath('/expenses', 'layout');
     return { ok: true };
   });
 }
