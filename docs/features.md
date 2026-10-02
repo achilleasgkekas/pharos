@@ -401,7 +401,6 @@ Highlights:
 the amount, the due date and the payee, and adds the payment code, the consumption and
 the billed period to the notes. The bill file is kept under **Files & links**.
 
-
 A tracker (`/bills`) for the bills you pay **by hand**, such as electricity, telephone, or building fees. This is distinct from
 Subscriptions (an **automatic** recurring charge) and from the Calendar (which only
 **projects** the future): a bill has a lifecycle you follow, "is it due?, did I
