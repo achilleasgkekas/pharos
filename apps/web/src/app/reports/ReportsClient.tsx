@@ -24,7 +24,7 @@ import {
   CartesianGrid,
 } from 'recharts';
 import { keepSeriesOrder } from '@/lib/chartOrder';
-import { Store, CalendarClock, Receipt as ReceiptIcon, Layers, ShieldCheck, TrendingUp, CreditCard, Wallet, Target, Plus, Trash2, X, Sparkles, AlertTriangle, Check, ArrowRight, Pencil } from 'lucide-react';
+import { Store, Layers, ShieldCheck, Wallet, Target, Plus, Trash2, X, Sparkles, AlertTriangle, Check, ArrowRight, Pencil } from 'lucide-react';
 import { AssetAccountsModal } from '@/components/AssetAccountsModal';
 import { convertToBase } from '@/lib/fx';
 import { applyFxRate, applyFxRateToCurrency } from './fxActions';
@@ -33,6 +33,10 @@ import { createGoal, addGoalContribution, deleteGoal, sweepBudgetLeftoverToGoal 
 import { formatDate } from '@/lib/i18n/format';
 import { compactControlClass } from '@/components/ui/Input';
 import { cn } from '@/components/ui/cn';
+import Link from 'next/link';
+import { PERIOD_PRESETS, periodQuery, pctChange, type ReportPeriod, type PeriodPreset } from '@/lib/reportPeriod';
+import type { TKey } from '@/lib/i18n';
+import { filterControlClass } from '@/components/ui/Input';
 
 const PALETTE = ['#00ff88', '#00d4ff', '#ffd93d', '#a55eea', '#ff4757', '#00b894', '#fdcb6e', '#6c5ce7'];
 
@@ -120,12 +124,14 @@ type GoalRow = {
 };
 
 type Data = {
+  period: ReportPeriod & { label: string; prevLabel: string };
+  totals: { expense: number; income: number; receipts: number; prevExpense: number; prevIncome: number; prevReceipts: number };
   statementPayments: PaymentReport;
   netWorth: { accountsTotal: number; series: NetWorthPoint[]; accounts?: Record<string, number> };
   safeToSpend: SafeToSpend;
   monthReview: MonthReview;
   monthlySpend: { key: string; label: string; total: number; count: number }[];
-  spendByStore: { name: string; total: number; count: number }[];
+  spendByStore: { name: string; total: number; count: number; prev: number }[];
   spendByCategory: { name: string; value: number }[];
   subsByCategory: { name: string; value: number }[];
   /** P68 φάση 2: μηνιαίο ισοδύναμο κόστος συνδρομών ανά χώρο· κενό όσο καμία δεν έχει tag. */
@@ -141,7 +147,7 @@ type Data = {
     rows: YoyRow[];
     headline: YoyRow | null;
   } | null;
-  expenseByCategory: { name: string; value: number }[];
+  expenseByCategory: { name: string; value: number; prev: number }[];
   expenseBySpace: { name: string; value: number }[];
   budgetVsActual: { name: string; budget: number; actual: number; projected?: number; carried?: number; effective?: number; leftover?: number }[];
   budgetRollover?: boolean;
@@ -166,6 +172,26 @@ type Data = {
     incomeMonth: number;
     expenseMonth: number;
   };
+};
+
+const REPORT_TABS = ['overview', 'spending', 'budget', 'subscriptions', 'assets'] as const;
+type ReportTab = (typeof REPORT_TABS)[number];
+const TAB_LABEL: Record<ReportTab, TKey> = {
+  overview: 'reports.tabOverview',
+  spending: 'reports.tabSpending',
+  budget: 'reports.tabGoals',
+  subscriptions: 'reports.tabSubscriptions',
+  assets: 'reports.tabAssets',
+};
+const PRESET_LABEL: Record<PeriodPreset, TKey> = {
+  'this-month': 'reports.pThisMonth',
+  'last-month': 'reports.pLastMonth',
+  '3m': 'reports.p3m',
+  '6m': 'reports.p6m',
+  '12m': 'reports.p12m',
+  'this-year': 'reports.pThisYear',
+  'last-year': 'reports.pLastYear',
+  custom: 'reports.pCustom',
 };
 
 // Literal keys (not a template string) so the translate function stays type-checked.
@@ -350,57 +376,68 @@ function FxIssueLine({ row, base, fallbackRate }: { row: FxIssueRow; base: strin
   );
 }
 
-export function ReportsClient({ data, months = 12 }: { data: Data; months?: number }) {
+export function ReportsClient({ data, initialTab }: { data: Data; initialTab?: string }) {
   const locale = useLocale();
   const t = useT();
   const money = useMoney();
   const s = data.summary;
+  const P = data.period;
+  const T = data.totals;
   const spend12 = data.monthlySpend.reduce((a, m) => a + m.total, 0);
   const netWorthNow = s.ownedValue + data.netWorth.accountsTotal - s.installmentsRemaining - s.outstanding;
-  const avgMonth = Math.round(spend12 / Math.max(1, data.monthlySpend.filter((m) => m.total > 0).length || 1));
-  // Every windowed figure below is labelled with the window it was actually built from.
-  // The 6/12/24 selector has always widened the data, but the captions said "last 12
-  // months" whatever you picked, so switching to 6mo or 24mo looked like it did nothing.
   const fxIssues = data.fxIssues ?? [];
   const fxBase = data.baseCurrency || 'EUR';
   // P83 — goals still open (an already-reached goal is a pointless sweep target).
   const openGoals = data.goals.filter((g) => !g.done);
-  // #122: the period links used to be plain <a href>, so every switch was a full browser reload
-  // (blank page, scroll back to top) that looked like the filter "just reloads". A client
-  // navigation keeps the current report on screen, dimmed, until the new window's data arrives.
+  // #122: switching period is a client navigation: the current report stays on screen, dimmed,
+  // until the new period's data arrives, instead of a blank full reload.
   const router = useRouter();
   const [periodPending, startPeriod] = useTransition();
-  const [pendingMonths, setPendingMonths] = useState<number | null>(null);
   const [showAccountsModal, setShowAccountsModal] = useState(false);
-  const shownMonths = periodPending && pendingMonths ? pendingMonths : months;
-  const inWindow = (title: string) => `${title} · ${months}mo`;
+  const [tab, setTab] = useState<ReportTab>(() => (REPORT_TABS.includes(initialTab as ReportTab) ? (initialTab as ReportTab) : 'overview'));
+  // Every windowed figure is captioned with the period it was built from.
+  const inWindow = (title: string) => `${title} · ${P.label}`;
+  const q = periodQuery(P);
+  function goTab(next: ReportTab) {
+    setTab(next);
+    // Remember the tab in the URL without asking the server again: the data is the same.
+    window.history.replaceState(null, '', `/reports?${q}&tab=${next}`);
+  }
+  function goPeriod(next: string) {
+    startPeriod(() => router.push(`/reports?${next}&tab=${tab}`, { scroll: false }));
+  }
+  /** A list page filtered to this period (and to one category or store). */
+  function listHref(path: string, extra: Record<string, string> = {}) {
+    const p = new URLSearchParams({ from: P.start, to: P.end, ...extra });
+    return `${path}?${p.toString()}`;
+  }
 
   return (
-    <main
-      className={`${PAGE_MAIN} transition-opacity ${periodPending ? 'opacity-60' : ''}`}
-      aria-busy={periodPending}
-    >
-      <PageHeader title={t('nav.reports')}>
-        <div className="shrink-0 flex h-10 items-center p-0.5 rounded-[10px] bg-[color:var(--color-surface-2)] border border-[color:var(--color-border-light)]">
-          {[6, 12, 24].map((m) => (
-            <a
-              key={m}
-              href={`/reports?months=${m}`}
-              aria-current={months === m ? 'page' : undefined}
-              onClick={(e) => {
-                if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return; // new tab still works
-                e.preventDefault();
-                if (m === months) return;
-                setPendingMonths(m);
-                startPeriod(() => router.push(`/reports?months=${m}`, { scroll: false }));
-              }}
-              className={`h-full flex items-center px-3 rounded-lg text-sm font-semibold whitespace-nowrap transition-colors ${shownMonths === m ? 'bg-[color:var(--color-surface-3)] text-[color:var(--color-text)]' : 'text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]'}`}
-            >
-              {t('reports.nMonths', { n: m })}
-            </a>
-          ))}
-        </div>
+    <main className={`${PAGE_MAIN} transition-opacity ${periodPending ? 'opacity-60' : ''}`} aria-busy={periodPending}>
+      <PageHeader
+        title={t('nav.reports')}
+        summary={<p className="text-sm text-[color:var(--color-text-dim)]">{t('reports.periodLine', { period: P.label, prev: P.prevLabel })}</p>}
+      >
+        <PeriodPicker period={P} onChange={goPeriod} />
       </PageHeader>
+
+      <div role="tablist" aria-label={t('nav.reports')} className="mb-5 flex gap-1 overflow-x-auto no-scrollbar border-b border-[color:var(--color-border)]">
+        {REPORT_TABS.map((k) => (
+          <button
+            key={k}
+            type="button"
+            role="tab"
+            aria-selected={tab === k}
+            onClick={() => goTab(k)}
+            className={cn(
+              'shrink-0 px-3 py-2 text-sm border-b-2 -mb-px transition-colors whitespace-nowrap',
+              tab === k ? 'border-[color:var(--color-accent)] text-[color:var(--color-text)] font-semibold' : 'border-transparent text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]'
+            )}
+          >
+            {t(TAB_LABEL[k])}
+          </button>
+        ))}
+      </div>
 
       {/* Missing exchange rates (P9 slice 7) — foreign records saved without a rate keep
           their PRINTED amount, so they are silently mixed into every figure below. Shown
@@ -425,56 +462,84 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
       )}
 
 
-      {/* Net worth (PA2) — assets (inventory + manual accounts) minus liabilities
-          (remaining installments + card balances), with the monthly snapshot trend */}
-      <div className="mb-6 rounded-2xl border border-[color:var(--color-border)] bg-gradient-to-br from-[color:var(--color-surface)] to-[color:var(--color-surface-2)] p-5">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <p className="text-[11px] text-[color:var(--color-text-faint)] mb-1" style={{ fontFamily: 'var(--font-mono)' }}>{t('reports.netWorth')}</p>
-            <p className="text-3xl md:text-4xl font-bold" style={{ fontFamily: 'var(--font-display)', color: netWorthNow >= 0 ? 'var(--color-accent)' : 'var(--color-red)' }}>
-              {money(netWorthNow)}
-            </p>
+
+      {tab === 'overview' && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <Kpi label={t('reports.kSpent')} value={T.expense} prev={T.prevExpense} upIsGood={false} href={listHref('/expenses')} />
+            <Kpi label={t('nav.income')} value={T.income} prev={T.prevIncome} upIsGood href={listHref('/income')} />
+            <Kpi label={t('reports.kNet')} value={T.income - T.expense} prev={T.prevIncome - T.prevExpense} upIsGood />
+            <Kpi label={t('reports.kReceipts')} value={T.receipts} prev={T.prevReceipts} upIsGood={false} href={listHref('/receipts')} />
           </div>
-          <div className="flex flex-wrap gap-5 text-xs" style={{ fontFamily: 'var(--font-mono)' }}>
-            <div><span className="text-[color:var(--color-text-faint)] block mb-0.5">{t('reports.inventoryValue')}</span><span className="text-[color:var(--color-text)] text-sm">{money(s.ownedValue)}</span></div>
-            <div>
-              <div className="flex items-center gap-1 mb-0.5">
-                <span className="text-[color:var(--color-text-faint)] block">{t('reports.accounts')}</span>
-                <button
-                  type="button"
-                  onClick={() => setShowAccountsModal(true)}
-                  className="text-[color:var(--color-text-faint)] hover:text-[color:var(--color-accent)] transition-colors p-0.5"
-                  title={t('reports.accounts')}
-                >
-                  <Pencil size={11} />
-                </button>
-              </div>
-              <span className="text-[color:var(--color-cyan)] text-sm">{money(data.netWorth.accountsTotal)}</span>
-            </div>
-            <div><span className="text-[color:var(--color-text-faint)] block mb-0.5">{t('reports.owed')}</span><span className="text-[color:var(--color-red)] text-sm">-{money(s.installmentsRemaining)}</span></div>
-            <div><span className="text-[color:var(--color-text-faint)] block mb-0.5">{t('reports.cardBalance')}</span><span className="text-[color:var(--color-gold)] text-sm">-{money(s.outstanding)}</span></div>
-          </div>
-        </div>
-        {data.netWorth.series.length >= 2 ? (
-          <div className="h-32 mt-4">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={data.netWorth.series} margin={{ left: 0, right: 10, top: 6 }}>
-                <defs>
-                  <linearGradient id="netWorthFill" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#00ff88" stopOpacity={0.28} />
-                    <stop offset="100%" stopColor="#00ff88" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid stroke="var(--color-border)" strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="period" tick={{ fill: 'var(--color-text-faint)', fontSize: 10 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: 'var(--color-text-faint)', fontSize: 10 }} axisLine={false} tickLine={false} width={52} tickFormatter={(v: number) => money(v, undefined, { notation: 'compact', minimumFractionDigits: 0, maximumFractionDigits: 1 })} />
-                <Tooltip contentStyle={tooltipStyle} formatter={(v) => [money(Number(v)), t('reports.netWorth')]} />
-                <Area type="monotone" dataKey="net" stroke="#00ff88" strokeWidth={2} fill="url(#netWorthFill)" />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
+      {/* Income vs Expense (cash flow) */}
+      <Card title={inWindow(t('reports.tCashFlow'))}>
+        {data.incomeExpense.every((m) => m.income === 0 && m.expense === 0) ? (
+          <Empty text={t('reports.noCashFlow')} />
         ) : (
-          <p className="mt-3 text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>{t('reports.netWorthTrendNote')}</p>
+          <>
+            <div className="flex flex-wrap gap-x-5 gap-y-1 mb-3 text-xs" style={{ fontFamily: 'var(--font-mono)' }}>
+              <span className="text-[color:var(--color-text-dim)]">
+                {t('reports.thisMonth')} <span className="text-[color:var(--color-accent)]">+{money(s.incomeMonth)}</span> {t('reports.in')} · <span className="text-[color:var(--color-red)]">-{money(s.expenseMonth)}</span> {t('reports.out')} · {t('reports.net')}{' '}
+                <span className={s.incomeMonth - s.expenseMonth >= 0 ? 'text-[color:var(--color-accent)]' : 'text-[color:var(--color-red)]'}>
+                  {money((s.incomeMonth - s.expenseMonth))}
+                </span>
+              </span>
+              <span className="text-[color:var(--color-text-dim)]">
+                {t('reports.thisYear')} {t('reports.net')}{' '}
+                <span className={s.incomeYear - s.expenseYear >= 0 ? 'text-[color:var(--color-accent)]' : 'text-[color:var(--color-red)]'}>
+                  {money((s.incomeYear - s.expenseYear))}
+                </span>
+              </span>
+            </div>
+            <ResponsiveContainer width="100%" height={260}>
+              <BarChart
+                data={data.incomeExpense}
+                margin={{ left: 0, right: 10, top: 6 }}
+                style={{ cursor: 'pointer' }}
+                onClick={(st) => {
+                  const m = data.incomeExpense[Number(st?.activeTooltipIndex ?? -1)];
+                  if (m) router.push(listHref('/expenses', { from: m.key, to: m.key }));
+                }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
+                <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} width={44} tickFormatter={(v: number) => money(v, undefined, { notation: 'compact', minimumFractionDigits: 0, maximumFractionDigits: 1 })} />
+                <Tooltip itemSorter={keepSeriesOrder} contentStyle={tooltipStyle} formatter={(v, n) => [money(Number(v)), n]} cursor={{ fill: 'rgba(127,127,127,0.08)' }} />
+                <Legend itemSorter={null} wrapperStyle={{ fontSize: 11 }} />
+                <Bar dataKey="income" name={t('nav.income')} radius={[5, 5, 0, 0]} fill="#00ff88" />
+                <Bar dataKey="expense" name={t('reports.expense')} radius={[5, 5, 0, 0]} fill="#ff4757" />
+              </BarChart>
+            </ResponsiveContainer>
+            <p className="mt-2 text-xs text-[color:var(--color-text-faint)]">{t('reports.clickMonth')}</p>
+          </>
+        )}
+      </Card>
+
+      {/* Month in Review (P3) — deterministic narrative digest (budget/price-hike/
+          warranty signals already computed elsewhere, zero AI, zero new queries). */}
+      <div className="mb-6 rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-5">
+        <p className="flex items-center gap-1.5 text-[11px] text-[color:var(--color-text-faint)] mb-2" style={{ fontFamily: 'var(--font-mono)' }}>
+          <Sparkles size={12} /> {t('reports.monthReview')} · {data.monthReview.monthLabel}
+        </p>
+        <p className="text-sm md:text-base leading-relaxed text-[color:var(--color-text)]">{data.monthReview.narrative}</p>
+        {(data.monthReview.overBudget.length > 0 || data.monthReview.priceChanges.length > 0 || data.monthReview.warrantiesExpiringSoon.length > 0) && (
+          <div className="mt-3 flex flex-wrap gap-2 text-[11px]" style={{ fontFamily: 'var(--font-mono)' }}>
+            {data.monthReview.overBudget.map((b) => (
+              <span key={`b-${b.category}`} className="px-2 py-1 rounded-md border border-[color:var(--color-red)]/40 text-[color:var(--color-red)]">
+                {b.category} {money(b.actual)}/{money(b.budget)}
+              </span>
+            ))}
+            {data.monthReview.priceChanges.slice(0, 5).map((p) => (
+              <span key={`p-${p.vendorKey}`} className="px-2 py-1 rounded-md border border-[color:var(--color-gold)]/40 text-[color:var(--color-gold)]">
+                {p.vendor} {p.direction === 'up' ? '+' : ''}{p.deltaPct}%
+              </span>
+            ))}
+            {data.monthReview.warrantiesExpiringSoon.slice(0, 5).map((w) => (
+              <span key={`w-${w.title}`} className="px-2 py-1 rounded-md border border-[color:var(--color-cyan)]/40 text-[color:var(--color-cyan)]">
+                {w.title} · {w.days}d
+              </span>
+            ))}
+          </div>
         )}
       </div>
 
@@ -508,49 +573,26 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
         <p className="mt-3 text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>{t('reports.stsNote')}</p>
       </div>
 
-      {/* Month in Review (P3) — deterministic narrative digest (budget/price-hike/
-          warranty signals already computed elsewhere, zero AI, zero new queries). */}
-      <div className="mb-6 rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-5">
-        <p className="flex items-center gap-1.5 text-[11px] text-[color:var(--color-text-faint)] mb-2" style={{ fontFamily: 'var(--font-mono)' }}>
-          <Sparkles size={12} /> {t('reports.monthReview')} · {data.monthReview.monthLabel}
-        </p>
-        <p className="text-sm md:text-base leading-relaxed text-[color:var(--color-text)]">{data.monthReview.narrative}</p>
-        {(data.monthReview.overBudget.length > 0 || data.monthReview.priceChanges.length > 0 || data.monthReview.warrantiesExpiringSoon.length > 0) && (
-          <div className="mt-3 flex flex-wrap gap-2 text-[11px]" style={{ fontFamily: 'var(--font-mono)' }}>
-            {data.monthReview.overBudget.map((b) => (
-              <span key={`b-${b.category}`} className="px-2 py-1 rounded-md border border-[color:var(--color-red)]/40 text-[color:var(--color-red)]">
-                {b.category} {money(b.actual)}/{money(b.budget)}
-              </span>
-            ))}
-            {data.monthReview.priceChanges.slice(0, 5).map((p) => (
-              <span key={`p-${p.vendorKey}`} className="px-2 py-1 rounded-md border border-[color:var(--color-gold)]/40 text-[color:var(--color-gold)]">
-                {p.vendor} {p.direction === 'up' ? '+' : ''}{p.deltaPct}%
-              </span>
-            ))}
-            {data.monthReview.warrantiesExpiringSoon.slice(0, 5).map((w) => (
-              <span key={`w-${w.title}`} className="px-2 py-1 rounded-md border border-[color:var(--color-cyan)]/40 text-[color:var(--color-cyan)]">
-                {w.title} · {w.days}d
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
+        </div>
+      )}
 
-      {/* Summary cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-        <Stat icon={<ReceiptIcon size={14} />} label={inWindow(t('reports.receiptsTotal'))} value={money(s.receiptsTotal)} sub={t('reports.receiptsSub', { n: s.receiptsCount, vat: money(s.receiptsVat) })} />
-        <Stat icon={<TrendingUp size={14} />} label={t('reports.spendAvg')} value={money(avgMonth)} sub={t('reports.spendAvgSub', { x: money(spend12), n: months })} />
-        <Stat icon={<CreditCard size={14} />} label={t('reports.cardsBalance')} value={money(s.outstanding)} sub={t('reports.cardsBalanceSub', { n: s.installmentsCount, x: money(s.installmentsRemaining) })} accent="var(--color-gold)" />
-        <Stat icon={<CalendarClock size={14} />} label={t('nav.subscriptions')} value={`${money(s.monthlySubs)}/mo`} sub={`${money(s.monthlySubs * 12)}/yr`} />
-      </div>
-
+      {tab === 'spending' && (
+        <div className="space-y-4">
       {/* Monthly spend — full width hero chart */}
-      <Card title={t('reports.cMonthlySpend', { n: months })} className="mb-4">
+      <Card title={inWindow(t('reports.tMonthly'))} className="mb-4">
         {spend12 === 0 ? (
           <Empty />
         ) : (
           <ResponsiveContainer width="100%" height={260}>
-            <AreaChart data={data.monthlySpend} margin={{ left: 0, right: 10, top: 6 }}>
+            <AreaChart
+              data={data.monthlySpend}
+              margin={{ left: 0, right: 10, top: 6 }}
+              style={{ cursor: 'pointer' }}
+              onClick={(st) => {
+                const m = data.monthlySpend[Number(st?.activeTooltipIndex ?? -1)];
+                if (m) router.push(listHref('/receipts', { from: m.key, to: m.key }));
+              }}
+            >
               <defs>
                 <linearGradient id="spendGrad" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="#00ff88" stopOpacity={0.5} />
@@ -571,41 +613,74 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
         )}
       </Card>
 
-      {/* Income vs Expense (cash flow) */}
-      <Card title={t('reports.cCashFlow', { n: months })}>
-        {data.incomeExpense.every((m) => m.income === 0 && m.expense === 0) ? (
-          <Empty text={t('reports.noCashFlow')} />
-        ) : (
-          <>
-            <div className="flex flex-wrap gap-x-5 gap-y-1 mb-3 text-xs" style={{ fontFamily: 'var(--font-mono)' }}>
-              <span className="text-[color:var(--color-text-dim)]">
-                {t('reports.thisMonth')} <span className="text-[color:var(--color-accent)]">+{money(s.incomeMonth)}</span> {t('reports.in')} · <span className="text-[color:var(--color-red)]">-{money(s.expenseMonth)}</span> {t('reports.out')} · {t('reports.net')}{' '}
-                <span className={s.incomeMonth - s.expenseMonth >= 0 ? 'text-[color:var(--color-accent)]' : 'text-[color:var(--color-red)]'}>
-                  {money((s.incomeMonth - s.expenseMonth))}
-                </span>
-              </span>
-              <span className="text-[color:var(--color-text-dim)]">
-                {t('reports.thisYear')} {t('reports.net')}{' '}
-                <span className={s.incomeYear - s.expenseYear >= 0 ? 'text-[color:var(--color-accent)]' : 'text-[color:var(--color-red)]'}>
-                  {money((s.incomeYear - s.expenseYear))}
-                </span>
-              </span>
-            </div>
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={data.incomeExpense} margin={{ left: 0, right: 10, top: 6 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
-                <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} width={44} tickFormatter={(v: number) => money(v, undefined, { notation: 'compact', minimumFractionDigits: 0, maximumFractionDigits: 1 })} />
-                <Tooltip itemSorter={keepSeriesOrder} contentStyle={tooltipStyle} formatter={(v, n) => [money(Number(v)), n]} cursor={{ fill: 'rgba(127,127,127,0.08)' }} />
-                <Legend itemSorter={null} wrapperStyle={{ fontSize: 11 }} />
-                <Bar dataKey="income" name={t('nav.income')} radius={[5, 5, 0, 0]} fill="#00ff88" />
-                <Bar dataKey="expense" name={t('reports.expense')} radius={[5, 5, 0, 0]} fill="#ff4757" />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Expenses by category: a row per category, each opening its expenses for the period */}
+        <Card title={inWindow(t('reports.cExpByCat'))}>
+          {data.expenseByCategory.length === 0 ? (
+            <Empty text={t('reports.noExpenses')} />
+          ) : (
+            <RankList
+              rows={data.expenseByCategory.map((r) => ({ name: r.name, value: r.value, prev: r.prev, href: listHref('/expenses', { category: r.name }) }))}
+              prevLabel={P.prevLabel}
+            />
+          )}
+        </Card>
+
+        {/* Spending by store: a row per store, each opening its receipts for the period */}
+        <Card title={inWindow(t('reports.cByStore'))}>
+          {data.spendByStore.length === 0 ? (
+            <Empty />
+          ) : (
+            <RankList
+              rows={data.spendByStore.map((r) => ({ name: r.name, value: r.total, prev: r.prev, sub: t('reports.nReceipts', { n: r.count }), href: listHref('/receipts', { store: r.name }) }))}
+              prevLabel={P.prevLabel}
+            />
+          )}
+        </Card>
+
+        {/* Expenses by space / property (P34) — only when the user has tagged spaces */}
+        {data.expenseBySpace.length > 0 && (
+          <Card title={inWindow(t('reports.cExpBySpace'))}>
+            <ResponsiveContainer width="100%" height={Math.max(200, data.expenseBySpace.length * 34)}>
+              <BarChart data={data.expenseBySpace.map((s) => ({ name: s.name || t('ex.spaceNone'), value: s.value }))} layout="vertical" margin={{ left: 8, right: 16 }}>
+                <XAxis type="number" tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} tickFormatter={(v: number) => money(v, undefined, { notation: 'compact', minimumFractionDigits: 0, maximumFractionDigits: 1 })} />
+                <YAxis type="category" dataKey="name" width={90} tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} />
+                <Tooltip contentStyle={tooltipStyle} formatter={(v) => [money(Number(v)), 'total']} cursor={{ fill: 'rgba(127,127,127,0.08)' }} />
+                <Bar dataKey="value" radius={[0, 5, 5, 0]}>
+                  {data.expenseBySpace.map((_, i) => (
+                    <Cell key={i} fill={PALETTE[(i + 1) % PALETTE.length]} />
+                  ))}
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
-          </>
+          </Card>
         )}
-      </Card>
 
+        {/* Biggest purchases */}
+        <Card title={inWindow(t('reports.cBiggest'))}>
+          {data.biggestPurchases.length === 0 ? (
+            <Empty />
+          ) : (
+            <div className="space-y-1.5">
+              {data.biggestPurchases.map((b, i) => (
+                <div key={i} className="flex items-center justify-between gap-2 bg-[color:var(--color-surface-2)] rounded-lg px-3 py-2">
+                  <span className="flex items-center gap-2 text-xs truncate">
+                    <span className="text-[11px] text-[color:var(--color-text-faint)] tabular-nums w-4" style={{ fontFamily: 'var(--font-mono)' }}>
+                      {i + 1}
+                    </span>
+                    <Store size={12} className="text-[color:var(--color-text-faint)] shrink-0" />
+                    <span className="truncate">{b.store}</span>
+                    {b.date && <span className="text-[11px] text-[color:var(--color-text-faint)] shrink-0">{fmtDate(b.date, locale)}</span>}
+                  </span>
+                  <span className="text-xs font-bold text-[color:var(--color-accent)] shrink-0 tabular-nums" style={{ fontFamily: 'var(--font-mono)' }}>
+                    {money(b.total)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+          </div>
       {/* Year over year · same month (P69). Answers "is this normal for the season
           or a real increase?", which the rolling monthly chart above cannot. Only
           rendered once at least one month has a prior-year figure, and the current
@@ -648,6 +723,11 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
         </Card>
       )}
 
+        </div>
+      )}
+
+      {tab === 'budget' && (
+        <div className="space-y-4">
       {/* Budget · this month (per category, actual vs budget). In envelope mode
           (P25) the limit is the rolling `effective` budget and a chip shows the
           net carried-in balance. */}
@@ -711,86 +791,27 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
         </Card>
       )}
 
-      <StatementPaymentReport report={data.statementPayments} />
+      {/* Savings / financial goals (P12) — targets to reach, distinct from budgets
+          (spending limits). Progress is derived from contributions, never stored. */}
+      <div id="goals">
+        <GoalsCard goals={data.goals} className="mt-4" />
+      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Spending by store */}
-        <Card title={inWindow(t('reports.cByStore'))}>
-          {data.spendByStore.length === 0 ? (
-            <Empty />
-          ) : (
-            <ResponsiveContainer width="100%" height={Math.max(200, data.spendByStore.length * 30)}>
-              <BarChart data={data.spendByStore} layout="vertical" margin={{ left: 8, right: 16 }}>
-                <XAxis type="number" tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} tickFormatter={(v: number) => money(v, undefined, { notation: 'compact', minimumFractionDigits: 0, maximumFractionDigits: 1 })} />
-                <YAxis type="category" dataKey="name" width={110} tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} />
-                <Tooltip contentStyle={tooltipStyle} formatter={(v, _n, p) => [`${money(Number(v))} · ${p?.payload?.count ?? 0} receipts`, 'spent']} cursor={{ fill: 'rgba(127,127,127,0.08)' }} />
-                <Bar dataKey="total" radius={[0, 5, 5, 0]}>
-                  {data.spendByStore.map((_, i) => (
-                    <Cell key={i} fill={PALETTE[i % PALETTE.length]} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </Card>
+        </div>
+      )}
 
-        {/* Spend by category (owned items) */}
-        <Card title={t('reports.cInvByCat')}>
-          {data.spendByCategory.length === 0 ? (
-            <Empty />
-          ) : (
-            <ResponsiveContainer width="100%" height={260}>
-              <PieChart>
-                <Pie data={data.spendByCategory} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={50} outerRadius={90} paddingAngle={2}>
-                  {data.spendByCategory.map((_, i) => (
-                    <Cell key={i} fill={PALETTE[i % PALETTE.length]} stroke="var(--color-bg)" />
-                  ))}
-                </Pie>
-                <Tooltip contentStyle={tooltipStyle} formatter={(v) => [money(Number(v)), 'value']} />
-                <Legend itemSorter={null} wrapperStyle={{ fontSize: 11 }} />
-              </PieChart>
-            </ResponsiveContainer>
-          )}
-        </Card>
-
-        {/* Expenses by category (bills) */}
-        <Card title={inWindow(t('reports.cExpByCat'))}>
-          {data.expenseByCategory.length === 0 ? (
-            <Empty text={t('reports.noExpenses')} />
-          ) : (
-            <ResponsiveContainer width="100%" height={Math.max(200, data.expenseByCategory.length * 34)}>
-              <BarChart data={data.expenseByCategory} layout="vertical" margin={{ left: 8, right: 16 }}>
-                <XAxis type="number" tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} tickFormatter={(v: number) => money(v, undefined, { notation: 'compact', minimumFractionDigits: 0, maximumFractionDigits: 1 })} />
-                <YAxis type="category" dataKey="name" width={90} tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} />
-                <Tooltip contentStyle={tooltipStyle} formatter={(v) => [money(Number(v)), 'total']} cursor={{ fill: 'rgba(127,127,127,0.08)' }} />
-                <Bar dataKey="value" radius={[0, 5, 5, 0]}>
-                  {data.expenseByCategory.map((_, i) => (
-                    <Cell key={i} fill={PALETTE[(i + 4) % PALETTE.length]} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </Card>
-
-        {/* Expenses by space / property (P34) — only when the user has tagged spaces */}
-        {data.expenseBySpace.length > 0 && (
-          <Card title={inWindow(t('reports.cExpBySpace'))}>
-            <ResponsiveContainer width="100%" height={Math.max(200, data.expenseBySpace.length * 34)}>
-              <BarChart data={data.expenseBySpace.map((s) => ({ name: s.name || t('ex.spaceNone'), value: s.value }))} layout="vertical" margin={{ left: 8, right: 16 }}>
-                <XAxis type="number" tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} tickFormatter={(v: number) => money(v, undefined, { notation: 'compact', minimumFractionDigits: 0, maximumFractionDigits: 1 })} />
-                <YAxis type="category" dataKey="name" width={90} tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} />
-                <Tooltip contentStyle={tooltipStyle} formatter={(v) => [money(Number(v)), 'total']} cursor={{ fill: 'rgba(127,127,127,0.08)' }} />
-                <Bar dataKey="value" radius={[0, 5, 5, 0]}>
-                  {data.expenseBySpace.map((_, i) => (
-                    <Cell key={i} fill={PALETTE[(i + 1) % PALETTE.length]} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </Card>
-        )}
-
+      {tab === 'subscriptions' && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="lg:col-span-2 rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-4 flex flex-wrap items-baseline justify-between gap-3">
+            <span>
+              <span className="block text-xs text-[color:var(--color-text-dim)]">{t('reports.subsPerMonth')}</span>
+              <span className="text-2xl font-bold tabular-nums" style={{ fontFamily: 'var(--font-display)' }}>{money(s.monthlySubs)}</span>
+              <span className="ml-2 text-sm text-[color:var(--color-text-dim)] tabular-nums">{t('reports.subsPerYear', { x: money(s.monthlySubs * 12) })}</span>
+            </span>
+            <Link href="/subscriptions" prefetch={false} className="inline-flex items-center gap-1 text-sm font-medium text-[color:var(--color-accent)] hover:underline">
+              {t('nav.subscriptions')} <ArrowRight size={14} />
+            </Link>
+          </div>
         {/* Subscriptions monthly by category */}
         <Card title={t('reports.cSubsByCat', { cur: cur() })}>
           {data.subsByCategory.length === 0 ? (
@@ -830,6 +851,84 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
           </Card>
         )}
 
+        </div>
+      )}
+
+      {tab === 'assets' && (
+        <div className="space-y-4">
+      {/* Net worth (PA2) — assets (inventory + manual accounts) minus liabilities
+          (remaining installments + card balances), with the monthly snapshot trend */}
+      <div className="mb-6 rounded-2xl border border-[color:var(--color-border)] bg-gradient-to-br from-[color:var(--color-surface)] to-[color:var(--color-surface-2)] p-5">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="text-[11px] text-[color:var(--color-text-faint)] mb-1" style={{ fontFamily: 'var(--font-mono)' }}>{t('reports.netWorth')}</p>
+            <p className="text-3xl md:text-4xl font-bold" style={{ fontFamily: 'var(--font-display)', color: netWorthNow >= 0 ? 'var(--color-accent)' : 'var(--color-red)' }}>
+              {money(netWorthNow)}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-5 text-xs" style={{ fontFamily: 'var(--font-mono)' }}>
+            <div><span className="text-[color:var(--color-text-faint)] block mb-0.5">{t('reports.inventoryValue')}</span><span className="text-[color:var(--color-text)] text-sm">{money(s.ownedValue)}</span></div>
+            <div>
+              <div className="flex items-center gap-1 mb-0.5">
+                <span className="text-[color:var(--color-text-faint)] block">{t('reports.accounts')}</span>
+                <button
+                  type="button"
+                  onClick={() => setShowAccountsModal(true)}
+                  className="text-[color:var(--color-text-faint)] hover:text-[color:var(--color-accent)] transition-colors p-0.5"
+                  title={t('reports.accounts')}
+                >
+                  <Pencil size={11} />
+                </button>
+              </div>
+              <span className="text-[color:var(--color-cyan)] text-sm">{money(data.netWorth.accountsTotal)}</span>
+            </div>
+            <div><span className="text-[color:var(--color-text-faint)] block mb-0.5">{t('reports.owed')}</span><span className="text-[color:var(--color-red)] text-sm">-{money(s.installmentsRemaining)}</span></div>
+            <div><span className="text-[color:var(--color-text-faint)] block mb-0.5">{t('reports.cardBalance')}</span><span className="text-[color:var(--color-gold)] text-sm">-{money(s.outstanding)}</span></div>
+          </div>
+        </div>
+        {data.netWorth.series.length >= 2 ? (
+          <div className="h-32 mt-4">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={data.netWorth.series} margin={{ left: 0, right: 10, top: 6 }}>
+                <defs>
+                  <linearGradient id="netWorthFill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#00ff88" stopOpacity={0.28} />
+                    <stop offset="100%" stopColor="#00ff88" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid stroke="var(--color-border)" strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="period" tick={{ fill: 'var(--color-text-faint)', fontSize: 10 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: 'var(--color-text-faint)', fontSize: 10 }} axisLine={false} tickLine={false} width={52} tickFormatter={(v: number) => money(v, undefined, { notation: 'compact', minimumFractionDigits: 0, maximumFractionDigits: 1 })} />
+                <Tooltip contentStyle={tooltipStyle} formatter={(v) => [money(Number(v)), t('reports.netWorth')]} />
+                <Area type="monotone" dataKey="net" stroke="#00ff88" strokeWidth={2} fill="url(#netWorthFill)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        ) : (
+          <p className="mt-3 text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>{t('reports.netWorthTrendNote')}</p>
+        )}
+      </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Spend by category (owned items) */}
+        <Card title={t('reports.cInvByCat')}>
+          {data.spendByCategory.length === 0 ? (
+            <Empty />
+          ) : (
+            <ResponsiveContainer width="100%" height={260}>
+              <PieChart>
+                <Pie data={data.spendByCategory} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={50} outerRadius={90} paddingAngle={2}>
+                  {data.spendByCategory.map((_, i) => (
+                    <Cell key={i} fill={PALETTE[i % PALETTE.length]} stroke="var(--color-bg)" />
+                  ))}
+                </Pie>
+                <Tooltip contentStyle={tooltipStyle} formatter={(v) => [money(Number(v)), 'value']} />
+                <Legend itemSorter={null} wrapperStyle={{ fontSize: 11 }} />
+              </PieChart>
+            </ResponsiveContainer>
+          )}
+        </Card>
+
         {/* Warranties expiring */}
         <Card title={t('reports.cWarranties')}>
           {data.warrantiesExpiring.length === 0 ? (
@@ -854,31 +953,8 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
           )}
         </Card>
 
-        {/* Biggest purchases */}
-        <Card title={inWindow(t('reports.cBiggest'))}>
-          {data.biggestPurchases.length === 0 ? (
-            <Empty />
-          ) : (
-            <div className="space-y-1.5">
-              {data.biggestPurchases.map((b, i) => (
-                <div key={i} className="flex items-center justify-between gap-2 bg-[color:var(--color-surface-2)] rounded-lg px-3 py-2">
-                  <span className="flex items-center gap-2 text-xs truncate">
-                    <span className="text-[11px] text-[color:var(--color-text-faint)] tabular-nums w-4" style={{ fontFamily: 'var(--font-mono)' }}>
-                      {i + 1}
-                    </span>
-                    <Store size={12} className="text-[color:var(--color-text-faint)] shrink-0" />
-                    <span className="truncate">{b.store}</span>
-                    {b.date && <span className="text-[11px] text-[color:var(--color-text-faint)] shrink-0">{fmtDate(b.date, locale)}</span>}
-                  </span>
-                  <span className="text-xs font-bold text-[color:var(--color-accent)] shrink-0 tabular-nums" style={{ fontFamily: 'var(--font-mono)' }}>
-                    {money(b.total)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </Card>
-      </div>
+          </div>
+      <StatementPaymentReport report={data.statementPayments} />
 
       {/* Installment payoff — full width */}
       <Card title={t('reports.payoffTitle')} className="mt-4">
@@ -913,11 +989,8 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
         )}
       </Card>
 
-      {/* Savings / financial goals (P12) — targets to reach, distinct from budgets
-          (spending limits). Progress is derived from contributions, never stored. */}
-      <div id="goals">
-        <GoalsCard goals={data.goals} className="mt-4" />
-      </div>
+        </div>
+      )}
 
       <AssetAccountsModal
         open={showAccountsModal}
@@ -1140,23 +1213,6 @@ function SweepToGoal({ category, monthKey, amount, goals }: { category: string; 
   );
 }
 
-function Stat({ icon, label, value, sub, accent }: { icon: React.ReactNode; label: string; value: string; sub: string; accent?: string }) {
-  return (
-    <div className="bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-xl p-4">
-      <div className="flex items-center gap-1.5 text-[11px] text-[color:var(--color-text-faint)] mb-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
-        {icon}
-        {label}
-      </div>
-      <div className="text-2xl font-bold tracking-tight" style={{ fontFamily: 'var(--font-display)', color: accent }}>
-        {value}
-      </div>
-      <div className="text-[11px] text-[color:var(--color-text-faint)] mt-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
-        {sub}
-      </div>
-    </div>
-  );
-}
-
 function Card({ title, children, className }: { title: string; children: React.ReactNode; className?: string }) {
   return (
     <div className={`bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-2xl p-5 ${className ?? ''}`}>
@@ -1172,4 +1228,123 @@ function Empty({ text }: { text?: string }) {
   const t = useT();
   // Short: an empty chart is a line of text, not a chart-sized hole in the page.
   return <div className="h-20 flex items-center justify-center text-center text-xs text-[color:var(--color-text-faint)]">{text ?? t('reports.noData')}</div>;
+}
+
+/** The period switch: the usual periods in one dropdown, and two month fields for any other. */
+function PeriodPicker({ period, onChange }: { period: ReportPeriod; onChange: (query: string) => void }) {
+  const t = useT();
+  const [custom, setCustom] = useState(period.preset === 'custom');
+  const [from, setFrom] = useState(period.start);
+  const [to, setTo] = useState(period.end);
+  const thisMonth = new Date().toISOString().slice(0, 7);
+  return (
+    <div className="shrink-0 flex items-center gap-2">
+      <select
+        aria-label={t('reports.period')}
+        value={custom ? 'custom' : period.preset}
+        onChange={(e) => {
+          const v = e.target.value as PeriodPreset;
+          if (v === 'custom') return setCustom(true);
+          setCustom(false);
+          onChange(`period=${v}`);
+        }}
+        className={cn(filterControlClass, 'w-auto')}
+      >
+        {PERIOD_PRESETS.map((p) => (
+          <option key={p} value={p}>
+            {t(PRESET_LABEL[p])}
+          </option>
+        ))}
+      </select>
+      {custom && (
+        <>
+          <input type="month" aria-label={t('reports.from')} value={from} max={thisMonth} onChange={(e) => setFrom(e.target.value)} className={cn(filterControlClass, 'w-[9.5rem]')} />
+          <input type="month" aria-label={t('reports.to')} value={to} max={thisMonth} onChange={(e) => setTo(e.target.value)} className={cn(filterControlClass, 'w-[9.5rem]')} />
+          <button
+            type="button"
+            disabled={!from || !to}
+            onClick={() => onChange(periodQuery({ preset: 'custom', start: from, end: to }))}
+            className="h-10 px-3 rounded-[10px] text-sm font-semibold bg-[color:var(--color-surface-3)] border border-[color:var(--color-border-light)] hover:bg-[color:var(--color-surface-2)] disabled:opacity-50"
+          >
+            {t('reports.apply')}
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
+/** "+12%" / "-8%" against the comparison period, green when the move is the good one. */
+function Delta({ value, prev, upIsGood, label }: { value: number; prev: number; upIsGood: boolean; label?: string }) {
+  const t = useT();
+  const pct = pctChange(value, prev);
+  if (pct === null) return <span className="text-xs text-[color:var(--color-text-faint)]">{t('reports.noCompare')}</span>;
+  const good = pct === 0 ? null : (pct > 0) === upIsGood;
+  return (
+    <span
+      className="text-xs font-semibold tabular-nums"
+      style={{ color: good === null ? 'var(--color-text-dim)' : good ? 'var(--color-accent)' : 'var(--color-red)' }}
+      title={label}
+    >
+      {pct > 0 ? '+' : ''}
+      {pct}%
+    </span>
+  );
+}
+
+/** A total of the period, its change against the previous period, and a link to its records. */
+function Kpi({ label, value, prev, upIsGood, href }: { label: string; value: number; prev: number; upIsGood: boolean; href?: string }) {
+  const t = useT();
+  const money = useMoney();
+  const body = (
+    <>
+      <span className="block text-xs text-[color:var(--color-text-dim)]">{label}</span>
+      <span className="block mt-1 text-xl lg:text-2xl font-bold tabular-nums" style={{ fontFamily: 'var(--font-display)', color: value < 0 ? 'var(--color-red)' : undefined }}>
+        {money(value)}
+      </span>
+      <span className="mt-1 flex items-center gap-1.5 text-xs text-[color:var(--color-text-faint)]">
+        <Delta value={value} prev={prev} upIsGood={upIsGood} />
+        {prev > 0 && <span className="truncate">{t('reports.vsPrev', { x: money(prev) })}</span>}
+      </span>
+    </>
+  );
+  const cls = 'block rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-4 min-w-0';
+  return href ? (
+    <Link href={href} prefetch={false} className={cn(cls, 'hover:border-[color:var(--color-border-light)] hover:bg-[color:var(--color-surface-2)] transition-colors')}>
+      {body}
+    </Link>
+  ) : (
+    <div className={cls}>{body}</div>
+  );
+}
+
+/** Ranked rows (category, store): a bar for the share, the total, the change, and a link to the records. */
+function RankList({ rows, prevLabel }: { rows: { name: string; value: number; prev: number; sub?: string; href: string }[]; prevLabel: string }) {
+  const money = useMoney();
+  const t = useT();
+  const max = Math.max(1, ...rows.map((r) => r.value));
+  return (
+    <ul className="divide-y divide-[color:var(--color-border)] -mx-2">
+      {rows.map((r) => (
+        <li key={r.name}>
+          <Link href={r.href} prefetch={false} className="flex items-center gap-3 px-2 py-2.5 rounded-lg hover:bg-[color:var(--color-surface-2)] transition-colors">
+            <span className="min-w-0 flex-1">
+              <span className="flex items-baseline justify-between gap-2">
+                <span className="text-sm font-medium truncate">{r.name}</span>
+                <span className="shrink-0 text-sm font-semibold tabular-nums">{money(r.value)}</span>
+              </span>
+              <span className="mt-1.5 block h-1.5 rounded-full bg-[color:var(--color-surface-3)] overflow-hidden">
+                <span className="block h-full rounded-full bg-[color:var(--color-accent)]/70" style={{ width: `${Math.max(2, (r.value / max) * 100)}%` }} />
+              </span>
+              <span className="mt-1 flex items-center justify-between gap-2 text-xs text-[color:var(--color-text-faint)]">
+                <span className="truncate">{r.sub ?? ''}</span>
+                <Delta value={r.value} prev={r.prev} upIsGood={false} label={t('reports.vsPeriod', { period: prevLabel, x: money(r.prev) })} />
+              </span>
+            </span>
+            <ArrowRight size={15} className="shrink-0 text-[color:var(--color-text-faint)]" />
+          </Link>
+        </li>
+      ))}
+    </ul>
+  );
 }
