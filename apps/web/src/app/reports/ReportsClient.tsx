@@ -24,7 +24,7 @@ import {
   CartesianGrid,
 } from 'recharts';
 import { keepSeriesOrder } from '@/lib/chartOrder';
-import { Store, Layers, ShieldCheck, Wallet, Target, Plus, Trash2, X, Sparkles, AlertTriangle, Check, ArrowRight, Pencil } from 'lucide-react';
+import { Store, Layers, ShieldCheck, Wallet, Target, Plus, Trash2, X, Sparkles, AlertTriangle, Check, ArrowRight, Pencil, Loader2 } from 'lucide-react';
 import { AssetAccountsModal } from '@/components/AssetAccountsModal';
 import { convertToBase } from '@/lib/fx';
 import { applyFxRate, applyFxRateToCurrency } from './fxActions';
@@ -37,6 +37,7 @@ import Link from 'next/link';
 import { PERIOD_PRESETS, periodQuery, pctChange, type ReportPeriod, type PeriodPreset } from '@/lib/reportPeriod';
 import type { TKey } from '@/lib/i18n';
 import { filterControlClass } from '@/components/ui/Input';
+import { summarizeReport, type ReportDigest } from './summaryActions';
 
 const PALETTE = ['#00ff88', '#00d4ff', '#ffd93d', '#a55eea', '#ff4757', '#00b894', '#fdcb6e', '#6c5ce7'];
 
@@ -376,7 +377,7 @@ function FxIssueLine({ row, base, fallbackRate }: { row: FxIssueRow; base: strin
   );
 }
 
-export function ReportsClient({ data, initialTab }: { data: Data; initialTab?: string }) {
+export function ReportsClient({ data, initialTab, summaryOn = false, currency = 'EUR' }: { data: Data; initialTab?: string; summaryOn?: boolean; currency?: string }) {
   const locale = useLocale();
   const t = useT();
   const money = useMoney();
@@ -471,6 +472,25 @@ export function ReportsClient({ data, initialTab }: { data: Data; initialTab?: s
             <Kpi label={t('reports.kNet')} value={T.income - T.expense} prev={T.prevIncome - T.prevExpense} upIsGood />
             <Kpi label={t('reports.kReceipts')} value={T.receipts} prev={T.prevReceipts} upIsGood={false} href={listHref('/receipts')} />
           </div>
+          {summaryOn && (
+            <ReportSummary
+              key={`${P.start}-${P.end}`}
+              digest={{
+                locale,
+                currency,
+                period: P.label,
+                prevPeriod: P.prevLabel,
+                spent: T.expense,
+                prevSpent: T.prevExpense,
+                income: T.income,
+                prevIncome: T.prevIncome,
+                receipts: T.receipts,
+                prevReceipts: T.prevReceipts,
+                categories: data.expenseByCategory.slice(0, 8).map((r) => ({ name: r.name.slice(0, 80), value: r.value, prev: r.prev ?? 0 })),
+                stores: data.spendByStore.slice(0, 8).map((r) => ({ name: r.name.slice(0, 80), value: r.total, prev: r.prev ?? 0 })),
+              }}
+            />
+          )}
       {/* Income vs Expense (cash flow) */}
       <Card title={inWindow(t('reports.tCashFlow'))}>
         {data.incomeExpense.every((m) => m.income === 0 && m.expense === 0) ? (
@@ -1346,5 +1366,52 @@ function RankList({ rows, prevLabel }: { rows: { name: string; value: number; pr
         </li>
       ))}
     </ul>
+  );
+}
+
+/** "Explain this period" (AI): asked for with a button, so it never runs (or costs) on its own.
+ *  Keyed on the period by the caller, so a new period starts empty again. */
+function ReportSummary({ digest }: { digest: ReportDigest }) {
+  const t = useT();
+  const [state, setState] = useState<{ sentences?: string[]; error?: string }>({});
+  const [pending, start] = useTransition();
+  const ask = () =>
+    start(async () => {
+      try {
+        const r = await summarizeReport(digest);
+        setState(r.ok ? { sentences: r.sentences } : { error: r.error });
+      } catch (e) {
+        setState({ error: (e as Error).message || t('common.failed') });
+      }
+    });
+  return (
+    <div className="rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="flex items-center gap-1.5 text-sm font-semibold">
+          <Sparkles size={14} className="text-[color:var(--color-accent)]" /> {t('reports.aiTitle')}
+        </p>
+        <button
+          type="button"
+          onClick={ask}
+          disabled={pending}
+          className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] px-3 text-xs text-[color:var(--color-text)] transition-colors hover:border-[color:var(--color-border-light)] disabled:opacity-50"
+        >
+          {pending ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
+          {state.sentences ? t('reports.aiAgain') : t('reports.aiExplain')}
+        </button>
+      </div>
+      {state.sentences ? (
+        <div className="mt-3 space-y-1.5 text-sm leading-relaxed text-[color:var(--color-text-dim)]">
+          {state.sentences.map((x, i) => (
+            <p key={i}>{x}</p>
+          ))}
+          <p className="pt-1 text-[11px] text-[color:var(--color-text-faint)]">{t('reports.aiNote')}</p>
+        </div>
+      ) : state.error ? (
+        <p className="mt-2 text-xs text-[color:var(--color-red)]">{state.error}</p>
+      ) : (
+        <p className="mt-1 text-xs text-[color:var(--color-text-faint)]">{t('reports.aiHint')}</p>
+      )}
+    </div>
   );
 }

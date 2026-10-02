@@ -1,6 +1,7 @@
 import { Schema, model, models, type Model, type InferSchemaType } from 'mongoose';
 import { softDeletePlugin } from '@/lib/softDelete';
 import { createdByPlugin } from '@/lib/createdBy';
+import { AttachmentSchema } from '@/lib/attachmentSchema';
 
 // Recurring cost-split among household members (P73). Same shape/semantics as
 // Expense.split (lib/split.ts, reused as-is): you pay the charge each cycle, each
@@ -19,6 +20,7 @@ const SubscriptionSchema = new Schema(
   {
     name: { type: String, required: true },
     provider: { type: String, default: '' },
+    attachments: { type: [AttachmentSchema], default: [] }, // files and links kept with it
     category: {
       type: String,
       // Relaxed from an enum → free string (editable list in Settings → Lists).

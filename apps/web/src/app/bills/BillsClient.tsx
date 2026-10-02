@@ -29,6 +29,10 @@ import {
 import { formatDate } from '@/lib/i18n/format';
 import { useLocale, useMoney, useT } from '@/components/LocaleProvider';
 import type { TFunc, TKey } from '@/lib/i18n';
+import { RecordAttachments } from '@/components/RecordAttachments';
+import type { BillScan } from '@/lib/homeScan';
+import { addAttachmentFiles } from '@/app/attachmentActions';
+import { ScanFileButton } from '@/components/ScanFileButton';
 
 type Filter = 'open' | 'overdue' | 'part-paid' | 'paid' | 'all';
 /** P9 context: the deployment's base currency + whether multi-currency is switched on at all. */
@@ -67,6 +71,7 @@ export function BillsClient({
   spaces = [],
   baseCurrency = 'EUR',
   multiCurrency = false,
+  scanOn = false,
 }: {
   bills: SerializedBill[];
   categories: string[];
@@ -74,6 +79,8 @@ export function BillsClient({
   spaces?: string[];
   baseCurrency?: string;
   multiCurrency?: boolean;
+  /** The "read the bill" scan is on and an AI provider answers. */
+  scanOn?: boolean;
 }) {
   const money = useMoney();
   const t = useT();
@@ -202,11 +209,14 @@ export function BillsClient({
       </FilterLayout>
 
       <Modal open={showCreate} onClose={() => setShowCreate(false)} title={t('bill.new')} size="lg">
-        <BillForm categories={categories} spaces={spaces} fx={fx} onSuccess={() => setShowCreate(false)} onCancel={() => setShowCreate(false)} />
+        <BillForm categories={categories} spaces={spaces} fx={fx} scanOn={scanOn} onSuccess={() => setShowCreate(false)} onCancel={() => setShowCreate(false)} />
       </Modal>
       {editing && (
         <Modal open onClose={() => setEditing(null)} title={editing.title} size="lg">
-          <BillForm bill={editing} categories={categories} spaces={spaces} fx={fx} onSuccess={() => setEditing(null)} onCancel={() => setEditing(null)} onDeleted={() => setEditing(null)} />
+          <BillForm bill={editing} categories={categories} spaces={spaces} fx={fx} scanOn={scanOn} onSuccess={() => setEditing(null)} onCancel={() => setEditing(null)} onDeleted={() => setEditing(null)} />
+          <div className="mt-5 border-t border-[color:var(--color-border)] pt-4">
+            <RecordAttachments kind="bill" id={editing._id} attachments={editing.attachments ?? []} />
+          </div>
         </Modal>
       )}
     </main>
@@ -325,11 +335,13 @@ function BillForm({
   onSuccess,
   onCancel,
   onDeleted,
+  scanOn = false,
 }: {
   bill?: SerializedBill;
   categories: string[];
   spaces?: string[];
   fx: FxCtx;
+  scanOn?: boolean;
   onSuccess: () => void;
   onCancel: () => void;
   onDeleted?: () => void;
@@ -350,13 +362,44 @@ function BillForm({
   const [amount, setAmount] = useState(String((wasForeign ? bill?.origAmount || bill?.amount : bill?.amount) || ''));
   const [dueDate, setDueDate] = useState(bill?.dueDate ? bill.dueDate.slice(0, 10) : '');
   const foreign = fx.enabled && isForeignCurrency(currency, fx.base);
+  // A scan fills the uncontrolled inputs through `prefill` (the form remounts on `formKey`) and
+  // the bill itself is kept with the record once it is saved.
+  const [prefill, setPrefill] = useState<{ title?: string; vendor?: string; category?: string; notes?: string }>({});
+  const [formKey, setFormKey] = useState(0);
+  const [scannedFile, setScannedFile] = useState<File | null>(null);
+
+  function applyScan(d: BillScan, file: File) {
+    if (d.amount !== null) setAmount(d.amount.toFixed(2));
+    if (d.dueDate) setDueDate(d.dueDate);
+    const extra = [
+      d.paymentCode && t('bill.paymentCode', { code: d.paymentCode }),
+      d.consumption !== null && t('bill.consumption', { value: String(d.consumption), unit: d.consumptionUnit }),
+      d.periodFrom && d.periodTo && t('bill.period', { from: d.periodFrom, to: d.periodTo }),
+    ].filter(Boolean).join(' · ');
+    const lower = categories.map((c) => c.toLowerCase());
+    const category = lower.includes(d.category) ? categories[lower.indexOf(d.category)] : lower.includes('utilities') ? categories[lower.indexOf('utilities')] : undefined;
+    setPrefill({
+      title: bill?.title || d.title || d.vendor || undefined,
+      vendor: bill?.vendor || d.vendor || undefined,
+      category: category ?? undefined,
+      notes: [bill?.notes, extra].filter(Boolean).join(' · ') || undefined,
+    });
+    setScannedFile(file);
+    setFormKey((k) => k + 1);
+  }
 
   const submit = (formData: FormData) => {
     setError('');
     startTransition(async () => {
       const r = bill ? await updateBill(bill._id, formData) : await createBill(formData);
-      if (r.ok) onSuccess();
-      else setError(r.error || t('common.saveFailed'));
+      if (!r.ok) return setError(r.error || t('common.saveFailed'));
+      const savedId = bill?._id || (r as { id?: string }).id;
+      if (scannedFile && savedId) {
+        const files = new FormData();
+        files.append('files', scannedFile);
+        await addAttachmentFiles('bill', savedId, files).catch(() => {});
+      }
+      onSuccess();
     });
   };
 
@@ -372,12 +415,14 @@ function BillForm({
 
   return (
     <div className="space-y-5">
-      <form action={submit} className="grid grid-cols-1 md:grid-cols-2 gap-3">
+      {/* Outside the keyed form, so its "filled in" note survives the remount a scan causes. */}
+      {scanOn && <ScanFileButton kind="bill" label={t('bill.scan')} onResult={(r, file) => r.kind === 'bill' && applyScan(r.data, file)} />}
+      <form key={formKey} action={submit} className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <Field label={t('bill.fTitle')} className="md:col-span-2">
-          <Input name="title" defaultValue={bill?.title} placeholder={t('bill.titleHint')} required />
+          <Input name="title" defaultValue={prefill.title ?? bill?.title} placeholder={t('bill.titleHint')} required />
         </Field>
         <Field label={t('bill.fPayee')}>
-          <Input name="vendor" defaultValue={bill?.vendor} placeholder={t('bill.payeeHint')} />
+          <Input name="vendor" defaultValue={prefill.vendor ?? bill?.vendor} placeholder={t('bill.payeeHint')} />
         </Field>
         <Field label={t('ex.fAmount', { cur: fx.enabled ? currencySymbol(currency).trim() : cur() })}>
           <Input
@@ -422,7 +467,7 @@ function BillForm({
           </select>
         </Field>
         <Field label={t('common.category')}>
-          <Input name="category" defaultValue={bill?.category || 'other'} list="bill-categories" placeholder={t('bill.categoryHint')} />
+          <Input name="category" defaultValue={prefill.category ?? (bill?.category || 'other')} list="bill-categories" placeholder={t('bill.categoryHint')} />
           <datalist id="bill-categories">
             {categories.map((c) => (
               <option key={c} value={c} />
@@ -443,7 +488,7 @@ function BillForm({
           </Field>
         )}
         <Field label={t('v.fNotes')} className="md:col-span-2">
-          <Input name="notes" defaultValue={bill?.notes} placeholder={t('common.optional')} />
+          <Input name="notes" defaultValue={prefill.notes ?? bill?.notes} placeholder={t('common.optional')} />
         </Field>
         {error && <p className="md:col-span-2 text-xs text-[color:var(--color-red)]">{error}</p>}
         {/* Footer like every other form (#351): record actions on the left, Cancel and the

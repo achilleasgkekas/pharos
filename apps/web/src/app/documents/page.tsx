@@ -5,26 +5,29 @@ import { currentModel } from '@/lib/tenancy/connection';
 import { getAppSettings } from '@/lib/appSettings';
 import { DocumentsClient } from './DocumentsClient';
 import type { SerializedDocument } from '@/types';
+import { aiFeatureStatus } from '@/lib/aiFeatures.server';
 
 export const dynamic = 'force-dynamic';
 
-async function getData(): Promise<{ documents: SerializedDocument[]; leadDays: number }> {
+async function getData(): Promise<{ documents: SerializedDocument[]; leadDays: number; scanOn: boolean }> {
   return withRequestTenant(async () => {
     await connectDB();
     const Document = await currentModel(DocumentModel);
-    const [documents, settings] = await Promise.all([
+    const [documents, settings, scan] = await Promise.all([
       // Soonest expiry first — the order you renew documents in.
       Document.find().sort({ expiryDate: 1 }).lean(),
       getAppSettings(),
+      aiFeatureStatus('documents'),
     ]);
     return {
       documents: JSON.parse(JSON.stringify(documents)),
       leadDays: settings.documentAlertDays,
+      scanOn: scan === 'ready',
     };
   });
 }
 
 export default async function DocumentsPage() {
-  const { documents, leadDays } = await getData();
-  return <DocumentsClient documents={documents} leadDays={leadDays} />;
+  const { documents, leadDays, scanOn } = await getData();
+  return <DocumentsClient documents={documents} leadDays={leadDays} scanOn={scanOn} />;
 }

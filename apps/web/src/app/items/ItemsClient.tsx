@@ -58,7 +58,6 @@ import { lowestKnownPrice } from '@/lib/lowestKnownPrice';
 import { InstallmentPlanCard } from '@/components/InstallmentPlanCard';
 import { useOpenParam } from '@/components/useOpenParam';
 import { ItemPhotoGallery } from './ItemPhotoGallery';
-import { ItemDocuments } from './ItemDocuments';
 import { applyItemPatch } from './itemPatch';
 import { ItemAssetTag } from './ItemAssetTag';
 import { CreatedBy } from '@/components/CreatedBy';
@@ -74,6 +73,8 @@ import { linkPlanToItem, unlinkPlanByKey } from '../statements/actions';
 import { ItemDuplicatesModal, MergeItemsPicker } from './ItemDuplicatesModal';
 import { PriceSearchPanel } from '@/components/PriceSearchPanel';
 import { estimateTaskCost, formatTaskCost } from '@/lib/claudePricing';
+import { RecordAttachments } from '@/components/RecordAttachments';
+import { AskManual } from './AskManual';
 
 const CATEGORIES = [
   { value: 'network', label: 'Network' },
@@ -300,6 +301,7 @@ export function ItemsClient({
   multiCurrency = false,
   shoppingMarket = null,
   bundles = [],
+  manualQaOn = false,
 }: {
   items: SerializedItem[];
   view?: ItemView;
@@ -312,6 +314,8 @@ export function ItemsClient({
   multiCurrency?: boolean;
   shoppingMarket?: ShoppingMarket | null; // #319: store links outside it get a badge
   bundles?: BundleSummary[]; // P39: every build's roll-up, across both views
+  /** "Ask the manual" (AI) is on and a provider answers. */
+  manualQaOn?: boolean;
 }) {
   const locale = useLocale();
   // The workspace's configured list, handed down instead of parked in module scope — see the
@@ -872,6 +876,7 @@ export function ItemsClient({
           onItemUpdated={(it) => setSelectedItem(it)}
           onItemPatched={(patch, rekey) => setSelectedItem((cur) => applyItemPatch(cur, patch, { rekey }))}
           bundle={selectedItem.bundle ? bundleByName.get(selectedItem.bundle) : undefined}
+          manualQaOn={manualQaOn}
           onShowBundle={(name) => {
             setBundleFilter(name);
             setSelectedItem(null);
@@ -1724,6 +1729,7 @@ function ItemDetailModal({
   onItemPatched,
   bundle,
   onShowBundle,
+  manualQaOn = false,
 }: {
   item: SerializedItem;
   view: ItemView;
@@ -1738,6 +1744,7 @@ function ItemDetailModal({
   /** P39: the roll-up of the build this item is a part of, when it is part of one. */
   bundle?: BundleSummary;
   onShowBundle: (name: string) => void;
+  manualQaOn?: boolean;
 }) {
   const market = useShoppingMarket(); // #319: deal checks count in-market shops only
   const locale = useLocale();
@@ -2527,7 +2534,12 @@ function ItemDetailModal({
           `?? []` guards items saved before this field existed (lean() reads skip
           schema defaults, so an untouched legacy doc has no `attachments` at all). */}
       <div className="mb-4">
-        <ItemDocuments key={`docs-${item._id}-${item.updatedAt}`} itemId={item._id} attachments={item.attachments ?? []} onChange={(attachments) => onItemPatched({ attachments })} />
+        <RecordAttachments key={`docs-${item._id}-${item.updatedAt}`} kind="item" id={item._id} attachments={item.attachments ?? []} title={t('it.manualsAndLinks')} onChange={(attachments) => onItemPatched({ attachments })} />
+        {manualQaOn && (item.attachments ?? []).some((a) => a.path && (a.mimeType === 'application/pdf' || /\.pdf$/i.test(a.path))) && (
+          <div className="mt-4">
+            <AskManual itemId={item._id} />
+          </div>
+        )}
       </div>
 
       {/* P56 — printable QR asset tag. Owned inventory only: a wishlist entry is not a

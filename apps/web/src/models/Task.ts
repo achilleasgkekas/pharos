@@ -1,6 +1,7 @@
 import { Schema, model, models, type Model, type InferSchemaType } from 'mongoose';
 import { softDeletePlugin } from '@/lib/softDelete';
 import { createdByPlugin } from '@/lib/createdBy';
+import { AttachmentSchema } from '@/lib/attachmentSchema';
 
 const StepSchema = new Schema(
   {
@@ -17,6 +18,7 @@ const TaskSchema = new Schema(
     content: { type: String, default: '' }, // rich notes / details (merged from Phases)
     steps: { type: [StepSchema], default: [] }, // checklist of sub-steps
     tags: { type: [String], default: [], index: true },
+    attachments: { type: [AttachmentSchema], default: [] }, // files and links kept with it
     status: {
       type: String,
       enum: ['todo', 'in-progress', 'done', 'blocked'],

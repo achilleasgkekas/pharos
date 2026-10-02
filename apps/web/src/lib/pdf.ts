@@ -44,7 +44,8 @@ function reconstructLines(items: PositionedItem[]): string {
     .join('\n');
 }
 
-export async function extractPdfText(buffer: Buffer): Promise<string> {
+/** `pageMarkers` prefixes each page with "[page N]", for answers that point to a page. */
+export async function extractPdfText(buffer: Buffer, opts?: { pageMarkers?: boolean }): Promise<string> {
   // Legacy build runs in Node without a DOM / worker.
   const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
 
@@ -70,7 +71,7 @@ export async function extractPdfText(buffer: Buffer): Promise<string> {
       items.push({ x: t[4], y: t[5], str: item.str });
     }
     const text = reconstructLines(items);
-    if (text) pages.push(text);
+    if (text) pages.push(opts?.pageMarkers ? `[page ${i}]\n${text}` : text);
   }
 
   // pdfjs 6 tears down through the loading task; the document proxy no longer has destroy().

@@ -31,6 +31,7 @@ import type { RecurringCandidate } from '@/lib/recurringDiscovery';
 import { equalSplit, splitTotals, type SplitEntry } from '@/lib/split';
 import { compareNames } from '@/lib/i18n/format';
 import { useLocale } from '@/components/LocaleProvider';
+import { RecordAttachments } from '@/components/RecordAttachments';
 import {
   createSubscription,
   updateSubscription,
@@ -347,6 +348,9 @@ export function SubscriptionsClient({
       {editing && (
         <Modal open onClose={() => setEditing(null)} title={editing.name} size="xl">
           <SubForm cards={cards} spaces={spaces} fx={fx} sub={editing} onSuccess={() => setEditing(null)} onDeleted={() => setEditing(null)} />
+          <div className="mt-5 border-t border-[color:var(--color-border)] pt-4">
+            <RecordAttachments kind="subscription" id={editing._id} attachments={editing.attachments ?? []} />
+          </div>
         </Modal>
       )}
     </main>

@@ -1,4 +1,5 @@
 import { runTextJSON } from '@/lib/ollama';
+import { isFeatureEnabled } from '@/lib/aiFeatures.server';
 import { SHOPPING_PRESETS } from '@/lib/shoppingRegion';
 
 export type StoreTarget = {
@@ -258,6 +259,8 @@ Rules:
 }`;
 
   try {
+    // The product AI switch covers this too: with it off, the category fallback below answers.
+    if (!(await isFeatureEnabled('itemsImport'))) throw new Error('Product AI is turned off');
     const { json } = await runTextJSON(
       'You are an e-commerce price intelligence agent. Output ONLY JSON.',
       prompt,

@@ -32,7 +32,7 @@ function fields(raw: z.infer<typeof DocumentFormSchema>) {
   };
 }
 
-export async function createDocument(formData: FormData): Promise<{ ok: boolean; error?: string }> {
+export async function createDocument(formData: FormData): Promise<{ ok: boolean; id?: string; error?: string }> {
   await assertCanWrite();
   const parsed = DocumentFormSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message || 'Invalid data' };
@@ -41,9 +41,9 @@ export async function createDocument(formData: FormData): Promise<{ ok: boolean;
   return withRequestTenant(async () => {
     await connectDB();
     const Document = await currentModel(DocumentModel);
-    await Document.create({ ...fields(parsed.data), expiryDate: expiry, archived: false });
+    const doc = await Document.create({ ...fields(parsed.data), expiryDate: expiry, archived: false });
     revalidatePath('/documents');
-    return { ok: true };
+    return { ok: true, id: doc?._id ? String(doc._id) : undefined };
   });
 }
 
