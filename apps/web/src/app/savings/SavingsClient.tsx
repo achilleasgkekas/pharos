@@ -7,7 +7,9 @@ import { useLocale, useT, useMoney } from '@/components/LocaleProvider';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { ResponsiveContainer, AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, ReferenceLine, Legend } from 'recharts';
 import { keepSeriesOrder } from '@/lib/chartOrder';
-import { Target, TrendingUp, Wallet, Plus, Trash2, Scissors, Check, AlertTriangle, Pencil } from 'lucide-react';
+import { Target, TrendingUp, Wallet, Plus, Trash2, Scissors, Check, AlertTriangle, Pencil, Sparkles, Loader2, ListChecks } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
+import { aiSavingsPlan, addPlanStepsAsTasks, type AiPlan, type AiPlanInput } from './aiPlanActions';
 import { AssetAccountsModal } from '@/components/AssetAccountsModal';
 import {
   balanceOn,
@@ -75,7 +77,7 @@ const VERDICT_COLOR: Record<SavingsVerdict, string> = {
   unknown: 'var(--color-text-dim)',
 };
 
-export function SavingsClient({ data }: { data: SavingsData }) {
+export function SavingsClient({ data, aiOn = false }: { data: SavingsData; aiOn?: boolean }) {
   const router = useRouter();
   const locale = useLocale();
   const t = useT();
@@ -265,6 +267,7 @@ export function SavingsClient({ data }: { data: SavingsData }) {
           {adHoc && <SaveAsGoal amount={Number(planAmount)} date={planDate} dateProblem={planDateProblem} />}
         </div>
         {adHoc ? <PlanReadout plan={adHoc} levers={levers} /> : <p className="text-xs text-[color:var(--color-text-faint)]">{t('sav.planHint')}</p>}
+        {adHoc && aiOn && <AiPlanPanel key={`${planAmount}|${planDate}`} request={{ target: Number(planAmount), targetDate: planDate || null }} goalTitle="" />}
       </Card>
 
       {/* ── Goals, each answered by the same engine ─────────────────────── */}
@@ -274,7 +277,7 @@ export function SavingsClient({ data }: { data: SavingsData }) {
         ) : (
           <div className="grid md:grid-cols-2 gap-3">
             {goals.map((g) => (
-              <GoalPlanCard key={g._id} goal={g} data={data} />
+              <GoalPlanCard key={g._id} goal={g} data={data} aiOn={aiOn} />
             ))}
           </div>
         )}
@@ -373,7 +376,7 @@ function PlanReadout({ plan, levers }: { plan: SavingsPlan; levers: SavingsData[
 }
 
 /** A goal, run through the same planner, with the progress + contribute controls. */
-function GoalPlanCard({ goal, data }: { goal: SavingsGoal; data: SavingsData }) {
+function GoalPlanCard({ goal, data, aiOn }: { goal: SavingsGoal; data: SavingsData; aiOn: boolean }) {
   const locale = useLocale();
   const t = useT();
   const money = useMoney();
@@ -427,6 +430,7 @@ function GoalPlanCard({ goal, data }: { goal: SavingsGoal; data: SavingsData }) 
       </div>
 
       <PlanReadout plan={plan} levers={data.levers} />
+      {aiOn && plan.verdict !== 'reached' && <AiPlanPanel request={{ goalId: goal._id }} goalTitle={goal.title} />}
 
       {plan.verdict !== 'reached' && (
         <div className="flex items-center gap-1.5 mt-2">
@@ -450,6 +454,113 @@ function GoalPlanCard({ goal, data }: { goal: SavingsGoal; data: SavingsData }) 
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+/** "Plan it with AI": a few steps with amounts and the month the goal is reached, a box to
+ *  ask more (the plan comes back adjusted), and one click to put the steps on Tasks. */
+function AiPlanPanel({ request, goalTitle }: { request: Pick<AiPlanInput, 'goalId' | 'target' | 'targetDate'>; goalTitle: string }) {
+  const t = useT();
+  const locale = useLocale();
+  const money = useMoney();
+  // 200 stays "200", 53.4 reads "53.40".
+  const amount = (n: number) => money(n, undefined, Number.isInteger(n) ? { minimumFractionDigits: 0, maximumFractionDigits: 0 } : { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const [pending, startTransition] = useTransition();
+  const [plan, setPlan] = useState<AiPlan | null>(null);
+  const [error, setError] = useState('');
+  const [question, setQuestion] = useState('');
+  const [added, setAdded] = useState(0);
+
+  function run(q?: string) {
+    setError('');
+    startTransition(async () => {
+      const r = await aiSavingsPlan({ ...request, locale, question: q, previous: q ? plan : null });
+      if (r.ok) {
+        setPlan(r.plan);
+        setAdded(0);
+        setQuestion('');
+      } else setError(r.error);
+    });
+  }
+  function toTasks() {
+    if (!plan) return;
+    startTransition(async () => {
+      const r = await addPlanStepsAsTasks({ goalTitle, steps: plan.steps });
+      setAdded(r.created);
+    });
+  }
+
+  if (!plan) {
+    return (
+      <div className="mt-2.5">
+        <Button size="sm" onClick={() => run()} disabled={pending}>
+          {pending ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} className="text-[color:var(--color-purple)]" />}
+          {pending ? t('sav.aiThinking') : t('sav.aiPlan')}
+        </Button>
+        {error && <p role="alert" className="mt-1.5 text-[11px] text-[color:var(--color-red)]">{error}</p>}
+      </div>
+    );
+  }
+  return (
+    <div className="mt-3 rounded-xl border border-[color:var(--color-purple)]/30 bg-[color:var(--color-surface)] p-3">
+      <p className="flex items-center gap-1.5 text-[11px] font-semibold text-[color:var(--color-purple)]">
+        <Sparkles size={12} /> {t('sav.aiPlanTitle')}
+        {plan.reachBy && (
+          <span className="ml-auto font-normal text-[color:var(--color-text-dim)]">
+            {t('sav.aiReachBy', { d: formatDate(`${plan.reachBy}-01T12:00:00Z`, locale, { month: 'long', year: 'numeric' }) })}
+          </span>
+        )}
+      </p>
+      {plan.summary && <p className="mt-1.5 text-xs leading-relaxed text-[color:var(--color-text)]">{plan.summary}</p>}
+      <ol className="mt-2.5 space-y-2">
+        {plan.steps.map((s, i) => (
+          <li key={i} className="flex gap-2.5">
+            <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[color:var(--color-purple)]/15 text-[10px] font-bold text-[color:var(--color-purple)]">{i + 1}</span>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="text-xs font-semibold">{s.title}</span>
+                {s.perMonth != null && s.perMonth > 0 && (
+                  <span className="shrink-0 text-[11px] tabular-nums text-[color:var(--color-accent)]" style={{ fontFamily: 'var(--font-mono)' }}>
+                    {t('sav.aiPerMonth', { x: amount(s.perMonth) })}
+                  </span>
+                )}
+              </div>
+              {s.detail && <p className="text-[11px] leading-relaxed text-[color:var(--color-text-dim)]">{s.detail}</p>}
+            </div>
+          </li>
+        ))}
+      </ol>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <Button size="sm" variant="primary" onClick={toTasks} disabled={pending || added > 0}>
+          {added > 0 ? <Check size={13} /> : <ListChecks size={13} />}
+          {added > 0 ? t('sav.aiAdded', { n: added }) : t('sav.aiToTasks')}
+        </Button>
+        <Button size="sm" variant="ghost" onClick={() => run()} disabled={pending}>
+          {t('sav.aiAgain')}
+        </Button>
+      </div>
+      <form
+        className="mt-2.5 flex gap-1.5"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (question.trim()) run(question.trim());
+        }}
+      >
+        <input
+          value={question}
+          onChange={(e) => setQuestion(e.target.value)}
+          placeholder={t('sav.aiAskPh')}
+          aria-label={t('sav.aiAsk')}
+          maxLength={500}
+          className={cn(compactControlClass, 'min-w-0 flex-1')}
+        />
+        <Button size="sm" type="submit" disabled={pending || !question.trim()}>
+          {pending ? <Loader2 size={13} className="animate-spin" /> : t('sav.aiAsk')}
+        </Button>
+      </form>
+      {error && <p role="alert" className="mt-1.5 text-[11px] text-[color:var(--color-red)]">{error}</p>}
+      <p className="mt-2 text-[10px] text-[color:var(--color-text-faint)]">{t('sav.aiNote')}</p>
     </div>
   );
 }

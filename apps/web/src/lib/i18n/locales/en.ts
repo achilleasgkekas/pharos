@@ -2690,6 +2690,19 @@ export const en = {
   "st.sameYes": "Yes, merge",
   "st.sameNo": "No, they are different",
   "stm.breakdown": "How the balance adds up",
+  "sav.aiPlan": "Plan it with AI",
+  "sav.aiThinking": "Making a plan…",
+  "sav.aiPlanTitle": "AI plan",
+  "sav.aiReachBy": "Goal reached by {d}",
+  "sav.aiPerMonth": "{x}/month",
+  "sav.aiToTasks": "Add steps to Tasks",
+  "sav.aiAdded": "{n} tasks added",
+  "sav.aiAgain": "New plan",
+  "sav.aiAsk": "Ask",
+  "sav.aiAskPh": "Ask more, e.g. \"what if I keep Netflix?\"",
+  "sav.aiNote": "Built from your records: a normal month, spend by category, subscriptions and installments. Check it before you act on it.",
+  "af.savingsPlan": "Savings plan",
+  "af.savingsPlanDesc": "Turn a savings goal into a few steps with amounts, from what you earn, spend and pay.",
 } as const;
 
 export type Dict = Record<keyof typeof en, string>;

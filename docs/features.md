@@ -558,7 +558,7 @@ Settings → AI.
 
 A forward-looking planner (`/savings`) that answers three questions the rest of the
 app could not: what will my balance be on a given date, how much should I put aside,
-and will I make it. Deterministic and zero-AI, computed by a single pure engine
+and will I make it. Deterministic, computed by a single pure engine
 (`lib/savingsPlan.ts`) from the ledger you already keep — nothing on the page is
 stored, and no new bookkeeping is asked of you.
 
@@ -593,6 +593,12 @@ Highlights:
   is run through the same engine — progress bar, verdict, required rate and earliest date —
   with contributions added inline. Goals stay visible in Reports as before; the two pages
   read and write the same records.
+- **Plan it with AI (optional).** A button on a goal, or on an amount in "Can I make it?",
+  asks the AI for 3 to 5 steps with amounts and the month the goal is reached. It sees only
+  the figures this page measures: a normal month, spend by category over the last three
+  months, subscriptions, and installments that end. You can ask more ("what if I keep
+  Netflix?") and get the plan back adjusted, and one click puts the steps on Tasks, tagged
+  `savings`. Turn it off in Settings → AI (Savings plan); the rest of the page does not use AI.
 
 ## Reports
 
