@@ -238,11 +238,10 @@ export async function searchAll(query: string): Promise<SearchHit[]> {
       hits.push({
         type: 'goal',
         id,
-        // Goals live as a section inside /reports, not a page with a detail modal, so the
-        // deep link is the anchor rather than ?open= (which nothing there would consume).
+        // Goals live on the Savings page, each as a card there rather than a detail modal.
         title: g.title,
         subtitle: `Goal · ${cur()}${g.targetAmount ?? 0} target${g.category ? ` · ${g.category}` : ''}${g.archived ? ' · closed' : ''}`,
-        href: '/reports#goals',
+        href: '/savings',
       });
     }
     for (const li of listItems) {

@@ -232,7 +232,7 @@ describe('searchAll — the late-arriving modules (P66)', () => {
     goalFind.mockReturnValue(chainOf([{ _id: 'g1', title: 'Sailing trip', targetAmount: 3000, category: 'travel' }]));
     const [hit] = await searchAll('sailing');
 
-    expect(hit).toMatchObject({ type: 'goal', id: 'g1', href: '/reports#goals' });
+    expect(hit).toMatchObject({ type: 'goal', id: 'g1', href: '/savings' });
     expect(hit.href).not.toContain('open=');
   });
 

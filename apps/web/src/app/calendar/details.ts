@@ -118,7 +118,7 @@ export function buildGoalDetails(g: any, target: number, saved: number): EntryDe
     targetAmount: target,
     savedAmount: saved,
     deadline: g.targetDate ? ymd(new Date(g.targetDate)) : undefined,
-    editUrl: '/reports#goals',
+    editUrl: '/savings',
   };
 }
 
