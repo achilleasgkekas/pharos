@@ -46,22 +46,23 @@ interface BadgeProps {
   status: string;
   /** Overrides the status's own tone. */
   tone?: BadgeTone;
+  /** Overrides the status's own label, for a chip that is not one of the statuses above. */
+  label?: React.ReactNode;
   className?: string;
 }
 
-export function Badge({ status, tone, className }: BadgeProps) {
+export function Badge({ status, tone, label: labelOverride, className }: BadgeProps) {
   const t = useT();
   const cfg = STATUS[status];
   const color = TONE_VAR[tone ?? cfg?.tone ?? 'muted'];
-  const label = cfg?.key ? t(cfg.key) : cfg?.label ?? status;
+  const label = labelOverride ?? (cfg?.key ? t(cfg.key) : cfg?.label ?? status);
   return (
     <span
       className={cn(
-        'inline-block text-[10px] font-semibold px-2 py-0.5 rounded-md uppercase tracking-wider whitespace-nowrap',
+        'inline-block text-[11px] font-semibold leading-4 px-2 py-0.5 rounded-md whitespace-nowrap',
         className
       )}
       style={{
-        fontFamily: 'var(--font-mono)',
         background: `color-mix(in srgb, ${color} 12%, transparent)`,
         color,
         border: `1px solid color-mix(in srgb, ${color} 25%, transparent)`,

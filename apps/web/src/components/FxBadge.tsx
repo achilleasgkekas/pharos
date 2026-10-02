@@ -30,7 +30,7 @@ export function FxBadge({
           : `No ${base} rate yet — this total is still in ${normalizeCurrency(doc.currency)}`
       }
       className={cn(
-        'text-[10px] font-bold rounded-md px-1.5 py-0.5 whitespace-nowrap',
+        'text-[11px] font-bold rounded-md px-1.5 py-0.5 whitespace-nowrap',
         known
           ? 'text-[color:var(--color-purple)] bg-[color:var(--color-purple)]/10 border border-[color:var(--color-purple)]/30'
           : 'text-[color:var(--color-gold)] bg-[color:var(--color-gold)]/10 border border-[color:var(--color-gold)]/30'

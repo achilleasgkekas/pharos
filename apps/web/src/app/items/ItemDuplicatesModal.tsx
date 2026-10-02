@@ -62,7 +62,7 @@ export function MergeItemsPicker({
               // eslint-disable-next-line @next/next/no-img-element
               <img src={fileUrl(it.thumbPath)} alt="" className="w-9 h-9 rounded object-cover bg-[color:var(--color-surface-3)] shrink-0" />
             ) : (
-              <span className="w-9 h-9 rounded bg-[color:var(--color-surface-3)] grid place-items-center text-[9px] text-[color:var(--color-text-faint)] shrink-0 uppercase">
+              <span className="w-9 h-9 rounded bg-[color:var(--color-surface-3)] grid place-items-center text-[10px] text-[color:var(--color-text-faint)] shrink-0">
                 {it.status.slice(0, 3)}
               </span>
             )}
@@ -75,10 +75,10 @@ export function MergeItemsPicker({
                     {it.currentPrice}
                   </span>
                 )}
-                {isKeep && <span className="text-[9px] uppercase tracking-wider text-[color:var(--color-accent)]">{t('dup.keep')}</span>}
+                {isKeep && <span className="text-[10px] text-[color:var(--color-accent)]">{t('dup.keep')}</span>}
               </span>
               <span className="block text-xs text-[color:var(--color-text)] truncate">{it.title}</span>
-              <span className="block text-[10px] text-[color:var(--color-text-faint)] truncate" style={{ fontFamily: 'var(--font-mono)' }}>
+              <span className="block text-[11px] text-[color:var(--color-text-faint)] truncate" style={{ fontFamily: 'var(--font-mono)' }}>
                 {t('itdup.stats', { links: it.links, photos: it.photos, receipts: it.receipts })}
               </span>
             </span>

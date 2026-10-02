@@ -94,7 +94,7 @@ export function ActivityFeed() {
                   <time
                     dateTime={e.at}
                     title={formatDateTime(e.at, locale)}
-                    className="text-[10px] text-[color:var(--color-text-faint)]"
+                    className="text-[11px] text-[color:var(--color-text-faint)]"
                     style={{ fontFamily: 'var(--font-mono)' }}
                   >
                     {relTime(e.at, t)}

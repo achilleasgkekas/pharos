@@ -24,7 +24,7 @@ import {
   Activity,
   MessageSquare,
   Trash2,
-  UserRound,
+  Sofa,
 } from 'lucide-react';
 
 export type NavItem = {
@@ -35,6 +35,9 @@ export type NavItem = {
 
 export type NavGroup = {
   key: TKey;
+  /** The label of the group's tab in the phone's section bar, where space is tight. */
+  shortKey: TKey;
+  icon: LucideIcon;
   links: NavItem[];
 };
 
@@ -74,8 +77,8 @@ export const PLANNER_LINKS: NavItem[] = [
   { href: '/special-dates', key: 'nav.specialDates', icon: Cake },
 ];
 
+// Your account lives in Settings (Settings › You), so the account menu needs no own page.
 export const ACCOUNT_LINKS: NavItem[] = [
-  { href: '/account', key: 'nav.account', icon: UserRound },
   { href: '/settings', key: 'nav.settings', icon: Settings },
   { href: '/jobs', key: 'nav.jobs', icon: Activity },
   { href: '/history', key: 'nav.history', icon: MessageSquare },
@@ -83,11 +86,16 @@ export const ACCOUNT_LINKS: NavItem[] = [
 ];
 
 export const NAV_GROUPS: NavGroup[] = [
-  { key: 'nav.money', links: MONEY_LINKS },
-  { key: 'nav.shopping', links: SHOPPING_LINKS },
-  { key: 'nav.homeAndCar', links: HOME_AND_CAR_LINKS },
-  { key: 'nav.planner', links: PLANNER_LINKS },
+  { key: 'nav.money', shortKey: 'nav.money', icon: Wallet, links: MONEY_LINKS },
+  { key: 'nav.shopping', shortKey: 'nav.shopping', icon: ShoppingBasket, links: SHOPPING_LINKS },
+  { key: 'nav.homeAndCar', shortKey: 'nav.homeAndCarShort', icon: Sofa, links: HOME_AND_CAR_LINKS },
+  { key: 'nav.planner', shortKey: 'nav.planner', icon: CalendarDays, links: PLANNER_LINKS },
 ];
+
+/** The group a path belongs to, or null for Home and the pages outside the groups. */
+export function navGroupOf(pathname: string): NavGroup | null {
+  return NAV_GROUPS.find((g) => g.links.some((l) => navActive(pathname, l.href))) ?? null;
+}
 
 export const ALL_NAV_ITEMS: NavItem[] = [
   HOME_ITEM,

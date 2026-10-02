@@ -150,13 +150,13 @@ export function SubscriptionDuplicatesModal({ onClose }: { onClose: () => void }
                                 </span>
                               )}
                               {isKeep && (
-                                <span className="text-[9px] uppercase tracking-wider text-[color:var(--color-accent)]">
+                                <span className="text-[10px] text-[color:var(--color-accent)]">
                                   {t('dup.keep')}
                                 </span>
                               )}
                             </span>
                             <span
-                              className="block text-[10px] text-[color:var(--color-text-faint)] truncate"
+                              className="block text-[11px] text-[color:var(--color-text-faint)] truncate"
                               style={{ fontFamily: 'var(--font-mono)' }}
                             >
                               {t('subdup.meta', {

@@ -1,16 +1,16 @@
 'use client';
 import { useState, useTransition, useRef, useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Activity, Sun, Moon, Sparkles, Database, CreditCard, ExternalLink, Server, Cloud, Download, Upload, Loader2, Check, Store as StoreIcon, Pencil, Trash2, Plus, X, Copy, ShieldCheck, SlidersHorizontal, Bell, MessageSquareCode, RotateCcw, ChevronDown, Globe, HardDrive, FolderTree, RefreshCw, Plug, Users, UserPlus, KeyRound, Star, Landmark, TrendingUp, TrendingDown, CalendarPlus, Tags, MapPin, FlaskConical, Webhook, Mail, Bookmark, LogOut, History, Zap, Coins, Briefcase, UserRound } from 'lucide-react';
-import { AccountManager } from '@/app/account/AccountManager';
+import { Activity, ChevronLeft, ChevronRight, Search, Sparkles, Database, CreditCard, ExternalLink, Server, Cloud, Download, Upload, Loader2, Check, Store as StoreIcon, Pencil, Trash2, Plus, X, Copy, ShieldCheck, SlidersHorizontal, Bell, MessageSquareCode, RotateCcw, ChevronDown, Globe, HardDrive, FolderTree, RefreshCw, Plug, Users, UserPlus, KeyRound, Star, CalendarPlus, Tags, MapPin, FlaskConical, Webhook, Mail, Bookmark, Zap, Coins } from 'lucide-react';
+import { AccountManager, AppearancePanel } from '@/app/account/AccountManager';
+import { ALL_SETTINGS_TABS, normalizeSettingsTab, settingsHref, visibleSettingsGroups, type SettingsTab, type SettingsTabId } from '@/components/settingsNav';
 import { getAccountData, type AccountData } from '@/app/account/actions';
-import { useTheme, type Theme } from '@/components/ThemeProvider';
-import { cur } from '@/lib/money';
 import { cn } from '@/components/ui/cn';
-import { PAGE_MAIN, PageHeader } from '@/components/ui/PageHeader';
-import { controlClass } from '@/components/ui/Input';
-import { Field } from '@/components/ui/Field';
+import { PAGE_MAIN, PageHeader, HeaderTotals } from '@/components/ui/PageHeader';
+import { Badge } from '@/components/ui/Badge';
+import { Input, controlClass } from '@/components/ui/Input';
+import { Field, FIELD_LABEL } from '@/components/ui/Field';
 import { useConfirm, usePrompt } from '@/components/ui/ConfirmDialog';
 import { saveAiConfig, pullOllamaModel, testAnthropic, saveStore, deleteStore, setAiConfirmBulk, saveCategoryRules, setAiEnabled, setAiFeature, fetchProviderModels, dismissAiModelNotices, getLiveAiSpendAction, type LiveAiSpendData } from './actions';
 import { applyCategoryRulesToExisting } from '@/app/expenses/actions';
@@ -37,35 +37,25 @@ import {
   deleteUser,
   setUserRole,
   changeUserPassword,
-  changeOwnPassword,
-  logoutOtherSessions,
-  getSelfMfaStatus,
-  beginSelfMfaEnrollment,
-  confirmSelfMfaEnrollment,
-  disableSelfMfa,
   type UserRow,
 } from './users.actions';
-import type { MfaStatus } from '@/lib/userMfaStore';
-import { mfaCodeReady, mfaPasswordReady, describeMfaError } from '@/lib/mfaSettings';
-import { QrCode } from '@/components/QrCode';
 import { McpManager } from './McpManager';
 import { BackupData } from './BackupData';
 import { CalendarFeedManager } from './CalendarFeedManager';
 import { ActivityFeed } from './ActivityFeed';
 import { useAttributionNames } from '@/components/CreatedBy';
 import { UpdateChecker } from './UpdateChecker';
-import { WebPushToggle } from './WebPushToggle';
 import { BookmarkletManager } from './BookmarkletManager';
 import { SystemHealthPanel } from './SystemHealthPanel';
 import { getSampleDataStatus, loadSampleData, clearSampleData } from './sampleDataActions';
 import { renderStoragePath, TEMPLATE_TOKENS } from '@/lib/storagePath';
 import { CURRENCIES } from '@/lib/money';
 import type { SerializedCard } from '@/types';
-import { useT, useLocale, useMoney } from '@/components/LocaleProvider';
+import { useT, useLocale } from '@/components/LocaleProvider';
 import { SHOPPING_COUNTRIES, SHOPPING_PRESETS } from '@/lib/shoppingRegion';
 import { ForeignShopsEditor } from './ForeignShopsEditor';
 import type { TKey } from '@/lib/i18n';
-import { formatDate, formatTime, formatDateTime, relTime } from '@/lib/i18n/format';
+import { formatDate, formatTime, formatDateTime } from '@/lib/i18n/format';
 
 type ProviderId = 'ollama' | 'anthropic' | 'openai' | 'gemini' | 'openrouter' | 'custom';
 
@@ -134,7 +124,6 @@ const WH_EVENT: Record<WebhookEvent, { label: TKey; hint: TKey }> = {
   'installment.due': { label: 'wh.evInstallment', hint: 'wh.evInstallmentHint' },
   'price.drop': { label: 'wh.evPrice', hint: 'wh.evPriceHint' },
 };
-const CSV_KIND: Record<'receipts' | 'expenses' | 'items', TKey> = { receipts: 'nav.receipts', expenses: 'nav.expenses', items: 'nav.inventory' };
 
 // Vision-capable local models that fit a Mac mini M4 16GB (receipts/cards need vision).
 const MODEL_SUGGESTIONS: { name: string; note: string; vision: boolean }[] = [
@@ -152,218 +141,192 @@ const OPENROUTER_SUGGESTIONS = ['openai/gpt-4o-mini', 'anthropic/claude-3.5-sonn
 // Mirror of the server-side vision detection (lib/aiConfig.ts) for inline warnings.
 const isVisionName = (name: string) => /vl|vision|llava|minicpm-v|moondream|bakllava|llama3\.2-vision/i.test(name);
 
-type TabId = 'workspace' | 'account' | 'ai' | 'storage' | 'integrations' | 'users' | 'activity' | 'system';
-
 import type { Role } from '@/lib/roles';
 
 type CurrentUser = { id: string; name: string; role: Role };
 
-const TABS: { id: TabId; label: string; icon: React.ReactNode; adminOnly?: boolean; selfHostOnly?: boolean; multiUserOnly?: boolean }[] = [
-  { id: 'workspace', label: 'Workspace', icon: <Briefcase size={15} /> },
-  { id: 'account', label: 'Account', icon: <UserRound size={15} /> },
-  // Hosted: AI moves to Workspace → AI (key + toggles in one control-plane place), so hide the
-  // product AI tab in SaaS. Self-host keeps it — it is the only AI settings surface there.
-  { id: 'ai', label: 'AI & Telemetry', icon: <Sparkles size={15} />, selfHostOnly: true },
-  { id: 'storage', label: 'Storage & Backups', icon: <HardDrive size={15} /> },
-  { id: 'integrations', label: 'Integrations', icon: <Plug size={15} /> },
-  { id: 'users', label: 'Users & Access', icon: <Users size={15} />, adminOnly: true, selfHostOnly: true },
-  // P89 (#23): who added or trashed what. Every role may read it, but only once there is a
-  // second account: on a single-user install there is nobody else's activity to show.
-  { id: 'activity', label: 'Activity', icon: <History size={15} />, multiUserOnly: true },
-  // P77 — host-level numbers (Mongo latency, volume free space, job queue). Shared
-  // infrastructure on the managed SaaS, so self-host + admin only.
-  { id: 'system', label: 'System status', icon: <Activity size={15} />, adminOnly: true, selfHostOnly: true },
-];
+const LAST_TAB_KEY = 'settingsTab';
 
-const TAB_KEY: Record<TabId, TKey> = {
-  workspace: 'set.tabWorkspace',
-  account: 'set.tabAccount' as TKey,
-  ai: 'set.tabAiTelemetry',
-  storage: 'set.tabStorageBackups',
-  integrations: 'set.tabIntegrations',
-  users: 'set.tabUsersAccess',
-  activity: 'set.tabActivity',
-  system: 'set.tabSystem',
-};
+function initialsOf(name: string): string {
+  const parts = name.trim().split(/[\s._-]+/).filter(Boolean);
+  return ((parts.length > 1 ? parts[0][0] + parts[1][0] : name.slice(0, 2)) || 'U').toUpperCase();
+}
 
-function normalizeTab(raw: string | null): TabId | null {
-  if (!raw) return null;
-  const ALIASES: Record<string, TabId> = {
-    workspace: 'workspace',
-    account: 'account',
-    profile: 'account',
-    general: 'workspace',
-    money: 'workspace',
-    data: 'workspace',
-    ai: 'ai',
-    storage: 'storage',
-    integrations: 'integrations',
-    notifications: 'integrations',
-    users: 'users',
-    activity: 'activity',
-    system: 'system',
-  };
-  return ALIASES[raw] ?? null;
+/** The phone's Settings: every page as a row, grouped, with a filter box on top. */
+function SettingsIndex({ groups, user }: { groups: ReturnType<typeof visibleSettingsGroups>; user: CurrentUser }) {
+  const t = useT();
+  const [q, setQ] = useState('');
+  const needle = q.trim().toLowerCase();
+  const match = (tab: SettingsTab) => !needle || t(tab.label).toLowerCase().includes(needle) || t(tab.desc).toLowerCase().includes(needle);
+  const shown = groups.map((g) => ({ ...g, tabs: g.tabs.filter((tab) => tab.id !== 'account' && match(tab)) })).filter((g) => g.tabs.length);
+  const showAccount = match(ALL_SETTINGS_TABS.find((tab) => tab.id === 'account')!);
+  return (
+    <div className="space-y-4">
+      <Input icon={<Search size={15} />} type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('set.searchSettings')} aria-label={t('set.searchSettings')} />
+      {showAccount && (
+        <Link href={settingsHref('account')} className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-[color:var(--color-surface)] border border-[color:var(--color-border)]">
+          <span className="w-11 h-11 shrink-0 rounded-full grid place-items-center text-sm font-bold bg-[color:var(--color-surface-2)] border border-[color:var(--color-border-light)]">
+            {initialsOf(user.name)}
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[15px] font-semibold truncate">{user.name}</span>
+            <span className="block text-xs text-[color:var(--color-text-dim)] truncate">{t('nav.accountHint')}</span>
+          </span>
+          <ChevronRight size={17} className="shrink-0 text-[color:var(--color-text-faint)]" />
+        </Link>
+      )}
+      {shown.map((g) => (
+        <section key={g.label} aria-label={t(g.label)}>
+          <h2 className="px-1 mb-1.5 text-xs font-semibold text-[color:var(--color-text-faint)]">{t(g.label)}</h2>
+          <div className="rounded-2xl bg-[color:var(--color-surface)] border border-[color:var(--color-border)] overflow-hidden divide-y divide-[color:var(--color-border)]">
+            {g.tabs.map((tab) => {
+              const Icon = tab.icon;
+              return (
+                <Link key={tab.id} href={settingsHref(tab.id)} className="flex items-center gap-3 h-12 px-4 text-[15px]">
+                  <Icon size={18} className="shrink-0 text-[color:var(--color-text-dim)]" />
+                  <span className="flex-1 min-w-0 truncate">{t(tab.label)}</span>
+                  <ChevronRight size={16} className="shrink-0 text-[color:var(--color-text-faint)]" />
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+      ))}
+      {!showAccount && shown.length === 0 && <p className="text-sm text-[color:var(--color-text-dim)] text-center py-6">{t('bar.noMatches')}</p>}
+    </div>
+  );
 }
 
 export function SettingsClient({ info, currentUser }: { info: Info; currentUser: CurrentUser }) {
-  const { theme, setTheme } = useTheme();
   const t = useT();
-  const [tab, setTab] = useState<TabId>('workspace');
-  const [accountData, setAccountData] = useState<AccountData | null>(null);
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const isAdmin = currentUser.role === 'admin';
   const multiUser = useAttributionNames() !== null;
-  const visibleTabs = TABS.filter((t) => (!t.adminOnly || isAdmin) && (!t.multiUserOnly || multiUser));
-  const searchParams = useSearchParams();
+  const groups = visibleSettingsGroups({ isAdmin, multiUser });
+  const visible = groups.flatMap((g) => g.tabs);
+  const requested = normalizeSettingsTab(searchParams.get('tab'));
+  const current = visible.find((d) => d.id === requested) ?? null;
+  // Loaded for the page it was fetched on: Account and My notifications each read it fresh,
+  // so a change made on one shows on the other (and after coming back).
+  const [account, setAccount] = useState<{ tab: string; data: AccountData } | null>(null);
 
+  // A computer lists the settings in the sidebar, so a bare /settings opens the page you had
+  // open last (General the first time). A phone shows the list itself first.
+  const currentId = current?.id ?? null;
   useEffect(() => {
-    if (tab === 'account' && !accountData) {
-      getAccountData().then(setAccountData).catch(() => {});
-    }
-  }, [tab, accountData]);
-
-  // A ?tab= deep-link (e.g. from the "Set up AI" banner) wins; otherwise restore the
-  // last-open tab from localStorage. Read on mount to avoid an SSR mismatch.
-  useEffect(() => {
-    const fromUrl = normalizeTab(searchParams.get('tab'));
-    if (fromUrl && visibleTabs.some((t) => t.id === fromUrl)) {
-      setTab(fromUrl);
+    if (currentId) {
+      try {
+        localStorage.setItem(LAST_TAB_KEY, currentId);
+      } catch {
+        /* private mode */
+      }
       return;
     }
-    const saved = normalizeTab(typeof window !== 'undefined' ? window.localStorage.getItem('settingsTab') : null);
-    if (saved && visibleTabs.some((t) => t.id === saved)) setTab(saved);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  function go(id: TabId) {
-    setTab(id);
+    if (!window.matchMedia('(min-width: 1024px)').matches) return;
+    let saved: SettingsTabId | null = null;
     try {
-      window.localStorage.setItem('settingsTab', id);
+      saved = normalizeSettingsTab(localStorage.getItem(LAST_TAB_KEY));
     } catch {
-      /* private mode → ignore */
+      /* private mode */
     }
-  }
+    const target = visible.some((d) => d.id === saved) && saved ? saved : 'general';
+    router.replace(settingsHref(target), { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentId]);
+
+  const accountTab = currentId === 'account' || currentId === 'my-notifications' ? currentId : null;
+  useEffect(() => {
+    if (!accountTab) return;
+    let live = true;
+    getAccountData()
+      .then((data) => live && setAccount({ tab: accountTab, data }))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [accountTab]);
+  const accountData = account && account.tab === accountTab ? account.data : null;
+
+  // On a computer a bare /settings shows General for the moment until the redirect lands.
+  const shown = current ?? visible.find((d) => d.id === 'general') ?? visible[0];
+  const loading = (
+    <div className="flex items-center justify-center p-12 text-sm text-[color:var(--color-text-dim)]">
+      <Loader2 size={16} className="animate-spin mr-2" /> {t('common.loading')}
+    </div>
+  );
 
   return (
     <main className={PAGE_MAIN}>
-      <PageHeader title={t('nav.settings')} />
+      {!current && (
+        <div className="lg:hidden">
+          <PageHeader title={t('nav.settings')} />
+          <SettingsIndex groups={groups} user={currentUser} />
+        </div>
+      )}
+      <div className={cn('max-w-4xl', !current && 'hidden lg:block')}>
+        <Link href="/settings" className="lg:hidden inline-flex items-center gap-1 -ml-1.5 mb-1 h-10 pr-2 text-sm text-[color:var(--color-text-dim)]">
+          <ChevronLeft size={18} /> {t('nav.settings')}
+        </Link>
+        <PageHeader title={t(shown.label)} subtitle={t(shown.desc)} />
+        <div className="space-y-4">
+          {shown.id === 'account' && (accountData ? <AccountManager initialData={accountData} panel="account" /> : loading)}
+          {shown.id === 'appearance' && <AppearancePanel />}
+          {shown.id === 'my-notifications' && (accountData ? <AccountManager initialData={accountData} panel="notifications" /> : loading)}
 
-      <div className="flex flex-col md:flex-row gap-5">
-        {/* Tab navigation — sidebar on desktop, scrollable pills on mobile */}
-        <nav className="w-full min-w-0 md:w-52 md:shrink-0">
-          <div className="flex md:flex-col gap-1.5 overflow-x-auto md:overflow-visible md:sticky md:top-20 pb-1 md:pb-0 -mx-4 px-4 md:mx-0 md:px-0">
-            {visibleTabs.map((tb) => (
-              <button
-                key={tb.id}
-                onClick={() => go(tb.id)}
-                className={cn(
-                  'flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all shrink-0 md:w-full',
-                  tab === tb.id
-                    ? 'bg-[color:var(--color-accent)] text-black'
-                    : 'bg-[color:var(--color-surface-2)] md:bg-transparent border border-[color:var(--color-border)] md:border-transparent text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface-2)]'
-                )}
-              >
-                {tb.icon}
-                {t(TAB_KEY[tb.id])}
-              </button>
-            ))}
-          </div>
-        </nav>
+          {shown.id === 'general' && <DefaultsManager settings={info.settings} part="general" />}
+          {shown.id === 'alerts' && <DefaultsManager settings={info.settings} part="alerts" />}
 
-        {/* Active panel */}
-        <div className="flex-1 min-w-0 space-y-4">
-          {tab === 'workspace' && (
+          {shown.id === 'categories' && (
             <>
-              <Section title={t('set.appearance')} icon={<Sun size={15} />}>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-sm font-medium">{t('set.theme')}</div>
-                    <div className="text-xs text-[color:var(--color-text-faint)]">{t('set.themeDesc')}</div>
-                  </div>
-                  <div className="flex gap-1.5">
-                    {(['dark', 'light'] as Theme[]).map((th) => (
-                      <button
-                        key={th}
-                        onClick={() => setTheme(th)}
-                        className={cn(
-                          'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all',
-                          theme === th
-                            ? 'bg-[color:var(--color-accent)] text-black'
-                            : 'bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]'
-                        )}
-                      >
-                        {th === 'dark' ? <Moon size={13} /> : <Sun size={13} />}
-                        {th === 'dark' ? t('set.dark') : t('set.light')}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </Section>
-
-              <DefaultsManager settings={info.settings} />
-
-              <StoresManager stores={info.stores} />
               <ListsManager lists={info.lists} />
-              <SpacesManager spaces={info.settings.spaces} />
-
               <CategoryRulesManager settings={info.settings} />
-              <CardsManager cards={info.cardList} />
-
-              <SelfPasswordCard />
-              <SelfMfaCard />
-
-              <Section title={t('set.about')}>
-                <UpdateChecker canEdit={isAdmin} />
-
-                <Row label={t('set.privacy')}>
-                  <span className="text-[color:var(--color-text-dim)]">
-                    {info.ai.effectiveProvider === 'anthropic' ? t('set.privacyHybrid') : t('set.privacyLocal')}
-                  </span>
-                </Row>
-              </Section>
+              <SpacesManager spaces={info.settings.spaces} />
             </>
           )}
 
-          {tab === 'account' && (
-            accountData ? (
-              <AccountManager initialData={accountData} embedded />
-            ) : (
-              <div className="flex items-center justify-center p-12 text-xs text-[color:var(--color-text-dim)]">
-                <Loader2 size={16} className="animate-spin mr-2" /> {t('common.loading')}
-              </div>
-            )
-          )}
+          {shown.id === 'stores' && <StoresManager stores={info.stores} />}
+          {shown.id === 'cards' && <CardsManager cards={info.cardList} />}
 
-          {tab === 'ai' && (
+          {shown.id === 'ai' && (
             <>
               <AiMasterAndFeatures ai={info.ai} canEdit={isAdmin} />
               <AiSettings ai={info.ai} ollamaUp={info.ollamaUp} />
-              <ScraperAiSettings scraperAi={info.scraperAi} installed={info.ai.installed} hasAnthropicKey={info.ai.hasKey} />
-              <AiPromptsManager prompts={info.prompts} />
+            </>
+          )}
+          {shown.id === 'scraper' && <ScraperAiSettings scraperAi={info.scraperAi} installed={info.ai.installed} hasAnthropicKey={info.ai.hasKey} />}
+          {shown.id === 'prompts' && <AiPromptsManager prompts={info.prompts} />}
+
+          {shown.id === 'storage' && <StorageManager storage={info.storage} counts={info.counts} />}
+
+          {shown.id === 'backups' && (
+            <>
+              <Section title={t('set.dataSection')} icon={<Database size={15} />}>
+                <HeaderTotals
+                  items={[
+                    { label: t('set.statItems'), value: info.counts.items },
+                    { label: t('set.statReceipts'), value: info.counts.receipts },
+                    { label: t('set.statStatements'), value: info.counts.statements },
+                    { label: t('set.statSubs'), value: info.counts.subscriptions },
+                    { label: t('set.statCards'), value: info.counts.cards },
+                  ]}
+                />
+              </Section>
+              <BackupData />
             </>
           )}
 
-          {tab === 'storage' && (
+          {shown.id === 'import' && (
             <>
-              <StorageManager storage={info.storage} counts={info.counts} />
-              <Section title={t('set.dataSection')} icon={<Database size={15} />}>
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-                  <Stat label={t('set.statItems')} value={info.counts.items} />
-                  <Stat label={t('set.statReceipts')} value={info.counts.receipts} />
-                  <Stat label={t('set.statStatements')} value={info.counts.statements} />
-                  <Stat label={t('set.statSubs')} value={info.counts.subscriptions} />
-                  <Stat label={t('set.statCards')} value={info.counts.cards} />
-                </div>
-                <BackupData />
-              </Section>
               <MigrationImportManager />
               <SampleDataManager />
             </>
           )}
 
-          {tab === 'integrations' && (
+          {shown.id === 'notifications' && <NotificationsManager />}
+
+          {shown.id === 'integrations' && (
             <>
-              <NotificationsManager />
               <WebhookManager />
               <Section title={t('set.mobileMcpTitle')} icon={<Plug size={15} />}>
                 <McpManager />
@@ -378,13 +341,24 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
             </>
           )}
 
-          {tab === 'users' && isAdmin && <UsersManager currentUserId={currentUser.id} />}
-          {tab === 'activity' && multiUser && <ActivityFeed />}
+          {shown.id === 'users' && <UsersManager currentUserId={currentUser.id} />}
+          {shown.id === 'activity' && <ActivityFeed />}
 
-          {tab === 'system' && isAdmin && (
+          {shown.id === 'system' && (
             <Section title={t('sys.title')} icon={<Activity size={15} />}>
               <p className="text-xs text-[color:var(--color-text-faint)] -mt-1 mb-1">{t('sys.desc')}</p>
               <SystemHealthPanel />
+            </Section>
+          )}
+
+          {shown.id === 'about' && (
+            <Section title={t('set.about')} icon={<Server size={15} />}>
+              <UpdateChecker canEdit={isAdmin} />
+              <Row label={t('set.privacy')}>
+                <span className="text-[color:var(--color-text-dim)]">
+                  {info.ai.effectiveProvider === 'anthropic' ? t('set.privacyHybrid') : t('set.privacyLocal')}
+                </span>
+              </Row>
             </Section>
           )}
         </div>
@@ -395,18 +369,9 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
 
 // ─── AI master switch + per-feature toggles ─────────────────────────────────
 
-function AiStatusChip({ status }: { status: 'ready' | 'no-provider' | 'disabled' }) {
+function AiStatusChip({ status }: { status: 'ready' | 'no-provider' }) {
   const t = useT();
-  const map = {
-    ready: { label: t('af.ready'), cls: 'text-[color:var(--color-accent)] border-[color:var(--color-accent)]' },
-    'no-provider': { label: t('af.noProvider'), cls: 'text-[color:var(--color-gold)] border-[color:var(--color-gold)]' },
-    disabled: { label: t('af.statusOff'), cls: 'text-[color:var(--color-text-faint)] border-[color:var(--color-border)]' },
-  }[status];
-  return (
-    <span className={cn('text-[9px] uppercase px-1.5 py-0.5 rounded-full border', map.cls)} style={{ fontFamily: 'var(--font-mono)' }}>
-      {map.label}
-    </span>
-  );
+  return <Badge status={status} tone={status === 'ready' ? 'accent' : 'gold'} label={status === 'ready' ? t('af.ready') : t('af.noProvider')} />;
 }
 
 const AREA_KEY: Record<string, TKey> = {
@@ -429,10 +394,6 @@ function AiMasterAndFeatures({ ai, canEdit }: { ai: AiInfo; canEdit: boolean }) 
     setFeatures((f) => ({ ...f, [key]: v }));
     startTransition(() => void setAiFeature(key, v));
   }
-  function statusOf(key: string): 'ready' | 'no-provider' | 'disabled' {
-    if (!enabled || features[key] === false) return 'disabled';
-    return ai.ready ? 'ready' : 'no-provider';
-  }
 
   const areas = [...new Set(AI_FEATURES.map((f) => f.area))];
 
@@ -442,9 +403,12 @@ function AiMasterAndFeatures({ ai, canEdit }: { ai: AiInfo; canEdit: boolean }) 
         {t('set.aiFeaturesDesc')}
       </p>
 
-      <div className="flex items-center justify-between rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] px-3 py-2.5 mb-3">
-        <div>
-          <div className="text-sm font-medium">{t('set.enableAi')}</div>
+      <div className="flex items-center justify-between gap-3 rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] px-3 py-2.5">
+        <div className="min-w-0">
+          <div className="text-sm font-medium flex flex-wrap items-center gap-2">
+            {t('set.enableAi')}
+            {enabled && <AiStatusChip status={ai.ready ? 'ready' : 'no-provider'} />}
+          </div>
           <div className="text-xs text-[color:var(--color-text-faint)]">{t('set.enableAiDesc')}</div>
         </div>
         {canEdit ? (
@@ -453,36 +417,33 @@ function AiMasterAndFeatures({ ai, canEdit }: { ai: AiInfo; canEdit: boolean }) 
           <span className="text-xs text-[color:var(--color-text-faint)]">{enabled ? t('set.on') : t('set.off')}</span>
         )}
       </div>
+      {/* Readiness is one fact for the whole app (is a provider reachable?), so it is said
+          once here, not as a chip on every feature. */}
+      {enabled && !ai.ready && <p className="text-xs text-[color:var(--color-gold)] mt-2">{t('set.noProviderWarn')}</p>}
 
-      <div className={cn('space-y-3', !enabled && 'opacity-50 pointer-events-none')}>
+      <div className={cn('mt-4 space-y-3', !enabled && 'opacity-50 pointer-events-none')}>
         {areas.map((area) => (
           <div key={area}>
-            <div className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)] mb-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
-              {AREA_KEY[area] ? t(AREA_KEY[area]) : area}
-            </div>
-            <div className="space-y-1.5">
+            <div className="text-xs font-medium text-[color:var(--color-text-faint)] mb-1.5">{AREA_KEY[area] ? t(AREA_KEY[area]) : area}</div>
+            <div className="rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] divide-y divide-[color:var(--color-border)]">
               {AI_FEATURES.filter((f) => f.area === area).map((f) => (
-                <div key={f.key} className="flex items-center gap-2 rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] px-3 py-2">
+                <div key={f.key} className="flex items-center gap-3 px-3 py-2.5">
                   <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium flex items-center gap-2">
-                      {t(('af.' + f.key) as TKey)}
-                      <AiStatusChip status={statusOf(f.key)} />
-                    </div>
-                    <div className="text-xs text-[color:var(--color-text-faint)]">{t(('af.' + f.key + 'Desc') as TKey)}</div>
+                    <div className="text-sm font-medium">{t(('af.' + f.key) as TKey)}</div>
+                    {/* The name says enough on a phone; the line under it is for the wider screen. */}
+                    <div className="hidden sm:block text-xs text-[color:var(--color-text-faint)]">{t(('af.' + f.key + 'Desc') as TKey)}</div>
                   </div>
-                  {canEdit && <Switch label={t(('af.' + f.key) as TKey)} checked={features[f.key] !== false} onChange={(v) => toggleFeature(f.key, v)} />}
+                  {canEdit ? (
+                    <Switch label={t(('af.' + f.key) as TKey)} checked={features[f.key] !== false} onChange={(v) => toggleFeature(f.key, v)} />
+                  ) : (
+                    <span className="shrink-0 text-xs text-[color:var(--color-text-faint)]">{features[f.key] !== false ? t('set.on') : t('set.off')}</span>
+                  )}
                 </div>
               ))}
             </div>
           </div>
         ))}
       </div>
-
-      {enabled && !ai.ready && (
-        <p className="text-[11px] text-[color:var(--color-gold)] mt-3">
-          {t('set.noProviderWarn')}
-        </p>
-      )}
     </Section>
   );
 }
@@ -537,11 +498,11 @@ function ModelPicker({
           <div className="mt-1.5 space-y-0.5">
             <div className="flex flex-wrap items-center gap-x-2 text-[11px] text-[color:var(--color-text-dim)]" style={{ fontFamily: 'var(--font-mono)' }}>
               <span>{currentClaudePrice.name} · {formatModelPrice(currentClaudePrice)}</span>
-              <span title={formatCacheTooltip(currentClaudePrice)} className="text-[10px] text-[color:var(--color-text-faint)] cursor-help underline decoration-dotted">
+              <span title={formatCacheTooltip(currentClaudePrice)} className="text-[11px] text-[color:var(--color-text-faint)] cursor-help underline decoration-dotted">
                 (cache rates)
               </span>
             </div>
-            <p className="text-[10px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
+            <p className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
               {taskCostSummary(model)}
             </p>
           </div>
@@ -576,20 +537,20 @@ function ModelPicker({
             type="button"
             onClick={() => onModel(recommend.model)}
             title={recommend.reason}
-            className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-[color:var(--color-surface-2)] border border-[color:var(--color-accent)]/50 text-[color:var(--color-accent)]"
+            className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-md bg-[color:var(--color-surface-2)] border border-[color:var(--color-accent)]/50 text-[color:var(--color-accent)]"
             style={{ fontFamily: 'var(--font-mono)' }}
           >
             <Star size={10} /> {recommend.model}
           </button>
         )}
-        {!canLoad && <span className="text-[10px] text-[color:var(--color-text-faint)]">{t('set.addKeyToLoad')}</span>}
+        {!canLoad && <span className="text-[11px] text-[color:var(--color-text-faint)]">{t('set.addKeyToLoad')}</span>}
       </div>
       {recommend && (
-        <p className="text-[10px] text-[color:var(--color-text-faint)] mt-1.5">
+        <p className="text-[11px] text-[color:var(--color-text-faint)] mt-1.5">
           {t('set.recommendedLabel')} <span className="text-[color:var(--color-text-dim)]" style={{ fontFamily: 'var(--font-mono)' }}>{recommend.model}</span> — {recommend.reason}
         </p>
       )}
-      {err && <p className="text-[10px] text-[color:var(--color-red)] mt-1.5" style={{ fontFamily: 'var(--font-mono)' }}>{err}</p>}
+      {err && <p className="text-[11px] text-[color:var(--color-red)] mt-1.5" style={{ fontFamily: 'var(--font-mono)' }}>{err}</p>}
 
       {models ? (
         <>
@@ -611,15 +572,15 @@ function ModelPicker({
                     {m.id}
                     {m.name && <span className="ml-1.5 text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-sans)' }}>{m.name}</span>}
                   </span>
-                  {m.vision && <span className="text-[9px] px-1 py-0.5 rounded bg-[color:var(--color-surface-3)] text-[color:var(--color-text-faint)] shrink-0">vision</span>}
-                  <span className="text-[10px] text-[color:var(--color-text-dim)] shrink-0 tabular-nums" style={{ fontFamily: 'var(--font-mono)' }}>
+                  {m.vision && <span className="text-[10px] px-1 py-0.5 rounded bg-[color:var(--color-surface-3)] text-[color:var(--color-text-faint)] shrink-0">vision</span>}
+                  <span className="text-[11px] text-[color:var(--color-text-dim)] shrink-0 tabular-nums" style={{ fontFamily: 'var(--font-mono)' }}>
                     {m.in == null ? '—' : m.in === 0 && m.out === 0 ? 'free' : `$${m.in}/$${m.out}`}
                   </span>
                 </button>
               );
             })}
           </div>
-          <p className="text-[9px] text-[color:var(--color-text-faint)] mt-1" style={{ fontFamily: 'var(--font-mono)' }}>
+          <p className="text-[10px] text-[color:var(--color-text-faint)] mt-1" style={{ fontFamily: 'var(--font-mono)' }}>
             {t('set.tokenPricing')}
           </p>
         </>
@@ -634,7 +595,7 @@ function ModelPicker({
                   type="button"
                   onClick={() => onModel(m)}
                   title={p ? formatCacheTooltip(p) : undefined}
-                  className="text-[10px] px-2 py-1 rounded-md bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] hover:border-[color:var(--color-accent)] transition-colors flex items-center gap-1.5"
+                  className="text-[11px] px-2 py-1 rounded-md bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] hover:border-[color:var(--color-accent)] transition-colors flex items-center gap-1.5"
                   style={{ fontFamily: 'var(--font-mono)' }}
                 >
                   <span>{m}</span>
@@ -646,14 +607,14 @@ function ModelPicker({
         )
       )}
       {provider === 'anthropic' && (
-        <p className="text-[9px] text-[color:var(--color-text-faint)] mt-2">
+        <p className="text-[10px] text-[color:var(--color-text-faint)] mt-2">
           Prices as of {PRICING_VERIFIED_AT} ·{' '}
           <a href={PRICING_SOURCE_URL} target="_blank" rel="noreferrer" className="underline underline-offset-2 hover:text-[color:var(--color-accent)]">
             Anthropic pricing
           </a>
         </p>
       )}
-      {hint && <p className="text-[10px] text-[color:var(--color-text-faint)] mt-1.5" style={{ fontFamily: 'var(--font-mono)' }}>{hint}</p>}
+      {hint && <p className="text-[11px] text-[color:var(--color-text-faint)] mt-1.5" style={{ fontFamily: 'var(--font-mono)' }}>{hint}</p>}
     </Field>
   );
 }
@@ -842,7 +803,8 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
         </div>
       )}
       {/* Provider toggle */}
-      <Row label={t('set.provider')}>
+      <div>
+        <div className={FIELD_LABEL}>{t('set.provider')}</div>
         <div className="flex gap-1.5 flex-wrap">
           {([
             { v: 'ollama', label: 'Ollama', icon: <Server size={13} /> },
@@ -858,7 +820,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
               className={cn(
                 'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all',
                 provider === p.v
-                  ? 'bg-[color:var(--color-accent)] text-black'
+                  ? 'bg-[color:var(--color-surface-3)] border border-[color:var(--color-border-light)] text-[color:var(--color-text)]'
                   : 'bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]'
               )}
             >
@@ -867,7 +829,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
             </button>
           ))}
         </div>
-      </Row>
+      </div>
 
       {((provider === 'anthropic' && !ai.hasKey) ||
         (provider === 'openai' && !ai.hasOpenaiKey) ||
@@ -900,7 +862,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
               className={controlClass}
               style={{ fontFamily: 'var(--font-mono)' }}
             />
-            <p className="text-[10px] text-[color:var(--color-text-faint)] mt-1" style={{ fontFamily: 'var(--font-mono)' }}>
+            <p className="text-[11px] text-[color:var(--color-text-faint)] mt-1" style={{ fontFamily: 'var(--font-mono)' }}>
               {t('set.serverUrlHint')}
             </p>
           </Field>
@@ -934,7 +896,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
               <input value={visionModel} onChange={(e) => setVisionModel(e.target.value)} className={controlClass} />
             )}
             {visionModel && !isVisionName(visionModel) && (
-              <p className="text-[10px] text-[color:var(--color-red)] mt-1" style={{ fontFamily: 'var(--font-mono)' }}>
+              <p className="text-[11px] text-[color:var(--color-red)] mt-1" style={{ fontFamily: 'var(--font-mono)' }}>
                 {t('set.visionWarn')}
               </p>
             )}
@@ -968,7 +930,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
                     title={s.note}
                     onClick={() => (have ? setOllamaModel(s.name) : doPull(s.name))}
                     disabled={pending}
-                    className="text-[10px] px-2 py-1 rounded-md bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] hover:border-[color:var(--color-accent)] transition-colors disabled:opacity-50"
+                    className="text-[11px] px-2 py-1 rounded-md bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] hover:border-[color:var(--color-accent)] transition-colors disabled:opacity-50"
                     style={{ fontFamily: 'var(--font-mono)' }}
                   >
                     {have ? '✓ ' : '↓ '}
@@ -978,7 +940,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
                 );
               })}
             </div>
-            <p className="text-[10px] text-[color:var(--color-text-faint)] mt-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
+            <p className="text-[11px] text-[color:var(--color-text-faint)] mt-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
               {t('set.visionModelHint')}
             </p>
           </Field>
@@ -1009,6 +971,9 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
             recommend={PROVIDER_RECOMMEND.anthropic}
             workspaceId={anthropicWorkspaceId}
           />
+          <details className="group rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)]/40 px-3 py-2">
+            <summary className="cursor-pointer text-xs font-medium text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]">{t('set.aiAdvanced')}</summary>
+            <div className="mt-3 space-y-3">
           <Field label={t('set.anthropicWorkspaceId')}>
             <input
               type="text"
@@ -1021,11 +986,11 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
               className={controlClass}
               style={{ fontFamily: 'var(--font-mono)' }}
             />
-            <p className="mt-1 text-[10px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
+            <p className="mt-1 text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
               {t('set.anthropicWorkspaceIdHint')}
             </p>
           </Field>
-          <Field label={`Anthropic Admin API Key ${ai.hasAdminKey ? '(saved)' : ''}`}>
+          <Field label={`${t('set.adminKey')} ${ai.hasAdminKey ? t('set.apiKeySavedSuffix') : ''}`}>
             <input
               type="password"
               value={adminKey}
@@ -1037,8 +1002,8 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
               className={controlClass}
               style={{ fontFamily: 'var(--font-mono)' }}
             />
-            <p className="mt-1 text-[10px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
-              Optional. Organization admin key (starts with sk-ant-admin-) used to pull live billed usage from Anthropic&apos;s Cost Report API.
+            <p className="mt-1 text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
+              {t('set.adminKeyHint')}
             </p>
           </Field>
           <Field label={t('set.aiPrepaidCredits')}>
@@ -1052,10 +1017,12 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
               className={controlClass}
               style={{ fontFamily: 'var(--font-mono)' }}
             />
-            <p className="mt-1 text-[10px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
+            <p className="mt-1 text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
               {t('set.aiPrepaidCreditsHelp')}
             </p>
           </Field>
+            </div>
+          </details>
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -1074,7 +1041,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
               </span>
             )}
           </div>
-          <p className="text-[10px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
+          <p className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
             {t('set.anthropicNote')}
           </p>
         </div>
@@ -1136,7 +1103,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
               className={controlClass}
               style={{ fontFamily: 'var(--font-mono)' }}
             />
-            <p className="text-[10px] text-[color:var(--color-text-faint)] mt-1" style={{ fontFamily: 'var(--font-mono)' }}>
+            <p className="text-[11px] text-[color:var(--color-text-faint)] mt-1" style={{ fontFamily: 'var(--font-mono)' }}>
               {t('set.baseUrlHint')}
             </p>
           </Field>
@@ -1162,7 +1129,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
             <p className="text-xs font-medium flex items-center gap-1.5">
               <ShieldCheck size={13} className="text-[color:var(--color-gold)]" /> {t('set.confirmBulk')}
             </p>
-            <p className="text-[10px] text-[color:var(--color-text-faint)] mt-0.5">
+            <p className="text-[11px] text-[color:var(--color-text-faint)] mt-0.5">
               {t('set.confirmBulkDesc')}
             </p>
           </div>
@@ -1190,7 +1157,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
 
 
       <div className="pt-3 border-t border-[color:var(--color-border)] mt-1 space-y-3">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
           <div>
             <Field label={t('set.aiBudget')}>
               <input
@@ -1205,10 +1172,14 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
                 style={{ fontFamily: 'var(--font-mono)' }}
               />
             </Field>
-            <p className="text-[10px] text-[color:var(--color-text-faint)] mt-1">{t('set.aiBudgetHint')}</p>
+            <p className="text-[11px] text-[color:var(--color-text-faint)] mt-1">{t('set.aiBudgetHint')}</p>
           </div>
+        </div>
+        <details className="rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)]/40 px-3 py-2">
+          <summary className="cursor-pointer text-xs font-medium text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]">{t('set.aiAdvanced')}</summary>
+          <div className="mt-3">
           <div>
-            <Field label="Spend Timezone">
+            <Field label={t('set.spendTz')}>
               <input
                 type="text"
                 value={timezone}
@@ -1219,28 +1190,29 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
               />
             </Field>
             <div className="flex items-center justify-between mt-1">
-              <p className="text-[10px] text-[color:var(--color-text-faint)]">
-                Determines daily and monthly billing cycle boundaries.
+              <p className="text-[11px] text-[color:var(--color-text-faint)]">
+                {t('set.spendTzHint')}
               </p>
               {!timezone && typeof window !== 'undefined' && (
                 <button
                   type="button"
                   onClick={() => setTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone)}
-                  className="text-[10px] text-[color:var(--color-accent)] hover:underline shrink-0"
+                  className="text-[11px] text-[color:var(--color-accent)] hover:underline shrink-0"
                 >
-                  Use browser timezone
+                  {t('set.spendTzBrowser')}
                 </button>
               )}
             </div>
           </div>
-        </div>
+          </div>
+        </details>
 
         {/* Live AI Spend & Run History Card (#361, #362) */}
         <div className="rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface-1)] p-4 space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Zap size={16} className="text-[color:var(--color-accent)]" />
-              <h4 className="text-sm font-semibold text-[color:var(--color-text)]">Live AI Spend & Usage</h4>
+              <h4 className="text-sm font-semibold text-[color:var(--color-text)]">{t('set.liveSpend')}</h4>
             </div>
             <div className="flex items-center gap-2 text-xs text-[color:var(--color-text-faint)]">
               <span style={{ fontFamily: 'var(--font-mono)' }}>TZ: {timezone || (typeof window !== 'undefined' ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'UTC')}</span>
@@ -1249,67 +1221,27 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
                 onClick={fetchLiveSpend}
                 disabled={refreshingLive}
                 className="p-1 rounded hover:bg-[color:var(--color-surface-2)] text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] transition-colors"
-                title="Refresh live spend"
+                title={t('set.liveSpend')} aria-label={t('set.liveSpend')}
               >
                 <RefreshCw size={13} className={cn(refreshingLive && 'animate-spin')} />
               </button>
             </div>
           </div>
 
-          {/* Spend Metrics Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="p-3 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)]">
-              <div className="text-[10px] font-medium text-[color:var(--color-text-dim)] uppercase tracking-wider">Today</div>
-              <div className="text-base font-semibold text-[color:var(--color-text)] mt-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
-                ${((liveSpend?.today.costMicros ?? 0) / 1_000_000).toFixed(4)}
-              </div>
-              <div className="text-[10px] text-[color:var(--color-accent)] mt-0.5 font-mono">
-                ~€{(((liveSpend?.today.costMicros ?? 0) / 1_000_000) * (liveSpend?.fxRateEur ?? 0.92)).toFixed(4)}
-              </div>
-              <div className="text-[10px] text-[color:var(--color-text-faint)] mt-0.5">
-                {liveSpend?.today.count ?? 0} calls
-              </div>
-            </div>
-
-            <div className="p-3 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)]">
-              <div className="text-[10px] font-medium text-[color:var(--color-text-dim)] uppercase tracking-wider">This Month (MTD)</div>
-              <div className="text-base font-semibold text-[color:var(--color-text)] mt-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
-                ${((liveSpend?.month.costMicros ?? (ai.spentThisMonth * 1_000_000)) / 1_000_000).toFixed(4)}
-              </div>
-              <div className="text-[10px] text-[color:var(--color-accent)] mt-0.5 font-mono">
-                ~€{(((liveSpend?.month.costMicros ?? (ai.spentThisMonth * 1_000_000)) / 1_000_000) * (liveSpend?.fxRateEur ?? 0.92)).toFixed(4)}
-              </div>
-              <div className="text-[10px] text-[color:var(--color-text-faint)] mt-0.5">
-                {liveSpend?.month.count ?? 0} calls
-              </div>
-            </div>
-
-            <div className="p-3 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)]">
-              <div className="text-[10px] font-medium text-[color:var(--color-text-dim)] uppercase tracking-wider">Month Tokens</div>
-              <div className="text-base font-semibold text-[color:var(--color-text)] mt-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
-                {liveSpend ? `${(((liveSpend.month.inputTokens + liveSpend.month.outputTokens) / 1000).toFixed(1))}k` : '0k'}
-              </div>
-              <div className="text-[10px] text-[color:var(--color-text-faint)] mt-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
-                in: {liveSpend ? (liveSpend.month.inputTokens / 1000).toFixed(1) : 0}k · out: {liveSpend ? (liveSpend.month.outputTokens / 1000).toFixed(1) : 0}k
-              </div>
-            </div>
-
-            <div className="p-3 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)]">
-              <div className="text-[10px] font-medium text-[color:var(--color-text-dim)] uppercase tracking-wider">Prompt Cache</div>
-              <div className="text-base font-semibold text-[color:var(--color-text)] mt-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
-                {liveSpend ? `${(((liveSpend.month.cacheReadTokens + liveSpend.month.cacheWriteTokens) / 1000).toFixed(1))}k` : '0k'}
-              </div>
-              <div className="text-[10px] text-[color:var(--color-text-faint)] mt-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
-                read: {liveSpend ? (liveSpend.month.cacheReadTokens / 1000).toFixed(1) : 0}k (90% off)
-              </div>
-            </div>
-          </div>
+          <HeaderTotals
+            items={[
+              { label: t('hist.pToday'), value: `$${((liveSpend?.today.costMicros ?? 0) / 1_000_000).toFixed(4)}` },
+              { label: t('hist.pMonth'), value: `$${((liveSpend?.month.costMicros ?? ai.spentThisMonth * 1_000_000) / 1_000_000).toFixed(4)}`, tone: 'accent' },
+              { label: t('hist.calls'), value: liveSpend?.month.count ?? 0 },
+              { label: t('hist.totalTokens'), value: `${(((liveSpend?.month.inputTokens ?? 0) + (liveSpend?.month.outputTokens ?? 0)) / 1000).toFixed(1)}k` },
+            ]}
+          />
 
           {/* Budget Progress Bar */}
           {ai.monthlyBudget > 0 && (
             <div className="space-y-1.5 pt-1">
               <div className="flex items-center justify-between text-xs">
-                <span className="text-[color:var(--color-text-dim)]">Monthly Cap Usage</span>
+                <span className="text-[color:var(--color-text-dim)]">{t('set.aiBudget')}</span>
                 <span className="font-semibold" style={{ fontFamily: 'var(--font-mono)' }}>
                   ${((liveSpend?.month.costMicros ?? (ai.spentThisMonth * 1_000_000)) / 1_000_000).toFixed(2)} / ${Number(monthlyBudget || ai.monthlyBudget).toFixed(2)} USD
                   {' '}({liveSpend?.budget.pct ?? Math.round((ai.spentThisMonth / ai.monthlyBudget) * 100)}%)
@@ -1330,7 +1262,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
               </div>
               {(liveSpend?.budget.capped || (liveSpend?.budget.pct ?? 0) >= 100) && (
                 <p className="text-[11px] text-[color:var(--color-red)] font-medium">
-                  ⚠ AI spend cap reached. Additional cloud AI requests are blocked until budget is increased or resets next month.
+                  {t('set.capReached')}
                 </p>
               )}
             </div>
@@ -1345,11 +1277,11 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
                 </span>
                 <div className="flex items-center gap-2">
                   {liveSpend.balance.lowBalance && (
-                    <span className="px-2 py-0.5 rounded text-[10px] font-semibold uppercase bg-red-500/15 text-red-600 dark:text-red-400">
+                    <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-red-500/15 text-red-600 dark:text-red-400">
                       {t('set.aiLowBalance')}
                     </span>
                   )}
-                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-[color:var(--color-accent)]/15 text-[color:var(--color-accent)]">
+                  <span className="px-2 py-0.5 rounded text-[11px] font-mono font-medium bg-[color:var(--color-accent)]/15 text-[color:var(--color-accent)]">
                     {t('set.aiRemaining', { pct: liveSpend.balance.pctRemaining })}
                   </span>
                 </div>
@@ -1405,62 +1337,9 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
             </div>
           )}
 
-          {/* Last 5 Calls (#362, #361) */}
-          <div className="space-y-2 pt-2 border-t border-[color:var(--color-border)]">
-            <div className="flex items-center justify-between">
-              <h5 className="text-xs font-semibold text-[color:var(--color-text-dim)] uppercase tracking-wider">
-                Recent AI Calls (Last 5)
-              </h5>
-              <Link
-                href="/history?tab=runs"
-                className="text-xs text-[color:var(--color-accent)] hover:underline flex items-center gap-1"
-              >
-                View full run history →
-              </Link>
-            </div>
-
-            {(liveSpend?.last5Runs ?? ai.recentRuns ?? []).length === 0 ? (
-              <p className="text-xs text-[color:var(--color-text-faint)] py-2 text-center">
-                No AI runs recorded yet.
-              </p>
-            ) : (
-              <div className="divide-y divide-[color:var(--color-border)]/50 border border-[color:var(--color-border)] rounded-lg overflow-hidden bg-[color:var(--color-surface-2)]/30">
-                {(liveSpend?.last5Runs ?? ai.recentRuns ?? []).map((run) => (
-                  <div key={run._id} className="flex items-center justify-between p-2.5 text-xs hover:bg-[color:var(--color-surface-2)]/60 transition-colors">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span
-                        className={cn(
-                          'w-2 h-2 rounded-full shrink-0',
-                          run.status === 'ok'
-                            ? 'bg-[color:var(--color-accent)]'
-                            : run.status === 'blocked'
-                            ? 'bg-[color:var(--color-gold)]'
-                            : 'bg-[color:var(--color-red)]'
-                        )}
-                      />
-                      <span className="font-medium text-[color:var(--color-text)] truncate">
-                        {run.feature}
-                      </span>
-                      <span className="text-[color:var(--color-text-faint)] font-mono text-[10px] hidden sm:inline truncate max-w-[120px]">
-                        {run.model}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-3 shrink-0 font-mono text-[11px]">
-                      <span className="text-[color:var(--color-text-dim)]">
-                        {((run.usage.inputTokens + run.usage.outputTokens) / 1000).toFixed(1)}k tok
-                      </span>
-                      <span className="font-semibold text-[color:var(--color-text)] w-14 text-right">
-                        ${(run.costMicros / 1_000_000).toFixed(4)}
-                      </span>
-                      <span className="text-[10px] text-[color:var(--color-text-faint)] w-16 text-right">
-                        {relTime(new Date(run.at).toISOString(), t)}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          <Link href="/history" className="inline-flex items-center gap-1 text-xs text-[color:var(--color-accent)] hover:underline">
+            {t('set.viewRunHistory')} →
+          </Link>
         </div>
       </div>
 
@@ -1541,7 +1420,7 @@ function ScraperAiSettings({ scraperAi, installed, hasAnthropicKey }: { scraperA
               className={cn(
                 'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all',
                 provider === p.v
-                  ? 'bg-[color:var(--color-accent)] text-black'
+                  ? 'bg-[color:var(--color-surface-3)] border border-[color:var(--color-border-light)] text-[color:var(--color-text)]'
                   : 'bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]'
               )}
             >
@@ -1567,7 +1446,7 @@ function ScraperAiSettings({ scraperAi, installed, hasAnthropicKey }: { scraperA
           ) : (
             <input value={model} onChange={(e) => setModel(e.target.value)} placeholder="qwen2.5:14b" className={controlClass} style={{ fontFamily: 'var(--font-mono)' }} />
           )}
-          <p className="text-[10px] text-[color:var(--color-text-faint)] mt-1" style={{ fontFamily: 'var(--font-mono)' }}>
+          <p className="text-[11px] text-[color:var(--color-text-faint)] mt-1" style={{ fontFamily: 'var(--font-mono)' }}>
             {t('set.scraperModelHint')}
           </p>
         </Field>
@@ -1582,11 +1461,11 @@ function ScraperAiSettings({ scraperAi, installed, hasAnthropicKey }: { scraperA
             suggestions={CLAUDE_SCRAPER_SUGGESTIONS}
             recommend={SCRAPER_RECOMMEND.anthropic}
           />
-          <p className="text-[10px] text-[color:var(--color-gold)]" style={{ fontFamily: 'var(--font-mono)' }}>
+          <p className="text-[11px] text-[color:var(--color-gold)]" style={{ fontFamily: 'var(--font-mono)' }}>
             {t('set.scraperAnthropicWarn')}
           </p>
           {scraperAi.lastAiError && (
-            <p className="text-[10px] text-[color:var(--color-red)]" style={{ fontFamily: 'var(--font-mono)' }}>
+            <p className="text-[11px] text-[color:var(--color-red)]" style={{ fontFamily: 'var(--font-mono)' }}>
               {t('set.scraperLastError', { when: formatDateTime(scraperAi.lastAiError.at, locale), model: scraperAi.lastAiError.model, message: scraperAi.lastAiError.message })}
             </p>
           )}
@@ -1596,7 +1475,7 @@ function ScraperAiSettings({ scraperAi, installed, hasAnthropicKey }: { scraperA
       <div className="flex items-center justify-between gap-3 pt-2 border-t border-[color:var(--color-border)] mt-1">
         <div className="min-w-0">
           <p className="text-xs font-medium">{t('set.scraperEnabled')}</p>
-          <p className="text-[10px] text-[color:var(--color-text-faint)] mt-0.5">{t('set.scraperEnabledHint')}</p>
+          <p className="text-[11px] text-[color:var(--color-text-faint)] mt-0.5">{t('set.scraperEnabledHint')}</p>
         </div>
         <button
           type="button"
@@ -1624,7 +1503,7 @@ function ScraperAiSettings({ scraperAi, installed, hasAnthropicKey }: { scraperA
           className={controlClass}
           style={{ fontFamily: 'var(--font-mono)' }}
         />
-        <p className="text-[10px] text-[color:var(--color-text-faint)] mt-1">{t('set.scraperMaxLinksHint')}</p>
+        <p className="text-[11px] text-[color:var(--color-text-faint)] mt-1">{t('set.scraperMaxLinksHint')}</p>
       </Field>
       {/* #330: what a scheduled scrape covers. Shopping always goes first. */}
       <Field label={t('set.scraperScope')}>
@@ -1633,7 +1512,7 @@ function ScraperAiSettings({ scraperAi, installed, hasAnthropicKey }: { scraperA
           <option value="shopping">{t('set.scraperScopeShopping')}</option>
           <option value="inventory">{t('set.scraperScopeInventory')}</option>
         </select>
-        <p className="text-[10px] text-[color:var(--color-text-faint)] mt-1">{t('set.scraperScopeHint')}</p>
+        <p className="text-[11px] text-[color:var(--color-text-faint)] mt-1">{t('set.scraperScopeHint')}</p>
       </Field>
       {scope !== 'shopping' && (
         <Field label={t('set.scraperOwnedDays')}>
@@ -1654,7 +1533,7 @@ function ScraperAiSettings({ scraperAi, installed, hasAnthropicKey }: { scraperA
         <input type="checkbox" checked={findLinks} onChange={(e) => setFindLinks(e.target.checked)} className="mt-0.5 accent-[color:var(--color-accent)]" />
         <span>
           {t('set.scraperFindLinks')}
-          <span className="block text-[10px] text-[color:var(--color-text-faint)] mt-0.5">{t('set.scraperFindLinksHint')}</span>
+          <span className="block text-[11px] text-[color:var(--color-text-faint)] mt-0.5">{t('set.scraperFindLinksHint')}</span>
         </span>
       </label>
 
@@ -1738,7 +1617,7 @@ function PromptEditor({ entry }: { entry: PromptEditorEntry }) {
             {entry.label}
             {overridden && (
               <span
-                className="text-[9px] px-1.5 py-0.5 rounded bg-[color:var(--color-gold)]/15 text-[color:var(--color-gold)] uppercase tracking-wider"
+                className="text-[10px] px-1.5 py-0.5 rounded bg-[color:var(--color-gold)]/15 text-[color:var(--color-gold)]"
                 style={{ fontFamily: 'var(--font-mono)' }}
               >
                 {t('set.edited')}
@@ -1757,7 +1636,7 @@ function PromptEditor({ entry }: { entry: PromptEditorEntry }) {
             rows={14}
             spellCheck={false}
             className="w-full bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-3 py-2 text-xs leading-relaxed focus:outline-none focus:border-[color:var(--color-accent)] resize-y"
-            style={{ fontFamily: 'var(--font-mono)' }}
+            style={{ fontFamily: 'var(--font-code)' }}
           />
           <div className="flex items-center gap-2 flex-wrap">
             <button type="button" onClick={save} disabled={pending} className={saveBtn}>
@@ -1845,12 +1724,12 @@ function OnedriveWizard({ connected: initialConnected, account }: { connected: b
           </button>
 
           <div>
-            <button onClick={() => setAdvanced((s) => !s)} className="text-[10px] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-cyan)]">
+            <button onClick={() => setAdvanced((s) => !s)} className="text-[11px] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-cyan)]">
               {advanced ? '▾' : '▸'} {t('set.useOwnAzure')}
             </button>
             {advanced && (
               <div className="mt-2 space-y-2">
-                <ol className="text-[10px] text-[color:var(--color-text-faint)] space-y-0.5 list-decimal pl-4 leading-relaxed">
+                <ol className="text-[11px] text-[color:var(--color-text-faint)] space-y-0.5 list-decimal pl-4 leading-relaxed">
                   <li><a href="https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade" target="_blank" rel="noreferrer" className="text-[color:var(--color-cyan)] hover:underline">Azure → App registrations</a> {t('set.azureStep1')}</li>
                   <li>{t('set.azureStep2')}</li>
                 </ol>
@@ -1864,8 +1743,8 @@ function OnedriveWizard({ connected: initialConnected, account }: { connected: b
       ) : (
         <div className="bg-[color:var(--color-surface-2)] border border-[color:var(--color-cyan)]/40 rounded-lg px-3 py-3 text-xs space-y-1.5">
           <p>1. {t('set.odStep1')} <a href={code.url} target="_blank" rel="noreferrer" className="text-[color:var(--color-cyan)] hover:underline font-semibold">{code.url}</a></p>
-          <p>2. {t('set.odStep2')} <span className="text-[color:var(--color-accent)] font-bold text-base tracking-widest" style={{ fontFamily: 'var(--font-mono)' }}>{code.userCode}</span></p>
-          <p className="text-[10px] text-[color:var(--color-text-faint)] flex items-center gap-1.5"><Loader2 size={11} className="animate-spin" /> {t('set.odWaiting')}</p>
+          <p>2. {t('set.odStep2')} <span className="text-[color:var(--color-accent)] font-bold text-base" style={{ fontFamily: 'var(--font-code)' }}>{code.userCode}</span></p>
+          <p className="text-[11px] text-[color:var(--color-text-faint)] flex items-center gap-1.5"><Loader2 size={11} className="animate-spin" /> {t('set.odWaiting')}</p>
         </div>
       )}
       {status && <p className={cn('text-[11px]', status.startsWith('✗') ? 'text-[color:var(--color-red)]' : 'text-[color:var(--color-accent)]')} style={{ fontFamily: 'var(--font-mono)' }}>{status}</p>}
@@ -2019,7 +1898,7 @@ function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Inf
               className={cn(
                 'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all',
                 backend === b.v
-                  ? 'bg-[color:var(--color-accent)] text-black'
+                  ? 'bg-[color:var(--color-surface-3)] border border-[color:var(--color-border-light)] text-[color:var(--color-text)]'
                   : 'bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]'
               )}
             >
@@ -2035,7 +1914,7 @@ function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Inf
       {(backend === 'smb' || backend === 'ftp') && (
         <div className="grid sm:grid-cols-2 gap-3 pt-1">
           <Field label={t('set.hostIp')}>
-            <input value={host} onChange={(e) => setHost(e.target.value)} placeholder="192.168.10.20" className={controlClass} style={{ fontFamily: 'var(--font-mono)' }} />
+            <input value={host} onChange={(e) => setHost(e.target.value)} placeholder="192.168.10.20" className={controlClass} style={{ fontFamily: 'var(--font-code)' }} />
           </Field>
           <Field label={t('set.portBlank', { default: backend === 'smb' ? '445' : '21' })}>
             <input value={port} onChange={(e) => setPort(e.target.value)} placeholder={backend === 'smb' ? '445' : '21'} className={controlClass} style={{ fontFamily: 'var(--font-mono)' }} />
@@ -2052,7 +1931,7 @@ function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Inf
             <input type="password" value={pass} onChange={(e) => setPass(e.target.value)} placeholder={storage.hasPass ? '••••••••' : ''} className={controlClass} autoComplete="new-password" data-1p-ignore data-lpignore="true" />
           </Field>
           <Field label={t('set.baseFolder')}>
-            <input value={basePath} onChange={(e) => setBasePath(e.target.value)} placeholder="Pharos" className={controlClass} style={{ fontFamily: 'var(--font-mono)' }} />
+            <input value={basePath} onChange={(e) => setBasePath(e.target.value)} placeholder="Pharos" className={controlClass} style={{ fontFamily: 'var(--font-code)' }} />
           </Field>
           {backend === 'ftp' && (
             <div className="flex items-center justify-between sm:col-span-2">
@@ -2064,18 +1943,18 @@ function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Inf
       )}
 
       <div className="pt-2 border-t border-[color:var(--color-border)] mt-1 space-y-3">
-        <div className="flex items-center gap-2 text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider" style={{ fontFamily: 'var(--font-mono)' }}>
+        <div className="flex items-center gap-2 text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
           <FolderTree size={12} /> {t('set.fileOrganization')}
         </div>
         <div className="grid sm:grid-cols-2 gap-3">
           <Field label={t('set.folderTemplate')}>
-            <input value={folderTpl} onChange={(e) => setFolderTpl(e.target.value)} className={controlClass} style={{ fontFamily: 'var(--font-mono)' }} />
+            <input value={folderTpl} onChange={(e) => setFolderTpl(e.target.value)} className={controlClass} style={{ fontFamily: 'var(--font-code)' }} />
           </Field>
           <Field label={t('set.filenameTemplate')}>
-            <input value={nameTpl} onChange={(e) => setNameTpl(e.target.value)} className={controlClass} style={{ fontFamily: 'var(--font-mono)' }} />
+            <input value={nameTpl} onChange={(e) => setNameTpl(e.target.value)} className={controlClass} style={{ fontFamily: 'var(--font-code)' }} />
           </Field>
         </div>
-        <div className="text-[10px] text-[color:var(--color-text-faint)] leading-relaxed" style={{ fontFamily: 'var(--font-mono)' }}>
+        <div className="text-[11px] text-[color:var(--color-text-faint)] leading-relaxed" style={{ fontFamily: 'var(--font-mono)' }}>
           {t('set.tokens')} {TEMPLATE_TOKENS.map((tok) => tok.token).join('  ')}
         </div>
         <div className="text-[11px] bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-3 py-2" style={{ fontFamily: 'var(--font-mono)' }}>
@@ -2088,7 +1967,7 @@ function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Inf
         <div className="flex items-center justify-between gap-3 pt-2">
           <div className="min-w-0">
             <p className="text-xs font-medium">{t('set.autoMirror')}</p>
-            <p className="text-[10px] text-[color:var(--color-text-faint)] mt-0.5">{t('set.autoMirrorDesc')}</p>
+            <p className="text-[11px] text-[color:var(--color-text-faint)] mt-0.5">{t('set.autoMirrorDesc')}</p>
           </div>
           <Switch label={t('set.autoMirror')} checked={mirror} onChange={setMirror} />
         </div>
@@ -2098,10 +1977,10 @@ function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Inf
           FTP/SMB only; only offered once a primary remote is set. */}
       {backend !== 'local' && (
         <div className="pt-2 border-t border-[color:var(--color-border)] mt-1 space-y-3">
-          <div className="flex items-center gap-2 text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider" style={{ fontFamily: 'var(--font-mono)' }}>
+          <div className="flex items-center gap-2 text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
             <Server size={12} /> {t('set.secondDest')}
           </div>
-          <p className="text-[10px] text-[color:var(--color-text-faint)] -mt-1">
+          <p className="text-[11px] text-[color:var(--color-text-faint)] -mt-1">
             {t('set.secondDestHelp')}
           </p>
           <Row label={t('set.backend')}>
@@ -2117,7 +1996,7 @@ function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Inf
                   className={cn(
                     'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all',
                     m2Backend === b.v
-                      ? 'bg-[color:var(--color-accent)] text-black'
+                      ? 'bg-[color:var(--color-surface-3)] border border-[color:var(--color-border-light)] text-[color:var(--color-text)]'
                       : 'bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]'
                   )}
                 >
@@ -2129,7 +2008,7 @@ function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Inf
           {(m2Backend === 'smb' || m2Backend === 'ftp') && (
             <div className="grid sm:grid-cols-2 gap-3">
               <Field label={t('set.hostIp')}>
-                <input value={m2Host} onChange={(e) => setM2Host(e.target.value)} placeholder="192.168.10.30" className={controlClass} style={{ fontFamily: 'var(--font-mono)' }} />
+                <input value={m2Host} onChange={(e) => setM2Host(e.target.value)} placeholder="192.168.10.30" className={controlClass} style={{ fontFamily: 'var(--font-code)' }} />
               </Field>
               <Field label={t('set.portBlank', { default: m2Backend === 'smb' ? '445' : '21' })}>
                 <input value={m2Port} onChange={(e) => setM2Port(e.target.value)} placeholder={m2Backend === 'smb' ? '445' : '21'} className={controlClass} style={{ fontFamily: 'var(--font-mono)' }} />
@@ -2146,7 +2025,7 @@ function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Inf
                 <input type="password" value={m2Pass} onChange={(e) => setM2Pass(e.target.value)} placeholder={storage.hasPass2 ? '••••••••' : ''} className={controlClass} autoComplete="new-password" data-1p-ignore data-lpignore="true" />
               </Field>
               <Field label={t('set.baseFolder')}>
-                <input value={m2BasePath} onChange={(e) => setM2BasePath(e.target.value)} placeholder="Pharos" className={controlClass} style={{ fontFamily: 'var(--font-mono)' }} />
+                <input value={m2BasePath} onChange={(e) => setM2BasePath(e.target.value)} placeholder="Pharos" className={controlClass} style={{ fontFamily: 'var(--font-code)' }} />
               </Field>
               {m2Backend === 'ftp' && (
                 <div className="flex items-center justify-between sm:col-span-2">
@@ -2209,7 +2088,7 @@ function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Inf
       {backend !== 'local' && (
         <p
           className={cn(
-            'text-[10px] mt-1.5',
+            'text-[11px] mt-1.5',
             syncedNow ? 'text-[color:var(--color-accent)]' : storage.syncIsStale ? 'text-[color:var(--color-gold)]' : 'text-[color:var(--color-text-faint)]'
           )}
           style={{ fontFamily: 'var(--font-mono)' }}
@@ -2248,7 +2127,7 @@ function Switch({ checked, onChange, label }: { checked: boolean; onChange: (v: 
   );
 }
 
-const fieldLabel = 'text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider mb-1.5 block';
+const fieldLabel = 'text-xs font-medium text-[color:var(--color-text-dim)] mb-1.5 block';
 const saveBtn =
   'flex items-center gap-1.5 text-xs px-4 py-2 rounded-lg bg-[color:var(--color-accent)] text-black font-semibold hover:opacity-90 transition-opacity disabled:opacity-50';
 const ghostBtn =
@@ -2379,7 +2258,7 @@ function CategoryRulesManager({ settings }: { settings: AppSettings }) {
 
 
 
-function DefaultsManager({ settings }: { settings: AppSettings }) {
+function DefaultsManager({ settings, part }: { settings: AppSettings; part: 'general' | 'alerts' }) {
   const t = useT();
   const [pending, startTransition] = useTransition();
   const [view, setView] = useState<'grid' | 'list'>(settings.defaultItemView);
@@ -2467,129 +2346,130 @@ function DefaultsManager({ settings }: { settings: AppSettings }) {
     });
   }
 
+  // Both pages share one form state and one save, so saving either page always sends every
+  // field and never resets the half that is not on screen.
+  const num = (label: TKey, value: string, set: (v: string) => void, max: number) => ({ label, value, set, max });
+  const alertRows = [
+    num('set.warrantyAlert', alertDays, setAlertDays, 730),
+    num('set.trialAlert', trialDays, setTrialDays, 60),
+    num('set.billAlert', billDays, setBillDays, 90),
+    num('set.documentAlert', docDays, setDocDays, 180),
+    num('set.specialDateAlert', specialDays, setSpecialDays, 180),
+    num('set.maintenanceAlert', maintDays, setMaintDays, 180),
+    num('set.lendingAlert', lendDays, setLendDays, 180),
+    num('set.claimStaleAlert', claimStaleDays, setClaimStaleDays, 180),
+    num('set.syncStaleAlert', syncStaleDays, setSyncStaleDays, 365),
+    num('set.subscriptionReviewAlert', subscriptionReviewDays, setSubscriptionReviewDays, 730),
+  ];
+
+  const footer = (
+    <div className="flex items-center gap-3 pt-4 border-t border-[color:var(--color-border)] mt-2">
+      <button type="button" onClick={save} disabled={pending} className={saveBtn}>
+        {pending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} {t('set.saveSettings')}
+      </button>
+      {msg && <span className="text-xs text-[color:var(--color-accent)]">{msg}</span>}
+    </div>
+  );
+
+  if (part === 'alerts') {
+    return (
+      <Section title={t('set.tabAlerts')} icon={<Bell size={15} />}>
+        <ul className="divide-y divide-[color:var(--color-border)]">
+          {alertRows.map((r) => (
+            <li key={r.label} className="flex items-center justify-between gap-4 py-2.5">
+              <label htmlFor={`alert-${r.label}`} className="text-sm text-[color:var(--color-text)] min-w-0">
+                {t(r.label)}
+              </label>
+              <input
+                id={`alert-${r.label}`}
+                type="number"
+                min="0"
+                max={r.max}
+                value={r.value}
+                onChange={(e) => r.set(e.target.value)}
+                className={cn(controlClass, 'w-24 shrink-0 text-right')}
+              />
+            </li>
+          ))}
+        </ul>
+        {footer}
+      </Section>
+    );
+  }
+
   return (
-    <Section title={t('set.defaultsTitle')} icon={<SlidersHorizontal size={15} />}>
-      <div className="grid sm:grid-cols-2 gap-4">
-        <label className="block">
-          <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.currency')}</span>
-          <select value={currency} onChange={(e) => setCurrency(e.target.value)} className={controlClass}>
-            {CURRENCIES.map((c) => (
-              <option key={c.code} value={c.code}>
-                {c.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="block">
-          <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.defaultVat')}</span>
-          <input type="number" min="0" max="100" step="0.5" value={vatRate} onChange={(e) => setVatRate(e.target.value)} className={controlClass} />
-        </label>
-        <label className="block">
-          <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.defaultView')}</span>
-          <select value={view} onChange={(e) => setView(e.target.value as 'grid' | 'list')} className={controlClass}>
-            <option value="grid">{t('v.grid')}</option>
-            <option value="list">{t('v.list')}</option>
-          </select>
-        </label>
-        <label className="block">
-          <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.defaultWarranty')}</span>
-          <input type="number" min="0" max="120" value={warrantyMonths} onChange={(e) => setWarrantyMonths(e.target.value)} className={controlClass} />
-        </label>
-        <label className="block">
-          <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.warrantyAlert')}</span>
-          <input type="number" min="0" max="730" value={alertDays} onChange={(e) => setAlertDays(e.target.value)} className={controlClass} />
-        </label>
-        <label className="block">
-          <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.returnWindow')}</span>
-          <input type="number" min="0" max="365" value={returnDays} onChange={(e) => setReturnDays(e.target.value)} className={controlClass} />
-        </label>
-        <label className="block">
-          <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.shoppingCountry')}</span>
-          <select
-            value={shoppingCountry}
-            onChange={(e) => handleCountryChange(e.target.value)}
-            className={controlClass}
-          >
-            <option value="">{t('set.shoppingCountryAny')}</option>
-            {[...SHOPPING_COUNTRIES]
-              .sort((a, b) => countryName(a).localeCompare(countryName(b), locale))
-              .map((code) => (
-                <option key={code} value={code}>
-                  {countryName(code)}
+    <>
+      <Section title={t('set.defaultsGeneral')} icon={<SlidersHorizontal size={15} />}>
+        <div className="grid sm:grid-cols-2 gap-4">
+          <label className="block">
+            <span className={fieldLabel}>{t('set.currency')}</span>
+            <select value={currency} onChange={(e) => setCurrency(e.target.value)} className={controlClass}>
+              {CURRENCIES.map((c) => (
+                <option key={c.code} value={c.code}>
+                  {c.label}
                 </option>
               ))}
-          </select>
-        </label>
-        {shoppingCountry && (
-          <div className="sm:col-span-2">
-            <ForeignShopsEditor
-              country={shoppingCountry}
-              countryLabel={countryName(shoppingCountry)}
-              shops={extraShops}
-              onChange={setExtraShops}
-            />
-          </div>
-        )}
-        <label className="block">
-          <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.trialAlert')}</span>
-          <input type="number" min="0" max="60" value={trialDays} onChange={(e) => setTrialDays(e.target.value)} className={controlClass} />
-        </label>
-        <label className="block">
-          <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.billAlert')}</span>
-          <input type="number" min="0" max="90" value={billDays} onChange={(e) => setBillDays(e.target.value)} className={controlClass} />
-        </label>
-        <label className="block">
-          <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.documentAlert')}</span>
-          <input type="number" min="0" max="180" value={docDays} onChange={(e) => setDocDays(e.target.value)} className={controlClass} />
-        </label>
-        <label className="block">
-          <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.specialDateAlert')}</span>
-          <input type="number" min="0" max="180" value={specialDays} onChange={(e) => setSpecialDays(e.target.value)} className={controlClass} />
-        </label>
-        <label className="block">
-          <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.maintenanceAlert')}</span>
-          <input type="number" min="0" max="180" value={maintDays} onChange={(e) => setMaintDays(e.target.value)} className={controlClass} />
-        </label>
-        <label className="block">
-          <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.lendingAlert')}</span>
-          <input type="number" min="0" max="180" value={lendDays} onChange={(e) => setLendDays(e.target.value)} className={controlClass} />
-        </label>
-        <label className="block">
-          <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.claimStaleAlert')}</span>
-          <input type="number" min="0" max="180" value={claimStaleDays} onChange={(e) => setClaimStaleDays(e.target.value)} className={controlClass} />
-        </label>
-        <label className="block">
-          <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.syncStaleAlert')}</span>
-          <input type="number" min="0" max="365" value={syncStaleDays} onChange={(e) => setSyncStaleDays(e.target.value)} className={controlClass} />
-        </label>
-        <label className="block">
-          <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.subscriptionReviewAlert')}</span>
-          <input type="number" min="0" max="730" value={subscriptionReviewDays} onChange={(e) => setSubscriptionReviewDays(e.target.value)} className={controlClass} />
-        </label>
-        <div className="flex items-center justify-between gap-3 self-end pb-1">
-          <span className="min-w-0">
-            <span className="text-xs font-medium block">{t('set.autoAddStores')}</span>
-            <span className="text-[10px] text-[color:var(--color-text-faint)] block">{t('set.autoAddStoresDesc')}</span>
-          </span>
-          <Switch label={t('set.autoAddStores')} checked={autoAdd} onChange={setAutoAdd} />
+            </select>
+          </label>
+          <label className="block">
+            <span className={fieldLabel}>{t('set.defaultVat')}</span>
+            <input type="number" min="0" max="100" step="0.5" value={vatRate} onChange={(e) => setVatRate(e.target.value)} className={controlClass} />
+          </label>
+          <label className="block">
+            <span className={fieldLabel}>{t('set.defaultView')}</span>
+            <select value={view} onChange={(e) => setView(e.target.value as 'grid' | 'list')} className={controlClass}>
+              <option value="grid">{t('v.grid')}</option>
+              <option value="list">{t('v.list')}</option>
+            </select>
+          </label>
+          <label className="block">
+            <span className={fieldLabel}>{t('set.defaultWarranty')}</span>
+            <input type="number" min="0" max="120" value={warrantyMonths} onChange={(e) => setWarrantyMonths(e.target.value)} className={controlClass} />
+          </label>
+          <label className="block">
+            <span className={fieldLabel}>{t('set.returnWindow')}</span>
+            <input type="number" min="0" max="365" value={returnDays} onChange={(e) => setReturnDays(e.target.value)} className={controlClass} />
+          </label>
+          <label className="block">
+            <span className={fieldLabel}>{t('set.shoppingCountry')}</span>
+            <select value={shoppingCountry} onChange={(e) => handleCountryChange(e.target.value)} className={controlClass}>
+              <option value="">{t('set.shoppingCountryAny')}</option>
+              {[...SHOPPING_COUNTRIES]
+                .sort((a, b) => countryName(a).localeCompare(countryName(b), locale))
+                .map((code) => (
+                  <option key={code} value={code}>
+                    {countryName(code)}
+                  </option>
+                ))}
+            </select>
+          </label>
+          {shoppingCountry && (
+            <div className="sm:col-span-2">
+              <ForeignShopsEditor country={shoppingCountry} countryLabel={countryName(shoppingCountry)} shops={extraShops} onChange={setExtraShops} />
+            </div>
+          )}
         </div>
-        {/* P9 opt-in: keeps the currency + FX-rate fields out of the way for the
-            single-currency majority. Totals always stay in the base currency above. */}
-        <div className="flex items-center justify-between gap-3 self-end pb-1">
-          <span className="min-w-0">
-            <span className="text-xs font-medium block">{t('set.multiCurrency')}</span>
-            <span className="text-[10px] text-[color:var(--color-text-faint)] block">{t('set.multiCurrencyDesc', { code: currency })}</span>
-          </span>
-          <Switch label={t('set.multiCurrency')} checked={multiCurrency} onChange={setMultiCurrency} />
-        </div>
-      </div>
-      <div className="flex items-center gap-3 pt-3 border-t border-[color:var(--color-border)] mt-1">
-        <button type="button" onClick={save} disabled={pending} className={saveBtn}>
-          {pending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} {t('set.saveDefaults')}
-        </button>
-        {msg && <span className="text-[11px] text-[color:var(--color-accent)]" style={{ fontFamily: 'var(--font-mono)' }}>{msg}</span>}
-      </div>
-    </Section>
+        <ul className="divide-y divide-[color:var(--color-border)] border-t border-[color:var(--color-border)] mt-4">
+          <li className="flex items-center justify-between gap-4 py-3">
+            <span className="min-w-0">
+              <span className="text-sm font-medium block">{t('set.autoAddStores')}</span>
+              <span className="text-xs text-[color:var(--color-text-faint)] block">{t('set.autoAddStoresDesc')}</span>
+            </span>
+            <Switch label={t('set.autoAddStores')} checked={autoAdd} onChange={setAutoAdd} />
+          </li>
+          {/* P9 opt-in: keeps the currency + FX-rate fields out of the way for the
+              single-currency majority. Totals always stay in the base currency above. */}
+          <li className="flex items-center justify-between gap-4 py-3">
+            <span className="min-w-0">
+              <span className="text-sm font-medium block">{t('set.multiCurrency')}</span>
+              <span className="text-xs text-[color:var(--color-text-faint)] block">{t('set.multiCurrencyDesc', { code: currency })}</span>
+            </span>
+            <Switch label={t('set.multiCurrency')} checked={multiCurrency} onChange={setMultiCurrency} />
+          </li>
+        </ul>
+        {footer}
+      </Section>
+    </>
   );
 }
 
@@ -2605,7 +2485,7 @@ function DeliveryHistory({ log }: { log?: DeliveryLogEntry[] }) {
   const failing = rows[0] && !rows[0].ok;
   return (
     <div className="pt-2 border-t border-[color:var(--color-border)] space-y-1">
-      <p className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
+      <p className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
         {t('notif.recent')} {failing && <span className="text-[color:var(--color-red)]">· {t('notif.lastFailed')}</span>}
       </p>
       {shown.map((r, i) => (
@@ -2619,7 +2499,7 @@ function DeliveryHistory({ log }: { log?: DeliveryLogEntry[] }) {
         </div>
       ))}
       {rows.length > 3 && (
-        <button type="button" onClick={() => setExpanded((v) => !v)} className="text-[10px] text-[color:var(--color-cyan)]">
+        <button type="button" onClick={() => setExpanded((v) => !v)} className="text-[11px] text-[color:var(--color-cyan)]">
           {expanded ? t('notif.showLess') : t('notif.showAll', { n: rows.length })}
         </button>
       )}
@@ -2761,7 +2641,7 @@ function ChannelCard({
       )}
 
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[10px] text-[color:var(--color-text-faint)]">{t(NOTIF_HINT[ch.type])}</span>
+        <span className="text-[11px] text-[color:var(--color-text-faint)]">{t(NOTIF_HINT[ch.type])}</span>
         <button type="button" onClick={onTest} disabled={testing} className={cn(ghostBtn, 'text-[color:var(--color-cyan)] py-1.5')}>
           {testing ? <Loader2 size={12} className="animate-spin" /> : <Bell size={12} />} {t('common.test')}
         </button>
@@ -2872,9 +2752,6 @@ function NotificationsManager() {
       <button type="button" onClick={add} className={cn(ghostBtn, 'w-full justify-center')}>
         <Plus size={13} /> {t('notif.addChannel')}
       </button>
-
-      {/* P102: native browser push — no external account needed */}
-      <WebPushToggle />
 
       <div className="pt-3 border-t border-[color:var(--color-border)]">
         <p className="text-xs text-[color:var(--color-text-dim)] mb-2">
@@ -3044,7 +2921,7 @@ function WebhookCard({
       </div>
 
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[10px] text-[color:var(--color-text-faint)]">{t('wh.signed')}</span>
+        <span className="text-[11px] text-[color:var(--color-text-faint)]">{t('wh.signed')}</span>
         <button type="button" onClick={onTest} disabled={testing || !sub.url} className={cn(ghostBtn, 'text-[color:var(--color-cyan)] py-1.5')}>
           {testing ? <Loader2 size={12} className="animate-spin" /> : <Webhook size={12} />} {t('common.test')}
         </button>
@@ -3257,7 +3134,7 @@ function ImapImportManager({ imap }: { imap: ImapInfo }) {
 
       <div className="grid sm:grid-cols-2 gap-3 pt-1">
         <Field label={t('set.imapHost')}>
-          <input value={host} onChange={(e) => setHost(e.target.value)} placeholder="imap.gmail.com" className={controlClass} style={{ fontFamily: 'var(--font-mono)' }} autoComplete="new-password" data-1p-ignore data-lpignore="true" />
+          <input value={host} onChange={(e) => setHost(e.target.value)} placeholder="imap.gmail.com" className={controlClass} style={{ fontFamily: 'var(--font-code)' }} autoComplete="new-password" data-1p-ignore data-lpignore="true" />
         </Field>
         <Field label={t('set.imapPort')}>
           <input value={port} onChange={(e) => setPort(e.target.value)} placeholder="993" className={controlClass} style={{ fontFamily: 'var(--font-mono)' }} />
@@ -3269,14 +3146,14 @@ function ImapImportManager({ imap }: { imap: ImapInfo }) {
           <input type="password" value={pass} onChange={(e) => setPass(e.target.value)} placeholder={imap.hasPass ? '••••••••' : ''} className={controlClass} autoComplete="new-password" data-1p-ignore data-lpignore="true" />
         </Field>
         <Field label={t('set.imapFolder')}>
-          <input value={folder} onChange={(e) => setFolder(e.target.value)} placeholder="INBOX" className={controlClass} style={{ fontFamily: 'var(--font-mono)' }} />
+          <input value={folder} onChange={(e) => setFolder(e.target.value)} placeholder="INBOX" className={controlClass} style={{ fontFamily: 'var(--font-code)' }} />
         </Field>
         <div className="flex items-center justify-between">
           <span className="text-xs text-[color:var(--color-text-dim)]">{t('set.imapSecure')}</span>
           <Switch label={t('set.imapSecure')} checked={secure} onChange={setSecure} />
         </div>
       </div>
-      <p className="text-[10px] text-[color:var(--color-text-faint)]">{t('set.imapAppPasswordHint')}</p>
+      <p className="text-[11px] text-[color:var(--color-text-faint)]">{t('set.imapAppPasswordHint')}</p>
 
       <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-[color:var(--color-border)] mt-1">
         <button type="button" onClick={save} disabled={pending} className={saveBtn}>
@@ -3299,7 +3176,7 @@ function ImapImportManager({ imap }: { imap: ImapInfo }) {
           <span className="text-[11px] text-[color:var(--color-accent)]" style={{ fontFamily: 'var(--font-mono)' }}>{msg}</span>
         )}
       </div>
-      <p className="text-[10px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
+      <p className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
         {lastChecked ? t('set.imapLastChecked', { when: fmt(lastChecked) }) : t('set.imapNeverChecked')}
         {lastImported ? ` · ${t('set.imapLastImported', { when: fmt(lastImported) })}` : ''}
       </p>
@@ -3376,7 +3253,7 @@ function SampleDataManager() {
         )}
       </div>
       {status?.loaded && (
-        <p className="text-[10px] text-[color:var(--color-text-faint)] mt-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
+        <p className="text-[11px] text-[color:var(--color-text-faint)] mt-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
           {status.counts.items} items · {status.counts.receipts} receipts · {status.counts.expenses} expenses · {status.counts.subscriptions} subscriptions
         </p>
       )}
@@ -3441,13 +3318,13 @@ function StoreRow({ store }: { store: StoreLite }) {
         <div className="text-sm font-medium flex items-center gap-1.5">
           {store.name}
           {store.auto && (
-            <span title={t('set.autoReview')} className="text-[9px] text-[color:var(--color-gold)]" style={{ fontFamily: 'var(--font-mono)' }}>
+            <span title={t('set.autoReview')} className="text-[10px] text-[color:var(--color-gold)]" style={{ fontFamily: 'var(--font-mono)' }}>
               ⚡ auto
             </span>
           )}
         </div>
         {store.aliases.length > 0 && (
-          <div className="text-[10px] text-[color:var(--color-text-faint)] truncate" style={{ fontFamily: 'var(--font-mono)' }}>
+          <div className="text-[11px] text-[color:var(--color-text-faint)] truncate" style={{ fontFamily: 'var(--font-mono)' }}>
             {store.aliases.join(', ')}
           </div>
         )}
@@ -3501,7 +3378,7 @@ function StoreForm({ store, onDone }: { store?: StoreLite; onDone: () => void })
         className={controlClass}
         style={{ fontFamily: 'var(--font-mono)' }}
       />
-      <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder={t('set.urlPlaceholder')} className={controlClass} style={{ fontFamily: 'var(--font-mono)' }} />
+      <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder={t('set.urlPlaceholder')} className={controlClass} style={{ fontFamily: 'var(--font-code)' }} />
       <input
         type="number"
         min="0"
@@ -3524,7 +3401,7 @@ function StoreForm({ store, onDone }: { store?: StoreLite; onDone: () => void })
           <X size={12} /> {t('common.cancel')}
         </button>
         {err && (
-          <span className="text-[10px] text-[color:var(--color-red)]" style={{ fontFamily: 'var(--font-mono)' }}>
+          <span className="text-[11px] text-[color:var(--color-red)]" style={{ fontFamily: 'var(--font-mono)' }}>
             {err}
           </span>
         )}
@@ -3580,7 +3457,7 @@ function CardsManager({ cards }: { cards: SerializedCard[] }) {
             <span className="w-3 h-3 rounded-full shrink-0" style={{ background: c.color || '#888' }} />
             <div className="min-w-0 flex-1">
               <span className="text-sm font-medium">{c.name}</span>
-              <span className="text-[10px] text-[color:var(--color-text-faint)] ml-2" style={{ fontFamily: 'var(--font-mono)' }}>
+              <span className="text-[11px] text-[color:var(--color-text-faint)] ml-2" style={{ fontFamily: 'var(--font-mono)' }}>
                 {c.type} · {c.kind}{c.last4 ? ` · ••${c.last4}` : ''}
               </span>
             </div>
@@ -3608,7 +3485,7 @@ function CardsManager({ cards }: { cards: SerializedCard[] }) {
             </select>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="text-[10px] text-[color:var(--color-text-faint)] uppercase mr-1" style={{ fontFamily: 'var(--font-mono)' }}>{t('set.color')}</span>
+            <span className="text-[11px] text-[color:var(--color-text-faint)] mr-1" style={{ fontFamily: 'var(--font-mono)' }}>{t('set.color')}</span>
             {CARD_COLORS.map((col) => (
               <button key={col} onClick={() => set({ color: col })} className={cn('w-5 h-5 rounded-full transition-transform', form.color === col && 'ring-2 ring-white scale-110')} style={{ background: col }} />
             ))}
@@ -3683,12 +3560,12 @@ function UsersManager({ currentUserId }: { currentUserId: string }) {
               <div className="min-w-0 flex-1">
                 <span className="text-sm font-medium">{u.username}</span>
                 {u.name && <span className="text-xs text-[color:var(--color-text-dim)] ml-2">{u.name}</span>}
-                {u.id === currentUserId && <span className="text-[10px] text-[color:var(--color-accent)] ml-2" style={{ fontFamily: 'var(--font-mono)' }}>{t('set.you')}</span>}
+                {u.id === currentUserId && <span className="text-[11px] text-[color:var(--color-accent)] ml-2" style={{ fontFamily: 'var(--font-mono)' }}>{t('set.you')}</span>}
               </div>
               {/* P31: three roles do not fit a two-way toggle, so the chip became a select. */}
               <select value={u.role} onChange={(e) => changeRole(u, e.target.value as Role)} title={t('set.toggleRole')}
                 style={{ fontFamily: 'var(--font-mono)' }}
-                className={cn('text-[10px] px-2 py-0.5 rounded-full border uppercase bg-transparent cursor-pointer',
+                className={cn('text-[11px] px-2 py-0.5 rounded-full border bg-transparent cursor-pointer',
                   u.role === 'admin' ? 'border-[color:var(--color-accent)] text-[color:var(--color-accent)]'
                     : u.role === 'viewer' ? 'border-[color:var(--color-cyan)] text-[color:var(--color-cyan)]'
                     : 'border-[color:var(--color-border)] text-[color:var(--color-text-dim)]')}>
@@ -3731,270 +3608,6 @@ function UsersManager({ currentUserId }: { currentUserId: string }) {
   );
 }
 
-/** "Change my own password" — available to every signed-in user (incl. members). */
-function SelfPasswordCard() {
-  const t = useT();
-  const [open, setOpen] = useState(false);
-  const [oldPwd, setOldPwd] = useState('');
-  const [newPwd, setNewPwd] = useState('');
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  const [pending, startTransition] = useTransition();
-
-  function submit() {
-    setMsg(null);
-    startTransition(async () => {
-      const r = await changeOwnPassword(oldPwd, newPwd);
-      if (r.ok) { setMsg({ ok: true, text: t('set.passwordChanged') }); setOldPwd(''); setNewPwd(''); setOpen(false); }
-      else setMsg({ ok: false, text: r.error || t('common.failed') });
-    });
-  }
-
-  // P91: invalidate every other session for this account (leaked password, a family
-  // tablet left logged in). This device stays signed in — the server re-mints its cookie.
-  function signOutOthers() {
-    setMsg(null);
-    startTransition(async () => {
-      const r = await logoutOtherSessions();
-      setMsg(r.ok ? { ok: true, text: t('set.signedOutOthers') } : { ok: false, text: t('common.failed') });
-    });
-  }
-
-  return (
-    <Section title={t('set.yourPassword')} icon={<KeyRound size={15} />}>
-      {open ? (
-        <div className="space-y-2.5">
-          <input value={oldPwd} onChange={(e) => setOldPwd(e.target.value)} type="password" placeholder={t('set.currentPwdPlaceholder')} className={controlClass} />
-          <input value={newPwd} onChange={(e) => setNewPwd(e.target.value)} type="password" placeholder={t('set.newPwdPlaceholder')} className={controlClass} />
-          <div className="flex items-center gap-2">
-            <button onClick={submit} disabled={pending} className={saveBtn}>{pending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} {t('set.update')}</button>
-            <button onClick={() => { setOpen(false); setMsg(null); }} className={ghostBtn}><X size={13} /> {t('common.cancel')}</button>
-            {msg && <span className={cn('text-[11px]', msg.ok ? 'text-[color:var(--color-accent)]' : 'text-[color:var(--color-red)]')}>{msg.text}</span>}
-          </div>
-        </div>
-      ) : (
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-[color:var(--color-text-dim)]">{t('set.changePasswordDesc')}</span>
-          <div className="flex items-center gap-2">
-            {msg && <span className={cn('text-[11px]', msg.ok ? 'text-[color:var(--color-accent)]' : 'text-[color:var(--color-red)]')}>{msg.text}</span>}
-            <button onClick={signOutOthers} disabled={pending} className={ghostBtn} title={t('set.signOutOthersDesc')}>
-              {pending ? <Loader2 size={13} className="animate-spin" /> : <LogOut size={13} />} {t('set.signOutOthers')}
-            </button>
-            <button onClick={() => setOpen(true)} className={ghostBtn}><KeyRound size={13} /> {t('set.changePassword')}</button>
-          </div>
-        </div>
-      )}
-    </Section>
-  );
-}
-
-/** Which sub-form the "Two-factor authentication" card is currently showing. Mirrors
- *  components/saas/AccountSettingsPanel.tsx's MfaStage exactly (same flow, same rules) — the
- *  self-hosted account settings and the SaaS account settings are now the same feature over two
- *  different models. */
-type MfaStage = 'idle' | 'need-password-to-start' | 'enrolling' | 'need-password-to-disable' | 'recovery-codes';
-
-/** "Set up / manage two-factor authentication for my own account" (P79) — the self-hosted
- *  counterpart of AccountSettingsPanel.tsx's MFA section, wired to server actions instead of
- *  fetch()+routes (same idiom as SelfPasswordCard above). Loads its own status on mount, same
- *  pattern as UpdateChecker, so a slow read never blocks the rest of Settings. */
-function SelfMfaCard() {
-  const t = useT();
-  const [status, setStatus] = useState<MfaStatus | null>(null);
-  const [stage, setStage] = useState<MfaStage>('idle');
-  const [reauthPassword, setReauthPassword] = useState('');
-  const [disablePassword, setDisablePassword] = useState('');
-  const [code, setCode] = useState('');
-  const [secret, setSecret] = useState('');
-  const [uri, setUri] = useState('');
-  const [recoveryCodes, setRecoveryCodes] = useState<string[] | null>(null);
-  const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
-  const [pending, startTransition] = useTransition();
-
-  useEffect(() => {
-    getSelfMfaStatus().then(setStatus).catch(() => {});
-  }, []);
-
-  function resetFlow() {
-    setStage('idle');
-    setReauthPassword('');
-    setDisablePassword('');
-    setCode('');
-    setSecret('');
-    setUri('');
-    setError('');
-  }
-
-  function clickStart() {
-    setError('');
-    setNotice('');
-    if (status?.enabled) {
-      setStage('need-password-to-start');
-    } else {
-      beginEnrollment('');
-    }
-  }
-
-  function beginEnrollment(password: string) {
-    setError('');
-    startTransition(async () => {
-      const res = await beginSelfMfaEnrollment(password);
-      if (res.ok && res.secret && res.uri) {
-        setSecret(res.secret);
-        setUri(res.uri);
-        setStage('enrolling');
-      } else {
-        setError(describeMfaError(400, res.error));
-      }
-    });
-  }
-
-  function confirmEnrollment() {
-    setError('');
-    startTransition(async () => {
-      const res = await confirmSelfMfaEnrollment(code);
-      if (res.ok && res.recoveryCodes) {
-        setRecoveryCodes(res.recoveryCodes);
-        setStage('recovery-codes');
-        setStatus((s) => (s ? { ...s, enabled: true, pending: false } : s));
-      } else {
-        setError(describeMfaError(400, res.error));
-      }
-    });
-  }
-
-  function finishRecoveryCodes() {
-    setRecoveryCodes(null);
-    resetFlow();
-    setNotice(t('set.twoFactorEnabledNotice'));
-  }
-
-  function confirmDisable() {
-    setError('');
-    startTransition(async () => {
-      const res = await disableSelfMfa(disablePassword);
-      if (res.ok) {
-        resetFlow();
-        setStatus((s) => (s ? { ...s, enabled: false, pending: false } : s));
-        setNotice(t('set.twoFactorDisabledNotice'));
-      } else {
-        setError(res.error || t('common.failed'));
-      }
-    });
-  }
-
-  return (
-    <Section title={t('set.twoFactor')} icon={<ShieldCheck size={15} />}>
-      {status?.enabled && stage === 'idle' && (
-        <span className="inline-block mb-1 text-[10px] uppercase tracking-wider text-[color:var(--color-accent)] border border-[color:var(--color-accent)]/40 rounded-full px-1.5 py-0.5">
-          {t('set.twoFactorEnabled')}
-        </span>
-      )}
-
-      {error && <p className="text-xs text-[color:var(--color-red)]">{error}</p>}
-      {notice && !error && stage === 'idle' && <p className="text-xs text-[color:var(--color-accent)]">{notice}</p>}
-
-      {status && !status.cryptoReady && <p className="text-xs text-[color:var(--color-text-dim)]">{t('set.twoFactorUnavailable')}</p>}
-
-      {status?.cryptoReady && stage === 'idle' && (
-        <div className="flex items-center justify-between gap-3">
-          <span className="text-xs text-[color:var(--color-text-dim)]">{status.enabled ? t('set.twoFactorDescOn') : t('set.twoFactorDescOff')}</span>
-          <div className="flex items-center gap-2 shrink-0">
-            <button onClick={clickStart} disabled={pending} className={ghostBtn}>
-              <ShieldCheck size={13} /> {status.enabled ? t('set.twoFactorReplace') : t('set.twoFactorEnable')}
-            </button>
-            {status.enabled && (
-              <button
-                onClick={() => {
-                  setError('');
-                  setStage('need-password-to-disable');
-                }}
-                disabled={pending}
-                className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-red)]/50 text-[color:var(--color-red)] hover:bg-[color:var(--color-red)]/10 transition-colors disabled:opacity-50"
-              >
-                {t('set.twoFactorDisable')}
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
-      {stage === 'need-password-to-start' && (
-        <div className="space-y-2.5">
-          <p className="text-xs text-[color:var(--color-text-dim)]">{t('set.twoFactorPasswordToStart')}</p>
-          <input value={reauthPassword} onChange={(e) => setReauthPassword(e.target.value)} type="password" autoComplete="current-password" placeholder={t('set.currentPwdPlaceholder')} className={controlClass} />
-          <div className="flex items-center gap-2">
-            <button onClick={() => beginEnrollment(reauthPassword)} disabled={pending || !mfaPasswordReady(reauthPassword)} className={saveBtn}>
-              {pending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} {pending ? t('set.twoFactorContinuing') : t('set.twoFactorContinue')}
-            </button>
-            <button onClick={resetFlow} disabled={pending} className={ghostBtn}><X size={13} /> {t('common.cancel')}</button>
-          </div>
-        </div>
-      )}
-
-      {stage === 'enrolling' && (
-        <div className="space-y-2.5">
-          <p className="text-xs text-[color:var(--color-text-dim)]">{t('set.twoFactorEnrollHint')}</p>
-          {uri && <QrCode value={uri} label={t('set.twoFactorQrAlt')} />}
-          <div className="rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] p-3">
-            <p className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>{t('set.twoFactorManualKey')}</p>
-            <p className="mt-1 select-all break-all text-sm" style={{ fontFamily: 'var(--font-mono)' }}>{secret}</p>
-          </div>
-          <label className="block text-xs">
-            <span className="text-[color:var(--color-text-dim)]">{t('set.twoFactorCode')}</span>
-            <input
-              value={code}
-              onChange={(e) => setCode(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))}
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              placeholder="000000"
-              className={cn(controlClass, 'mt-1 max-w-[10rem] text-center tracking-[0.3em]')}
-              style={{ fontFamily: 'var(--font-mono)' }}
-            />
-          </label>
-          <div className="flex items-center gap-2">
-            <button onClick={confirmEnrollment} disabled={pending || !mfaCodeReady(code)} className={saveBtn}>
-              {pending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} {pending ? t('set.twoFactorVerifying') : t('set.twoFactorConfirm')}
-            </button>
-            <button onClick={resetFlow} disabled={pending} className={ghostBtn}><X size={13} /> {t('common.cancel')}</button>
-          </div>
-        </div>
-      )}
-
-      {stage === 'need-password-to-disable' && (
-        <div className="space-y-2.5">
-          <p className="text-xs text-[color:var(--color-text-dim)]">{t('set.twoFactorPasswordToDisable')}</p>
-          <input value={disablePassword} onChange={(e) => setDisablePassword(e.target.value)} type="password" autoComplete="current-password" placeholder={t('set.currentPwdPlaceholder')} className={controlClass} />
-          <div className="flex items-center gap-2">
-            <button
-              onClick={confirmDisable}
-              disabled={pending || !mfaPasswordReady(disablePassword)}
-              className="flex items-center gap-1.5 text-xs px-4 py-2 rounded-lg bg-[color:var(--color-red)]/15 border border-[color:var(--color-red)]/50 text-[color:var(--color-red)] font-semibold hover:bg-[color:var(--color-red)]/25 transition-colors disabled:opacity-50"
-            >
-              {pending ? <Loader2 size={13} className="animate-spin" /> : <X size={13} />} {pending ? t('set.twoFactorDisabling') : t('set.twoFactorDisable')}
-            </button>
-            <button onClick={resetFlow} disabled={pending} className={ghostBtn}><X size={13} /> {t('common.cancel')}</button>
-          </div>
-        </div>
-      )}
-
-      {stage === 'recovery-codes' && recoveryCodes && (
-        <div className="space-y-2.5">
-          <div className="rounded-lg border border-[color:var(--color-gold)]/45 bg-[color:var(--color-gold)]/10 px-3 py-2 text-xs text-[color:var(--color-gold)]">
-            {t('set.twoFactorRecoveryWarning')}
-          </div>
-          <div className="grid grid-cols-2 gap-2 rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] p-3 text-sm" style={{ fontFamily: 'var(--font-mono)' }}>
-            {recoveryCodes.map((c) => (
-              <span key={c} className="select-all">{c}</span>
-            ))}
-          </div>
-          <button onClick={finishRecoveryCodes} className={saveBtn}><Check size={13} /> {t('set.twoFactorRecoverySaved')}</button>
-        </div>
-      )}
-    </Section>
-  );
-}
-
 // ─── Editable dropdown lists (taxonomies) ─────────────────────────────────────
 
 function ListsManager({ lists }: { lists: ListEditorEntry[] }) {
@@ -4032,7 +3645,7 @@ function ListEditor({ entry }: { entry: ListEditorEntry }) {
     <div className="rounded-xl border border-[color:var(--color-border)] p-3">
       <div className="flex items-center justify-between mb-2">
         <span className="text-sm font-medium">{entry.label}</span>
-        <span className="text-[10px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>{entry.where}</span>
+        <span className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>{entry.where}</span>
       </div>
       <div className="flex flex-wrap gap-1.5 mb-2">
         {values.map((v) => (
@@ -4102,16 +3715,15 @@ function SpacesManager({ spaces }: { spaces: string[] }) {
 
 function Section({ title, icon, children }: { title: string; icon?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div className="bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-2xl p-5">
-      <h2
-        className="flex items-center gap-2 text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-[0.15em] mb-4"
-        style={{ fontFamily: 'var(--font-mono)' }}
-      >
-        {icon}
+    <section className="bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-2xl p-5">
+      <h2 className="flex items-center gap-2.5 text-sm font-semibold text-[color:var(--color-text)] mb-3">
+        {icon && (
+          <span className="grid place-items-center w-7 h-7 rounded-lg bg-[color:var(--color-surface-2)] text-[color:var(--color-accent)] shrink-0">{icon}</span>
+        )}
         {title}
       </h2>
       <div className="space-y-2.5">{children}</div>
-    </div>
+    </section>
   );
 }
 
@@ -4124,15 +3736,3 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   );
 }
 
-function Stat({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="bg-[color:var(--color-surface-2)] rounded-lg px-3 py-2 text-center">
-      <div className="text-xl font-bold" style={{ fontFamily: 'var(--font-display)' }}>
-        {value}
-      </div>
-      <div className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider" style={{ fontFamily: 'var(--font-mono)' }}>
-        {label}
-      </div>
-    </div>
-  );
-}

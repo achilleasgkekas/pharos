@@ -131,10 +131,10 @@ export function CaptureClient({ initialUrl }: { initialUrl: string }) {
             {preview && (
               <div className="mt-3 rounded-xl border border-[color:var(--color-accent)] bg-[color:var(--color-surface-2)] p-3">
                 {preview.existing && (
-                  <p className="text-[10px] text-[color:var(--color-gold)] mb-2">{t('cap.matchesExisting', { title: preview.existing.title })}</p>
+                  <p className="text-[11px] text-[color:var(--color-gold)] mb-2">{t('cap.matchesExisting', { title: preview.existing.title })}</p>
                 )}
                 <p className="font-semibold text-sm leading-snug" style={{ fontFamily: 'var(--font-display)' }}>{preview.title}</p>
-                <p className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider mt-0.5">
+                <p className="text-[11px] text-[color:var(--color-text-faint)] mt-0.5">
                   {preview.category} · {preview.store}
                 </p>
                 {preview.price > 0 && (

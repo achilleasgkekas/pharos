@@ -149,16 +149,16 @@ export function QuickVerify({
               {/* the 3 headline fields, editable */}
               <div className="space-y-3">
                 <label className="block">
-                  <span className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>{t('rc.fStore')}</span>
+                  <span className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>{t('rc.fStore')}</span>
                   <SearchableSelect value={store} onChange={setStore} options={stores} allowCustom placeholder={t('rc.fStorePlaceholder')} />
                 </label>
                 <div className="grid grid-cols-2 gap-3">
                   <label className="block">
-                    <span className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>{t('ex.fDate')}</span>
+                    <span className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>{t('ex.fDate')}</span>
                     <DateInput required value={date} onValueChange={setDate} onProblemChange={setDateProblem} />
                   </label>
                   <label className="block">
-                    <span className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)] flex items-center gap-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
+                    <span className="text-[11px] text-[color:var(--color-text-faint)] flex items-center gap-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
                       {t('qv.total', { cur: isForeignCurrency(r.currency, base) ? currencySymbol(normalizeCurrency(r.currency)).trim() : cur() })}
                       <FxBadge doc={r} base={base} />
                     </span>
@@ -189,7 +189,7 @@ export function QuickVerify({
                 <Archive size={14} /> {t('rc.notReceipt')}
               </button>
             </div>
-            <p className="text-[10px] text-[color:var(--color-text-faint)] mt-3 text-center" style={{ fontFamily: 'var(--font-mono)' }}>
+            <p className="text-[11px] text-[color:var(--color-text-faint)] mt-3 text-center" style={{ fontFamily: 'var(--font-mono)' }}>
               {t('qv.keys')}
             </p>
           </>

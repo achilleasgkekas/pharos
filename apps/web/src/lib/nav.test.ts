@@ -5,6 +5,7 @@ import {
   ACCOUNT_LINKS,
   ALL_NAV_ITEMS,
   navActive,
+  navGroupOf,
 } from './nav';
 
 // Extracted from apps/web/e2e/smoke.mjs
@@ -37,6 +38,14 @@ describe('Navigation structure (#367)', () => {
     expect(navActive('/shopping', '/shopping-list')).toBe(false);
   });
 
+  it('finds the group of a page, and none for Home or the account pages', () => {
+    expect(navGroupOf('/expenses')?.key).toBe('nav.money');
+    expect(navGroupOf('/vehicles/abc')?.key).toBe('nav.homeAndCar');
+    expect(navGroupOf('/shopping-list')?.key).toBe('nav.shopping');
+    expect(navGroupOf('/')).toBeNull();
+    expect(navGroupOf('/settings')).toBeNull();
+  });
+
   it('groups contain items ordered logically', () => {
     expect(NAV_GROUPS.map((g) => g.key)).toEqual([
       'nav.money',
@@ -46,7 +55,6 @@ describe('Navigation structure (#367)', () => {
     ]);
     expect(HOME_ITEM.href).toBe('/');
     expect(ACCOUNT_LINKS.map((l) => l.href)).toEqual([
-      '/account',
       '/settings',
       '/jobs',
       '/history',

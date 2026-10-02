@@ -68,7 +68,7 @@ export function ShoppingListClient({ initialItems }: { initialItems: SerializedL
   });
 
   // E-shop layout state
-  const [layout, setLayout] = useState<'grid' | 'list'>('grid');
+  const [layout, setLayout] = useState<'grid' | 'list'>('list');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [catFilter, setCatFilter] = useState('');
   const [search, setSearch] = useState('');
@@ -232,19 +232,20 @@ export function ShoppingListClient({ initialItems }: { initialItems: SerializedL
   const statusLabel = (v: StatusFilter) => (v === 'all' ? t('common.all') : v === 'todo' ? t('sl.fToBuy') : t('sl.fBought'));
   const anyF = statusFilter !== 'all' || !!catFilter || !!search || sortBy !== 'recent';
 
+  const searchBox = <Input icon={<Search size={15} />} type="search" placeholder={t('common.search')} aria-label={t('common.search')} value={search} onChange={(e) => setSearch(e.target.value)} />;
+  const statusSwitch = (
+    <FilterOptions
+      variant="segmented"
+      value={statusFilter}
+      onChange={setStatusFilter}
+      options={(['all', 'todo', 'bought'] as const).map((v) => ({ value: v, label: statusLabel(v) }))}
+    />
+  );
   const filterControls = (
-    <div className="space-y-4">
-      <Input icon={<Search size={14} />} placeholder={t('common.search')} value={search} onChange={(e) => setSearch(e.target.value)} />
-      <FilterSection label={t('common.status')}>
-        <FilterOptions
-          value={statusFilter}
-          onChange={setStatusFilter}
-          options={(['all', 'todo', 'bought'] as const).map((v) => ({ value: v, label: statusLabel(v) }))}
-        />
-      </FilterSection>
+    <div>
       {cats.length > 0 && (
         <FilterSection label={t('common.category')}>
-          <select value={catFilter} onChange={(e) => setCatFilter(e.target.value)} className={filterControlClass} style={mono}>
+          <select value={catFilter} onChange={(e) => setCatFilter(e.target.value)} className={filterControlClass} aria-label={t('common.category')}>
             <option value="">{t('common.all')}</option>
             {cats.map((c) => (
               <option key={c} value={c}>{c}</option>
@@ -253,20 +254,21 @@ export function ShoppingListClient({ initialItems }: { initialItems: SerializedL
         </FilterSection>
       )}
       <FilterSection label={t('common.sort')}>
-        <select value={sortBy} onChange={(e) => setSortBy(e.target.value as SortKey)} className={filterControlClass} style={mono}>
+        <select value={sortBy} onChange={(e) => setSortBy(e.target.value as SortKey)} className={filterControlClass} aria-label={t('common.sort')}>
           <option value="recent">{t('sl.sortRecent')}</option>
           <option value="name">{t('sl.sortName')}</option>
           <option value="category">{t('common.category')}</option>
         </select>
       </FilterSection>
       {anyF && (
-        <button
-          onClick={() => { setStatusFilter('all'); setCatFilter(''); setSearch(''); setSortBy('recent'); }}
-          className="text-[0.65rem] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] underline"
-          style={mono}
-        >
-          reset filters
-        </button>
+        <div className="self-end">
+          <button
+            onClick={() => { setStatusFilter('all'); setCatFilter(''); setSearch(''); setSortBy('recent'); }}
+            className="h-10 text-sm text-[color:var(--color-text-dim)] hover:text-[color:var(--color-red)] underline"
+          >
+            {t('common.resetFilters')}
+          </button>
+        </div>
       )}
     </div>
   );
@@ -302,14 +304,14 @@ export function ShoppingListClient({ initialItems }: { initialItems: SerializedL
       </PageHeader>
       <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => onPhoto(e.target.files?.[0])} />
 
-      <FilterLayout filters={filterControls} active={anyF}>
+      <FilterLayout search={searchBox} quick={statusSwitch} filters={filterControls} active={anyF}>
           {scanErr && <p className="mb-3 text-xs text-[color:var(--color-red)]">{scanErr}</p>}
 
           {/* Items */}
           {visible.length === 0 ? (
             <EmptyState icon={<ShoppingBasket />} title={items.length === 0 ? t('sl.empty') : t('sl.noMatch')} />
           ) : (
-            <div className={cn(layout === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3' : 'flex flex-col gap-2')}>
+            <div className={cn(layout === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3' : 'rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] overflow-hidden divide-y divide-[color:var(--color-border)]')}>
               {visible.map((it) =>
                 layout === 'grid' ? (
                   <Card key={it._id} it={it} color={catColor(it.category)} selectMode={selectMode} selected={selectedIds.has(it._id)} onSelect={() => toggleSelect(it._id)} onToggle={() => toggle(it)} onRemove={() => remove(it)} onRestock={() => { setRestockItem(it); setRestockDays(it.restockIntervalDays?.toString() ?? ''); }} />
@@ -423,11 +425,11 @@ function Box({ checked, accent, onClick }: { checked: boolean; accent: boolean; 
   );
 }
 
-/** Mono uppercase category eyebrow — the same treatment as the inventory cards' eyebrow. */
+/** Mono category eyebrow — the same treatment as the inventory cards' eyebrow. */
 function Eyebrow({ category, color }: { category: string; color: string | null }) {
   if (!category) return null;
   return (
-    <span className="block text-[11px] uppercase tracking-[0.08em] mb-0.5 truncate" style={{ ...mono, color: color || 'var(--color-text-faint)' }}>
+    <span className="block text-[11px] mb-0.5 truncate" style={{ ...mono, color: color || 'var(--color-text-faint)' }}>
       {category}
     </span>
   );
@@ -437,9 +439,9 @@ function Meta({ it }: { it: SerializedListItem }) {
   if (!it.quantity && !it.aiScanned && !it.restockIntervalDays) return null;
   return (
     <div className="flex flex-wrap items-center gap-1.5 mt-2">
-      {it.quantity && <span className="text-[10px] px-1.5 py-0.5 rounded bg-[color:var(--color-surface-2)] text-[color:var(--color-text-dim)]" style={mono}>{it.quantity}</span>}
-      {it.aiScanned && <span className="text-[10px] text-[color:var(--color-accent)] flex items-center gap-0.5" style={mono}><Sparkles size={9} /> AI</span>}
-      {it.restockIntervalDays && <span className="text-[10px] text-[color:var(--color-text-faint)]" style={mono}>↻ {it.restockIntervalDays}d</span>}
+      {it.quantity && <span className="text-[11px] px-1.5 py-0.5 rounded bg-[color:var(--color-surface-2)] text-[color:var(--color-text-dim)]" style={mono}>{it.quantity}</span>}
+      {it.aiScanned && <span className="text-[11px] text-[color:var(--color-accent)] flex items-center gap-0.5" style={mono}><Sparkles size={9} /> AI</span>}
+      {it.restockIntervalDays && <span className="text-[11px] text-[color:var(--color-text-faint)]" style={mono}>↻ {it.restockIntervalDays}d</span>}
     </div>
   );
 }
@@ -477,7 +479,7 @@ function Card({ it, color, selectMode, selected, onSelect, onToggle, onRemove, o
         <Meta it={it} />
       </div>
       {!selectMode && (
-        <div className="flex flex-col"><button onClick={(e) => { e.stopPropagation(); onRestock?.(); }} className="p-1.5 text-[color:var(--color-text-faint)] hover:text-[color:var(--color-accent)] opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 focus:opacity-100" aria-label="restock"><Repeat2 size={14} /></button><button onClick={(e) => { e.stopPropagation(); onRemove(); }} className="p-1.5 text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 focus:opacity-100" aria-label="remove"><Trash2 size={14} /></button></div>
+        <div className="flex flex-col"><button onClick={(e) => { e.stopPropagation(); onRestock?.(); }} className="p-1.5 text-[color:var(--color-text-faint)] hover:text-[color:var(--color-accent)] opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 focus:opacity-100" aria-label="restock"><Repeat2 size={14} /></button><button onClick={(e) => { e.stopPropagation(); onRemove(); }} className="p-2.5 text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 focus:opacity-100" aria-label="remove"><Trash2 size={14} /></button></div>
       )}
     </div>
   );
@@ -490,28 +492,32 @@ function Row({ it, color, selectMode, selected, onSelect, onToggle, onRemove, on
     <div
       onClick={selectMode ? onSelect : undefined}
       className={cn(
-        'group relative flex items-center gap-3 bg-[color:var(--color-surface)] border rounded-xl pl-4 pr-3 py-2.5 overflow-hidden transition-colors',
+        'group flex items-center gap-3 pl-3 sm:pl-4 pr-2 py-2.5 transition-colors',
         selectMode && 'cursor-pointer',
-        selected ? 'border-[color:var(--color-accent)] ring-1 ring-[color:var(--color-accent)]' : 'border-[color:var(--color-border)] hover:border-[color:var(--color-border-light)]',
+        selected ? 'bg-[color:var(--color-accent)]/10' : 'hover:bg-[color:var(--color-surface-2)]',
         it.checked && !selected && 'opacity-60'
       )}
     >
-      {color && <span className="absolute left-0 top-0 bottom-0 w-1" style={{ background: color }} />}
       <Box checked={selectMode ? selected : it.checked} accent={selectMode && selected} onClick={selectMode ? undefined : (e) => { e.stopPropagation(); onToggle(); }} />
       <div className={cn('min-w-0 flex-1', !selectMode && 'cursor-pointer')} onClick={selectMode ? undefined : onToggle}>
-        <span className={cn('block text-sm font-semibold truncate', struck && 'line-through')} style={display}>
+        <span className={cn('block text-[15px] font-semibold truncate', struck && 'line-through')}>
           {it.name}
           {it.brand && <span className="text-[color:var(--color-text-faint)] font-normal"> · {it.brand}</span>}
         </span>
         {(it.quantity || it.category) && (
           <span className="flex items-center gap-2 mt-0.5">
-            {it.category && <span className="text-[10px] uppercase tracking-[0.08em]" style={{ ...mono, color: color || 'var(--color-text-faint)' }}>{it.category}</span>}
-            {it.quantity && <span className="text-[10px] px-1.5 py-0.5 rounded bg-[color:var(--color-surface-2)] text-[color:var(--color-text-dim)]" style={mono}>{it.quantity}</span>}
+            {it.category && (
+              <span className="inline-flex items-center gap-1.5 text-xs text-[color:var(--color-text-dim)]">
+                {color && <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} aria-hidden />}
+                {it.category}
+              </span>
+            )}
+            {it.quantity && <span className="text-[11px] px-1.5 py-0.5 rounded bg-[color:var(--color-surface-2)] text-[color:var(--color-text-dim)]" style={mono}>{it.quantity}</span>}
           </span>
         )}
       </div>
       {!selectMode && (
-        <div className="flex"><button onClick={(e) => { e.stopPropagation(); onRestock?.(); }} className="p-1.5 text-[color:var(--color-text-faint)] hover:text-[color:var(--color-accent)] opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 focus:opacity-100" aria-label="restock"><Repeat2 size={15} /></button><button onClick={(e) => { e.stopPropagation(); onRemove(); }} className="p-1.5 text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 focus:opacity-100" aria-label="remove"><Trash2 size={15} /></button></div>
+        <div className="flex"><button onClick={(e) => { e.stopPropagation(); onRestock?.(); }} className="p-2.5 text-[color:var(--color-text-faint)] hover:text-[color:var(--color-accent)] opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 focus:opacity-100" aria-label="restock"><Repeat2 size={15} /></button><button onClick={(e) => { e.stopPropagation(); onRemove(); }} className="p-2.5 text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 focus:opacity-100" aria-label="remove"><Trash2 size={15} /></button></div>
       )}
     </div>
   );

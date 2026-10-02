@@ -102,7 +102,7 @@ function EntryRow({ e, onClick }: { e: Entry; onClick: () => void }) {
       </span>
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium truncate text-[color:var(--color-text)]">{e.label}</p>
-        <p className="text-[10px] text-[color:var(--color-text-faint)] truncate" style={mono}>
+        <p className="text-[11px] text-[color:var(--color-text-faint)] truncate" style={mono}>
           {e.sub}
         </p>
       </div>
@@ -195,7 +195,7 @@ function MonthGrid({
         {weekdays(locale).map((w) => (
           <div
             key={w}
-            className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider text-center pb-1"
+            className="text-[11px] text-[color:var(--color-text-faint)] text-center pb-1"
             style={mono}
           >
             {w}
@@ -258,7 +258,7 @@ function MonthGrid({
                         onSelectEntry(e);
                       }}
                       title={`${e.label} · ${e.sub}${e.amount != null ? ` · ${fmt(e.amount)}` : ''}`}
-                      className="text-[10px] leading-tight px-1.5 py-1 rounded truncate text-left cursor-pointer hover:brightness-125 transition-all"
+                      className="text-[11px] leading-tight px-1.5 py-1 rounded truncate text-left cursor-pointer hover:brightness-125 transition-all"
                       style={{ color: meta.color, background: `color-mix(in srgb, ${meta.color} 14%, transparent)` }}
                     >
                       {e.amount != null && <b>{e.kind === 'income' ? '+' : ''}{fmt(e.amount)} </b>}
@@ -275,7 +275,7 @@ function MonthGrid({
       {/* Selected day events list on phone (#356: dots + day list under grid) */}
       {selectedDay != null && (
         <div className="sm:hidden mt-4 pt-3 border-t border-[color:var(--color-border)]">
-          <h3 className="text-xs font-semibold text-[color:var(--color-text-dim)] uppercase tracking-wider mb-2" style={mono}>
+          <h3 className="text-xs font-semibold text-[color:var(--color-text-dim)] mb-2" style={mono}>
             {dayMonth(`${month.key}-${String(selectedDay).padStart(2, '0')}`, locale)}
           </h3>
           {selectedDayEvents.length === 0 ? (
@@ -361,7 +361,7 @@ function EventDetailModal({
                 {fmt(entry.amount)}
               </span>
               {d?.billingCycle && (
-                <span className="block text-[10px] text-[color:var(--color-text-faint)]" style={mono}>
+                <span className="block text-[11px] text-[color:var(--color-text-faint)]" style={mono}>
                   {t(`sub.${d.billingCycle}` as TKey)}
                 </span>
               )}
@@ -459,7 +459,7 @@ function EventDetailModal({
           {d?.code && (
             <div className="flex justify-between items-center">
               <span className="text-[color:var(--color-text-dim)]">Code</span>
-              <span className="font-bold text-[color:var(--color-gold)] font-mono text-sm tracking-wider">
+              <span className="font-bold text-[color:var(--color-gold)] font-mono text-sm">
                 {d.code}
               </span>
             </div>
@@ -494,7 +494,7 @@ function EventDetailModal({
         {/* Installment plan details breakdown */}
         {d?.plans && d.plans.length > 0 && (
           <div className="space-y-1.5">
-            <h4 className="text-[11px] font-semibold text-[color:var(--color-text-dim)] uppercase tracking-wider" style={mono}>
+            <h4 className="text-[11px] font-semibold text-[color:var(--color-text-dim)]" style={mono}>
               {t('cal.lblInstallments')}
             </h4>
             <div className="space-y-1">
@@ -502,7 +502,7 @@ function EventDetailModal({
                 <div key={idx} className="flex items-center justify-between text-xs p-2 rounded-lg bg-[color:var(--color-surface)] border border-[color:var(--color-border)]">
                   <div>
                     <p className="font-medium">{p.merchant || p.cardName || 'Plan'}</p>
-                    <p className="text-[10px] text-[color:var(--color-text-faint)]" style={mono}>
+                    <p className="text-[11px] text-[color:var(--color-text-faint)]" style={mono}>
                       {p.cardName ? `${p.cardName} · ` : ''}Installment {p.planIndex} of {p.totalInstallments}
                     </p>
                   </div>
@@ -621,7 +621,7 @@ export function CalendarClient({ months, dueThisMonth }: { months: MonthBlock[];
               <ChevronLeft size={18} />
             </button>
             <div className="text-center">
-              <h2 className="text-sm font-bold uppercase tracking-[0.1em]" style={mono}>
+              <h2 className="text-sm font-bold" style={mono}>
                 {m.label}
               </h2>
               <span className="text-[11px] text-[color:var(--color-text-faint)]" style={mono}>
@@ -653,7 +653,7 @@ export function CalendarClient({ months, dueThisMonth }: { months: MonthBlock[];
         months.map((mb) => (
           <section key={mb.key} className="mb-6">
             <div className="flex items-baseline justify-between mb-2 pb-1.5 border-b border-[color:var(--color-border)]">
-              <h2 className="text-sm font-bold uppercase tracking-[0.1em]" style={mono}>
+              <h2 className="text-sm font-bold" style={mono}>
                 {mb.label}
               </h2>
               <span className="text-[11px] text-[color:var(--color-text-faint)]" style={mono}>

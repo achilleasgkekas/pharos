@@ -1,9 +1,9 @@
 import { useId } from 'react';
 import { cn } from './cn';
 
-/** The small mono caption above a form control. Exported for the rare caption that labels no
- *  single control (a row of chips, a read-only value). */
-export const FIELD_LABEL = 'block text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider mb-1.5';
+/** The caption above a form control. Exported for the rare caption that labels no single
+ *  control (a row of chips, a read-only value). */
+export const FIELD_LABEL = 'block text-xs font-medium text-[color:var(--color-text-dim)] mb-1.5';
 
 /**
  * One labelled form row, the same on every page (#351).
@@ -29,11 +29,11 @@ export function Field({
 }) {
   const id = useId();
   const caption = (
-    <span id={as === 'div' ? id : undefined} className={FIELD_LABEL} style={{ fontFamily: 'var(--font-mono)' }}>
+    <span id={as === 'div' ? id : undefined} className={FIELD_LABEL}>
       {label}
     </span>
   );
-  const help = hint ? <span className="block mt-1 text-[11px] text-[color:var(--color-text-faint)]">{hint}</span> : null;
+  const help = hint ? <span className="block mt-1 text-xs text-[color:var(--color-text-faint)]">{hint}</span> : null;
   if (as === 'div') {
     return (
       <div role="group" aria-labelledby={id} className={cn('block min-w-0', className)}>

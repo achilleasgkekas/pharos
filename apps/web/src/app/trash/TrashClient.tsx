@@ -241,7 +241,7 @@ function Chip({ active, onClick, label }: { active: boolean; onClick: () => void
     <button
       onClick={onClick}
       className={cn(
-        'px-2.5 py-1 rounded-lg text-[11px] uppercase tracking-wide border transition-colors',
+        'px-2.5 py-1 rounded-lg text-[11px] border transition-colors',
         active
           ? 'bg-[color:var(--color-accent)]/15 border-[color:var(--color-accent)]/40 text-[color:var(--color-accent)]'
           : 'border-[color:var(--color-border)] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)]'

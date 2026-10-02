@@ -48,7 +48,7 @@ export function McpManager() {
 
   return (
     <div className="space-y-4" style={{ fontFamily: 'inherit' }}>
-      <p className="text-sm text-[color:var(--color-text-dim)]">
+      <p className="text-xs text-[color:var(--color-text-dim)]">
         {t('mcp.intro')}
       </p>
 
@@ -56,7 +56,7 @@ export function McpManager() {
       <div>
         <span className={FIELD_LABEL} style={{ fontFamily: 'var(--font-mono)' }}>{t('mcp.connectorUrl')}</span>
         <div className="flex items-center gap-2">
-          <code className={codeCls} style={{ fontFamily: 'var(--font-mono)' }}>{url}</code>
+          <code className={codeCls} style={{ fontFamily: 'var(--font-code)' }}>{url}</code>
           <button type="button" onClick={() => copy(url, 'url')} className={iconBtn} title={t('mcp.copyUrl')}>
             {copied === 'url' ? <Check size={14} className="text-[color:var(--color-accent)]" /> : <Copy size={14} />}
           </button>
@@ -72,7 +72,7 @@ export function McpManager() {
         {token ? (
           <div className="space-y-1.5">
             <div className="flex items-center gap-2">
-              <code className={`${codeCls} text-[color:var(--color-accent)]`} style={{ fontFamily: 'var(--font-mono)' }}>{token}</code>
+              <code className={`${codeCls} text-[color:var(--color-accent)]`} style={{ fontFamily: 'var(--font-code)' }}>{token}</code>
               <button type="button" onClick={() => copy(token, 'tok')} className={iconBtn} title={t('mcp.copyToken')}>
                 {copied === 'tok' ? <Check size={14} className="text-[color:var(--color-accent)]" /> : <Copy size={14} />}
               </button>

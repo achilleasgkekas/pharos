@@ -1,26 +1,10 @@
 'use client';
-import { useMemo, useState, useTransition, useEffect } from 'react';
+import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import {
-  MessageSquare,
-  Search,
-  Trash2,
-  Check,
-  ChevronDown,
-  Activity,
-  Download,
-  X,
-  Copy,
-  Clock,
-  Coins,
-  Cpu,
-  RefreshCw,
-  AlertTriangle,
-} from 'lucide-react';
-import { Button } from '@/components/ui/Button';
+import { MessageSquare, Search, Trash2, Check, ChevronDown, Activity, Download, Copy, AlertTriangle } from 'lucide-react';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { Input } from '@/components/ui/Input';
-import { PAGE_MAIN, PageHeader } from '@/components/ui/PageHeader';
+import { Input, filterControlClass } from '@/components/ui/Input';
+import { PAGE_MAIN, PageHeader, HeaderButton, HeaderTotals, FilterLayout, FilterSection, FilterOptions } from '@/components/ui/PageHeader';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { cn } from '@/components/ui/cn';
 import { Modal } from '@/components/ui/Modal';
@@ -33,8 +17,9 @@ import {
   type ConversationRow,
 } from './actions';
 import type { SerializedAiRun, AiRunSummary, AiRunFilter } from '@/lib/aiRun';
-import { useT } from '@/components/LocaleProvider';
+import { useLocale, useT } from '@/components/LocaleProvider';
 import { relTime } from '@/lib/i18n/format';
+import type { TKey } from '@/lib/i18n';
 
 function renderRich(text: string) {
   return text.split('\n').map((line, li, arr) => (
@@ -47,20 +32,21 @@ function renderRich(text: string) {
   ));
 }
 
-const FEATURE_LABELS: Record<string, string> = {
-  commandBar: 'Command bar',
-  receipts: 'Receipts',
-  expenses: 'Bills & payslips',
-  statements: 'Statements',
-  statementCategorize: 'Categorize',
-  itemsImport: 'Product import',
-  scraperPrice: 'Price scraper',
-  productPhoto: 'Product photo',
-  vehicles: 'Vehicles',
-  vouchers: 'Vouchers',
-  cards: 'Cards',
-  subscriptions: 'Subscriptions',
-  test: 'Test probe',
+// AI run features, named as on Settings → Provider & features.
+const FEATURE_KEYS: Record<string, TKey> = {
+  commandBar: 'af.commandBar',
+  receipts: 'af.receipts',
+  expenses: 'af.expenses',
+  statements: 'af.statements',
+  statementCategorize: 'af.statementCategorize',
+  itemsImport: 'af.itemsImport',
+  scraperPrice: 'sys.checkScraper',
+  productPhoto: 'af.productPhoto',
+  vehicles: 'af.vehicles',
+  vouchers: 'af.vouchers',
+  cards: 'af.cards',
+  subscriptions: 'af.subscriptions',
+  test: 'hist.featTest',
 };
 
 function formatCost(
@@ -140,7 +126,9 @@ export function HistoryClient({
   const router = useRouter();
   const confirm = useConfirm();
   const t = useT();
+  const locale = useLocale();
   const [pending, start] = useTransition();
+  const featureLabel = (f: string) => (FEATURE_KEYS[f] ? t(FEATURE_KEYS[f]) : f);
 
   const [activeTab, setActiveTab] = useState<'runs' | 'conversations'>('runs');
 
@@ -270,135 +258,194 @@ export function HistoryClient({
     return Math.max(1, ...runsData.dailyCosts.map((d) => d.costMicros));
   }, [runsData.dailyCosts]);
 
+  const filtersActive = featureFilter !== 'all' || statusFilter !== 'all' || modelFilter !== 'all' || datePreset === 'custom';
+  function resetRunFilters() {
+    setDatePreset('all');
+    setDateFrom('');
+    setDateTo('');
+    setFeatureFilter('all');
+    setModelFilter('all');
+    setStatusFilter('all');
+    void loadRuns({ dateFrom: undefined, dateTo: undefined, feature: undefined, model: undefined, status: undefined });
+  }
+  const cost = (micros: number) => formatCost(micros, currency, fxRate);
+  const duration = (ms: number) => (ms >= 1000 ? `${(ms / 1000).toFixed(1)} s` : `${ms} ms`);
+
+  const periodSwitch = (
+    <FilterOptions
+      variant="segmented"
+      value={datePreset === 'custom' || datePreset === 'yesterday' ? ('' as typeof datePreset) : datePreset}
+      onChange={handlePresetChange}
+      options={[
+        { value: 'all', label: t('hist.pAll') },
+        { value: 'today', label: t('hist.pToday') },
+        { value: '7d', label: t('hist.p7d') },
+        { value: 'month', label: t('hist.pMonth') },
+      ]}
+    />
+  );
+  const runFilters = (
+    <div>
+      <FilterSection label={t('hist.from')}>
+        <DateInput
+          value={dateFrom}
+          onValueChange={(val) => {
+            setDatePreset('custom');
+            setDateFrom(val);
+            void loadRuns({ dateFrom: val || undefined });
+          }}
+          keepWhileTyping
+        />
+      </FilterSection>
+      <FilterSection label={t('hist.to')}>
+        <DateInput
+          value={dateTo}
+          onValueChange={(val) => {
+            setDatePreset('custom');
+            setDateTo(val);
+            void loadRuns({ dateTo: val || undefined });
+          }}
+          keepWhileTyping
+        />
+      </FilterSection>
+      <FilterSection label={t('hist.feature')}>
+        <select
+          aria-label={t('hist.feature')}
+          value={featureFilter}
+          onChange={(e) => {
+            setFeatureFilter(e.target.value);
+            void loadRuns({ feature: e.target.value !== 'all' ? e.target.value : undefined });
+          }}
+          className={filterControlClass}
+        >
+          <option value="all">{t('hist.allFeatures')}</option>
+          {Object.keys(FEATURE_KEYS).map((k) => (
+            <option key={k} value={k}>
+              {featureLabel(k)}
+            </option>
+          ))}
+        </select>
+      </FilterSection>
+      <FilterSection label={t('common.status')}>
+        <select
+          aria-label={t('common.status')}
+          value={statusFilter}
+          onChange={(e) => {
+            setStatusFilter(e.target.value);
+            void loadRuns({ status: e.target.value !== 'all' ? e.target.value : undefined });
+          }}
+          className={filterControlClass}
+        >
+          <option value="all">{t('hist.allStatuses')}</option>
+          <option value="ok">{t('hist.stOk')}</option>
+          <option value="error">{t('hist.stError')}</option>
+          <option value="blocked">{t('hist.stBlockedHint')}</option>
+        </select>
+      </FilterSection>
+      {modelOptions.length > 0 && (
+        <FilterSection label={t('hist.model')}>
+          <select
+            aria-label={t('hist.model')}
+            value={modelFilter}
+            onChange={(e) => {
+              setModelFilter(e.target.value);
+              void loadRuns({ model: e.target.value !== 'all' ? e.target.value : undefined });
+            }}
+            className={filterControlClass}
+          >
+            <option value="all">{t('hist.allModels')}</option>
+            {modelOptions.map((m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
+          </select>
+        </FilterSection>
+      )}
+      {filtersActive && (
+        <div className="self-end">
+          <button type="button" onClick={resetRunFilters} disabled={pending} className="h-10 text-sm text-[color:var(--color-text-dim)] hover:text-[color:var(--color-red)] underline">
+            {t('common.resetFilters')}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+
+  const TABS = [
+    { id: 'runs' as const, label: t('hist.tabRuns'), n: runsData.total },
+    { id: 'conversations' as const, label: t('hist.tabChats'), n: conversations.length },
+  ];
+
   return (
     <main className={PAGE_MAIN}>
       <PageHeader
         title={t('nav.history')}
-        count={activeTab === 'runs' ? runsData.total : conversations.length}
-        subtitle={
-          activeTab === 'runs'
-            ? 'Complete audit log of token usage, latency, and costs across all AI calls.'
-            : t('history.intro')
+        subtitle={activeTab === 'runs' ? t('hist.subtitleRuns') : t('history.intro')}
+        summary={
+          activeTab === 'runs' && runsData.summary.totalRuns > 0 ? (
+            <HeaderTotals
+              items={[
+                { label: t('hist.calls'), value: runsData.summary.totalRuns.toLocaleString(locale) },
+                { label: t('hist.spend'), value: cost(runsData.summary.totalCostMicros).primary, tone: 'accent' },
+                { label: t('hist.tokensIn'), value: runsData.summary.totalInputTokens.toLocaleString(locale) },
+                { label: t('hist.tokensOut'), value: runsData.summary.totalOutputTokens.toLocaleString(locale) },
+              ]}
+            />
+          ) : undefined
         }
       >
         {activeTab === 'conversations' && conversations.length > 0 && (
-          <Button variant="danger" onClick={clearAllConversations} disabled={pending}>
-            <Trash2 size={14} /> {t('history.clearAll')}
-          </Button>
+          <HeaderButton tone="default" icon={<Trash2 size={15} />} onClick={clearAllConversations} disabled={pending} className="hover:text-[color:var(--color-red)]">
+            {t('history.clearAll')}
+          </HeaderButton>
         )}
         {activeTab === 'runs' && (
-          <Button variant="secondary" onClick={handleExportCsv} disabled={exporting || pending}>
-            <Download size={14} /> {exporting ? 'Exporting…' : 'Export CSV'}
-          </Button>
+          <HeaderButton icon={<Download size={15} />} onClick={handleExportCsv} disabled={exporting || pending}>
+            {exporting ? t('hist.exporting') : t('hist.export')}
+          </HeaderButton>
         )}
       </PageHeader>
 
-      {/* Tab Switcher */}
-      <div className="flex border-b border-[color:var(--color-border)] mb-5">
-        <button
-          onClick={() => setActiveTab('runs')}
-          className={cn(
-            'flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px',
-            activeTab === 'runs'
-              ? 'border-[color:var(--color-accent)] text-[color:var(--color-accent)]'
-              : 'border-transparent text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]'
-          )}
-        >
-          <Activity size={16} />
-          <span>AI Runs</span>
-          <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-[color:var(--color-surface-2)] text-[color:var(--color-text-dim)] font-mono">
-            {runsData.total}
-          </span>
-        </button>
-        <button
-          onClick={() => setActiveTab('conversations')}
-          className={cn(
-            'flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px',
-            activeTab === 'conversations'
-              ? 'border-[color:var(--color-accent)] text-[color:var(--color-accent)]'
-              : 'border-transparent text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]'
-          )}
-        >
-          <MessageSquare size={16} />
-          <span>Command Bar</span>
-          <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-[color:var(--color-surface-2)] text-[color:var(--color-text-dim)] font-mono">
-            {conversations.length}
-          </span>
-        </button>
+      <div role="tablist" aria-label={t('nav.history')} className="mb-4 flex gap-1 overflow-x-auto no-scrollbar border-b border-[color:var(--color-border)]">
+        {TABS.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={cn(
+              'shrink-0 px-3 py-2 text-sm border-b-2 -mb-px transition-colors',
+              activeTab === tab.id
+                ? 'border-[color:var(--color-accent)] text-[color:var(--color-text)] font-semibold'
+                : 'border-transparent text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]'
+            )}
+          >
+            {tab.label}
+            <span className="ml-1.5 text-[color:var(--color-text-faint)] font-normal tabular-nums">{tab.n}</span>
+          </button>
+        ))}
       </div>
 
       {activeTab === 'runs' && (
-        <div className="space-y-5">
-          {/* Summary Metric Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-3.5">
-              <div className="text-[11px] uppercase tracking-wider font-semibold text-[color:var(--color-text-dim)] mb-1">
-                Total Calls
+        <FilterLayout quick={periodSwitch} filters={runFilters} active={filtersActive}>
+          {runsData.dailyCosts.length > 1 && (
+            <div className="mb-3 rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-4 py-3">
+              <div className="flex items-center justify-between mb-2 text-xs text-[color:var(--color-text-dim)]">
+                <span className="font-medium">{t('hist.dailySpend')}</span>
+                <span className="text-[color:var(--color-text-faint)]">{t('hist.daysRecorded', { n: runsData.dailyCosts.length })}</span>
               </div>
-              <div className="text-2xl font-bold font-mono text-[color:var(--color-text)]">
-                {runsData.summary.totalRuns.toLocaleString()}
-              </div>
-            </div>
-            <div className="rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-3.5">
-              <div className="text-[11px] uppercase tracking-wider font-semibold text-[color:var(--color-text-dim)] mb-1">
-                Total Spend ({currency})
-              </div>
-              <div className="text-2xl font-bold font-mono text-[color:var(--color-accent)]">
-                {formatCost(runsData.summary.totalCostMicros, currency, fxRate).primary}
-              </div>
-              {currency !== 'USD' && (
-                <div className="text-[11px] text-[color:var(--color-text-faint)] font-mono mt-0.5">
-                  {formatCost(runsData.summary.totalCostMicros, currency, fxRate).usd}
-                </div>
-              )}
-            </div>
-            <div className="rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-3.5">
-              <div className="text-[11px] uppercase tracking-wider font-semibold text-[color:var(--color-text-dim)] mb-1">
-                Input Tokens
-              </div>
-              <div className="text-2xl font-bold font-mono text-[color:var(--color-text)]">
-                {runsData.summary.totalInputTokens.toLocaleString()}
-              </div>
-            </div>
-            <div className="rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-3.5">
-              <div className="text-[11px] uppercase tracking-wider font-semibold text-[color:var(--color-text-dim)] mb-1">
-                Output Tokens
-              </div>
-              <div className="text-2xl font-bold font-mono text-[color:var(--color-text)]">
-                {runsData.summary.totalOutputTokens.toLocaleString()}
-              </div>
-            </div>
-          </div>
-
-          {/* Daily Spend Mini Chart */}
-          {runsData.dailyCosts.length > 0 && (
-            <div className="rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-4">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-semibold uppercase tracking-wider text-[color:var(--color-text-dim)]">
-                  Daily Spend Trend
-                </span>
-                <span className="text-[11px] text-[color:var(--color-text-faint)]">
-                  {runsData.dailyCosts.length} days recorded
-                </span>
-              </div>
-              <div className="flex items-end gap-1.5 h-20 pt-2 overflow-x-auto pb-1">
+              <div className="flex items-end gap-1 h-12 overflow-x-auto no-scrollbar">
                 {runsData.dailyCosts.map((d) => {
                   const pct = Math.max(8, Math.round((d.costMicros / maxDailyCost) * 100));
                   return (
                     <div
                       key={d.date}
-                      className="group relative flex-1 min-w-[14px] max-w-[28px] flex flex-col items-center justify-end h-full"
+                      title={`${d.date}: ${cost(d.costMicros).primary} · ${t('hist.callsN', { n: d.count })}`}
+                      className="flex-1 min-w-[8px] max-w-[24px] h-full flex items-end"
                     >
-                      <div
-                        className="w-full rounded-t bg-[color:var(--color-accent)]/70 hover:bg-[color:var(--color-accent)] transition-all cursor-pointer"
-                        style={{ height: `${pct}%` }}
-                      />
-                      {/* Tooltip */}
-                      <div className="pointer-events-none absolute bottom-full mb-1.5 hidden group-hover:flex flex-col items-center z-10">
-                        <div className="rounded bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] px-2 py-1 text-[10px] whitespace-nowrap shadow-lg">
-                          <span className="font-semibold">{d.date}</span>: {formatCost(d.costMicros, currency, fxRate).primary} ({d.count} calls)
-                        </div>
-                      </div>
+                      <div className="w-full rounded-t bg-[color:var(--color-accent)]/60 hover:bg-[color:var(--color-accent)] transition-colors" style={{ height: `${pct}%` }} />
                     </div>
                   );
                 })}
@@ -406,467 +453,145 @@ export function HistoryClient({
             </div>
           )}
 
-          {/* Filter Bar */}
-          <div className="rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-3 space-y-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs font-medium text-[color:var(--color-text-dim)] mr-1">Period:</span>
-              {(['all', 'today', 'yesterday', '7d', 'month', 'custom'] as const).map((p) => (
-                <button
-                  key={p}
-                  onClick={() => handlePresetChange(p)}
-                  className={cn(
-                    'px-2.5 py-1 rounded-lg text-xs font-medium transition-colors',
-                    datePreset === p
-                      ? 'bg-[color:var(--color-accent)]/15 text-[color:var(--color-accent)] font-semibold'
-                      : 'bg-[color:var(--color-surface-2)] text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]'
-                  )}
-                >
-                  {p === 'all'
-                    ? 'All time'
-                    : p === 'today'
-                    ? 'Today'
-                    : p === 'yesterday'
-                    ? 'Yesterday'
-                    : p === '7d'
-                    ? 'Last 7 days'
-                    : p === 'month'
-                    ? 'This month'
-                    : 'Custom'}
-                </button>
-              ))}
-
-              {datePreset === 'custom' && (
-                <div className="flex items-center gap-1.5 ml-2">
-                  <div className="w-36">
-                    <DateInput
-                      value={dateFrom}
-                      onValueChange={(val) => {
-                        setDateFrom(val);
-                        void loadRuns({ dateFrom: val || undefined });
-                      }}
-                      keepWhileTyping
-                      className="py-1 text-xs"
-                    />
-                  </div>
-                  <span className="text-xs text-[color:var(--color-text-dim)]">to</span>
-                  <div className="w-36">
-                    <DateInput
-                      value={dateTo}
-                      onValueChange={(val) => {
-                        setDateTo(val);
-                        void loadRuns({ dateTo: val || undefined });
-                      }}
-                      keepWhileTyping
-                      className="py-1 text-xs"
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-[color:var(--color-border)]">
-              {/* Feature filter */}
-              <div className="flex items-center gap-1.5 text-xs">
-                <span className="text-[color:var(--color-text-dim)]">Feature:</span>
-                <select
-                  value={featureFilter}
-                  onChange={(e) => {
-                    setFeatureFilter(e.target.value);
-                    void loadRuns({ feature: e.target.value !== 'all' ? e.target.value : undefined });
-                  }}
-                  className="px-2 py-1 rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-bg)] text-[color:var(--color-text)] text-xs"
-                >
-                  <option value="all">All features</option>
-                  {Object.entries(FEATURE_LABELS).map(([k, label]) => (
-                    <option key={k} value={k}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Status filter */}
-              <div className="flex items-center gap-1.5 text-xs">
-                <span className="text-[color:var(--color-text-dim)]">Status:</span>
-                <select
-                  value={statusFilter}
-                  onChange={(e) => {
-                    setStatusFilter(e.target.value);
-                    void loadRuns({ status: e.target.value !== 'all' ? e.target.value : undefined });
-                  }}
-                  className="px-2 py-1 rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-bg)] text-[color:var(--color-text)] text-xs"
-                >
-                  <option value="all">All statuses</option>
-                  <option value="ok">Ok</option>
-                  <option value="error">Error</option>
-                  <option value="blocked">Blocked (cap/off)</option>
-                </select>
-              </div>
-
-              {/* Model filter */}
-              {modelOptions.length > 0 && (
-                <div className="flex items-center gap-1.5 text-xs">
-                  <span className="text-[color:var(--color-text-dim)]">Model:</span>
-                  <select
-                    value={modelFilter}
-                    onChange={(e) => {
-                      setModelFilter(e.target.value);
-                      void loadRuns({ model: e.target.value !== 'all' ? e.target.value : undefined });
-                    }}
-                    className="px-2 py-1 rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-bg)] text-[color:var(--color-text)] text-xs"
-                  >
-                    <option value="all">All models</option>
-                    {modelOptions.map((m) => (
-                      <option key={m} value={m}>
-                        {m}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setDatePreset('all');
-                  setDateFrom('');
-                  setDateTo('');
-                  setFeatureFilter('all');
-                  setModelFilter('all');
-                  setStatusFilter('all');
-                  void loadRuns({
-                    dateFrom: undefined,
-                    dateTo: undefined,
-                    feature: undefined,
-                    model: undefined,
-                    status: undefined,
-                  });
-                }}
-                disabled={pending}
-                className="ml-auto text-xs py-1"
-              >
-                <RefreshCw size={12} className={cn(pending && 'animate-spin')} /> Reset
-              </Button>
-            </div>
-          </div>
-
-          {/* Runs Table */}
           {runsData.runs.length === 0 ? (
-            <EmptyState icon={<Activity />} title="No AI runs found" hint="AI operations will appear here as they occur." />
+            <EmptyState
+              icon={<Activity />}
+              title={filtersActive || datePreset !== 'all' ? t('hist.emptyFiltered') : t('hist.empty')}
+              hint={filtersActive || datePreset !== 'all' ? undefined : t('hist.emptyHint')}
+            />
           ) : (
-            <div className="rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] overflow-hidden shadow-sm">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-[color:var(--color-surface-2)] text-[color:var(--color-text-dim)] uppercase tracking-wider font-semibold border-b border-[color:var(--color-border)]">
-                    <tr>
-                      <th className="py-2.5 px-3">Status</th>
-                      <th className="py-2.5 px-3">Time</th>
-                      <th className="py-2.5 px-3">Feature</th>
-                      <th className="py-2.5 px-3">Model</th>
-                      <th className="py-2.5 px-3">Tokens</th>
-                      <th className="py-2.5 px-3 text-right">Cost ({currency})</th>
-                      <th className="py-2.5 px-3 text-right">Duration</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[color:var(--color-border)]">
-                    {runsData.runs.map((r) => {
-                      const totalTok = r.usage.inputTokens + r.usage.outputTokens;
-                      const hasCache = r.usage.cacheWriteTokens > 0 || r.usage.cacheReadTokens > 0;
-                      return (
-                        <tr
-                          key={r._id}
-                          onClick={() => setSelectedRun(r)}
-                          className="hover:bg-[color:var(--color-surface-2)]/50 cursor-pointer transition-colors"
-                        >
-                          <td className="py-2.5 px-3 whitespace-nowrap">
-                            {r.status === 'ok' ? (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold uppercase bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
-                                ok
-                              </span>
-                            ) : r.status === 'blocked' ? (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold uppercase bg-amber-500/15 text-amber-600 dark:text-amber-400">
-                                blocked
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold uppercase bg-red-500/15 text-red-600 dark:text-red-400">
-                                error
-                              </span>
-                            )}
-                          </td>
-                          <td className="py-2.5 px-3 whitespace-nowrap text-[color:var(--color-text-dim)] font-mono text-[11px]">
-                            {relTime(r.at, t)}
-                          </td>
-                          <td className="py-2.5 px-3 whitespace-nowrap font-medium text-[color:var(--color-text)]">
-                            {FEATURE_LABELS[r.feature] ?? r.feature}
-                          </td>
-                          <td className="py-2.5 px-3 whitespace-nowrap font-mono text-[11px] text-[color:var(--color-text-dim)]">
-                            <span className="text-[color:var(--color-text-faint)] mr-1">[{r.provider}]</span>
-                            {r.model}
-                          </td>
-                          <td className="py-2.5 px-3 whitespace-nowrap font-mono text-[11px]">
-                            <span>{totalTok.toLocaleString()}</span>
-                            <span className="text-[color:var(--color-text-faint)] ml-1">
-                              (↓{r.usage.inputTokens.toLocaleString()} ↑{r.usage.outputTokens.toLocaleString()})
-                            </span>
-                            {hasCache && (
-                              <span className="text-[10px] ml-1 px-1 rounded bg-[color:var(--color-accent)]/10 text-[color:var(--color-accent)] font-sans">
-                                cache
-                              </span>
-                            )}
-                          </td>
-                          <td className="py-2.5 px-3 whitespace-nowrap text-right font-mono font-medium text-[color:var(--color-accent)]">
-                            <div>{formatCost(r.costMicros, currency, fxRate).primary}</div>
-                            {currency !== 'USD' && (
-                              <div className="text-[10px] text-[color:var(--color-text-faint)] font-normal">
-                                {formatCost(r.costMicros, currency, fxRate).usd}
-                              </div>
-                            )}
-                          </td>
-                          <td className="py-2.5 px-3 whitespace-nowrap text-right font-mono text-[11px] text-[color:var(--color-text-dim)]">
-                            {r.durationMs >= 1000 ? `${(r.durationMs / 1000).toFixed(1)}s` : `${r.durationMs}ms`}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+            <div className="rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] overflow-hidden divide-y divide-[color:var(--color-border)]">
+              {runsData.runs.map((r) => {
+                const totalTok = r.usage.inputTokens + r.usage.outputTokens;
+                const hasCache = r.usage.cacheWriteTokens > 0 || r.usage.cacheReadTokens > 0;
+                const c = cost(r.costMicros);
+                return (
+                  <button
+                    key={r._id}
+                    type="button"
+                    onClick={() => setSelectedRun(r)}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-[color:var(--color-surface-2)] transition-colors"
+                  >
+                    <RunDot status={r.status} />
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-center gap-2 min-w-0">
+                        <span className="text-sm font-medium truncate">{featureLabel(r.feature)}</span>
+                        {r.status !== 'ok' && <RunStatusLabel status={r.status} />}
+                      </span>
+                      <span className="block text-xs text-[color:var(--color-text-faint)] truncate">
+                        {relTime(r.at, t)} · <span style={{ fontFamily: 'var(--font-code)' }}>{r.model}</span> · {totalTok.toLocaleString(locale)} tok
+                        {hasCache ? ` · ${t('hist.cache')}` : ''}
+                      </span>
+                    </span>
+                    <span className="shrink-0 text-right">
+                      <span className="block text-sm font-semibold tabular-nums">{c.primary}</span>
+                      <span className="block text-xs text-[color:var(--color-text-faint)] tabular-nums">{duration(r.durationMs)}</span>
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           )}
+        </FilterLayout>
+      )}
 
+      {activeTab === 'runs' && (
+        <div>
           {/* Inspector Modal for selected AI run */}
           {selectedRun && (
-            <Modal open={!!selectedRun} onClose={() => setSelectedRun(null)} title="AI Run Details" size="lg">
-              <div className="p-6 space-y-5">
+            <Modal open={!!selectedRun} onClose={() => setSelectedRun(null)} title={featureLabel(selectedRun.feature)} size="lg">
+              <div className="space-y-5">
                 <div className="flex items-center gap-2">
-                  {selectedRun.status === 'ok' ? (
-                    <span className="px-2 py-0.5 rounded text-[10px] font-semibold uppercase bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
-                      ok
-                    </span>
-                  ) : selectedRun.status === 'blocked' ? (
-                    <span className="px-2 py-0.5 rounded text-[10px] font-semibold uppercase bg-amber-500/15 text-amber-600 dark:text-amber-400">
-                      blocked
-                    </span>
-                  ) : (
-                    <span className="px-2 py-0.5 rounded text-[10px] font-semibold uppercase bg-red-500/15 text-red-600 dark:text-red-400">
-                      error
-                    </span>
-                  )}
-                  <span className="text-xs text-[color:var(--color-text-faint)] font-mono">
-                    {selectedRun.at}
-                  </span>
+                  <RunDot status={selectedRun.status} />
+                  <RunStatusLabel status={selectedRun.status} />
+                  <span className="text-xs text-[color:var(--color-text-faint)] tabular-nums">{new Date(selectedRun.at).toLocaleString(locale)}</span>
                 </div>
 
-                {/* Key Metrics */}
                 <div className="grid grid-cols-3 gap-3 p-3 rounded-xl bg-[color:var(--color-surface-2)]">
-                  <div>
-                    <div className="text-[10px] uppercase font-semibold text-[color:var(--color-text-dim)]">
-                      Cost ({currency})
-                    </div>
-                    <div className="text-lg font-bold font-mono text-[color:var(--color-accent)]">
-                      {formatCost(selectedRun.costMicros, currency, fxRate).primary}
-                    </div>
-                    {currency !== 'USD' && (
-                      <div className="text-xs text-[color:var(--color-text-faint)] font-mono">
-                        {formatCost(selectedRun.costMicros, currency, fxRate).usd}
-                      </div>
-                    )}
-                  </div>
-                  <div>
-                    <div className="text-[10px] uppercase font-semibold text-[color:var(--color-text-dim)]">
-                      Duration
-                    </div>
-                    <div className="text-lg font-bold font-mono text-[color:var(--color-text)]">
-                      {selectedRun.durationMs >= 1000
-                        ? `${(selectedRun.durationMs / 1000).toFixed(2)}s`
-                        : `${selectedRun.durationMs}ms`}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-[10px] uppercase font-semibold text-[color:var(--color-text-dim)]">
-                      Total Tokens
-                    </div>
-                    <div className="text-lg font-bold font-mono text-[color:var(--color-text)]">
-                      {(selectedRun.usage.inputTokens + selectedRun.usage.outputTokens).toLocaleString()}
-                    </div>
-                  </div>
+                  <RunMetric label={t('hist.cost')} value={cost(selectedRun.costMicros).primary} sub={currency !== 'USD' ? cost(selectedRun.costMicros).usd : undefined} accent />
+                  <RunMetric label={t('hist.duration')} value={duration(selectedRun.durationMs)} />
+                  <RunMetric label={t('hist.totalTokens')} value={(selectedRun.usage.inputTokens + selectedRun.usage.outputTokens).toLocaleString(locale)} />
                 </div>
 
-                {/* Token Usage Breakdown */}
-                <div className="space-y-2 border-t border-[color:var(--color-border)] pt-4">
-                  <div className="text-xs font-semibold uppercase tracking-wider text-[color:var(--color-text-dim)]">
-                    Token Breakdown
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 text-xs font-mono">
-                    <div className="flex justify-between p-2 rounded bg-[color:var(--color-surface-2)]">
-                      <span className="text-[color:var(--color-text-dim)]">Input:</span>
-                      <span className="font-semibold">{selectedRun.usage.inputTokens.toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between p-2 rounded bg-[color:var(--color-surface-2)]">
-                      <span className="text-[color:var(--color-text-dim)]">Output:</span>
-                      <span className="font-semibold">{selectedRun.usage.outputTokens.toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between p-2 rounded bg-[color:var(--color-surface-2)]">
-                      <span className="text-[color:var(--color-text-dim)]">Cache Write:</span>
-                      <span className="font-semibold">{selectedRun.usage.cacheWriteTokens.toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between p-2 rounded bg-[color:var(--color-surface-2)]">
-                      <span className="text-[color:var(--color-text-dim)]">Cache Read:</span>
-                      <span className="font-semibold">{selectedRun.usage.cacheReadTokens.toLocaleString()}</span>
-                    </div>
-                  </div>
-                </div>
+                <dl className="grid grid-cols-2 gap-2 text-xs">
+                  <RunPair label={t('hist.input')} value={selectedRun.usage.inputTokens.toLocaleString(locale)} />
+                  <RunPair label={t('hist.outputTokens')} value={selectedRun.usage.outputTokens.toLocaleString(locale)} />
+                  <RunPair label={t('hist.cacheWrite')} value={selectedRun.usage.cacheWriteTokens.toLocaleString(locale)} />
+                  <RunPair label={t('hist.cacheRead')} value={selectedRun.usage.cacheReadTokens.toLocaleString(locale)} />
+                </dl>
 
-                {/* Diagnostics / Metadata */}
-                <div className="space-y-2 border-t border-[color:var(--color-border)] pt-4 text-xs">
-                  <div className="text-xs font-semibold uppercase tracking-wider text-[color:var(--color-text-dim)]">
-                    Diagnostics
-                  </div>
-                  <div className="space-y-1.5 font-mono">
-                    <div className="flex justify-between">
-                      <span className="text-[color:var(--color-text-dim)]">Feature:</span>
-                      <span className="font-sans font-medium">
-                        {FEATURE_LABELS[selectedRun.feature] ?? selectedRun.feature}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-[color:var(--color-text-dim)]">Provider / Model:</span>
-                      <span>
-                        {selectedRun.provider} / {selectedRun.model}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-[color:var(--color-text-dim)]">Trigger:</span>
-                      <span className="capitalize">{selectedRun.trigger}</span>
-                    </div>
-                    {selectedRun.requestId && (
-                      <div className="flex items-center justify-between">
-                        <span className="text-[color:var(--color-text-dim)]">Request ID:</span>
-                        <div className="flex items-center gap-1">
-                          <span className="truncate max-w-[200px]">{selectedRun.requestId}</span>
+                <dl className="space-y-1.5 border-t border-[color:var(--color-border)] pt-4 text-xs">
+                  <RunLine label={t('hist.providerModel')} value={<span style={{ fontFamily: 'var(--font-code)' }}>{selectedRun.provider} / {selectedRun.model}</span>} />
+                  <RunLine label={t('hist.trigger')} value={selectedRun.trigger} />
+                  {selectedRun.requestId && (
+                    <RunLine
+                      label={t('hist.requestId')}
+                      value={
+                        <span className="flex items-center gap-1 min-w-0">
+                          <span className="truncate max-w-[200px]" style={{ fontFamily: 'var(--font-code)' }}>{selectedRun.requestId}</span>
                           <button
+                            type="button"
                             onClick={() => {
                               void navigator.clipboard.writeText(selectedRun.requestId || '');
                               setCopiedId(true);
                               setTimeout(() => setCopiedId(false), 2000);
                             }}
                             className="p-1 text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)]"
-                            title="Copy Request ID"
+                            title={t('hist.copyRequestId')}
+                            aria-label={t('hist.copyRequestId')}
                           >
-                            {copiedId ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
+                            {copiedId ? <Check size={12} className="text-[color:var(--color-accent)]" /> : <Copy size={12} />}
                           </button>
-                        </div>
-                      </div>
-                    )}
-                    {selectedRun.stopReason && (
-                      <div className="flex justify-between">
-                        <span className="text-[color:var(--color-text-dim)]">Stop Reason:</span>
-                        <span>{selectedRun.stopReason}</span>
-                      </div>
-                    )}
-                    {selectedRun.conversationId && (
-                      <div className="flex justify-between">
-                        <span className="text-[color:var(--color-text-dim)]">Conversation:</span>
-                        <span>
-                          {selectedRun.conversationId.slice(0, 10)}… (turn {selectedRun.turn ?? 1})
                         </span>
-                      </div>
-                    )}
-                    {selectedRun.record && (
-                      <div className="flex justify-between">
-                        <span className="text-[color:var(--color-text-dim)]">Linked Record:</span>
-                        <span>
-                          {selectedRun.record.type} #{selectedRun.record.id.slice(0, 8)}…
-                        </span>
-                      </div>
-                    )}
-                    {selectedRun.jobId && (
-                      <div className="flex justify-between">
-                        <span className="text-[color:var(--color-text-dim)]">Job ID:</span>
-                        <span>{selectedRun.jobId}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                      }
+                    />
+                  )}
+                  {selectedRun.stopReason && <RunLine label={t('hist.stopReason')} value={<span style={{ fontFamily: 'var(--font-code)' }}>{selectedRun.stopReason}</span>} />}
+                  {selectedRun.conversationId && (
+                    <RunLine label={t('hist.conversation')} value={`${selectedRun.conversationId.slice(0, 10)}… · ${t('hist.turn', { n: selectedRun.turn ?? 1 })}`} />
+                  )}
+                  {selectedRun.record && <RunLine label={t('hist.record')} value={`${selectedRun.record.type} #${selectedRun.record.id.slice(0, 8)}…`} />}
+                  {selectedRun.jobId && <RunLine label={t('hist.jobId')} value={<span style={{ fontFamily: 'var(--font-code)' }}>{selectedRun.jobId}</span>} />}
+                </dl>
 
-                {/* Error message if present */}
                 {selectedRun.error && (
                   <div className="space-y-1.5 border-t border-[color:var(--color-border)] pt-4">
-                    <div className="flex items-center gap-1.5 text-xs font-semibold text-red-500">
-                      <AlertTriangle size={14} /> Error Details
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-[color:var(--color-red)]">
+                      <AlertTriangle size={14} /> {t('hist.errorDetails')}
                     </div>
-                    <pre className="p-3 rounded-lg border border-red-500/20 bg-red-500/5 text-red-600 dark:text-red-400 font-mono text-xs overflow-x-auto whitespace-pre-wrap">
+                    <pre className="p-3 rounded-lg border border-[color:var(--color-red)]/25 bg-[color:var(--color-red)]/5 text-[color:var(--color-red)] text-xs overflow-x-auto whitespace-pre-wrap">
                       {selectedRun.error}
                     </pre>
                   </div>
                 )}
 
-                {/* Prompt & Output Inspector */}
                 <div className="space-y-4 border-t border-[color:var(--color-border)] pt-4">
-                  {/* Prompt */}
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold uppercase tracking-wider text-[color:var(--color-text-dim)]">
-                        {t('hist.prompt')}
-                      </span>
-                      {selectedRun.prompt && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            void navigator.clipboard.writeText(selectedRun.prompt || '');
-                            setCopiedPrompt(true);
-                            setTimeout(() => setCopiedPrompt(false), 2000);
-                          }}
-                          className="flex items-center gap-1 text-[11px] text-[color:var(--color-accent)] hover:underline"
-                        >
-                          {copiedPrompt ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
-                          <span>{copiedPrompt ? t('hist.copied') : t('hist.copyPrompt')}</span>
-                        </button>
-                      )}
-                    </div>
-                    {selectedRun.prompt ? (
-                      <pre className="p-3 rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] text-[color:var(--color-text)] font-mono text-xs overflow-x-auto whitespace-pre-wrap max-h-52">
-                        {selectedRun.prompt}
-                      </pre>
-                    ) : (
-                      <div className="text-xs text-[color:var(--color-text-dim)] italic p-2 rounded bg-[color:var(--color-surface-2)]">
-                        {t('hist.noPrompt')}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Output */}
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold uppercase tracking-wider text-[color:var(--color-text-dim)]">
-                        {t('hist.output')}
-                      </span>
-                      {selectedRun.output && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            void navigator.clipboard.writeText(selectedRun.output || '');
-                            setCopiedOutput(true);
-                            setTimeout(() => setCopiedOutput(false), 2000);
-                          }}
-                          className="flex items-center gap-1 text-[11px] text-[color:var(--color-accent)] hover:underline"
-                        >
-                          {copiedOutput ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
-                          <span>{copiedOutput ? t('hist.copied') : t('hist.copyOutput')}</span>
-                        </button>
-                      )}
-                    </div>
-                    {selectedRun.output ? (
-                      <pre className="p-3 rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] text-[color:var(--color-text)] font-mono text-xs overflow-x-auto whitespace-pre-wrap max-h-52">
-                        {selectedRun.output}
-                      </pre>
-                    ) : (
-                      <div className="text-xs text-[color:var(--color-text-dim)] italic p-2 rounded bg-[color:var(--color-surface-2)]">
-                        {t('hist.noOutput')}
-                      </div>
-                    )}
-                  </div>
+                  <RunText
+                    label={t('hist.prompt')}
+                    text={selectedRun.prompt}
+                    empty={t('hist.noPrompt')}
+                    copied={copiedPrompt}
+                    copyLabel={t('hist.copyPrompt')}
+                    copiedLabel={t('hist.copied')}
+                    onCopy={() => {
+                      void navigator.clipboard.writeText(selectedRun.prompt || '');
+                      setCopiedPrompt(true);
+                      setTimeout(() => setCopiedPrompt(false), 2000);
+                    }}
+                  />
+                  <RunText
+                    label={t('hist.output')}
+                    text={selectedRun.output}
+                    empty={t('hist.noOutput')}
+                    copied={copiedOutput}
+                    copyLabel={t('hist.copyOutput')}
+                    copiedLabel={t('hist.copied')}
+                    onCopy={() => {
+                      void navigator.clipboard.writeText(selectedRun.output || '');
+                      setCopiedOutput(true);
+                      setTimeout(() => setCopiedOutput(false), 2000);
+                    }}
+                  />
                 </div>
               </div>
             </Modal>
@@ -880,9 +605,10 @@ export function HistoryClient({
             <EmptyState icon={<MessageSquare />} title={t('history.empty')} hint={t('history.emptyHint')} />
           ) : (
             <>
-              <div className="mb-4">
+              <div className="mb-3 sm:max-w-sm">
                 <Input
-                  icon={<Search size={14} />}
+                  icon={<Search size={15} />}
+                  type="search"
                   value={convSearch}
                   onChange={(e) => setConvSearch(e.target.value)}
                   placeholder={t('history.searchPlaceholder')}
@@ -890,15 +616,13 @@ export function HistoryClient({
                 />
               </div>
 
-              <div className="space-y-2">
+              {visibleConversations.length > 0 && (
+                <div className="rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] overflow-hidden divide-y divide-[color:var(--color-border)]">
                 {visibleConversations.map((c) => {
                   const isOpen = openConvId === c.id;
                   return (
-                    <div
-                      key={c.id}
-                      className="rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] overflow-hidden"
-                    >
-                      <div className="flex items-center gap-2 px-3 py-2.5">
+                    <div key={c.id}>
+                      <div className="flex items-center gap-2 px-4 py-2.5">
                         <button
                           onClick={() => setOpenConvId(isOpen ? null : c.id)}
                           className="flex items-center gap-2.5 min-w-0 flex-1 text-left"
@@ -969,14 +693,96 @@ export function HistoryClient({
                     </div>
                   );
                 })}
-                {visibleConversations.length === 0 && (
-                  <EmptyState className="py-10" title={t('history.noMatch')} />
-                )}
-              </div>
+                </div>
+              )}
+              {visibleConversations.length === 0 && <EmptyState className="py-10" title={t('history.noMatch')} />}
             </>
           )}
         </>
       )}
     </main>
+  );
+}
+
+const RUN_TONE: Record<string, string> = { ok: 'var(--color-accent)', blocked: 'var(--color-gold)', error: 'var(--color-red)' };
+
+function RunDot({ status }: { status: string }) {
+  return <span aria-hidden className="shrink-0 w-2 h-2 rounded-full" style={{ background: RUN_TONE[status] ?? RUN_TONE.error }} />;
+}
+
+function RunStatusLabel({ status }: { status: string }) {
+  const t = useT();
+  const label = status === 'ok' ? t('hist.stOk') : status === 'blocked' ? t('hist.stBlocked') : t('hist.stError');
+  return (
+    <span className="shrink-0 text-xs font-semibold" style={{ color: RUN_TONE[status] ?? RUN_TONE.error }}>
+      {label}
+    </span>
+  );
+}
+
+function RunMetric({ label, value, sub, accent }: { label: string; value: string; sub?: string; accent?: boolean }) {
+  return (
+    <div className="min-w-0">
+      <div className="text-xs text-[color:var(--color-text-dim)]">{label}</div>
+      <div className="text-lg font-bold tabular-nums truncate" style={{ color: accent ? 'var(--color-accent)' : undefined }}>
+        {value}
+      </div>
+      {sub && <div className="text-xs text-[color:var(--color-text-faint)] tabular-nums">{sub}</div>}
+    </div>
+  );
+}
+
+function RunPair({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex justify-between gap-2 px-2.5 py-2 rounded-lg bg-[color:var(--color-surface-2)]">
+      <dt className="text-[color:var(--color-text-dim)]">{label}</dt>
+      <dd className="font-semibold tabular-nums">{value}</dd>
+    </div>
+  );
+}
+
+function RunLine({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-3 min-w-0">
+      <dt className="shrink-0 text-[color:var(--color-text-dim)]">{label}</dt>
+      <dd className="min-w-0 text-right truncate">{value}</dd>
+    </div>
+  );
+}
+
+function RunText({
+  label,
+  text,
+  empty,
+  copied,
+  copyLabel,
+  copiedLabel,
+  onCopy,
+}: {
+  label: string;
+  text?: string | null;
+  empty: string;
+  copied: boolean;
+  copyLabel: string;
+  copiedLabel: string;
+  onCopy: () => void;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-semibold text-[color:var(--color-text-dim)]">{label}</span>
+        {text && (
+          <button type="button" onClick={onCopy} className="flex items-center gap-1 text-xs text-[color:var(--color-accent)] hover:underline">
+            {copied ? <Check size={12} /> : <Copy size={12} />}
+            <span>{copied ? copiedLabel : copyLabel}</span>
+          </button>
+        )}
+      </div>
+      {text ? (
+        <pre className="p-3 rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] text-[color:var(--color-text)] text-xs overflow-x-auto whitespace-pre-wrap max-h-52">{text}</pre>
+      ) : (
+        <div className="text-xs text-[color:var(--color-text-dim)] italic p-2 rounded-lg bg-[color:var(--color-surface-2)]">{empty}</div>
+      )}
+    </div>
   );
 }
