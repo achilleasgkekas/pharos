@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ChevronDown, Search, Check, X } from 'lucide-react';
 import { cn } from './cn';
+import { fieldBase } from './Input';
 import { useT } from '@/components/LocaleProvider';
 
 /**
@@ -57,7 +58,7 @@ export function SearchableSelect({
     setQ('');
   }
 
-  const pad = size === 'sm' ? 'px-2.5 py-1.5 text-xs' : 'px-3 py-2 text-sm';
+  const pad = size === 'sm' ? 'px-2.5 py-1.5 min-h-8 text-xs' : 'px-3 py-2 min-h-10 text-sm';
 
   return (
     <div ref={ref} className={cn('relative', className)}>
@@ -65,7 +66,8 @@ export function SearchableSelect({
         type="button"
         onClick={() => setOpen((o) => !o)}
         className={cn(
-          'w-full flex items-center justify-between gap-2 rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] text-left hover:border-[color:var(--color-border-light)] focus:outline-none focus:border-[color:var(--color-accent)]',
+          fieldBase,
+          'flex items-center justify-between gap-2 text-left hover:border-[color:var(--color-text-faint)]',
           pad
         )}
       >
@@ -91,7 +93,7 @@ export function SearchableSelect({
       </button>
 
       {open && (
-        <div className="absolute z-50 mt-1 w-full rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] shadow-xl overflow-hidden">
+        <div className="absolute z-50 mt-1 w-full rounded-[10px] border border-[color:var(--color-border-light)] bg-[color:var(--color-surface-2)] shadow-xl overflow-hidden">
           <div className="flex items-center gap-1.5 px-2.5 py-2 border-b border-[color:var(--color-border)]">
             <Search size={13} className="text-[color:var(--color-text-faint)] shrink-0" />
             {/* eslint-disable-next-line jsx-a11y/no-autofocus */}

@@ -11,6 +11,8 @@ import type { SerializedReceipt } from '@/types';
 import { quickVerifyReceipt, archiveReceipt } from './actions';
 import { useT } from '@/components/LocaleProvider';
 import { recordDay } from '@/lib/recordDay';
+import { controlClass } from '@/components/ui/Input';
+import { cn } from '@/components/ui/cn';
 
 function fileUrl(filePath: string) {
   const u = `/api/files/${filePath.split('/').map(encodeURIComponent).join('/')}`;
@@ -162,7 +164,7 @@ export function QuickVerify({
                       {t('qv.total', { cur: isForeignCurrency(r.currency, base) ? currencySymbol(normalizeCurrency(r.currency)).trim() : cur() })}
                       <FxBadge doc={r} base={base} />
                     </span>
-                    <input type="number" step="0.01" value={total} onChange={(e) => setTotal(e.target.value)} className="w-full text-base font-semibold px-3 py-2 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] focus:border-[color:var(--color-accent)] outline-none" style={{ fontFamily: 'var(--font-mono)' }} />
+                    <input type="number" step="0.01" value={total} onChange={(e) => setTotal(e.target.value)} className={cn(controlClass, 'w-full text-base font-semibold')} style={{ fontFamily: 'var(--font-mono)' }} />
                   </label>
                 </div>
                 <p className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>

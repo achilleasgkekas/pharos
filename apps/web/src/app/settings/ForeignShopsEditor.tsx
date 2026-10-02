@@ -3,6 +3,8 @@ import { useState } from 'react';
 import { Globe, Plus, Trash2, RotateCcw, AlertCircle } from 'lucide-react';
 import { useT } from '@/components/LocaleProvider';
 import { Button } from '@/components/ui/Button';
+import { controlClass } from '@/components/ui/Input';
+import { cn } from '@/components/ui/cn';
 import { addShopToList, SHOPPING_PRESETS } from '@/lib/shoppingRegion';
 
 interface ForeignShopsEditorProps {
@@ -136,7 +138,7 @@ export function ForeignShopsEditor({
               }
             }}
             placeholder={t('set.addShopPlaceholder')}
-            className="flex-1 min-w-0 bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-xl px-3 py-2 text-xs text-[color:var(--color-text)] placeholder:text-[color:var(--color-text-dim)] focus:outline-none focus:border-[color:var(--color-accent)] transition-colors"
+            className={cn(controlClass, 'flex-1')}
           />
           <Button
             type="button"

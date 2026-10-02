@@ -2607,6 +2607,8 @@ export const en = {
   "set.liveSpend": "AI spend",
   "set.viewRunHistory": "Every call in AI history",
   "set.capReached": "Spend cap reached: cloud AI calls are blocked until you raise it or the month rolls over.",
+  "it.photoAdd": "Add product photos",
+  "it.photoUploading": "Uploading…",
 } as const;
 
 export type Dict = Record<keyof typeof en, string>;

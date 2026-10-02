@@ -3,7 +3,7 @@ import { PAGE_MAIN, PageHeader, HeaderButton, ViewToggle, PrimaryAction, FilterL
 import { DateInput } from '@/components/ui/DateInput';
 import { Field } from '@/components/ui/Field';
 import { CreatedBy } from '@/components/CreatedBy';
-import { cur, currencySymbol, CURRENCIES } from "@/lib/money";
+import { cur, currencySymbol, CURRENCIES, moneyField } from "@/lib/money";
 import { matchesQuery, haystack, fold, sameLabel } from '@/lib/searchText';
 import { isForeignCurrency, normalizeCurrency, convertToBase, deriveFxRate, formatMoney, toPrinted } from '@/lib/fx';
 import { FxBadge } from '@/components/FxBadge';
@@ -12,7 +12,7 @@ import { useState, useTransition, useRef, useMemo } from 'react';
 import { Upload, Sparkles, Trash2, CheckCircle2, AlertTriangle, Plus, X, FileText, Loader2, PackagePlus, Mail, Search, Archive, Zap, Undo2, Copy, Receipt as ReceiptIcon } from 'lucide-react';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Button } from '@/components/ui/Button';
-import { Input, filterControlClass } from '@/components/ui/Input';
+import { Input, compactControlClass, controlClass, filterControlClass } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { cn } from '@/components/ui/cn';
@@ -855,11 +855,11 @@ function ReceiptDetailModal({
   const buildForm = (r: SerializedReceipt): EditState => {
     const foreign = isForeignCurrency(r.currency, fx.base);
     const rate = foreign ? r.fxRate || 0 : 0;
-    const printed = (n: number) => toPrinted(n, rate).toString();
+    const printed = (n: number) => moneyField(toPrinted(n, rate));
     return {
       store: r.store,
       date: recordDay(r.date),
-      total: (foreign ? r.origAmount || r.total : r.total).toString(),
+      total: moneyField(foreign ? r.origAmount || r.total : r.total),
       subtotal: printed(r.subtotal || 0),
       vatAmount: printed(r.vatAmount || 0),
       warrantyMonths: (r.warrantyMonths ?? 24).toString(),
@@ -1151,7 +1151,7 @@ function ReceiptDetailModal({
                   value={form.currency}
                   onChange={(e) => setForm((p) => ({ ...p, currency: e.target.value }))}
                   aria-label={t('ex.fCurrency')}
-                  className="shrink-0 bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-md px-2 py-2 text-xs focus:outline-none focus:border-[color:var(--color-accent)]"
+                  className={cn(compactControlClass, 'shrink-0')}
                   style={{ fontFamily: 'var(--font-mono)' }}
                 >
                   {currencyCodes(fx.base).map((c) => <option key={c} value={c}>{c}</option>)}
@@ -1229,14 +1229,14 @@ function ReceiptDetailModal({
                         value={li.refinedName}
                         onChange={(e) => updateLine(i, 'refinedName', e.target.value)}
                         placeholder={t('rc.itemNamePlaceholder')}
-                        className="flex-1 min-w-0 bg-[color:var(--color-surface-3)] border border-[color:var(--color-border)] rounded-md px-2 py-1.5 text-xs font-medium focus:outline-none focus:border-[color:var(--color-accent)]"
+                        className={cn(compactControlClass, 'flex-1 min-w-0 font-medium')}
                       />
                       <input
                         value={li.qty}
                         onChange={(e) => updateLine(i, 'qty', e.target.value)}
                         type="number"
                         title="quantity"
-                        className="w-10 bg-[color:var(--color-surface-3)] border border-[color:var(--color-border)] rounded-md px-1 py-1.5 text-xs text-center focus:outline-none focus:border-[color:var(--color-accent)]"
+                        className={cn(compactControlClass, 'w-14 shrink-0 text-center')}
                       />
                       <input
                         value={li.price}
@@ -1244,13 +1244,13 @@ function ReceiptDetailModal({
                         type="number"
                         step="0.01"
                         title="unit price (excl. VAT)"
-                        className="w-16 bg-[color:var(--color-surface-3)] border border-[color:var(--color-border)] rounded-md px-2 py-1.5 text-xs text-right focus:outline-none focus:border-[color:var(--color-accent)]"
+                        className={cn(compactControlClass, 'w-20 shrink-0 text-right')}
                       />
                       <select
                         value={li.vatRate}
                         onChange={(e) => updateLine(i, 'vatRate', e.target.value)}
                         title="VAT %"
-                        className="w-14 bg-[color:var(--color-surface-3)] border border-[color:var(--color-border)] rounded-md px-1 py-1.5 text-xs focus:outline-none focus:border-[color:var(--color-accent)]"
+                        className={cn(compactControlClass, 'w-[4.75rem] shrink-0')}
                       >
                         <option value="24">24%</option>
                         <option value="13">13%</option>
@@ -1270,7 +1270,7 @@ function ReceiptDetailModal({
                         value={li.name}
                         onChange={(e) => updateLine(i, 'name', e.target.value)}
                         placeholder={t('rc.rawTextPlaceholder')}
-                        className="flex-1 min-w-0 bg-transparent border-0 px-2 py-0.5 text-[11px] text-[color:var(--color-text-faint)] focus:outline-none focus:text-[color:var(--color-text-dim)]"
+                        className="flex-1 min-w-[7rem] bg-transparent border-0 px-2 py-0.5 text-[11px] text-[color:var(--color-text-faint)] focus:outline-none focus:text-[color:var(--color-text-dim)]"
                         style={{ fontFamily: 'var(--font-mono)' }}
                       />
                       {/* P64: per-line spend category. Empty = untagged (the pre-P64 state),
@@ -1279,7 +1279,7 @@ function ReceiptDetailModal({
                         value={li.category}
                         onChange={(e) => updateLine(i, 'category', e.target.value)}
                         title={t('rc.lineCategory')}
-                        className="shrink-0 max-w-[9rem] bg-[color:var(--color-surface-3)] border border-[color:var(--color-border)] rounded-md px-1 py-0.5 text-[11px] text-[color:var(--color-text-dim)] focus:outline-none focus:border-[color:var(--color-accent)]"
+                        className={cn(compactControlClass, 'shrink-0 max-w-[9rem]')}
                         style={{ fontFamily: 'var(--font-mono)' }}
                       >
                         <option value="">{t('rc.lineCategoryNone')}</option>
@@ -1302,7 +1302,7 @@ function ReceiptDetailModal({
                           type="number"
                           step="0.01"
                           title="line total WITH VAT (edits the net back)"
-                          className="w-16 bg-[color:var(--color-surface-3)] border border-[color:var(--color-border)] rounded-md px-1.5 py-1 text-[11px] text-right text-[color:var(--color-text)] focus:outline-none focus:border-[color:var(--color-accent)]"
+                          className={cn(compactControlClass, 'w-20 shrink-0 text-right')}
                         />
                       </div>
                     </div>
@@ -1322,7 +1322,7 @@ function ReceiptDetailModal({
               value={form.notes}
               onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
               rows={2}
-              className="w-full bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[color:var(--color-accent)] resize-none"
+              className={cn(controlClass, 'w-full resize-none')}
             />
           </Field>
 
@@ -1352,19 +1352,19 @@ function ReceiptDetailModal({
           {/* Actions */}
           {saveError && <p role="alert" className="text-xs text-[color:var(--color-red)]">{saveError}</p>}
           <div className="flex flex-wrap gap-2 pt-2 border-t border-[color:var(--color-border)]">
-            <Button variant="primary" size="sm" onClick={() => save(true)} disabled={pending || !!dateBlocked}>
-              <CheckCircle2 size={13} /> {receipt.verified ? t('common.save') : t('common.confirm')}
+            <Button variant="primary" onClick={() => save(true)} disabled={pending || !!dateBlocked}>
+              <CheckCircle2 size={15} /> {receipt.verified ? t('common.save') : t('common.confirm')}
             </Button>
             {receipt.verified && (
-              <Button variant="secondary" size="sm" onClick={() => save(false)} disabled={pending || !!dateBlocked}>
+              <Button variant="secondary" onClick={() => save(false)} disabled={pending || !!dateBlocked}>
                 {t('rc.unverify')}
               </Button>
             )}
-            <Button variant="ghost" size="sm" onClick={handleArchive} disabled={pending} title={receipt.archived ? t('rc.unarchiveTitle') : t('rc.archiveTitle')}>
-              <Archive size={13} /> {receipt.archived ? t('rc.unarchive') : t('rc.notReceipt')}
+            <Button variant="ghost" onClick={handleArchive} disabled={pending} title={receipt.archived ? t('rc.unarchiveTitle') : t('rc.archiveTitle')}>
+              <Archive size={15} /> {receipt.archived ? t('rc.unarchive') : t('rc.notReceipt')}
             </Button>
-            <Button variant="danger" size="sm" onClick={handleDelete} disabled={pending} className="ml-auto">
-              <Trash2 size={13} /> {t('common.delete')}
+            <Button variant="danger" onClick={handleDelete} disabled={pending} className="ml-auto">
+              <Trash2 size={15} /> {t('common.delete')}
             </Button>
           </div>
         </div>

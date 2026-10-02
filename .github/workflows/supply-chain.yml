@@ -53,7 +53,7 @@ jobs:
           persist-credentials: false
       # Blocks a PR that ADDS a dependency with a high-severity advisory or a licence that
       # cannot ship inside an AGPL-3.0 app.
-      - uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4.9.0
+      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
           fail-on-severity: high
           deny-licenses: SSPL-1.0, BUSL-1.1

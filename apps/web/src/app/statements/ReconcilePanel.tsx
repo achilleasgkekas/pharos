@@ -2,7 +2,6 @@
 import { cur } from '@/lib/money';
 import { useState, useEffect, useCallback, useTransition } from 'react';
 import { Loader2, Receipt as ReceiptIcon, Link2, X, Check, AlertCircle } from 'lucide-react';
-import { cn } from '@/components/ui/cn';
 import { useLocale, useT } from '@/components/LocaleProvider';
 import { periodLabel } from '@/lib/cards';
 import {
@@ -13,6 +12,8 @@ import {
   type ReconReceiptView,
 } from './actions';
 import { formatDate } from '@/lib/i18n/format';
+import { compactControlClass } from '@/components/ui/Input';
+import { cn } from '@/components/ui/cn';
 
 type StmtOption = { _id: string; card: string; period: string };
 
@@ -77,7 +78,7 @@ export function ReconcilePanel({ statements }: { statements: StmtOption[] }) {
           <select
             value={statementId}
             onChange={(e) => setStatementId(e.target.value)}
-            className="bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-2.5 py-1.5 text-sm"
+            className={compactControlClass}
           >
             {statements.map((s) => (
               <option key={s._id} value={s._id}>
