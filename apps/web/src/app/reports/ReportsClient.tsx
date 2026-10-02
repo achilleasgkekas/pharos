@@ -2,13 +2,11 @@
 import { CategoryIcon, useCategoryLabel } from '@/components/CategoryBadge';
 import { PAGE_MAIN, PageHeader } from '@/components/ui/PageHeader';
 import { useState, useTransition } from 'react';
-import { StatementPaymentReport } from '@/components/StatementPaymentReport';
 import type { StatementPaymentReport as PaymentReport } from '@/lib/statementPayments';
+import { SubscriptionsReport, type SubRow } from './SubscriptionsReport';
+import { AssetsReport } from './AssetsReport';
 import { useRouter } from 'next/navigation';
-import { cur } from "@/lib/money";
 import { useLocale, useT, useMoney } from '@/components/LocaleProvider';
-import { useConfirm } from '@/components/ui/ConfirmDialog';
-import { DateInput } from '@/components/ui/DateInput';
 import {
   ResponsiveContainer,
   AreaChart,
@@ -19,18 +17,15 @@ import {
   YAxis,
   Tooltip,
   Cell,
-  PieChart,
-  Pie,
   Legend,
   CartesianGrid,
 } from 'recharts';
 import { keepSeriesOrder } from '@/lib/chartOrder';
-import { Store, Layers, ShieldCheck, Wallet, Target, Plus, Trash2, X, Sparkles, AlertTriangle, Check, ArrowRight, Pencil, Loader2 } from 'lucide-react';
+import { Store, Wallet, Sparkles, AlertTriangle, Check, ArrowRight, Loader2 } from 'lucide-react';
 import { AssetAccountsModal } from '@/components/AssetAccountsModal';
 import { convertToBase } from '@/lib/fx';
 import { applyFxRate, applyFxRateToCurrency } from './fxActions';
 import { FxRateButton } from '@/components/FxRateButton';
-import { createGoal, addGoalContribution, deleteGoal, sweepBudgetLeftoverToGoal } from './goalsActions';
 import { formatDate } from '@/lib/i18n/format';
 import { compactControlClass } from '@/components/ui/Input';
 import { cn } from '@/components/ui/cn';
@@ -109,22 +104,6 @@ type MonthReview = {
   narrative: string;
 };
 
-type GoalRow = {
-  _id: string;
-  title: string;
-  targetAmount: number;
-  targetDate: string | null;
-  category: string;
-  contributions: { _id: string; amount: number; date: string; note: string }[];
-  current: number;
-  target: number;
-  remaining: number;
-  pct: number;
-  done: boolean;
-  monthsLeft: number | null;
-  perMonth: number | null;
-};
-
 type Data = {
   period: ReportPeriod & { label: string; prevLabel: string };
   totals: { expense: number; income: number; receipts: number; prevExpense: number; prevIncome: number; prevReceipts: number };
@@ -138,6 +117,7 @@ type Data = {
   subsByCategory: { name: string; value: number }[];
   /** P68 φάση 2: μηνιαίο ισοδύναμο κόστος συνδρομών ανά χώρο· κενό όσο καμία δεν έχει tag. */
   subsBySpace: { name: string; value: number }[];
+  subscriptions: SubRow[];
   warrantiesExpiring: { title: string; until: string; days: number }[];
   biggestPurchases: { store: string; total: number; date: string }[];
   installmentPlans: InstallmentPlanRow[];
@@ -151,11 +131,6 @@ type Data = {
   } | null;
   expenseByCategory: { name: string; value: number; prev: number }[];
   expenseBySpace: { name: string; value: number }[];
-  budgetVsActual: { name: string; budget: number; actual: number; projected?: number; carried?: number; effective?: number; leftover?: number }[];
-  budgetRollover?: boolean;
-  /** P83 — "YYYY-MM" a sweep of this month's leftover is booked against. */
-  budgetMonthKey?: string;
-  goals: GoalRow[];
   /** P9 slice 7: records still holding a foreign amount with no rate (empty when single-currency). */
   fxIssues?: FxIssueRow[];
   baseCurrency?: string;
@@ -176,12 +151,11 @@ type Data = {
   };
 };
 
-const REPORT_TABS = ['overview', 'spending', 'budget', 'subscriptions', 'assets'] as const;
+const REPORT_TABS = ['overview', 'spending', 'subscriptions', 'assets'] as const;
 type ReportTab = (typeof REPORT_TABS)[number];
 const TAB_LABEL: Record<ReportTab, TKey> = {
   overview: 'reports.tabOverview',
   spending: 'reports.tabSpending',
-  budget: 'reports.tabGoals',
   subscriptions: 'reports.tabSubscriptions',
   assets: 'reports.tabAssets',
 };
@@ -387,11 +361,8 @@ export function ReportsClient({ data, initialTab, summaryOn = false, currency = 
   const P = data.period;
   const T = data.totals;
   const spend12 = data.monthlySpend.reduce((a, m) => a + m.total, 0);
-  const netWorthNow = s.ownedValue + data.netWorth.accountsTotal - s.installmentsRemaining - s.outstanding;
   const fxIssues = data.fxIssues ?? [];
   const fxBase = data.baseCurrency || 'EUR';
-  // P83 — goals still open (an already-reached goal is a pointless sweep target).
-  const openGoals = data.goals.filter((g) => !g.done);
   // #122: switching period is a client navigation: the current report stays on screen, dimmed,
   // until the new period's data arrives, instead of a blank full reload.
   const router = useRouter();
@@ -748,271 +719,20 @@ export function ReportsClient({ data, initialTab, summaryOn = false, currency = 
         </div>
       )}
 
-      {tab === 'budget' && (
-        <div className="space-y-4">
-      {/* Budget · this month (per category, actual vs budget). In envelope mode
-          (P25) the limit is the rolling `effective` budget and a chip shows the
-          net carried-in balance. */}
-      {data.budgetVsActual.length > 0 && (
-        <Card title={data.budgetRollover ? t('reports.cBudgetEnvelope') : t('reports.cBudget')}>
-          <div className="space-y-2.5">
-            {data.budgetVsActual.map((b) => {
-              const rollover = data.budgetRollover && b.effective != null;
-              const limit = rollover ? (b.effective as number) : b.budget;
-              const carried = b.carried ?? 0;
-              const pct = limit > 0 ? Math.min(100, Math.round((b.actual / limit) * 100)) : 0;
-              const over = b.actual > limit;
-              return (
-                <div key={b.name}>
-                  <div className="flex items-center justify-between text-xs mb-1">
-                    <span className="text-[color:var(--color-text-dim)] flex items-center gap-1.5">
-                      <CategoryIcon category={b.name} size={13} />
-                      {catLabel(b.name)}
-                      {rollover && carried !== 0 && (
-                        <span
-                          title={t('reports.budgetCarriedHint')}
-                          style={{ fontFamily: 'var(--font-mono)' }}
-                          className={`text-[11px] px-1.5 py-px rounded ${carried > 0 ? 'text-[color:var(--color-accent)] bg-[color:var(--color-accent)]/10' : 'text-[color:var(--color-red)] bg-[color:var(--color-red)]/10'}`}
-                        >
-                          {carried > 0 ? '+' : '−'}{money(Math.abs(carried))}
-                        </span>
-                      )}
-                    </span>
-                    <span style={{ fontFamily: 'var(--font-mono)' }} className={over ? 'text-[color:var(--color-red)]' : 'text-[color:var(--color-text-dim)]'}>
-                      {money(b.actual)} / {money(limit)}{over ? ` · over ${money((b.actual - limit))}` : ''}
-                    </span>
-                  </div>
-                  <div className="h-2 rounded-full bg-[color:var(--color-surface-2)] overflow-hidden">
-                    <div className="h-full rounded-full transition-all" style={{ width: `${Math.max(pct, b.actual > 0 ? 3 : 0)}%`, background: over ? 'var(--color-red)' : 'var(--color-accent)' }} />
-                  </div>
-                  {/* P100 — month-end pace projection. Hidden on the last day / with no spend
-                      (b.projected is undefined then). "over pace" = the run rate blows the limit
-                      even if the actual has not yet. */}
-                  {b.projected != null && limit > 0 && (() => {
-                    const overPace = b.projected > limit;
-                    return (
-                      <div className="mt-1 flex items-center gap-1.5 text-[11px]" style={{ fontFamily: 'var(--font-mono)' }}>
-                        <span className="text-[color:var(--color-text-faint)]">
-                          {t('reports.pace', { x: `~${money(b.projected)}` })}
-                        </span>
-                        <span className={`px-1.5 py-px rounded ${overPace ? 'text-[color:var(--color-red)] bg-[color:var(--color-red)]/10' : 'text-[color:var(--color-accent)] bg-[color:var(--color-accent)]/10'}`}>
-                          {overPace ? t('reports.overPace') : t('reports.onTrack')}
-                        </span>
-                      </div>
-                    );
-                  })()}
-                  {/* P83 — the unspent part of the envelope, offered to a savings goal.
-                      Hidden unless envelope mode is on, something is actually left, and
-                      there is an open goal to receive it. */}
-                  {rollover && (b.leftover ?? 0) > 0 && openGoals.length > 0 && data.budgetMonthKey && (
-                    <SweepToGoal category={b.name} monthKey={data.budgetMonthKey} amount={b.leftover as number} goals={openGoals} />
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </Card>
-      )}
-
-      {/* Savings / financial goals (P12) — targets to reach, distinct from budgets
-          (spending limits). Progress is derived from contributions, never stored. */}
-      <div id="goals">
-        <GoalsCard goals={data.goals} className="mt-4" />
-      </div>
-
-        </div>
-      )}
-
-      {tab === 'subscriptions' && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div className="lg:col-span-2 rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-4 flex flex-wrap items-baseline justify-between gap-3">
-            <span>
-              <span className="block text-xs text-[color:var(--color-text-dim)]">{t('reports.subsPerMonth')}</span>
-              <span className="text-2xl font-bold tabular-nums" style={{ fontFamily: 'var(--font-display)' }}>{money(s.monthlySubs)}</span>
-              <span className="ml-2 text-sm text-[color:var(--color-text-dim)] tabular-nums">{t('reports.subsPerYear', { x: money(s.monthlySubs * 12) })}</span>
-            </span>
-            <Link href="/subscriptions" prefetch={false} className="inline-flex items-center gap-1 text-sm font-medium text-[color:var(--color-accent)] hover:underline">
-              {t('nav.subscriptions')} <ArrowRight size={14} />
-            </Link>
-          </div>
-        {/* Subscriptions monthly by category */}
-        <Card title={t('reports.cSubsByCat', { cur: cur() })}>
-          {data.subsByCategory.length === 0 ? (
-            <Empty text={t('reports.noSubscriptions')} />
-          ) : (
-            <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={data.subsByCategory} margin={{ left: 0, right: 8 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
-                <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} width={36} tickFormatter={(v: number) => money(v, undefined, { notation: 'compact', minimumFractionDigits: 0, maximumFractionDigits: 1 })} />
-                <Tooltip contentStyle={tooltipStyle} formatter={(v) => [`${money(Number(v))}/mo`, 'cost']} cursor={{ fill: 'rgba(127,127,127,0.08)' }} />
-                <Bar dataKey="value" radius={[5, 5, 0, 0]}>
-                  {data.subsByCategory.map((_, i) => (
-                    <Cell key={i} fill={PALETTE[(i + 2) % PALETTE.length]} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </Card>
-
-        {/* Subscriptions monthly by space / property (P68 phase 2) — only once tagged */}
-        {data.subsBySpace.length > 0 && (
-          <Card title={t('reports.cSubsBySpace', { cur: cur() })}>
-            <ResponsiveContainer width="100%" height={Math.max(200, data.subsBySpace.length * 34)}>
-              <BarChart data={data.subsBySpace} layout="vertical" margin={{ left: 8, right: 16 }}>
-                <XAxis type="number" tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} tickFormatter={(v: number) => money(v, undefined, { notation: 'compact', minimumFractionDigits: 0, maximumFractionDigits: 1 })} />
-                <YAxis type="category" dataKey="name" width={90} tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} />
-                <Tooltip contentStyle={tooltipStyle} formatter={(v) => [`${money(Number(v))}/mo`, 'cost']} cursor={{ fill: 'rgba(127,127,127,0.08)' }} />
-                <Bar dataKey="value" radius={[0, 5, 5, 0]}>
-                  {data.subsBySpace.map((_, i) => (
-                    <Cell key={i} fill={PALETTE[(i + 3) % PALETTE.length]} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </Card>
-        )}
-
-        </div>
-      )}
+      {tab === 'subscriptions' && <SubscriptionsReport subs={data.subscriptions} bySpace={data.subsBySpace} />}
 
       {tab === 'assets' && (
-        <div className="space-y-4">
-      {/* Net worth (PA2) — assets (inventory + manual accounts) minus liabilities
-          (remaining installments + card balances), with the monthly snapshot trend */}
-      <div className="mb-6 rounded-2xl border border-[color:var(--color-border)] bg-gradient-to-br from-[color:var(--color-surface)] to-[color:var(--color-surface-2)] p-5">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <p className="text-[11px] text-[color:var(--color-text-faint)] mb-1" style={{ fontFamily: 'var(--font-mono)' }}>{t('reports.netWorth')}</p>
-            <p className="text-3xl md:text-4xl font-bold" style={{ fontFamily: 'var(--font-display)', color: netWorthNow >= 0 ? 'var(--color-accent)' : 'var(--color-red)' }}>
-              {money(netWorthNow)}
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-5 text-xs" style={{ fontFamily: 'var(--font-mono)' }}>
-            <div><span className="text-[color:var(--color-text-faint)] block mb-0.5">{t('reports.inventoryValue')}</span><span className="text-[color:var(--color-text)] text-sm">{money(s.ownedValue)}</span></div>
-            <div>
-              <div className="flex items-center gap-1 mb-0.5">
-                <span className="text-[color:var(--color-text-faint)] block">{t('reports.accounts')}</span>
-                <button
-                  type="button"
-                  onClick={() => setShowAccountsModal(true)}
-                  className="text-[color:var(--color-text-faint)] hover:text-[color:var(--color-accent)] transition-colors p-0.5"
-                  title={t('reports.accounts')}
-                >
-                  <Pencil size={11} />
-                </button>
-              </div>
-              <span className="text-[color:var(--color-cyan)] text-sm">{money(data.netWorth.accountsTotal)}</span>
-            </div>
-            <div><span className="text-[color:var(--color-text-faint)] block mb-0.5">{t('reports.owed')}</span><span className="text-[color:var(--color-red)] text-sm">-{money(s.installmentsRemaining)}</span></div>
-            <div><span className="text-[color:var(--color-text-faint)] block mb-0.5">{t('reports.cardBalance')}</span><span className="text-[color:var(--color-gold)] text-sm">-{money(s.outstanding)}</span></div>
-          </div>
-        </div>
-        {data.netWorth.series.length >= 2 ? (
-          <div className="h-32 mt-4">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={data.netWorth.series} margin={{ left: 0, right: 10, top: 6 }}>
-                <defs>
-                  <linearGradient id="netWorthFill" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#00ff88" stopOpacity={0.28} />
-                    <stop offset="100%" stopColor="#00ff88" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid stroke="var(--color-border)" strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="period" tick={{ fill: 'var(--color-text-faint)', fontSize: 10 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: 'var(--color-text-faint)', fontSize: 10 }} axisLine={false} tickLine={false} width={52} tickFormatter={(v: number) => money(v, undefined, { notation: 'compact', minimumFractionDigits: 0, maximumFractionDigits: 1 })} />
-                <Tooltip contentStyle={tooltipStyle} formatter={(v) => [money(Number(v)), t('reports.netWorth')]} />
-                <Area type="monotone" dataKey="net" stroke="#00ff88" strokeWidth={2} fill="url(#netWorthFill)" />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        ) : (
-          <p className="mt-3 text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>{t('reports.netWorthTrendNote')}</p>
-        )}
-      </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Spend by category (owned items) */}
-        <Card title={t('reports.cInvByCat')}>
-          {data.spendByCategory.length === 0 ? (
-            <Empty />
-          ) : (
-            <ResponsiveContainer width="100%" height={260}>
-              <PieChart>
-                <Pie data={data.spendByCategory} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={50} outerRadius={90} paddingAngle={2}>
-                  {data.spendByCategory.map((_, i) => (
-                    <Cell key={i} fill={PALETTE[i % PALETTE.length]} stroke="var(--color-bg)" />
-                  ))}
-                </Pie>
-                <Tooltip contentStyle={tooltipStyle} formatter={(v) => [money(Number(v)), 'value']} />
-                <Legend itemSorter={null} wrapperStyle={{ fontSize: 11 }} />
-              </PieChart>
-            </ResponsiveContainer>
-          )}
-        </Card>
-
-        {/* Warranties expiring */}
-        <Card title={t('reports.cWarranties')}>
-          {data.warrantiesExpiring.length === 0 ? (
-            <Empty text={t('reports.nothingExpiring')} />
-          ) : (
-            <div className="space-y-1.5">
-              {data.warrantiesExpiring.map((w, i) => {
-                const tone = w.days <= 30 ? 'var(--color-red)' : w.days <= 90 ? 'var(--color-gold)' : 'var(--color-accent)';
-                return (
-                  <div key={i} className="flex items-center justify-between gap-2 bg-[color:var(--color-surface-2)] rounded-lg px-3 py-2">
-                    <span className="flex items-center gap-1.5 text-xs font-medium truncate">
-                      <ShieldCheck size={12} style={{ color: tone }} className="shrink-0" />
-                      {w.title}
-                    </span>
-                    <span className="text-[11px] shrink-0 tabular-nums" style={{ fontFamily: 'var(--font-mono)', color: tone }}>
-                      {w.days}d · {fmtDate(w.until, locale)}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </Card>
-
-          </div>
-      <StatementPaymentReport report={data.statementPayments} />
-
-      {/* Installment payoff — full width */}
-      <Card title={t('reports.payoffTitle')} className="mt-4">
-        {data.installmentPlans.length === 0 ? (
-          <Empty />
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
-            {data.installmentPlans.map((p) => {
-              const pct = p.totalInstallments > 0 ? Math.round((p.paidInstallments / p.totalInstallments) * 100) : 0;
-              return (
-                <div key={p.key}>
-                  <div className="flex items-center justify-between gap-2 mb-1 text-xs">
-                    <span className="font-medium truncate flex items-center gap-1.5">
-                      {p.linked && <Layers size={11} className="text-[color:var(--color-accent)] shrink-0" />}
-                      {p.label}
-                    </span>
-                    <span className="text-[11px] text-[color:var(--color-text-faint)] shrink-0 tabular-nums" style={{ fontFamily: 'var(--font-mono)' }}>
-                      {p.paidInstallments}/{p.totalInstallments}
-                    </span>
-                  </div>
-                  <div className="h-1.5 bg-[color:var(--color-surface-2)] rounded-full overflow-hidden">
-                    <div className="h-full rounded-full" style={{ width: `${pct}%`, background: p.done ? 'var(--color-accent)' : 'var(--color-purple)' }} />
-                  </div>
-                  <div className="flex items-center justify-between text-[11px] text-[color:var(--color-text-faint)] mt-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
-                    <span>{money(p.perAmount)}/mo</span>
-                    <span>{p.done ? 'paid off ✓' : `${money(p.remainingAmount)} left`}</span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </Card>
-
-        </div>
+        <AssetsReport
+          inventory={s.ownedValue}
+          accounts={data.netWorth.accountsTotal}
+          installments={s.installmentsRemaining}
+          cardBalance={s.outstanding}
+          plans={data.installmentPlans}
+          inventoryByCategory={data.spendByCategory}
+          warranties={data.warrantiesExpiring}
+          series={data.netWorth.series}
+          onEditAccounts={() => setShowAccountsModal(true)}
+        />
       )}
 
       <AssetAccountsModal
@@ -1022,217 +742,6 @@ export function ReportsClient({ data, initialTab, summaryOn = false, currency = 
         onSaved={() => router.refresh()}
       />
     </main>
-  );
-}
-
-function GoalsCard({ goals, className }: { goals: GoalRow[]; className?: string }) {
-  const t = useT();
-  const [adding, setAdding] = useState(false);
-  return (
-    <div className={`bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-2xl p-5 ${className ?? ''}`}>
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="flex items-center gap-1.5 text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
-          <Target size={12} /> {t('reports.cGoals')}
-        </h2>
-        <button
-          onClick={() => setAdding((v) => !v)}
-          className="flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-lg bg-[color:var(--color-accent)]/10 text-[color:var(--color-accent)] hover:bg-[color:var(--color-accent)]/20 transition-colors"
-          style={{ fontFamily: 'var(--font-mono)' }}
-        >
-          {adding ? <X size={12} /> : <Plus size={12} />} {t('reports.gNewGoal')}
-        </button>
-      </div>
-
-      {adding && <NewGoalForm onDone={() => setAdding(false)} />}
-
-      {goals.length === 0 && !adding ? (
-        <Empty text={t('reports.gNoGoals')} />
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-1">
-          {goals.map((g) => (
-            <GoalItem key={g._id} g={g} />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function NewGoalForm({ onDone }: { onDone: () => void }) {
-  const t = useT();
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
-  const [targetDate, setTargetDate] = useState('');
-
-  function submit(formData: FormData) {
-    setError(null);
-    startTransition(async () => {
-      const res = await createGoal(formData);
-      if (res.ok) onDone();
-      else setError(res.error ?? 'Failed');
-    });
-  }
-
-  return (
-    <form action={submit} className="mb-4 p-3 rounded-xl bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] flex flex-wrap gap-2 items-end">
-      <div className="flex-1 min-w-[140px]">
-        <label className="block text-[11px] text-[color:var(--color-text-faint)] mb-1">{t('reports.gTitle')}</label>
-        <input name="title" required placeholder={t('reports.gTitlePlaceholder')} className={cn(compactControlClass, 'w-full')} />
-      </div>
-      <div className="w-28">
-        <label className="block text-[11px] text-[color:var(--color-text-faint)] mb-1">{t('reports.gTarget')} ({cur()})</label>
-        <input name="targetAmount" type="number" min="0" step="0.01" required className={cn(compactControlClass, 'w-full')} />
-      </div>
-      <div className="w-36">
-        <label className="block text-[11px] text-[color:var(--color-text-faint)] mb-1">{t('reports.gDeadline')}</label>
-        <DateInput name="targetDate" value={targetDate} onValueChange={setTargetDate} className="!text-xs !py-1.5 pr-8" />
-      </div>
-      <button type="submit" disabled={pending} className="text-xs px-3 py-1.5 rounded-lg bg-[color:var(--color-accent)] text-black font-semibold hover:opacity-90 disabled:opacity-50">
-        {pending ? t('common.saving') : t('common.save')}
-      </button>
-      {error && <p className="w-full text-[11px] text-[color:var(--color-red)]">{error}</p>}
-    </form>
-  );
-}
-
-function GoalItem({ g }: { g: GoalRow }) {
-  const t = useT();
-  const money = useMoney();
-  const confirm = useConfirm();
-  const [pending, startTransition] = useTransition();
-  const [amount, setAmount] = useState('');
-
-  function contribute() {
-    const n = Number(amount);
-    if (!Number.isFinite(n) || n <= 0) return;
-    startTransition(async () => {
-      await addGoalContribution(g._id, n);
-      setAmount('');
-    });
-  }
-
-  async function remove() {
-    const ok = await confirm({ title: t('reports.gDeleteTitle', { title: g.title }), message: t('reports.gDeleteBody'), danger: true });
-    if (!ok) return;
-    startTransition(async () => {
-      await deleteGoal(g._id);
-    });
-  }
-
-  return (
-    <div className="rounded-xl bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] p-3">
-      <div className="flex items-start justify-between gap-2 mb-1.5">
-        <div className="min-w-0">
-          <p className="text-xs font-semibold truncate flex items-center gap-1.5">
-            {g.title}
-            {g.done && <span className="text-[11px] px-1.5 py-px rounded bg-[color:var(--color-accent)]/15 text-[color:var(--color-accent)]">{t('reports.gReached')}</span>}
-          </p>
-          {g.category && <p className="text-[11px] text-[color:var(--color-text-faint)] mt-0.5">{g.category}</p>}
-        </div>
-        <button onClick={remove} disabled={pending} className="shrink-0 text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] transition-colors">
-          <Trash2 size={13} />
-        </button>
-      </div>
-
-      <div className="h-2 rounded-full bg-[color:var(--color-surface-3)] overflow-hidden mb-1.5">
-        <div className="h-full rounded-full transition-all" style={{ width: `${Math.max(g.pct, g.current > 0 ? 3 : 0)}%`, background: g.done ? 'var(--color-accent)' : 'var(--color-cyan)' }} />
-      </div>
-
-      <div className="flex items-center justify-between text-[11px] text-[color:var(--color-text-dim)] mb-2" style={{ fontFamily: 'var(--font-mono)' }}>
-        <span>{money(g.current)} / {money(g.target)}</span>
-        <span>{g.pct}%</span>
-      </div>
-
-      {!g.done && g.perMonth != null && (
-        <p className="text-[11px] text-[color:var(--color-text-faint)] mb-2">{t('reports.gPerMonth', { x: money(g.perMonth) })}</p>
-      )}
-
-      {!g.done && (
-        <div className="flex items-center gap-1.5">
-          <input
-            type="number"
-            min="0"
-            step="0.01"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && contribute()}
-            placeholder={t('reports.gAddAmount')}
-            className={cn(compactControlClass, 'flex-1 min-w-0')}
-          />
-          <button onClick={contribute} disabled={pending} className="shrink-0 text-[11px] px-2 py-1 rounded-lg bg-[color:var(--color-accent)]/10 text-[color:var(--color-accent)] hover:bg-[color:var(--color-accent)]/20 disabled:opacity-50">
-            <Plus size={12} />
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/** P83 — one-click transfer of a budget category's unspent leftover into a goal.
- *  Two steps on purpose: money never moves between "boxes" without the user first
- *  seeing the amount and choosing where it lands. */
-function SweepToGoal({ category, monthKey, amount, goals }: { category: string; monthKey: string; amount: number; goals: GoalRow[] }) {
-  const t = useT();
-  const money = useMoney();
-  const [pending, startTransition] = useTransition();
-  const [open, setOpen] = useState(false);
-  const [goalId, setGoalId] = useState(goals[0]?._id ?? '');
-  const [error, setError] = useState<string | null>(null);
-
-  function sweep() {
-    const target = goalId || goals[0]?._id;
-    if (!target) return;
-    setError(null);
-    startTransition(async () => {
-      const res = await sweepBudgetLeftoverToGoal(target, category, monthKey, amount);
-      if (res.ok) setOpen(false);
-      else setError(res.error ?? t('common.failed'));
-    });
-  }
-
-  const label = money(amount);
-
-  if (!open) {
-    return (
-      <button
-        onClick={() => setOpen(true)}
-        title={t('reports.sweepHint')}
-        className="mt-1 flex items-center gap-1 text-[11px] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-accent)] transition-colors"
-        style={{ fontFamily: 'var(--font-mono)' }}
-      >
-        <Target size={10} /> {t('reports.sweepOffer', { x: label })}
-      </button>
-    );
-  }
-
-  return (
-    <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
-      <select
-        value={goalId}
-        onChange={(e) => setGoalId(e.target.value)}
-        className={cn(compactControlClass, 'min-w-0 flex-1')}
-      >
-        {goals.map((g) => (
-          <option key={g._id} value={g._id}>{g.title}</option>
-        ))}
-      </select>
-      <button
-        onClick={sweep}
-        disabled={pending}
-        className="shrink-0 flex items-center gap-1 text-[11px] px-2 py-1 rounded-lg bg-[color:var(--color-accent)]/10 text-[color:var(--color-accent)] hover:bg-[color:var(--color-accent)]/20 disabled:opacity-50"
-        style={{ fontFamily: 'var(--font-mono)' }}
-      >
-        <ArrowRight size={11} /> {label}
-      </button>
-      <button
-        onClick={() => { setOpen(false); setError(null); }}
-        className="shrink-0 text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)] transition-colors"
-        aria-label={t('common.cancel')}
-      >
-        <X size={12} />
-      </button>
-      {error && <p className="w-full text-[11px] text-[color:var(--color-red)]">{error}</p>}
-    </div>
   );
 }
 

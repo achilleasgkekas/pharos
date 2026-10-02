@@ -11,14 +11,22 @@ import {
   Trash2,
   ChevronRight,
   Layers,
-  FileText,
   X,
   Loader2,
   Sparkles,
   Link2,
   Package,
   GitMerge,
+  ExternalLink,
+  RefreshCw,
+  ScanLine,
+  CheckCircle2,
+  CalendarClock,
+  Search,
+  ArrowDownLeft,
 } from 'lucide-react';
+import { MenuButton, type MenuItem } from '@/components/ui/MenuButton';
+import { ALL_CATEGORIES, CATEGORY_GROUPS, categoryGroup, categoryGroupLabel, type CategoryGroupKey } from '@/lib/categories';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Button } from '@/components/ui/Button';
 import { DateInput } from '@/components/ui/DateInput';
@@ -49,6 +57,7 @@ import {
   setTransactionInstallment,
   bindInstallmentGroup,
   rescanStatement,
+  setTransactionCategory,
 } from './actions';
 import { OWNED_STATUSES } from '@/lib/itemStatus';
 import { createCard, updateCard, deleteCard, toggleCardActive, scanCard } from './cards';
@@ -68,9 +77,8 @@ import {
   formatMoney,
 } from '@/lib/fx';
 import { formatDate } from '@/lib/i18n/format';
-import { RescanControl } from '@/components/RescanControl';
 import { PlanTile } from './PlanTile';
-import { CategoryBadge } from '@/components/CategoryBadge';
+import { CategoryBadge, CategoryIcon, CategoryOptions } from '@/components/CategoryBadge';
 
 export type ItemOption = {
   _id: string;
@@ -708,7 +716,11 @@ function StatementRow({
   );
 }
 
-// ─── Statement Detail (full-screen) ────────────────────────────────────────
+// ─── Statement Detail ──────────────────────────────────────────────────────
+
+type DetailTab = 'tx' | 'details' | 'pdf';
+
+const dayMs = 86_400_000;
 
 function StatementDetail({
   statement,
@@ -726,133 +738,265 @@ function StatementDetail({
   onClose: () => void;
 }) {
   const money = useMoney();
+  const locale = useLocale();
   const t = useT();
-  const [showPdf, setShowPdf] = useState(false);
   const [pending, startTransition] = useTransition();
   const confirm = useConfirm();
+  const [tab, setTab] = useState<DetailTab>('tx');
+  const [group, setGroup] = useState<CategoryGroupKey | null>(null);
+  // One clock per opening, so "due in N days" is stable across re-renders.
+  const [now] = useState(() => Date.now());
 
   // Local copy so a re-scan refreshes transactions in place; bumping `rev` re-mounts
   // the form + transaction list (they seed their own state from props) with the
   // fresh data. StatementDetail itself is keyed by _id at the call site.
   const [current, setCurrent] = useState(statement);
   const [rev, setRev] = useState(0);
-  const [rescanMsg, setRescanMsg] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+  // The list shows the server's latest copy (a category change or link refreshes it);
+  // a re-scan swaps in the freshly parsed one until the page catches up.
+  const shown = rev === 0 ? statement : current;
 
-  const paymentSummary = statementPaymentSummary(current);
-  const credit = paymentSummary.credit > 0;
+  const summary = statementPaymentSummary(shown);
+  const credit = summary.credit > 0;
+  const total = Math.max(0, shown.totalAmount);
+  const paid = Math.max(0, Math.min(total, total - summary.due));
+  const paidPct = total > 0 ? Math.round((paid / total) * 100) : 100;
 
-  // Re-run the AI parse on the stored PDF. OCR mode rasterizes + OCRs every page —
+  // Where the money went, by category group (charges only, credits left out).
+  const byGroup = useMemo(() => {
+    const m = new Map<CategoryGroupKey, number>();
+    for (const tx of shown.transactions) if (tx.amount > 0) {
+      const g = categoryGroup(tx.category).key;
+      m.set(g, (m.get(g) ?? 0) + tx.amount);
+    }
+    return [...m.entries()].sort((a, b) => b[1] - a[1]);
+  }, [shown.transactions]);
+  const chargesTotal = byGroup.reduce((s, [, v]) => s + v, 0);
+
+  const due = shown.dueDate ? new Date(shown.dueDate) : null;
+  const daysLeft = due ? Math.ceil((due.getTime() - now) / dayMs) : null;
+  const dueDate = due ? formatDate(shown.dueDate!, locale, { day: 'numeric', month: 'short' }) : '';
+  const status =
+    summary.due <= 0.005
+      ? { label: credit ? t('st.credit') : t('stm.settled'), tone: 'var(--color-accent)' }
+      : daysLeft == null
+        ? { label: t('stm.stillDue'), tone: 'var(--color-gold)' }
+        : daysLeft < 0
+          ? { label: t('stm.overdue', { date: dueDate }), tone: 'var(--color-red)' }
+          : daysLeft === 0
+            ? { label: t('stm.dueToday'), tone: 'var(--color-red)' }
+            : { label: t('stm.dueIn', { date: dueDate, n: daysLeft }), tone: daysLeft <= 5 ? 'var(--color-gold)' : 'var(--color-cyan)' };
+
+  // Re-run the AI parse on the stored PDF. OCR mode rasterizes + OCRs every page,
   // the fix for statements whose text layer dropped the "ΔΟΣΗ x/y" installment
   // column (so installments were never detected). Manual edits + links are kept.
-  function handleRescan(useOcr: boolean) {
-    setRescanMsg(useOcr ? t('stm.rescanningOcr') : t('rc.rescanning'));
+  function rescan(useOcr: boolean) {
+    setNote(useOcr ? t('stm.rescanningOcr') : t('rc.rescanning'));
     startTransition(async () => {
-      const r = await rescanStatement(current._id, useOcr);
+      const r = await rescanStatement(shown._id, useOcr);
       if (r.ok && r.statement) {
         setCurrent(statementsWithCurrentCards([r.statement], cards)[0]);
         setRev((v) => v + 1);
-        setRescanMsg(
-          t('stm.rescanned', { tx: r.txCount ?? 0, inst: r.installmentsFound ?? 0 }) + (r.usedOcr ? ' (OCR)' : '')
-        );
+        setNote(t('stm.rescanned', { tx: r.txCount ?? 0, inst: r.installmentsFound ?? 0 }) + (r.usedOcr ? ' (OCR)' : ''));
       } else {
-        setRescanMsg(t('rc.rescanFailed', { err: r.aiError || r.error || 'no result' }));
+        setNote(t('rc.rescanFailed', { err: r.aiError || r.error || 'no result' }));
       }
+    });
+  }
+
+  function categorize() {
+    setNote(t('stm.categorizing'));
+    startTransition(async () => {
+      const r = await categorizeStatement(shown._id);
+      setNote(r.ok ? t('stm.categorized') : r.error || t('rc.rescanFailed', { err: '' }));
     });
   }
 
   async function handleDeleteStatement() {
     const ok = await confirm({
       title: t('stm.deleteStatement'),
-      message: t('stm.confirmDeleteStatement', { title: statementTitle(current) }),
+      message: t('stm.confirmDeleteStatement', { title: statementTitle(shown) }),
       confirmLabel: t('common.delete'),
       danger: true,
     });
-    if (ok) startTransition(async () => { await deleteStatement(current._id); onClose(); });
+    if (ok) startTransition(async () => { await deleteStatement(shown._id); onClose(); });
   }
 
-  return (
-    <div className="min-w-0 space-y-5 [&_input]:min-w-0 [&_input]:max-w-full [&_select]:min-w-0 [&_select]:max-w-full">
-      {/* Overpaid highlight */}
-      {credit && (
-        <div className="flex items-center gap-2 text-xs px-3 py-2 rounded-lg bg-[color:var(--color-accent)]/8 text-[color:var(--color-accent)] border border-[color:var(--color-accent)]/20" style={{ fontFamily: 'var(--font-mono)' }}>
-          {t('stm.creditBalance', { amount: `${money(paymentSummary.credit)}` })}
-        </div>
-      )}
+  const menu: MenuItem[] = [
+    ...(shown.filePath
+      ? [{ label: t('stm.openPdf'), hint: t('stm.openPdfHint'), icon: <ExternalLink size={14} />, onClick: () => window.open(fileUrl(shown.filePath!), '_blank', 'noopener') }]
+      : []),
+    ...(shown.transactions.length > 0
+      ? [{ label: t('stm.aiCategorize'), hint: t('stm.aiCategorizeHint'), icon: <Sparkles size={14} />, onClick: categorize, disabled: pending }]
+      : []),
+    ...(shown.filePath
+      ? [
+          { label: t('common.rescan'), hint: t('stm.rescanHint'), icon: <RefreshCw size={14} />, onClick: () => rescan(false), disabled: pending },
+          { label: t('common.rescanForceOcr'), hint: t('common.rescanForceOcrHint'), icon: <ScanLine size={14} />, onClick: () => rescan(true), disabled: pending },
+        ]
+      : []),
+    { label: t('stm.deleteStatement'), icon: <Trash2 size={14} />, onClick: handleDeleteStatement, disabled: pending },
+  ];
 
-      <dl className="grid min-w-0 gap-4 rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] p-4 sm:grid-cols-3">
-        <div><dt style={{ fontFamily: 'var(--font-mono)' }} className="text-[11px] text-[color:var(--color-text-faint)]">{t('payments.included')}</dt><dd className="mt-1.5 text-lg font-semibold tabular-nums text-[color:var(--color-accent)]" style={{ fontFamily: 'var(--font-display)' }}>{money(paymentSummary.paymentsIncluded)}</dd></div>
-        <div><dt style={{ fontFamily: 'var(--font-mono)' }} className="text-[11px] text-[color:var(--color-text-faint)]">{t('payments.additional')}</dt><dd className="mt-1.5 text-lg font-semibold tabular-nums text-[color:var(--color-accent)]" style={{ fontFamily: 'var(--font-display)' }}>{money(paymentSummary.additionalPaid)}</dd></div>
-        <div><dt style={{ fontFamily: 'var(--font-mono)' }} className="text-[11px] text-[color:var(--color-text-faint)]">{t('payments.due')}</dt><dd className="mt-1.5 text-lg font-semibold tabular-nums" style={{ fontFamily: 'var(--font-display)', color: paymentSummary.due > 0 ? 'var(--color-red)' : 'var(--color-accent)' }}>{money(paymentSummary.due)}</dd></div>
-      </dl>
-      {/* How the bank got to the closing balance. Lived in a second "history" list on the page. */}
-      <details className="-mt-2 rounded-xl border border-[color:var(--color-border)] px-4 py-2.5">
-        <summary className="cursor-pointer text-xs text-[color:var(--color-cyan)]">{t('stm.breakdown')}</summary>
-        <dl className="mt-3 grid min-w-0 gap-3 grid-cols-2 sm:grid-cols-4">
+  const tabs: { key: DetailTab; label: string }[] = [
+    { key: 'tx', label: t('stm.tabTx', { n: shown.transactions.length }) },
+    { key: 'details', label: t('stm.tabDetails') },
+    ...(shown.filePath ? [{ key: 'pdf' as const, label: t('stm.tabPdf') }] : []),
+  ];
+
+  return (
+    <div className="min-w-0 space-y-4 [&_input]:min-w-0 [&_input]:max-w-full [&_select]:min-w-0 [&_select]:max-w-full">
+      {/* The bill at a glance: what it came to, how much is paid, when the rest is due. */}
+      <section className="relative overflow-hidden rounded-2xl border border-[color:var(--color-border)] bg-gradient-to-br from-[color:var(--color-surface-2)] to-[color:var(--color-surface)] p-4 sm:p-5">
+        <div className="flex items-start gap-3">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[color:var(--color-purple)]/15 text-[color:var(--color-purple)]">
+            <CreditCardIcon size={19} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold">{shown.card || t('stm.statement')}</p>
+            <p className="text-xs text-[color:var(--color-text-dim)]">
+              {periodLabel(shown.period) || shown.period}
+              {shown.statementDate && ` · ${t('stm.issued', { date: formatDate(shown.statementDate, locale, { day: 'numeric', month: 'short' }) })}`}
+            </p>
+          </div>
+          <MenuButton items={menu} label={t('stm.actions')} align="right" disabled={pending} />
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p className="text-3xl font-bold tabular-nums sm:text-4xl" style={{ fontFamily: 'var(--font-display)', color: credit ? 'var(--color-accent)' : undefined }}>
+              {credit ? '+' : ''}{money(Math.abs(shown.totalAmount))}
+            </p>
+            <FxBadge doc={shown} base={fx.base} />
+          </div>
+          <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold" style={{ color: status.tone, background: `color-mix(in srgb, ${status.tone} 14%, transparent)` }}>
+            {summary.due <= 0.005 ? <CheckCircle2 size={13} /> : <CalendarClock size={13} />} {status.label}
+          </span>
+        </div>
+
+        {total > 0 && (
+          <div className="mt-3">
+            <div className="h-2 overflow-hidden rounded-full bg-[color:var(--color-surface-3)]">
+              <div className="h-full rounded-full bg-[color:var(--color-accent)] transition-all" style={{ width: `${paidPct}%` }} />
+            </div>
+            <p className="mt-1.5 text-xs text-[color:var(--color-text-dim)] tabular-nums">{t('stm.paidOf', { paid: money(paid), total: money(total) })}</p>
+          </div>
+        )}
+
+        <dl className="mt-4 grid grid-cols-3 gap-2">
           {([
-            ['payments.opening', paymentSummary.opening, false],
-            ['payments.charges', paymentSummary.charges, false],
-            ['payments.otherCredits', paymentSummary.otherCredits, true],
-            ['payments.closing', paymentSummary.closing, false],
-          ] as const).map(([k, v, green]) => (
-            <div key={k} className="min-w-0">
-              <dt className="text-[11px] text-[color:var(--color-text-faint)]">{t(k)}</dt>
-              <dd className="mt-1 text-sm font-semibold tabular-nums" style={{ fontFamily: 'var(--font-display)', color: green ? 'var(--color-accent)' : undefined }}>{money(v)}</dd>
+            ['payments.included', summary.paymentsIncluded, 'var(--color-accent)'],
+            ['payments.additional', summary.additionalPaid, 'var(--color-accent)'],
+            ['payments.due', summary.due, summary.due > 0 ? 'var(--color-red)' : 'var(--color-accent)'],
+          ] as const).map(([k, v, c]) => (
+            <div key={k} className="min-w-0 rounded-xl bg-[color:var(--color-bg)]/40 px-3 py-2">
+              <dt className="truncate text-[11px] text-[color:var(--color-text-faint)]">{t(k)}</dt>
+              <dd className="mt-0.5 text-sm font-semibold tabular-nums sm:text-base" style={{ fontFamily: 'var(--font-display)', color: c }}>{money(v)}</dd>
             </div>
           ))}
         </dl>
-        <p className="mt-3 text-[11px] leading-relaxed text-[color:var(--color-text-dim)]">{t('payments.summaryNote')}</p>
-      </details>
-      {/* Editable statement fields — same form for reading and writing */}
-      <StatementForm
-        key={`form-${rev}`}
-        cards={cards}
-        fx={fx}
-        statement={current}
-        onSuccess={onClose}
-        onDelete={handleDeleteStatement}
-        deletePending={pending}
-      />
+        {credit && <p className="mt-3 text-xs text-[color:var(--color-accent)]">{t('stm.creditBalance', { amount: money(summary.credit) })}</p>}
+      </section>
 
-      {/* Tools: PDF + AI categorize + re-scan */}
-      <div className="flex items-center gap-4 flex-wrap text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
-        {current.filePath && (
-          <button onClick={() => setShowPdf((v) => !v)} className="flex items-center gap-1 text-[color:var(--color-cyan)] hover:underline">
-            <FileText size={12} /> {showPdf ? t('stm.hidePdf') : t('stm.viewPdf')}
-          </button>
-        )}
-        {current.transactions.length > 0 && (
+      {/* Where it went: one bar split by category group; a tap filters the list. */}
+      {chargesTotal > 0 && (
+        <section aria-label={t('stm.whereItWent')}>
+          <div className="flex h-2.5 overflow-hidden rounded-full bg-[color:var(--color-surface-2)]">
+            {byGroup.map(([g, v]) => (
+              <span key={g} style={{ width: `${(v / chargesTotal) * 100}%`, background: CATEGORY_GROUPS.find((x) => x.key === g)?.color, opacity: group && group !== g ? 0.25 : 1 }} />
+            ))}
+          </div>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {byGroup.map(([g, v]) => {
+              const color = CATEGORY_GROUPS.find((x) => x.key === g)?.color;
+              const on = group === g;
+              return (
+                <button
+                  key={g}
+                  type="button"
+                  onClick={() => { setGroup(on ? null : g); setTab('tx'); }}
+                  aria-pressed={on}
+                  className={cn(
+                    'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors',
+                    on ? 'border-[color:var(--color-text-dim)] bg-[color:var(--color-surface-3)]' : 'border-[color:var(--color-border)] hover:bg-[color:var(--color-surface-2)]'
+                  )}
+                >
+                  <span className="h-2 w-2 rounded-full" style={{ background: color }} />
+                  {categoryGroupLabel(t, g)}
+                  <span className="tabular-nums text-[color:var(--color-text-dim)]">{money(v)}</span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {note && (
+        <p role="status" className="flex items-center gap-2 rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] px-3 py-2 text-xs text-[color:var(--color-text-dim)]">
+          {pending && <Loader2 size={13} className="animate-spin" />} {note}
+          <button type="button" onClick={() => setNote(null)} aria-label={t('common.close')} className="ml-auto text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)]"><X size={13} /></button>
+        </p>
+      )}
+
+      <div role="tablist" className="flex gap-1 border-b border-[color:var(--color-border)]">
+        {tabs.map((x) => (
           <button
-            onClick={() => startTransition(async () => { setRescanMsg(null); const r = await categorizeStatement(current._id); if (!r.ok && r.error) setRescanMsg(r.error); })}
-            disabled={pending}
-            className="flex items-center gap-1 text-[color:var(--color-purple)] hover:opacity-80 disabled:opacity-50"
+            key={x.key}
+            type="button"
+            role="tab"
+            aria-selected={tab === x.key}
+            onClick={() => setTab(x.key)}
+            className={cn(
+              '-mb-px border-b-2 px-3 py-2 text-sm transition-colors',
+              tab === x.key ? 'border-[color:var(--color-accent)] font-semibold text-[color:var(--color-text)]' : 'border-transparent text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]'
+            )}
           >
-            <Sparkles size={12} /> {t('stm.aiCategorize')}
+            {x.label}
           </button>
-        )}
-        {current.filePath && (
-          <span className="normal-case" style={{ fontFamily: 'var(--font-sans)' }}>
-            <RescanControl onRescan={handleRescan} pending={pending} />
-          </span>
-        )}
-        {rescanMsg && <span className="text-[color:var(--color-text-dim)] normal-case">{rescanMsg}</span>}
+        ))}
       </div>
 
-      {/* PDF preview */}
-      {showPdf && current.filePath && (
-        <div className="space-y-1.5">
-          <iframe
-            src={`${fileUrl(current.filePath)}#toolbar=0&navpanes=0`}
-            className="w-full h-[520px] rounded-lg border border-[color:var(--color-border)] bg-white"
-            title={statementTitle(current)}
-          />
-          <a href={fileUrl(current.filePath)} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-1.5 text-[11px] text-[color:var(--color-cyan)] hover:underline" style={{ fontFamily: 'var(--font-mono)' }}>
-            <FileText size={10} /> {t('stm.openNewTab')}
-          </a>
+      {tab === 'tx' && (
+        <TransactionList key={`tx-${rev}`} statement={shown} items={items} itemMap={itemMap} group={group} onClearGroup={() => setGroup(null)} />
+      )}
+
+      {tab === 'details' && (
+        <div className="space-y-4">
+          {/* How the bank got to the closing balance. */}
+          <details className="rounded-xl border border-[color:var(--color-border)] px-4 py-2.5">
+            <summary className="cursor-pointer text-xs text-[color:var(--color-cyan)]">{t('stm.breakdown')}</summary>
+            <dl className="mt-3 grid min-w-0 grid-cols-2 gap-3 sm:grid-cols-4">
+              {([
+                ['payments.opening', summary.opening, false],
+                ['payments.charges', summary.charges, false],
+                ['payments.otherCredits', summary.otherCredits, true],
+                ['payments.closing', summary.closing, false],
+              ] as const).map(([k, v, green]) => (
+                <div key={k} className="min-w-0">
+                  <dt className="text-[11px] text-[color:var(--color-text-faint)]">{t(k)}</dt>
+                  <dd className="mt-1 text-sm font-semibold tabular-nums" style={{ fontFamily: 'var(--font-display)', color: green ? 'var(--color-accent)' : undefined }}>{money(v)}</dd>
+                </div>
+              ))}
+            </dl>
+            <p className="mt-3 text-[11px] leading-relaxed text-[color:var(--color-text-dim)]">{t('payments.summaryNote')}</p>
+          </details>
+          <StatementForm key={`form-${rev}`} cards={cards} fx={fx} statement={shown} onSuccess={onClose} />
         </div>
       )}
 
-      {/* Transactions */}
-      <TransactionList key={`tx-${rev}`} statement={current} items={items} itemMap={itemMap} />
+      {tab === 'pdf' && shown.filePath && (
+        <div className="space-y-2">
+          <iframe
+            src={`${fileUrl(shown.filePath)}#toolbar=0&navpanes=0`}
+            className="h-[65vh] w-full rounded-xl border border-[color:var(--color-border)] bg-white"
+            title={statementTitle(shown)}
+          />
+          <a href={fileUrl(shown.filePath)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs text-[color:var(--color-cyan)] hover:underline">
+            <ExternalLink size={12} /> {t('stm.openNewTab')}
+          </a>
+        </div>
+      )}
     </div>
   );
 }
@@ -863,63 +1007,92 @@ function TransactionList({
   statement,
   items,
   itemMap,
+  group,
+  onClearGroup,
 }: {
   statement: SerializedStatement;
   items: ItemOption[];
   itemMap: Map<string, ItemOption>;
+  group: CategoryGroupKey | null;
+  onClearGroup: () => void;
 }) {
   const t = useT();
+  const locale = useLocale();
   const [pending, startTransition] = useTransition();
   const [adding, setAdding] = useState(false);
+  const [query, setQuery] = useState('');
+
+  const rows = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return statement.transactions.filter(
+      (tx) => (!group || categoryGroup(tx.category).key === group) && (!q || tx.description.toLowerCase().includes(q))
+    );
+  }, [statement.transactions, group, query]);
+
+  // One heading per day, so a long month reads like a bank app rather than a table.
+  const days = useMemo(() => {
+    const out: { day: string; rows: SerializedTransaction[] }[] = [];
+    for (const tx of rows) {
+      const day = (tx.date || '').slice(0, 10);
+      const last = out[out.length - 1];
+      if (last && last.day === day) last.rows.push(tx);
+      else out.push({ day, rows: [tx] });
+    }
+    return out;
+  }, [rows]);
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-2">
-        <span
-          className="text-[11px] text-[color:var(--color-text-faint)]"
-          style={{ fontFamily: 'var(--font-mono)' }}
-        >
-          {t('stm.transactions', { n: statement.transactions.length })}
-        </span>
-        <button
-          onClick={() => setAdding((v) => !v)}
-          className="text-[11px] text-[color:var(--color-accent)] flex items-center gap-1 hover:opacity-80"
-          style={{ fontFamily: 'var(--font-mono)' }}
-        >
-          <Plus size={11} /> {t('stm.add')}
-        </button>
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        <div className="relative min-w-0 flex-1">
+          <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[color:var(--color-text-faint)]" />
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t('stm.searchTx')} className={cn(controlClass, 'pl-9')} />
+        </div>
+        <Button type="button" variant="secondary" onClick={() => setAdding((v) => !v)}>
+          <Plus size={15} /> {t('stm.addCharge')}
+        </Button>
       </div>
-
-      {adding && (
-        <AddTransactionForm statementId={statement._id} onDone={() => setAdding(false)} />
+      {group && (
+        <button type="button" onClick={onClearGroup} className="inline-flex items-center gap-1 text-xs text-[color:var(--color-cyan)] hover:underline">
+          <X size={12} /> {t('stm.showAll')}
+        </button>
       )}
 
-      <div className="space-y-1">
-        {statement.transactions.map((tx) => (
-          <TransactionRow
-            key={tx._id}
-            tx={tx}
-            statementId={statement._id}
-            items={items}
-            linkedItems={tx.matchedItemIds.map((id) => itemMap.get(id)).filter((x): x is ItemOption => !!x)}
-            onDelete={() => startTransition(() => deleteTransaction(statement._id, tx._id))}
-            pending={pending}
-          />
-        ))}
-        {statement.transactions.length === 0 && !adding && (
-          <p className="text-xs text-[color:var(--color-text-faint)] italic py-2">{t('stm.noTransactions')}</p>
-        )}
-      </div>
+      {adding && <AddTransactionForm statementId={statement._id} onDone={() => setAdding(false)} />}
+
+      {days.map(({ day, rows: dayRows }) => (
+        <div key={day}>
+          <p className="mb-1 px-1 text-[11px] font-semibold uppercase tracking-wide text-[color:var(--color-text-faint)]">
+            {day ? formatDate(`${day}T12:00:00Z`, locale, { weekday: 'short', day: 'numeric', month: 'short' }) : '—'}
+          </p>
+          <div className="divide-y divide-[color:var(--color-border)] overflow-hidden rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)]">
+            {dayRows.map((tx) => (
+              <TransactionRow
+                key={tx._id}
+                tx={tx}
+                statementId={statement._id}
+                items={items}
+                linkedItems={tx.matchedItemIds.map((id) => itemMap.get(id)).filter((x): x is ItemOption => !!x)}
+                onDelete={() => startTransition(() => deleteTransaction(statement._id, tx._id))}
+                pending={pending}
+              />
+            ))}
+          </div>
+        </div>
+      ))}
+      {rows.length === 0 && !adding && (
+        <p className="py-6 text-center text-sm text-[color:var(--color-text-faint)]">{statement.transactions.length ? t('stm.noMatches') : t('stm.noTransactions')}</p>
+      )}
     </div>
   );
 }
 
 /** Inline editor for a transaction's installment counter (x/y). Lets you add it
  *  manually when the statement didn't print it, so future statements can match. */
-function InstallmentEditor({ tx, statementId }: { tx: SerializedTransaction; statementId: string }) {
+function InstallmentEditor({ tx, statementId, startEditing = false, onCancel }: { tx: SerializedTransaction; statementId: string; startEditing?: boolean; onCancel?: () => void }) {
   const t = useT();
   const [pending, startTransition] = useTransition();
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState(startEditing);
   const [cur, setCur] = useState('');
   const [tot, setTot] = useState('');
 
@@ -938,46 +1111,46 @@ function InstallmentEditor({ tx, statementId }: { tx: SerializedTransaction; sta
   if (editing) {
     return (
       <span className="inline-flex items-center gap-1">
-        <input
-          value={cur}
-          onChange={(e) => setCur(e.target.value)}
-          placeholder={t('stm.installmentNum')}
-          inputMode="numeric"
-          className={cn(compactControlClass, 'w-8 text-center')}
-        />
+        <input value={cur} onChange={(e) => setCur(e.target.value)} placeholder={t('stm.installmentNum')} inputMode="numeric" className={cn(compactControlClass, 'w-9 text-center')} />
         <span className="text-[11px] text-[color:var(--color-text-faint)]">/</span>
-        <input
-          value={tot}
-          onChange={(e) => setTot(e.target.value)}
-          placeholder={t('stm.installmentOf')}
-          inputMode="numeric"
-          className={cn(compactControlClass, 'w-8 text-center')}
-        />
-        <button onClick={save} disabled={pending} className="text-[11px] text-[color:var(--color-accent)] hover:opacity-80">
-          {t('stm.save')}
-        </button>
-        <button onClick={() => setEditing(false)} className="text-[11px] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)]">
-          ×
-        </button>
+        <input value={tot} onChange={(e) => setTot(e.target.value)} placeholder={t('stm.installmentOf')} inputMode="numeric" className={cn(compactControlClass, 'w-9 text-center')} />
+        <button onClick={save} disabled={pending} className="text-[11px] font-semibold text-[color:var(--color-accent)] hover:opacity-80">{t('stm.save')}</button>
+        <button onClick={() => { setEditing(false); onCancel?.(); }} aria-label={t('common.close')} className="text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)]"><X size={12} /></button>
       </span>
     );
   }
   if (tx.installmentInfo) {
     return (
-      <button onClick={open} className="inline-flex items-center gap-1 text-[11px] text-[color:var(--color-purple)] hover:opacity-80" style={{ fontFamily: 'var(--font-mono)' }}>
-        {t('stm.installmentCounter', { cur: tx.installmentInfo.currentInstallment, tot: tx.installmentInfo.totalInstallments })}
-        <Pencil size={8} />
+      <button onClick={open} className="inline-flex items-center gap-1 rounded-md bg-[color:var(--color-purple)]/12 px-1.5 py-0.5 text-[11px] font-medium text-[color:var(--color-purple)] hover:opacity-80">
+        <Layers size={10} /> {t('stm.installmentCounter', { cur: tx.installmentInfo.currentInstallment, tot: tx.installmentInfo.totalInstallments })}
       </button>
     );
   }
+  return null;
+}
+
+/** The category of one charge, changed in place: a native select laid over the badge. */
+function TxCategory({ tx, statementId }: { tx: SerializedTransaction; statementId: string }) {
+  const t = useT();
+  const [value, setValue] = useState(tx.category || 'uncategorized');
+  const [pending, startTransition] = useTransition();
   return (
-    <button
-      onClick={open}
-      className="text-[11px] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-cyan)] hover:underline transition-colors"
-      style={{ fontFamily: 'var(--font-mono)' }}
-    >
-      {t('stm.setInstallment')}
-    </button>
+    <span className="relative inline-flex">
+      <CategoryBadge category={value} className={cn('text-[11px] text-[color:var(--color-text-dim)]', pending && 'opacity-50')} />
+      <select
+        aria-label={t('stm.changeCategory')}
+        title={t('stm.changeCategory')}
+        value={value}
+        onChange={(e) => {
+          const next = e.target.value;
+          setValue(next);
+          startTransition(async () => { await setTransactionCategory(statementId, tx._id, next); });
+        }}
+        className="absolute inset-0 cursor-pointer opacity-0"
+      >
+        <CategoryOptions categories={ALL_CATEGORIES} current={value} />
+      </select>
+    </span>
   );
 }
 
@@ -997,52 +1170,53 @@ function TransactionRow({
   pending: boolean;
 }) {
   const money = useMoney();
-  const locale = useLocale();
   const t = useT();
   const credit = tx.amount < 0;
+  const [linking, setLinking] = useState(false);
+  const [settingPlan, setSettingPlan] = useState(false);
+  const linked = linkedItems ?? [];
+  const g = categoryGroup(tx.category);
   return (
-    <div className="group bg-[color:var(--color-surface-2)] rounded-lg px-3 py-2">
+    <div className="group px-3 py-2.5">
       <div className="flex items-center gap-3">
-        <span className="text-[11px] text-[color:var(--color-text-faint)] tabular-nums shrink-0" style={{ fontFamily: 'var(--font-mono)' }}>
-          {formatDate(tx.date, locale, { day: '2-digit', month: '2-digit' })}
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl" style={{ background: `color-mix(in srgb, ${credit ? 'var(--color-accent)' : g.color} 15%, transparent)` }}>
+          {credit ? <ArrowDownLeft size={16} className="text-[color:var(--color-accent)]" /> : <CategoryIcon category={tx.category} size={16} />}
         </span>
-        <div className="flex-1 min-w-0">
-          <span className="text-xs truncate block">{tx.description}</span>
-          <span className="flex items-center gap-1.5 flex-wrap">
-            <InstallmentEditor tx={tx} statementId={statementId} />
-            {tx.category && tx.category !== 'uncategorized' && (
-              <span className="text-[11px] text-[color:var(--color-text-faint)]">
-                <CategoryBadge category={tx.category} plain />
-              </span>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium">{tx.description}</p>
+          <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+            {credit ? (
+              <span className="text-[11px] text-[color:var(--color-accent)]">{t('stm.paymentCredit')}</span>
+            ) : (
+              <TxCategory tx={tx} statementId={statementId} />
             )}
-            {credit && (
-              <span className="text-[11px] text-[color:var(--color-accent)]" style={{ fontFamily: 'var(--font-mono)' }}>
-                {t('stm.paymentCredit')}
+            {settingPlan || tx.installmentInfo ? <InstallmentEditor key={String(settingPlan)} tx={tx} statementId={statementId} startEditing={settingPlan} onCancel={() => setSettingPlan(false)} /> : null}
+            {linked.map((i) => (
+              <span key={i._id} className="inline-flex max-w-[180px] items-center gap-1 rounded-md bg-[color:var(--color-accent)]/10 px-1.5 py-0.5 text-[11px] text-[color:var(--color-accent)]">
+                <Package size={10} className="shrink-0" /> <span className="truncate">{i.title}</span>
               </span>
-            )}
-          </span>
+            ))}
+          </div>
         </div>
-        <span
-          className={cn(
-            'text-xs font-semibold tabular-nums shrink-0',
-            credit ? 'text-[color:var(--color-accent)]' : 'text-[color:var(--color-text)]'
-          )}
-          style={{ fontFamily: 'var(--font-mono)' }}
-        >
+        <span className={cn('shrink-0 text-sm font-semibold tabular-nums', credit && 'text-[color:var(--color-accent)]')}>
           {credit ? '+' : ''}{money(Math.abs(tx.amount))}
         </span>
-        <button
-          onClick={onDelete}
+        <MenuButton
+          align="right"
+          label={t('common.more')}
           disabled={pending}
-          className="shrink-0 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] transition-all"
-        >
-          <X size={12} />
-        </button>
+          items={[
+            ...(tx.installmentInfo
+              ? [{ label: linked.length ? t('stm.addProduct') : t('stm.linkToProduct'), icon: <Link2 size={14} />, onClick: () => setLinking(true) }]
+              : credit ? [] : [{ label: t('stm.setInstallment'), icon: <Layers size={14} />, onClick: () => setSettingPlan(true) }]),
+            { label: t('common.delete'), icon: <Trash2 size={14} />, onClick: onDelete },
+          ]}
+        />
       </div>
 
-      {/* Installment ↔ product link(s) */}
-      {tx.installmentInfo && (
-        <InstallmentLink tx={tx} statementId={statementId} items={items} linkedItems={linkedItems} />
+      {/* Installment ↔ product link(s), opened from the row's menu */}
+      {linking && tx.installmentInfo && (
+        <InstallmentLink tx={tx} statementId={statementId} items={items} linkedItems={linkedItems} onDone={() => setLinking(false)} />
       )}
     </div>
   );
@@ -1053,16 +1227,18 @@ function InstallmentLink({
   statementId,
   items,
   linkedItems,
+  onDone,
 }: {
   tx: SerializedTransaction;
   statementId: string;
   items: ItemOption[];
   linkedItems?: ItemOption[];
+  onDone: () => void;
 }) {
   const t = useT();
   const confirm = useConfirm();
   const [pending, startTransition] = useTransition();
-  const [picking, setPicking] = useState(false);
+  const [picking, setPicking] = useState(true);
   const [query, setQuery] = useState('');
   const [msg, setMsg] = useState<string | null>(null);
 
@@ -1096,7 +1272,7 @@ function InstallmentLink({
   }
 
   return (
-    <div className="mt-3 min-w-0 space-y-3 rounded-lg border border-[color:var(--color-border)] p-3 [&_button]:min-h-11 [&_button]:px-3 [&_button]:text-xs">
+    <div className="mt-2.5 ml-12 min-w-0 space-y-3 rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] p-3 [&_button]:min-h-10 [&_button]:px-3 [&_button]:text-xs">
       {/* Linked products — a single charge can cover several bought on one receipt. */}
       {linked.length > 0 && (
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -1149,7 +1325,7 @@ function InstallmentLink({
               <p className="text-[11px] text-[color:var(--color-text-faint)] italic px-2 py-1">{t('stm.noProductsFound')}</p>
             )}
           </div>
-          <button onClick={() => { setPicking(false); setQuery(''); }} className="text-[11px] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)] px-1">
+          <button onClick={() => { setPicking(false); setQuery(''); onDone(); }} className="text-[11px] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)] px-1">
             {t('stm.cancelLower')}
           </button>
         </div>

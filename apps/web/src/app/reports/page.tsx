@@ -1,12 +1,12 @@
 import { connectDB } from '@/lib/db';
 import { monthlyFactor } from '@/lib/billingCycle';
+import { effectiveNextRenewalISO } from '@/lib/subscriptionRenewal';
 import { Item as ItemModel } from '@/models/Item';
 import { Receipt as ReceiptModel } from '@/models/Receipt';
 import { canonicalCategory } from '@/lib/categories';
 import { Statement as StatementModel } from '@/models/Statement';
 import { Subscription as SubscriptionModel } from '@/models/Subscription';
 import { Expense as ExpenseModel } from '@/models/Expense';
-import { Goal as GoalModel } from '@/models/Goal';
 import { withRequestTenant } from '@/lib/tenancy/request';
 import { currentModel } from '@/lib/tenancy/connection';
 import { OWNED_STATUSES, SHOPPING_STATUSES } from '@/lib/itemStatus';
@@ -14,16 +14,12 @@ import { buildStatementPaymentReport, cardBalanceSummary } from '@/lib/statement
 import { computeInstallmentPlans } from '@/lib/installments';
 import { getAppSettings } from '@/lib/appSettings';
 import { estimatedItemValue } from '@/lib/depreciation';
-import { categoryRollover, ROLLOVER_WINDOW } from '@/lib/budgetRollover';
-import { projectMonthEnd, paceMeaningful } from '@/lib/budgetPace';
-import { sweepableLeftover, sweptForMonth } from '@/lib/budgetSweep';
 import { receiptCategorySpend } from '@/lib/receiptCategorySpend';
 import { receiptSpaceSpend } from '@/lib/receiptSpaceSpend';
 import { subscriptionSpaceCost } from '@/lib/subscriptionSpaceCost';
 import { captureAndListSnapshots } from '@/lib/netWorth';
 import { computeMoneyAgenda } from '@/lib/moneyAgenda';
 import { computeSafeToSpend } from '@/lib/safeToSpend';
-import { goalProgress } from '@/lib/goals';
 import { buildMonthReview } from '@/lib/monthReview';
 import { buildYearOverYear } from '@/lib/yearOverYear';
 import { listEntriesNeedingRate } from '@/lib/fxAudit';
@@ -59,7 +55,20 @@ type LeanItem = {
   purchasedAt?: string | Date | null;
   warrantyUntil?: string | Date | null;
 };
-type LeanSub = { amount?: number; billingCycle?: string; category?: string; space?: string };
+type LeanSub = {
+  _id?: unknown;
+  name?: string;
+  provider?: string;
+  amount?: number;
+  billingCycle?: string;
+  category?: string;
+  space?: string;
+  startDate?: string | null;
+  nextRenewal?: string | null;
+  trialEndsAt?: string | null;
+  lastReviewedAt?: string | null;
+  createdAt?: string | null;
+};
 
 // The month AXIS: the run of months the page draws, built from the server's own clock and so
 // read in local time. Deliberately NOT the frame a stored date is keyed in — that one is
@@ -92,15 +101,13 @@ async function getReports(period: ReportPeriod, locale = 'en') {
   const Subscription = await currentModel(SubscriptionModel);
   const Statement = await currentModel(StatementModel);
   const Expense = await currentModel(ExpenseModel);
-  const Goal = await currentModel(GoalModel);
 
-  const [receiptsRaw, itemsRaw, subsRaw, statementsRaw, expensesRaw, goalsRaw] = await Promise.all([
+  const [receiptsRaw, itemsRaw, subsRaw, statementsRaw, expensesRaw] = await Promise.all([
     Receipt.find().select('store date total vatAmount space lineItems.qty lineItems.price lineItems.vatRate lineItems.category').lean(),
     Item.find().select('title category status purchasedPrice currentPrice purchasedAt warrantyUntil').lean(),
-    Subscription.find({ active: true }).select('amount billingCycle category space').lean(),
+    Subscription.find({ active: true }).select('name provider amount billingCycle category space startDate nextRenewal trialEndsAt lastReviewedAt createdAt').lean(),
     Statement.find().lean(),
     Expense.find().select('kind amount date period category space vendor vendorKey series seriesKey recurring').lean(),
-    Goal.find({ archived: { $ne: true } }).sort({ createdAt: -1 }).lean(),
   ]);
 
   const receipts = JSON.parse(JSON.stringify(receiptsRaw)) as LeanReceipt[];
@@ -245,49 +252,7 @@ async function getReports(period: ReportPeriod, locale = 'en') {
   // στο cash flow ή στα μηνιαία σύνολα, γιατί εκεί οι αποδείξεις μετριούνται ήδη.
   for (const [sp, amt] of receiptSpaceSpend(windowReceipts)) expSpaceMap.set(sp, (expSpaceMap.get(sp) ?? 0) + amt);
   const incomeExpense = ie.map((m) => ({ ...m, income: Math.round(m.income), expense: Math.round(m.expense) }));
-  // Budget vs actual (this month), per budgeted category. In envelope mode (P25)
-  // each category also gets a `carried` (net unspent from recent complete months)
-  // and an `effective` budget = base + carried, so the bar tracks the rolling
-  // envelope instead of the flat monthly cap.
   const appSettings = await getAppSettings();
-  // The last ROLLOVER_WINDOW complete months (excluding the current partial month),
-  // restricted to months that actually had tracked expense — an untracked/empty
-  // month must not manufacture a phantom surplus.
-  const rolloverMonthKeys: string[] = [];
-  if (appSettings.budgetRollover) {
-    for (let n = 1; n <= ROLLOVER_WINDOW; n++) {
-      const d = new Date(now.getFullYear(), now.getMonth() - n, 1);
-      const mk = axisMonthKey(d);
-      if ((totalByMonth.get(mk) ?? 0) > 0) rolloverMonthKeys.push(mk);
-    }
-  }
-  // P83 — every contribution already logged against an open goal, so the sweep button
-  // below can tell which categories of THIS month have already been moved to a goal.
-  // Flattened once here rather than per category (the list is tiny either way).
-  const allContributions = (goalsRaw as unknown as { contributions?: { amount?: number; note?: string }[] }[])
-    .flatMap((g) => g.contributions ?? []);
-  // P100 — month-end pace projection per category (linear from spend-so-far). Meaningful only
-  // mid-month once something is spent; undefined otherwise so the client hides the line.
-  const paceNow = new Date();
-  const paceDay = paceNow.getDate();
-  const paceDaysInMonth = new Date(paceNow.getFullYear(), paceNow.getMonth() + 1, 0).getDate();
-  const projectedFor = (actual: number): number | undefined =>
-    paceMeaningful(actual, paceDay, paceDaysInMonth) ? projectMonthEnd(actual, paceDay, paceDaysInMonth) : undefined;
-
-  const budgetVsActual = Object.entries(appSettings.budgets)
-    .map(([name, budget]) => {
-      const base = Math.round(budget);
-      const actual = Math.round(thisMonthCat.get(canonicalCategory(name)) ?? 0);
-      const projected = projectedFor(actual);
-      if (!appSettings.budgetRollover) return { name, budget: base, actual, projected };
-      const priorSpends = rolloverMonthKeys.map((mk) => catByMonth.get(mk)?.get(canonicalCategory(name)) ?? 0);
-      const { carried, effective } = categoryRollover(base, priorSpends);
-      // Whole euro still unspent in the envelope, offered to a savings goal. Zero once
-      // the category is on/over its limit, or once this month was already swept.
-      const leftover = sweepableLeftover(effective, actual, sweptForMonth(allContributions, name, thisMonthKey));
-      return { name, budget: base, actual, projected, carried, effective, leftover };
-    })
-    .sort((a, b) => b.budget - a.budget);
   const expenseByCategory = [...expCatMap.entries()]
     .map(([name, value]) => ({ name, value: Math.round(value), prev: Math.round(prevCatMap.get(name) ?? 0) }))
     .sort((a, b) => b.value - a.value)
@@ -418,6 +383,24 @@ async function getReports(period: ReportPeriod, locale = 'en') {
     subsByCat.set(s.category || 'other', (subsByCat.get(s.category || 'other') ?? 0) + m);
   }
   const subsByCategory = [...subsByCat.entries()].map(([name, value]) => ({ name, value: Math.round(value * 100) / 100 }));
+  // Every active subscription with its monthly equivalent and next charge, for the
+  // Subscriptions report (ranked list, renewals ahead, trials and long-unreviewed ones).
+  const subscriptions = subs
+    .map((s) => {
+      const cycle = s.billingCycle || 'monthly';
+      return {
+        id: String(s._id ?? ''),
+        name: s.name || s.provider || '—',
+        amount: Math.round((s.amount || 0) * 100) / 100,
+        cycle,
+        monthly: Math.round((s.amount || 0) * monthlyFactor(cycle) * 100) / 100,
+        category: canonicalCategory(s.category),
+        next: effectiveNextRenewalISO(s.nextRenewal, cycle, now.getTime(), s.startDate),
+        trialEndsAt: s.trialEndsAt && new Date(s.trialEndsAt).getTime() > now.getTime() ? String(s.trialEndsAt) : null,
+        reviewedAt: String(s.lastReviewedAt || s.createdAt || '') || null,
+      };
+    })
+    .sort((a, b) => b.monthly - a.monthly);
 
   // ── P68 φάση 2: μηνιαίο κόστος συνδρομών ανά χώρο ────────────────────────
   // ΞΕΧΩΡΙΣΤΟ card, όχι μέσα στο «δαπάνες ανά χώρο» από πάνω: εκεί αθροίζονται
@@ -444,20 +427,6 @@ async function getReports(period: ReportPeriod, locale = 'en') {
   // distil it into a single available figure + 30/60/90-day windows.
   const { months: agendaMonths } = await computeMoneyAgenda(now, locale);
   const safeToSpend = computeSafeToSpend(agendaMonths, now, locale);
-
-  // ── Savings / financial goals (P12) — progress is derived, never stored ──
-  const goals = (goalsRaw as unknown as { _id: unknown; title?: string; targetAmount?: number; targetDate?: string | Date | null; category?: string; contributions?: { amount?: number; date?: string | Date; note?: string; _id?: unknown }[] }[]).map((g) => {
-    const progress = goalProgress({ targetAmount: g.targetAmount || 0, targetDate: g.targetDate, contributions: (g.contributions ?? []).map((c) => ({ amount: c.amount || 0 })) });
-    return {
-      _id: String(g._id),
-      title: g.title || '—',
-      targetAmount: g.targetAmount || 0,
-      targetDate: g.targetDate ? String(g.targetDate) : null,
-      category: g.category || '',
-      contributions: (g.contributions ?? []).map((c) => ({ _id: String(c._id), amount: c.amount || 0, date: String(c.date), note: c.note || '' })),
-      ...progress,
-    };
-  });
 
   // ── Month in Review (P3) — deterministic narrative digest, reuses the already-
   // fetched expense rows + item warranties + budgets (zero new DB round-trips).
@@ -502,10 +471,7 @@ async function getReports(period: ReportPeriod, locale = 'en') {
     yearOverYear,
     expenseByCategory,
     expenseBySpace,
-    budgetVsActual,
-    budgetRollover: appSettings.budgetRollover,
-    budgetMonthKey: thisMonthKey, // P83 — the month a sweep is booked against
-    goals,
+    subscriptions,
     summary: {
       receiptsTotal: Math.round(receiptsTotal),
       receiptsVat: Math.round(receiptsVat),

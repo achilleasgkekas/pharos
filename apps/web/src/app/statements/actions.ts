@@ -1,5 +1,6 @@
 'use server';
 import { connectDB } from '@/lib/db';
+import { canonicalCategory } from '@/lib/categories';
 import { Statement as StatementModel } from '@/models/Statement';
 import { Card as CardModel } from '@/models/Card';
 import { withRequestTenant } from '@/lib/tenancy/request';
@@ -363,6 +364,20 @@ export async function deleteTransaction(statementId: string, transactionId: stri
       $pull: { transactions: { _id: transactionId } },
     });
     revalidatePath('/statements');
+  });
+}
+
+/** Put one charge in a category by hand (the AI pass can be wrong, or was never run). */
+export async function setTransactionCategory(statementId: string, transactionId: string, category: string): Promise<{ ok: boolean }> {
+  await assertCanWrite();
+  const value = canonicalCategory(category).slice(0, 60);
+  return withRequestTenant(async () => {
+    await connectDB();
+    const Statement = await currentModel(StatementModel);
+    const r = await Statement.updateOne({ _id: statementId, 'transactions._id': transactionId }, { $set: { 'transactions.$.category': value } });
+    revalidatePath('/statements');
+    revalidatePath('/reports');
+    return { ok: r.matchedCount > 0 };
   });
 }
 
