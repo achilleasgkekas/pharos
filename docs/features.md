@@ -77,6 +77,13 @@ Each item can hold specs, notes, tags, a location, a category, one or more
 the same product can be sold in several shops, an item aggregates multiple store
 links and prices rather than duplicating the product.
 
+Opening an item shows a summary on top (photo, price, status, quick actions) and
+four tabs below it: **Details**, **Prices & links**, **Documents & tag** (manuals and
+the printable QR label) and **More** (serial, build, service schedule, lending,
+custom attributes, warranty claims). One Save button keeps every tab's edits.
+Lists and cards show prices with two decimals, the category in your language with
+an icon, the sale price for sold items, and the warranty only on things you still own.
+
 Highlights:
 
 - **Builds.** Give related items the same **build / project** name (a PC build, a
@@ -203,7 +210,7 @@ it, needs your check), or **needs scan / failed** (empty). A **Quick Verify** mo
 lets you rush through the unverified queue one at a time, editing just store /
 date / total with keyboard shortcuts. You can also:
 
-- **Re-scan** a receipt (text or OCR) against the stored file.
+- **Re-scan** a receipt against the stored file. It reads the file the same way an upload does; forcing OCR on every page is under the "⋯" menu for hard scanned pages.
 - **Find duplicates** and merge them (backfilling the most complete record).
 - **Add items to library** — turn receipt line items into Inventory items,
   optionally with a warranty end date.
@@ -339,7 +346,7 @@ date.
   "QUEST ONLINE" vs "QUEST ONLINE KALLITHEA").
 - **Link a plan to products** (one plan can cover several items from the same
   purchase), so an installment charge points back at what it bought.
-- **Re-scan** (text or OCR) preserves your manual edits and product links.
+- **Re-scan** preserves your manual edits and product links (forced OCR on every page is under the "⋯" menu).
 - **Multi-currency support (P9).** Credit card statements issued in foreign
   currencies (e.g., USD card with a EUR billing option, or a foreign bank account)
   can now be tracked accurately. When you upload a statement, specify the currency

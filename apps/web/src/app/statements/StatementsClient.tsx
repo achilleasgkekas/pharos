@@ -57,7 +57,7 @@ import {
 } from './actions';
 import { OWNED_STATUSES } from '@/lib/itemStatus';
 import { createCard, updateCard, deleteCard, toggleCardActive, scanCard } from './cards';
-import { CreditCard as CreditCardIcon, Wallet, Power, Camera, ScanLine } from 'lucide-react';
+import { CreditCard as CreditCardIcon, Wallet, Power, Camera } from 'lucide-react';
 import { shrinkImage } from '@/lib/clientImage';
 import { StatementPaymentReport } from '@/components/StatementPaymentReport';
 import { buildStatementPaymentReport, cardBalanceSummary, statementPaymentSummary } from '@/lib/statementPayments';
@@ -73,6 +73,7 @@ import {
   formatMoney,
 } from '@/lib/fx';
 import { formatDate } from '@/lib/i18n/format';
+import { RescanControl } from '@/components/RescanControl';
 
 export type ItemOption = {
   _id: string;
@@ -845,10 +846,8 @@ function StatementDetail({
           </button>
         )}
         {current.filePath && (
-          <span className="flex flex-wrap items-center gap-3">
-            <span className="flex items-center gap-1"><ScanLine size={12} /> {t('stm.rescanLabel')}</span>
-            <button onClick={() => handleRescan(false)} disabled={pending} className="text-[color:var(--color-accent)] hover:opacity-80 disabled:opacity-50">{t('stm.text')}</button>
-            <button onClick={() => handleRescan(true)} disabled={pending} title={t('stm.ocrTitle')} className="text-[color:var(--color-accent)] hover:opacity-80 disabled:opacity-50">{t('rc.ocr')}</button>
+          <span className="normal-case" style={{ fontFamily: 'var(--font-sans)' }}>
+            <RescanControl onRescan={handleRescan} pending={pending} />
           </span>
         )}
         {rescanMsg && <span className="text-[color:var(--color-text-dim)] normal-case">{rescanMsg}</span>}

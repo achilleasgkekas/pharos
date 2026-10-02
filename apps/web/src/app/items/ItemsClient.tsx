@@ -17,7 +17,8 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { PricePanel } from '@/components/PricePanel';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { cn } from '@/components/ui/cn';
-import { Layers, Receipt as ReceiptIcon, CreditCard, Package, ShoppingCart } from 'lucide-react';
+import { Layers, Receipt as ReceiptIcon, CreditCard, Package, ShoppingCart, Wifi, HardDrive, Cpu, Headphones, Monitor, Smartphone, Mouse, Droplets } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { CURRENCIES, currencySymbol } from '@/lib/money';
 import { FxBadge } from '@/components/FxBadge';
 import { FxRateButton } from '@/components/FxRateButton';
@@ -99,6 +100,43 @@ const CATEGORIES = [
 // A context is per-render by construction, so there is no shared slot left to leak through. Its
 // default is the built-in list, which is what a tree without a provider should show.
 const CATEGORY_LABELS: Record<string, string> = Object.fromEntries(CATEGORIES.map((c) => [c.value, c.label]));
+const CATEGORY_KEYS: Record<string, TKey> = {
+  network: 'it.catNetwork',
+  storage: 'it.catStorage',
+  compute: 'it.catCompute',
+  audio: 'it.catAudio',
+  video: 'it.catVideo',
+  mobile: 'it.catMobile',
+  peripheral: 'it.catPeripheral',
+  consumable: 'it.catConsumable',
+  other: 'it.catOther',
+};
+const CATEGORY_ICONS: Record<string, LucideIcon> = {
+  network: Wifi,
+  storage: HardDrive,
+  compute: Cpu,
+  audio: Headphones,
+  video: Monitor,
+  mobile: Smartphone,
+  peripheral: Mouse,
+  consumable: Droplets,
+};
+/** A built-in category in the reader's language; a workspace's own category as typed. */
+function categoryLabel(value: string, t: TFunc): string {
+  if (!value) return '';
+  if (CATEGORY_KEYS[value]) return t(CATEGORY_KEYS[value]);
+  return CATEGORY_LABELS[value] || value.charAt(0).toUpperCase() + value.slice(1);
+}
+/** Warranty only means something while you still have the thing. */
+const WARRANTY_SHOWN = new Set(['received', 'installed', 'broken']);
+function shownWarranty(item: SerializedItem, t: TFunc): { label: string; color: string } | null {
+  return WARRANTY_SHOWN.has(item.status) ? warrantyState(item.warrantyUntil, t) : null;
+}
+/** The figure a row leads with: what it sold for once sold, otherwise its current price. */
+function listPrice(item: SerializedItem): number {
+  if (item.status === 'sold') return item.soldPrice != null && item.soldPrice > 0 ? item.soldPrice : 0;
+  return item.currentPrice > 0 ? item.currentPrice : 0;
+}
 const BUILTIN_CATEGORY_VALUES = CATEGORIES.map((c) => c.value);
 const ItemCategoriesContext = createContext<string[]>(BUILTIN_CATEGORY_VALUES);
 // P39: the existing build names, offered as suggestions in the item form's bundle field so a
@@ -108,16 +146,17 @@ const BundleNamesContext = createContext<string[]>([]);
 /** The category dropdown's options for a given list. `current` is prepended when the item already
  *  carries a value that is no longer on the list, so editing an item never silently
  *  re-categorises it. */
-function categoryOptionsFrom(list: string[], current?: string): { value: string; label: string }[] {
+function categoryOptionsFrom(list: string[], t: TFunc, current?: string): { value: string; label: string }[] {
   const out = list.slice();
   if (current && !out.includes(current)) out.unshift(current);
-  return out.map((v) => ({ value: v, label: CATEGORY_LABELS[v] || v.charAt(0).toUpperCase() + v.slice(1) }));
+  return out.map((v) => ({ value: v, label: categoryLabel(v, t) }));
 }
 
 /** Same, for the components BELOW the provider (the form, the detail modal), which do not receive
  *  the list as a prop. */
 function useItemCategoryOptions(current?: string): { value: string; label: string }[] {
-  return categoryOptionsFrom(useContext(ItemCategoriesContext), current);
+  const t = useT();
+  return categoryOptionsFrom(useContext(ItemCategoriesContext), t, current);
 }
 
 const STATUSES = [
@@ -132,6 +171,15 @@ const STATUSES = [
 ];
 
 type SortKey = 'default' | 'recent' | 'price-desc' | 'price-asc' | 'name';
+
+/** The detail dialog's tabs. The summary above them is always visible. */
+type ItemTab = 'basics' | 'prices' | 'files' | 'more';
+const ITEM_TABS: { key: ItemTab; label: TKey }[] = [
+  { key: 'basics', label: 'it.tabBasics' },
+  { key: 'prices', label: 'it.tabPrices' },
+  { key: 'files', label: 'it.tabFiles' },
+  { key: 'more', label: 'it.tabMore' },
+];
 
 const SORT_OPTIONS: { value: SortKey; label: string }[] = [
   { value: 'default', label: 'Sort: default' },
@@ -271,10 +319,10 @@ export function ItemsClient({
   const configuredCategories = categoryList.length ? categoryList : BUILTIN_CATEGORY_VALUES;
   // This dropdown lives in the same component that PROVIDES the list, so it reads it directly —
   // a hook here would see the context default, not the value being provided.
-  const bulkCategoryOptions = categoryOptionsFrom(configuredCategories);
   const fx: FxCtx = { base: baseCurrency, enabled: multiCurrency };
   const router = useRouter();
   const t = useT();
+  const bulkCategoryOptions = categoryOptionsFrom(configuredCategories, t);
   const money = useMoney();
   const cfg = VIEW_CONFIG[view];
   const viewName = view === 'shopping' ? t('nav.wishlist') : t('nav.inventory');
@@ -606,7 +654,7 @@ export function ItemsClient({
       )}
       {categories.length > 1 && (
         <FilterSection label={t('common.category')}>
-          <SearchableSelect value={categoryFilter} onChange={setCategoryFilter} options={categories} placeholder={t('sub.allCategories')} clearable size="sm" className="w-full" />
+          <SearchableSelect value={categoryFilter} onChange={setCategoryFilter} options={categories} labels={Object.fromEntries(categories.map((c) => [c, categoryLabel(c, t)]))} placeholder={t('sub.allCategories')} clearable size="sm" className="w-full" />
         </FilterSection>
       )}
       {/* P92 — browse by physical location (room / rack / shelf). Only shown once items
@@ -933,8 +981,8 @@ function CompareItemsTable({
   truncated: boolean;
 }) {
   const market = useShoppingMarket(); // #319: deal checks count in-market shops only
+  const money = useMoney();
   if (items.length === 0) return null;
-  const money = (n: number) => `${cur()}${n}`;
   const statusLabel = (s: string) => (IT_STATUS_KEY[s] ? t(IT_STATUS_KEY[s]) : s);
   const storeOf = (i: SerializedItem) => bestLinkPrice(i, market)?.store || i.purchasedFrom || '';
   const cell = 'align-top p-2 border-b border-[color:var(--color-border)] text-xs';
@@ -1060,6 +1108,7 @@ type PreviewData = {
 
 function UrlImport({ view, onImported }: { view: ItemView; onImported: () => void }) {
   const t = useT();
+  const money = useMoney();
   const [url, setUrl] = useState('');
   const [pending, startTransition] = useTransition(); // preview fetch
   const [approving, startApprove] = useTransition(); // save
@@ -1185,7 +1234,7 @@ function UrlImport({ view, onImported }: { view: ItemView; onImported: () => voi
             {preview.price > 0 && (
               <span className="text-[color:var(--color-accent)] font-extrabold text-xl leading-none shrink-0" style={{ fontFamily: 'var(--font-display)' }}>
                 {/* P9: show the price in the currency the page actually prints it in. */}
-                {preview.currency ? formatMoney(preview.price, preview.currency) : `${cur()}${preview.price}`}
+                {preview.currency ? formatMoney(preview.price, preview.currency) : `${money(preview.price)}`}
               </span>
             )}
           </div>
@@ -1281,6 +1330,7 @@ function isDeal(item: SerializedItem, market: ShoppingMarket | null): boolean {
  */
 function BundleSummaryCard({ bundle }: { bundle: BundleSummary }) {
   const t = useT();
+  const money = useMoney();
   const stages = [
     bundle.planned ? t('it.bundlePlanned', { n: bundle.planned }) : '',
     bundle.ordered ? t('it.bundleOrdered', { n: bundle.ordered }) : '',
@@ -1305,12 +1355,12 @@ function BundleSummaryCard({ bundle }: { bundle: BundleSummary }) {
       <div className="flex gap-6" style={{ fontFamily: 'var(--font-mono)' }}>
         <div className="text-right">
           <div className="text-[11px] text-[color:var(--color-text-faint)]">{t('it.bundleInvested')}</div>
-          <div className="text-sm font-semibold text-[color:var(--color-cyan)]">{cur()}{bundle.invested.toFixed(0)}</div>
+          <div className="text-sm font-semibold text-[color:var(--color-cyan)]">{money(bundle.invested)}</div>
         </div>
         {bundle.toBuy > 0 && (
           <div className="text-right">
             <div className="text-[11px] text-[color:var(--color-text-faint)]">{t('it.bundleToBuy')}</div>
-            <div className="text-sm font-semibold">{cur()}{bundle.toBuy.toFixed(0)}</div>
+            <div className="text-sm font-semibold">{money(bundle.toBuy)}</div>
           </div>
         )}
       </div>
@@ -1336,12 +1386,15 @@ type ItemCardProps = {
 function ItemRow({ item, view, base, plan, onClick, selected, onToggleSelect, selectMode }: ItemCardProps) {
   const market = useShoppingMarket(); // #319: deal checks count in-market shops only
   const t = useT();
+  const money = useMoney();
   const cover = item.photos[0];
   const best = view === 'shopping' ? bestLinkPrice(item, market) : null;
   const deal = view === 'shopping' && isDeal(item, market);
-  const w = warrantyState(item.warrantyUntil, t);
+  const w = shownWarranty(item, t);
   const lend = lendBadge(item, t);
   const claim = claimBadge(item, t);
+  const price = listPrice(item);
+  const CatIcon = CATEGORY_ICONS[item.category] ?? Package;
   const mainClick = selectMode ? onToggleSelect : onClick;
   return (
     <div
@@ -1373,20 +1426,18 @@ function ItemRow({ item, view, base, plan, onClick, selected, onToggleSelect, se
             // eslint-disable-next-line @next/next/no-img-element
             <img src={fileUrl(cover)} alt={item.title} loading="lazy" className="w-full h-full object-contain" />
           ) : (
-            <span className="text-[10px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
-              {(item.category || '?').slice(0, 3)}
-            </span>
+            <CatIcon size={18} className="text-[color:var(--color-text-faint)]" aria-hidden />
           )}
         </div>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5">
-            <span className="font-semibold text-sm truncate" style={{ fontFamily: 'var(--font-display)' }}>
+          <div className="flex items-start gap-1.5">
+            <span className="font-semibold text-sm leading-snug line-clamp-2 sm:line-clamp-1 [overflow-wrap:anywhere]" style={{ fontFamily: 'var(--font-display)' }}>
               {item.title}
             </span>
             {item.aiFilledAt && <Sparkles size={10} className="text-[color:var(--color-accent)] shrink-0" />}
           </div>
           <div className="flex items-center gap-2 flex-wrap text-[11px] text-[color:var(--color-text-faint)] mt-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
-            <span className="">{item.num ? `${item.num} / ` : ''}{item.category}</span>
+            <span>{item.num ? `${item.num} · ` : ''}{categoryLabel(item.category, t)}</span>
             {w && <span style={{ color: w.color }}>{w.label}</span>}
             {lend && <span className="truncate max-w-[14rem]" style={{ color: lend.color }}>{lend.label}</span>}
             {claim && <span className="truncate max-w-[14rem]" style={{ color: claim.color }}>{claim.label}</span>}
@@ -1394,7 +1445,7 @@ function ItemRow({ item, view, base, plan, onClick, selected, onToggleSelect, se
             {best && (
               <span className="text-[color:var(--color-text-dim)]">
                 {best.price !== item.currentPrice ? (
-                  <>{t('it.best')} <span className="text-[color:var(--color-accent)]">{cur()}{best.price}</span></>
+                  <>{t('it.best')} <span className="text-[color:var(--color-accent)]">{money(best.price)}</span></>
                 ) : (
                   <>{t('it.at')} <span className="text-[color:var(--color-text-faint)]">{best.store}</span></>
                 )}
@@ -1404,10 +1455,13 @@ function ItemRow({ item, view, base, plan, onClick, selected, onToggleSelect, se
           </div>
         </div>
       </button>
-      <div className="flex items-center gap-3 shrink-0">
-        {item.currentPrice > 0 && (
-          <span className="font-extrabold text-[color:var(--color-accent)] text-lg leading-none" style={{ fontFamily: 'var(--font-display)' }}>
-            {cur()}{item.currentPrice}
+      <div className="flex flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-3 shrink-0">
+        {price > 0 && (
+          <span
+            className={cn('font-extrabold text-base sm:text-lg leading-none tabular-nums', item.status === 'sold' ? 'text-[color:var(--color-text-dim)]' : 'text-[color:var(--color-accent)]')}
+            style={{ fontFamily: 'var(--font-display)' }}
+          >
+            {money(price)}
           </span>
         )}
         {/* P9: what the receipt actually said, when the item was not bought in base currency. */}
@@ -1431,11 +1485,13 @@ function ItemCard({
   const market = useShoppingMarket(); // #319: deal checks count in-market shops only
   const locale = useLocale();
   const t = useT();
+  const money = useMoney();
   const cover = item.photos[0];
   const links = (item.links ?? []).slice(0, 3);
   const best = view === 'shopping' ? bestLinkPrice(item, market) : null;
   const trend = view === 'shopping' ? priceTrend(item, market) : null;
   const deal = view === 'shopping' && isDeal(item, market);
+  const price = listPrice(item);
   // In select mode, a click anywhere on the card toggles selection (the user asked
   // not to be forced to hit the tiny top-left checkbox). Otherwise it opens detail.
   const mainClick = selectMode ? onToggleSelect : onClick;
@@ -1480,7 +1536,7 @@ function ItemCard({
             className="flex items-center justify-between gap-2 text-[0.7rem] text-[color:var(--color-text-faint)] mb-1.5"
             style={{ fontFamily: 'var(--font-mono)' }}
           >
-            <span className="truncate">{item.num ? `${item.num} / ` : ''}{item.category}</span>
+            <span className="truncate">{item.num ? `${item.num} · ` : ''}{categoryLabel(item.category, t)}</span>
             {item.aiFilledAt && (
               <span
                 className="flex items-center gap-0.5 text-[color:var(--color-accent)] shrink-0"
@@ -1499,17 +1555,20 @@ function ItemCard({
           </div>
 
           <div className="flex items-baseline gap-2 flex-wrap">
-            {item.currentPrice > 0 && (
+            {price > 0 && (
               <span
-                className="text-[color:var(--color-accent)] font-extrabold text-2xl tracking-tight leading-none"
+                className={cn('font-extrabold text-2xl tracking-tight leading-none tabular-nums', item.status === 'sold' ? 'text-[color:var(--color-text-dim)]' : 'text-[color:var(--color-accent)]')}
                 style={{ fontFamily: 'var(--font-display)' }}
               >
-                {cur()}{item.currentPrice}
+                {money(price)}
               </span>
             )}
-            {item.purchasedPrice && item.purchasedPrice !== item.currentPrice && (
+            {item.status === 'sold' && price > 0 && (
+              <span className="text-[color:var(--color-text-faint)] text-xs">{t('it.soldForLabel')}</span>
+            )}
+            {item.purchasedPrice && item.purchasedPrice !== price && (
               <span className="text-[color:var(--color-text-faint)] text-xs" style={{ fontFamily: 'var(--font-mono)' }}>
-                {t('it.paid')} {cur()}{item.purchasedPrice}
+                {t('it.paid')} {money(item.purchasedPrice)}
               </span>
             )}
             {/* P9: what the receipt actually said, when the item was not bought in base currency. */}
@@ -1520,10 +1579,10 @@ function ItemCard({
                   'inline-flex items-center gap-0.5 text-[11px] font-semibold',
                   trend < 0 ? 'text-[color:var(--color-accent)]' : 'text-[color:var(--color-red)]'
                 )}
-                title={t('it.lastChange', { dir: trend < 0 ? t('pp.down') : t('pp.up'), x: `${cur()}${Math.abs(trend).toFixed(2)}` })}
+                title={t('it.lastChange', { dir: trend < 0 ? t('pp.down') : t('pp.up'), x: `${money(Math.abs(trend))}` })}
                 style={{ fontFamily: 'var(--font-mono)' }}
               >
-                {trend < 0 ? <TrendingDown size={11} /> : <TrendingUp size={11} />}{cur()}{Math.abs(trend).toFixed(0)}
+                {trend < 0 ? <TrendingDown size={11} /> : <TrendingUp size={11} />}{money(Math.abs(trend))}
               </span>
             )}
           </div>
@@ -1535,7 +1594,7 @@ function ItemCard({
                 <span className="text-[color:var(--color-text-dim)]">
                   {best.price !== item.currentPrice ? (
                     <>
-                      {t('it.best')} <span className="text-[color:var(--color-accent)] font-semibold">{cur()}{best.price}</span>
+                      {t('it.best')} <span className="text-[color:var(--color-accent)] font-semibold">{money(best.price)}</span>
                       <span className="text-[color:var(--color-text-faint)]"> · {best.store}</span>
                     </>
                   ) : (
@@ -1546,11 +1605,11 @@ function ItemCard({
               {item.targetPrice ? (
                 deal ? (
                   <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-[color:var(--color-accent)]/10 text-[color:var(--color-accent)] border border-[color:var(--color-accent)]/25 font-semibold">
-                    <Target size={9} /> {t('it.deal')} ≤{cur()}{item.targetPrice}
+                    <Target size={9} /> {t('it.deal')} ≤{money(item.targetPrice)}
                   </span>
                 ) : (
                   <span className="inline-flex items-center gap-0.5 text-[color:var(--color-text-faint)]">
-                    <Target size={9} /> {t('it.targetWord')} {cur()}{item.targetPrice}
+                    <Target size={9} /> {t('it.targetWord')} {money(item.targetPrice)}
                   </span>
                 )
               ) : null}
@@ -1565,7 +1624,7 @@ function ItemCard({
 
           <div className="flex items-center gap-1.5 flex-wrap mt-2">
             {(() => {
-              const w = warrantyState(item.warrantyUntil, t);
+              const w = shownWarranty(item, t);
               return w ? (
                 <span
                   className="inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded"
@@ -1620,24 +1679,27 @@ function ItemCard({
       {/* Link pills (like reference .item-links). Siblings of the button, not nested,
           so the markup stays valid and clicks open the URL instead of the modal. */}
       {links.length > 0 && (
-        <div className="flex flex-col gap-1.5 px-4 pb-4 pt-3 border-t border-[color:var(--color-border)]">
-          {links.map((l, i) => (
-            <a
-              key={i}
-              href={l.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              className="flex items-center gap-2 text-[0.7rem] text-[color:var(--color-cyan)] bg-[color:var(--color-surface-2)] hover:bg-[color:var(--color-surface-3)] hover:text-[color:var(--color-accent)] rounded-md px-2.5 py-1.5 transition-colors"
-              style={{ fontFamily: 'var(--font-mono)' }}
-            >
-              <span className="shrink-0">→</span>
-              {l.label && (
-                <span className="shrink-0 text-[11px] text-[color:var(--color-text-faint)]">{l.label}</span>
-              )}
-              <span className="truncate">{linkHost(l.url)}</span>
-            </a>
-          ))}
+        <div className="flex flex-wrap gap-1.5 px-4 pb-4 pt-3 border-t border-[color:var(--color-border)]">
+          {links.map((l, i) => {
+            const p = l.price ?? latestPriceForUrl(item.priceHistory, l.url);
+            return (
+              <a
+                key={i}
+                href={l.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={l.url}
+                onClick={(e) => e.stopPropagation()}
+                className="inline-flex max-w-full items-center gap-1.5 text-xs text-[color:var(--color-cyan)] bg-[color:var(--color-surface-2)] hover:bg-[color:var(--color-surface-3)] hover:text-[color:var(--color-accent)] rounded-md px-2 py-1 transition-colors"
+              >
+                <ExternalLink size={11} className="shrink-0" />
+                <span className="truncate">{l.label || linkHost(l.url)}</span>
+                {p != null && p > 0 && (
+                  <span className="shrink-0 font-semibold text-[color:var(--color-text)] tabular-nums">{money(p)}</span>
+                )}
+              </a>
+            );
+          })}
         </div>
       )}
     </div>
@@ -1680,6 +1742,7 @@ function ItemDetailModal({
   const market = useShoppingMarket(); // #319: deal checks count in-market shops only
   const locale = useLocale();
   const t = useT();
+  const money = useMoney();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const confirm = useConfirm();
@@ -1689,6 +1752,7 @@ function ItemDetailModal({
   const [showPriceSearch, setShowPriceSearch] = useState(false);
   const [actionMsg, setActionMsg] = useState<{ text: string; href?: string; tone: 'ok' | 'err' } | null>(null);
   const [showLinkPicker, setShowLinkPicker] = useState(false);
+  const [tab, setTab] = useState<ItemTab>('basics');
   const busy = pending || aiAllFilling || infoFilling || photoFetching;
 
   // Combined "AI fill all" — info + prices + photos in one shot.
@@ -1839,7 +1903,7 @@ function ItemDetailModal({
     });
   }
 
-  const warranty = warrantyState(item.warrantyUntil, t);
+  const warranty = shownWarranty(item, t);
   const hasPayment = plans.length > 0 || item.receiptIds.length > 0 || unlinkedPlans.length > 0;
   // Headline price: what you paid (owned) or the cheapest REAL store link (shopping).
   // Falls back to currentPrice only when there are no priced links — so a stale/seeded
@@ -1890,14 +1954,14 @@ function ItemDetailModal({
     <>
     <Modal open onClose={onClose} title={item.title} size="2xl">
       {/* Hero: product photos + key facts at a glance */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-6">
+      <div className={cn('grid grid-cols-1 gap-5 mb-5', item.photos.length > 0 ? 'md:grid-cols-2' : 'md:grid-cols-[12rem_minmax(0,1fr)]')}>
         <ItemPhotoGallery key={`g-${item._id}-${item.updatedAt}`} itemId={item._id} photos={item.photos} canFetch={false} onChange={(photos) => onItemPatched({ photos })} />
 
         <div className="flex flex-col gap-3">
           <div className="flex items-center gap-2 flex-wrap">
             <Badge status={item.status} />
             <span className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
-              {item.category}
+              {categoryLabel(item.category, t)}
             </span>
             {item.num && (
               <span className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
@@ -1915,14 +1979,14 @@ function ItemDetailModal({
               </div>
               <div className="flex items-baseline gap-2 flex-wrap">
                 <span className="text-3xl font-bold text-[color:var(--color-accent)]" style={{ fontFamily: 'var(--font-display)' }}>
-                  {headlinePrice > 0 ? `${cur()}${headlinePrice}` : '—'}
+                  {headlinePrice > 0 ? `${money(headlinePrice)}` : '—'}
                 </span>
                 {/* P9: the printed figure behind the converted one above. */}
                 <FxBadge doc={item} base={fx.base} />
               </div>
               {item.purchasedFrom && (
                 <div className="text-xs text-[color:var(--color-text-dim)] mt-0.5">
-                  from {item.purchasedFrom}
+                  {t('it.fromStore', { store: item.purchasedFrom })}
                   {item.purchasedAt && ` · ${formatDate(item.purchasedAt, locale)}`}
                 </div>
               )}
@@ -1930,7 +1994,7 @@ function ItemDetailModal({
             {item.purchasedPrice && item.currentPrice > 0 && item.currentPrice !== item.purchasedPrice && (
               <div className="text-right">
                 <div className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>{t('it.priceNow')}</div>
-                <div className="text-sm font-semibold" style={{ fontFamily: 'var(--font-mono)' }}>{cur()}{item.currentPrice}</div>
+                <div className="text-sm font-semibold" style={{ fontFamily: 'var(--font-mono)' }}>{money(item.currentPrice)}</div>
               </div>
             )}
           </div>
@@ -1945,7 +2009,7 @@ function ItemDetailModal({
                     {t('it.soldForLabel')}
                   </div>
                   <div className="text-2xl font-bold" style={{ fontFamily: 'var(--font-display)' }}>
-                    {cur()}{soldFor}
+                    {money(soldFor)}
                   </div>
                   {(item.soldTo || item.soldAt) && (
                     <div className="text-xs text-[color:var(--color-text-dim)] mt-0.5">
@@ -1967,7 +2031,7 @@ function ItemDetailModal({
                       )}
                       style={{ fontFamily: 'var(--font-mono)' }}
                     >
-                      {realized >= 0 ? '+' : '-'}{cur()}{Math.abs(realized)}
+                      {realized >= 0 ? '+' : '-'}{money(Math.abs(realized))}
                     </div>
                   </div>
                 )}
@@ -2073,7 +2137,7 @@ function ItemDetailModal({
                 {bundle.name}
               </div>
               <div className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
-                {t('it.bundleInvestedParts', { amount: `${cur()}${bundle.invested.toFixed(0)}`, n: bundle.parts })}
+                {t('it.bundleInvestedParts', { amount: `${money(bundle.invested)}`, n: bundle.parts })}
               </div>
               <Button variant="ghost" onClick={() => onShowBundle(bundle.name)} className="self-start">
                 {t('it.bundleShowParts')}
@@ -2157,8 +2221,8 @@ function ItemDetailModal({
             >
               <Target size={13} className="shrink-0" />
               {isDeal(item, market)
-                ? t('it.dealReached', { x: `${cur()}${item.targetPrice}` })
-                : `${t('it.targetX', { x: `${cur()}${item.targetPrice}` })}${lowestKnown(item, market) != null ? ` · ${t('it.bestKnown', { y: `${cur()}${lowestKnown(item, market)}` })}` : ''}`}
+                ? t('it.dealReached', { x: `${money(item.targetPrice)}` })
+                : `${t('it.targetX', { x: `${money(item.targetPrice)}` })}${lowestKnown(item, market) != null ? ` · ${t('it.bestKnown', { y: `${money(lowestKnown(item, market) ?? 0)}` })}` : ''}`}
             </div>
           ) : null}
 
@@ -2275,6 +2339,29 @@ function ItemDetailModal({
             </div>
           )}
 
+        </div>
+      </div>
+
+      <div role="tablist" aria-label={item.title} className="mb-5 flex gap-1 overflow-x-auto no-scrollbar border-b border-[color:var(--color-border)]">
+        {ITEM_TABS.map((x) => (
+          <button
+            key={x.key}
+            type="button"
+            role="tab"
+            aria-selected={tab === x.key}
+            onClick={() => setTab(x.key)}
+            className={cn(
+              'shrink-0 px-2.5 sm:px-3 py-2 text-[13px] sm:text-sm border-b-2 -mb-px transition-colors whitespace-nowrap',
+              tab === x.key ? 'border-[color:var(--color-accent)] text-[color:var(--color-text)] font-semibold' : 'border-transparent text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]'
+            )}
+          >
+            {t(x.label)}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'prices' && (
+        <div className="flex flex-col gap-4 mb-5">
           {/* Where to buy (owned items only — wishlist shows store links in the PricePanel below) */}
           {view === 'inventory' && item.links.length > 0 && (
             <div>
@@ -2297,7 +2384,7 @@ function ItemDetailModal({
                     {link.label}
                     {p != null && (
                       <span className="font-bold text-[color:var(--color-accent)] ml-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
-                        {cur()}{p}
+                        {money(p)}
                       </span>
                     )}
                   </a>
@@ -2306,6 +2393,14 @@ function ItemDetailModal({
               </div>
             </div>
           )}
+
+      {/* Price: ONE home — summary + verdict + log + (folded) full per-store history.
+          Shopping gets the full summary; an owned item only shows its history if any. */}
+      {(view === 'shopping' || item.priceHistory.length > 0) && (
+        <div className="mb-4">
+          <PricePanel item={item} summary={view === 'shopping'} onChanged={() => router.refresh()} onSearchOnline={() => setShowPriceSearch(true)} />
+        </div>
+      )}
 
           {/* Purchase & payment — right column, under the AI buttons */}
           {hasPayment && (
@@ -2327,7 +2422,7 @@ function ItemDetailModal({
                 >
                   <ReceiptIcon size={12} />
                   {r.store || t('it.receiptFallback')}
-                  {r.total > 0 && <span className="text-[color:var(--color-text-faint)]">· {cur()}{r.total}</span>}
+                  {r.total > 0 && <span className="text-[color:var(--color-text-faint)]">· {money(r.total)}</span>}
                   {r.fileType === 'pdf' && <span className="text-[10px] text-[color:var(--color-text-faint)]">pdf</span>}
                 </a>
               ) : (
@@ -2335,7 +2430,7 @@ function ItemDetailModal({
                   key={r._id}
                   className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg text-[color:var(--color-text-dim)]"
                 >
-                  <ReceiptIcon size={12} /> {r.store || t('it.receiptFallback')} {r.total > 0 && `· ${cur()}${r.total}`}
+                  <ReceiptIcon size={12} /> {r.store || t('it.receiptFallback')} {r.total > 0 && `· ${money(r.total)}`}
                 </span>
               )
             )}
@@ -2410,7 +2505,7 @@ function ItemDetailModal({
                         </span>
                         <span className="flex items-center gap-2 shrink-0">
                           <span className="text-[11px] text-[color:var(--color-text-faint)] tabular-nums" style={{ fontFamily: 'var(--font-mono)' }}>
-                            {p.paidInstallments}/{p.totalInstallments} · {cur()}{p.perAmount.toFixed(2)}/mo
+                            {p.paidInstallments}/{p.totalInstallments} · {money(p.perAmount)}/mo
                           </span>
                           <Plus size={13} className="text-[color:var(--color-accent)]" />
                         </span>
@@ -2424,16 +2519,10 @@ function ItemDetailModal({
             </div>
           )}
         </div>
-      </div>
-
-      {/* Price: ONE home — summary + verdict + log + (folded) full per-store history.
-          Shopping gets the full summary; an owned item only shows its history if any. */}
-      {(view === 'shopping' || item.priceHistory.length > 0) && (
-        <div className="mb-4">
-          <PricePanel item={item} summary={view === 'shopping'} onChanged={() => router.refresh()} onSearchOnline={() => setShowPriceSearch(true)} />
-        </div>
       )}
 
+      {tab === 'files' && (
+        <>
       {/* Documents / manual vault (P21) — manuals, warranty certs, serial photos.
           `?? []` guards items saved before this field existed (lean() reads skip
           schema defaults, so an untouched legacy doc has no `attachments` at all). */}
@@ -2449,7 +2538,12 @@ function ItemDetailModal({
         </div>
       )}
 
-      <ItemForm key={`f-${item._id}-${item.updatedAt}`} item={item} fx={fx} onSuccess={onClose} onDelete={handleDelete} deletePending={pending} />
+        </>
+      )}
+
+      <div className={tab === 'files' ? 'hidden' : undefined}>
+        <ItemForm key={`f-${item._id}-${item.updatedAt}`} item={item} fx={fx} section={tab} onSuccess={onClose} onDelete={handleDelete} deletePending={pending} />
+      </div>
     </Modal>
     {showPriceSearch && (
       <PriceSearchPanel
@@ -2512,6 +2606,7 @@ function ItemForm({
   onCancel,
   onDelete,
   deletePending,
+  section,
 }: {
   item?: SerializedItem;
   fx: FxCtx;
@@ -2520,8 +2615,13 @@ function ItemForm({
   onCancel?: () => void;
   onDelete?: () => void;
   deletePending?: boolean;
+  /** Which tab of the detail dialog is showing. The other groups stay mounted (hidden), so an
+   *  edit typed on one tab is still there, and saved, from another. Unset = every field. */
+  section?: ItemTab;
 }) {
   const t = useT();
+  const sec = (s: ItemTab) => (section && section !== s ? 'hidden' : 'contents');
+  const money = useMoney();
   const [pending, startTransition] = useTransition();
   // P9: the stored prices are base currency, but the form edits PRINTED figures — otherwise
   // re-saving an unchanged foreign item would convert an already-converted number. So an
@@ -2654,6 +2754,7 @@ function ItemForm({
 
   return (
     <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-4">
+      <div className={sec('basics')}>
       {/* Title */}
       <Field label={t('it.fTitle')} className="md:col-span-2">
         <Input
@@ -2684,6 +2785,8 @@ function ItemForm({
         </select>
       </Field>
 
+      </div>
+      <div className={sec('prices')}>
       {/* Prices — one field that fits the item: what you PAID (owned) vs the
           current PRICE (wishlist). Target + store comparison are in the price panel.
           P9: with multi-currency on these are the PRINTED figures, in `form.currency`. */}
@@ -2699,7 +2802,7 @@ function ItemForm({
       ) : cheapestLink != null ? (
         <Field as="div" label={t('it.fPrice', { cur: priceCur })}>
           <div className="text-sm px-3 py-2 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-text-dim)] flex items-center justify-between gap-2">
-            <span className="font-semibold text-[color:var(--color-text)]">{cur()}{cheapestLink}</span>
+            <span className="font-semibold text-[color:var(--color-text)]">{money(cheapestLink)}</span>
             <span className="text-[11px] text-[color:var(--color-text-faint)]">{t('it.autoCheapest')}</span>
           </div>
         </Field>
@@ -2740,6 +2843,8 @@ function ItemForm({
         />
       </Field>
 
+      </div>
+      <div className={sec('basics')}>
       {/* P55 — resale. Appears only on a `sold` item; everything here is optional, so
           leaving it blank keeps `sold` behaving exactly as it did before (a bare label).
           The amounts are base currency: see the note on ItemFormSchema.soldPrice. */}
@@ -2837,6 +2942,8 @@ function ItemForm({
       <Field label={t('it.fNum')}>
         <Input value={form.num} onChange={set('num')} placeholder="01" />
       </Field>
+      </div>
+      <div className={sec('more')}>
       <Field label={t('it.fSerial')}>
         <Input
           value={form.serialNumber}
@@ -2845,9 +2952,13 @@ function ItemForm({
           style={{ fontFamily: 'var(--font-mono)' }}
         />
       </Field>
+      </div>
+      <div className={sec('basics')}>
       <Field label={t('it.fLocation')}>
         <Input value={form.location} onChange={set('location')} placeholder={t('it.fLocationPlaceholder')} />
       </Field>
+      </div>
+      <div className={sec('more')}>
       {/* P39 — which build this is a part of. A plain input with the existing names as
           suggestions: typing a new name starts a new build, there is nothing to create first. */}
       <Field label={t('it.fBundle')}>
@@ -2905,6 +3016,8 @@ function ItemForm({
         </>
       )}
 
+      </div>
+      <div className={sec('prices')}>
       {/* Links editor */}
       <div className="md:col-span-2">
         <div className="flex items-center justify-between mb-1.5">
@@ -2965,6 +3078,8 @@ function ItemForm({
         </div>
       </div>
 
+      </div>
+      <div className={sec('more')}>
       {/* P70 — custom fields editor. Free-form names, no fixed schema and no admin list:
           whatever the user calls the attribute is what gets stored. */}
       <div className="md:col-span-2">
@@ -3110,6 +3225,7 @@ function ItemForm({
         </div>
       )}
 
+      </div>
       {/* Buttons */}
       <div className="flex gap-3 pt-2 md:col-span-2">
         <Button type="submit" variant="primary" disabled={pending}>

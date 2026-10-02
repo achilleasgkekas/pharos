@@ -256,32 +256,6 @@ export async function downloadFromOnedrive(relPath: string): Promise<{ ok: boole
   }
 }
 
-/**
- * Create (or reuse) an anonymous, view-only share link for a file under
- * /Apps/Pharos/<relPath>. Powers an optional "Open in OneDrive" action. Graph
- * returns the existing link if one of the same type already exists.
- */
-export async function createShareLink(relPath: string): Promise<{ ok: boolean; url?: string; error?: string }> {
-  try {
-    const creds = await getOnedriveCreds();
-    if (!creds) return { ok: false, error: 'OneDrive not connected' };
-    const token = await accessTokenFor(creds.clientId, creds.refreshToken);
-    const clean = relPath.split('/').map((s) => encodeURIComponent(s)).join('/');
-    const url = `${GRAPH}/me/drive/root:/Apps/Pharos/${clean}:/createLink`;
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
-      body: JSON.stringify({ type: 'view', scope: 'anonymous' }),
-      signal: AbortSignal.timeout(15000),
-    });
-    const j = (await res.json().catch(() => ({}))) as { link?: { webUrl?: string }; error?: { message?: string } };
-    if (!res.ok || !j.link?.webUrl) return { ok: false, error: j.error?.message || `Graph HTTP ${res.status}` };
-    return { ok: true, url: j.link.webUrl };
-  } catch (err) {
-    return { ok: false, error: (err as Error).message };
-  }
-}
-
 /** Connectivity check: refresh a token + read the drive name. */
 export async function testOnedrive(): Promise<{ ok: boolean; error?: string; drive?: string }> {
   try {

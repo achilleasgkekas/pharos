@@ -23,7 +23,7 @@ const { getStorageConfigMock, pushToRemoteMock, uploadToOnedriveMock, readFileMo
 
 vi.mock('./storageConfig', () => ({ getStorageConfig: getStorageConfigMock }));
 vi.mock('./remoteStorage', () => ({ pushToRemote: pushToRemoteMock }));
-vi.mock('./onedrive', () => ({ uploadToOnedrive: uploadToOnedriveMock, downloadFromOnedrive: vi.fn(), createShareLink: vi.fn() }));
+vi.mock('./onedrive', () => ({ uploadToOnedrive: uploadToOnedriveMock, downloadFromOnedrive: vi.fn() }));
 vi.mock('./storage', () => ({ readFile: readFileMock }));
 vi.mock('./storagePath', () => ({ renderStoragePath: renderStoragePathMock }));
 vi.mock('./syncState', () => ({ markRemoteSync: markRemoteSyncMock }));
