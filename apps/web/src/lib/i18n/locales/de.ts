@@ -2502,4 +2502,13 @@ export const de: Partial<Dict> = {
   "hist.errorDetails": "Fehler",
   "hist.featTest": "Verbindungstest",
   "reports.nMonths": "{n} Mon.",
+  "set.aiAdvanced": "Erweitert (optional)",
+  "set.adminKey": "Anthropic-Admin-API-Schlüssel",
+  "set.adminKeyHint": "Optional. Ein Organisations-Admin-Schlüssel (sk-ant-admin-…), um zu lesen, was Anthropic tatsächlich berechnet hat.",
+  "set.spendTz": "Zeitzone für Kosten",
+  "set.spendTzHint": "Wo Tag und Monat für Summen und Limit beginnen.",
+  "set.spendTzBrowser": "Die des Browsers",
+  "set.liveSpend": "KI-Kosten",
+  "set.viewRunHistory": "Alle Aufrufe im KI-Verlauf",
+  "set.capReached": "Kostenlimit erreicht: Cloud-KI-Aufrufe sind blockiert, bis du es erhöhst oder der Monat wechselt.",
 };

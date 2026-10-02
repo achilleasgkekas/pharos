@@ -2533,4 +2533,13 @@ export const el: Partial<Dict> = {
   "hist.errorDetails": "Σφάλμα",
   "hist.featTest": "Δοκιμή σύνδεσης",
   "reports.nMonths": "{n} μήνες",
+  "set.aiAdvanced": "Για προχωρημένους (προαιρετικά)",
+  "set.adminKey": "Κλειδί Admin API της Anthropic",
+  "set.adminKeyHint": "Προαιρετικό. Κλειδί διαχειριστή οργανισμού (sk-ant-admin-…) για να διαβάζεται τι χρέωσε πραγματικά η Anthropic.",
+  "set.spendTz": "Ζώνη ώρας κόστους",
+  "set.spendTzHint": "Πού ξεκινά η μέρα και ο μήνας για τα σύνολα κόστους και το όριο.",
+  "set.spendTzBrowser": "Χρήση του browser",
+  "set.liveSpend": "Κόστος AI",
+  "set.viewRunHistory": "Όλες οι κλήσεις στο Ιστορικό AI",
+  "set.capReached": "Έφτασες το όριο κόστους: οι κλήσεις σε cloud AI μπλοκάρονται μέχρι να το αυξήσεις ή να αλλάξει ο μήνας.",
 };

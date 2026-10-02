@@ -2502,4 +2502,13 @@ export const it: Partial<Dict> = {
   "hist.errorDetails": "Errore",
   "hist.featTest": "Test di connessione",
   "reports.nMonths": "{n} mesi",
+  "set.aiAdvanced": "Avanzate (facoltativo)",
+  "set.adminKey": "Chiave Admin API di Anthropic",
+  "set.adminKeyHint": "Facoltativa. Una chiave admin dell’organizzazione (sk-ant-admin-…) per leggere quanto Anthropic ha davvero addebitato.",
+  "set.spendTz": "Fuso orario della spesa",
+  "set.spendTzHint": "Dove iniziano giorno e mese per i totali e il limite.",
+  "set.spendTzBrowser": "Usa quello del browser",
+  "set.liveSpend": "Spesa IA",
+  "set.viewRunHistory": "Tutte le chiamate nella cronologia IA",
+  "set.capReached": "Limite raggiunto: le chiamate all’IA cloud sono bloccate finché non lo alzi o cambia il mese.",
 };

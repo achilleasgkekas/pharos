@@ -10,7 +10,7 @@ import { cn } from '@/components/ui/cn';
 import { PAGE_MAIN, PageHeader, HeaderTotals } from '@/components/ui/PageHeader';
 import { Badge } from '@/components/ui/Badge';
 import { Input, controlClass } from '@/components/ui/Input';
-import { Field } from '@/components/ui/Field';
+import { Field, FIELD_LABEL } from '@/components/ui/Field';
 import { useConfirm, usePrompt } from '@/components/ui/ConfirmDialog';
 import { saveAiConfig, pullOllamaModel, testAnthropic, saveStore, deleteStore, setAiConfirmBulk, saveCategoryRules, setAiEnabled, setAiFeature, fetchProviderModels, dismissAiModelNotices, getLiveAiSpendAction, type LiveAiSpendData } from './actions';
 import { applyCategoryRulesToExisting } from '@/app/expenses/actions';
@@ -55,7 +55,7 @@ import { useT, useLocale } from '@/components/LocaleProvider';
 import { SHOPPING_COUNTRIES, SHOPPING_PRESETS } from '@/lib/shoppingRegion';
 import { ForeignShopsEditor } from './ForeignShopsEditor';
 import type { TKey } from '@/lib/i18n';
-import { formatDate, formatTime, formatDateTime, relTime } from '@/lib/i18n/format';
+import { formatDate, formatTime, formatDateTime } from '@/lib/i18n/format';
 
 type ProviderId = 'ollama' | 'anthropic' | 'openai' | 'gemini' | 'openrouter' | 'custom';
 
@@ -420,7 +420,8 @@ function AiMasterAndFeatures({ ai, canEdit }: { ai: AiInfo; canEdit: boolean }) 
                 <div key={f.key} className="flex items-center gap-3 px-3 py-2.5">
                   <div className="min-w-0 flex-1">
                     <div className="text-sm font-medium">{t(('af.' + f.key) as TKey)}</div>
-                    <div className="text-xs text-[color:var(--color-text-faint)]">{t(('af.' + f.key + 'Desc') as TKey)}</div>
+                    {/* The name says enough on a phone; the line under it is for the wider screen. */}
+                    <div className="hidden sm:block text-xs text-[color:var(--color-text-faint)]">{t(('af.' + f.key + 'Desc') as TKey)}</div>
                   </div>
                   {canEdit ? (
                     <Switch label={t(('af.' + f.key) as TKey)} checked={features[f.key] !== false} onChange={(v) => toggleFeature(f.key, v)} />
@@ -792,7 +793,8 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
         </div>
       )}
       {/* Provider toggle */}
-      <Row label={t('set.provider')}>
+      <div>
+        <div className={FIELD_LABEL}>{t('set.provider')}</div>
         <div className="flex gap-1.5 flex-wrap">
           {([
             { v: 'ollama', label: 'Ollama', icon: <Server size={13} /> },
@@ -817,7 +819,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
             </button>
           ))}
         </div>
-      </Row>
+      </div>
 
       {((provider === 'anthropic' && !ai.hasKey) ||
         (provider === 'openai' && !ai.hasOpenaiKey) ||
@@ -959,6 +961,9 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
             recommend={PROVIDER_RECOMMEND.anthropic}
             workspaceId={anthropicWorkspaceId}
           />
+          <details className="group rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)]/40 px-3 py-2">
+            <summary className="cursor-pointer text-xs font-medium text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]">{t('set.aiAdvanced')}</summary>
+            <div className="mt-3 space-y-3">
           <Field label={t('set.anthropicWorkspaceId')}>
             <input
               type="text"
@@ -975,7 +980,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
               {t('set.anthropicWorkspaceIdHint')}
             </p>
           </Field>
-          <Field label={`Anthropic Admin API Key ${ai.hasAdminKey ? '(saved)' : ''}`}>
+          <Field label={`${t('set.adminKey')} ${ai.hasAdminKey ? t('set.apiKeySavedSuffix') : ''}`}>
             <input
               type="password"
               value={adminKey}
@@ -988,7 +993,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
               style={{ fontFamily: 'var(--font-mono)' }}
             />
             <p className="mt-1 text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
-              Optional. Organization admin key (starts with sk-ant-admin-) used to pull live billed usage from Anthropic&apos;s Cost Report API.
+              {t('set.adminKeyHint')}
             </p>
           </Field>
           <Field label={t('set.aiPrepaidCredits')}>
@@ -1006,6 +1011,8 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
               {t('set.aiPrepaidCreditsHelp')}
             </p>
           </Field>
+            </div>
+          </details>
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -1140,7 +1147,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
 
 
       <div className="pt-3 border-t border-[color:var(--color-border)] mt-1 space-y-3">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
           <div>
             <Field label={t('set.aiBudget')}>
               <input
@@ -1157,8 +1164,12 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
             </Field>
             <p className="text-[11px] text-[color:var(--color-text-faint)] mt-1">{t('set.aiBudgetHint')}</p>
           </div>
+        </div>
+        <details className="rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)]/40 px-3 py-2">
+          <summary className="cursor-pointer text-xs font-medium text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]">{t('set.aiAdvanced')}</summary>
+          <div className="mt-3">
           <div>
-            <Field label="Spend Timezone">
+            <Field label={t('set.spendTz')}>
               <input
                 type="text"
                 value={timezone}
@@ -1170,7 +1181,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
             </Field>
             <div className="flex items-center justify-between mt-1">
               <p className="text-[11px] text-[color:var(--color-text-faint)]">
-                Determines daily and monthly billing cycle boundaries.
+                {t('set.spendTzHint')}
               </p>
               {!timezone && typeof window !== 'undefined' && (
                 <button
@@ -1178,19 +1189,20 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
                   onClick={() => setTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone)}
                   className="text-[11px] text-[color:var(--color-accent)] hover:underline shrink-0"
                 >
-                  Use browser timezone
+                  {t('set.spendTzBrowser')}
                 </button>
               )}
             </div>
           </div>
-        </div>
+          </div>
+        </details>
 
         {/* Live AI Spend & Run History Card (#361, #362) */}
         <div className="rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface-1)] p-4 space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Zap size={16} className="text-[color:var(--color-accent)]" />
-              <h4 className="text-sm font-semibold text-[color:var(--color-text)]">Live AI Spend & Usage</h4>
+              <h4 className="text-sm font-semibold text-[color:var(--color-text)]">{t('set.liveSpend')}</h4>
             </div>
             <div className="flex items-center gap-2 text-xs text-[color:var(--color-text-faint)]">
               <span style={{ fontFamily: 'var(--font-mono)' }}>TZ: {timezone || (typeof window !== 'undefined' ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'UTC')}</span>
@@ -1199,67 +1211,27 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
                 onClick={fetchLiveSpend}
                 disabled={refreshingLive}
                 className="p-1 rounded hover:bg-[color:var(--color-surface-2)] text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] transition-colors"
-                title="Refresh live spend"
+                title={t('set.liveSpend')} aria-label={t('set.liveSpend')}
               >
                 <RefreshCw size={13} className={cn(refreshingLive && 'animate-spin')} />
               </button>
             </div>
           </div>
 
-          {/* Spend Metrics Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="p-3 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)]">
-              <div className="text-[11px] font-medium text-[color:var(--color-text-dim)]">Today</div>
-              <div className="text-base font-semibold text-[color:var(--color-text)] mt-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
-                ${((liveSpend?.today.costMicros ?? 0) / 1_000_000).toFixed(4)}
-              </div>
-              <div className="text-[11px] text-[color:var(--color-accent)] mt-0.5 font-mono">
-                ~€{(((liveSpend?.today.costMicros ?? 0) / 1_000_000) * (liveSpend?.fxRateEur ?? 0.92)).toFixed(4)}
-              </div>
-              <div className="text-[11px] text-[color:var(--color-text-faint)] mt-0.5">
-                {liveSpend?.today.count ?? 0} calls
-              </div>
-            </div>
-
-            <div className="p-3 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)]">
-              <div className="text-[11px] font-medium text-[color:var(--color-text-dim)]">This Month (MTD)</div>
-              <div className="text-base font-semibold text-[color:var(--color-text)] mt-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
-                ${((liveSpend?.month.costMicros ?? (ai.spentThisMonth * 1_000_000)) / 1_000_000).toFixed(4)}
-              </div>
-              <div className="text-[11px] text-[color:var(--color-accent)] mt-0.5 font-mono">
-                ~€{(((liveSpend?.month.costMicros ?? (ai.spentThisMonth * 1_000_000)) / 1_000_000) * (liveSpend?.fxRateEur ?? 0.92)).toFixed(4)}
-              </div>
-              <div className="text-[11px] text-[color:var(--color-text-faint)] mt-0.5">
-                {liveSpend?.month.count ?? 0} calls
-              </div>
-            </div>
-
-            <div className="p-3 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)]">
-              <div className="text-[11px] font-medium text-[color:var(--color-text-dim)]">Month Tokens</div>
-              <div className="text-base font-semibold text-[color:var(--color-text)] mt-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
-                {liveSpend ? `${(((liveSpend.month.inputTokens + liveSpend.month.outputTokens) / 1000).toFixed(1))}k` : '0k'}
-              </div>
-              <div className="text-[11px] text-[color:var(--color-text-faint)] mt-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
-                in: {liveSpend ? (liveSpend.month.inputTokens / 1000).toFixed(1) : 0}k · out: {liveSpend ? (liveSpend.month.outputTokens / 1000).toFixed(1) : 0}k
-              </div>
-            </div>
-
-            <div className="p-3 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)]">
-              <div className="text-[11px] font-medium text-[color:var(--color-text-dim)]">Prompt Cache</div>
-              <div className="text-base font-semibold text-[color:var(--color-text)] mt-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
-                {liveSpend ? `${(((liveSpend.month.cacheReadTokens + liveSpend.month.cacheWriteTokens) / 1000).toFixed(1))}k` : '0k'}
-              </div>
-              <div className="text-[11px] text-[color:var(--color-text-faint)] mt-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
-                read: {liveSpend ? (liveSpend.month.cacheReadTokens / 1000).toFixed(1) : 0}k (90% off)
-              </div>
-            </div>
-          </div>
+          <HeaderTotals
+            items={[
+              { label: t('hist.pToday'), value: `$${((liveSpend?.today.costMicros ?? 0) / 1_000_000).toFixed(4)}` },
+              { label: t('hist.pMonth'), value: `$${((liveSpend?.month.costMicros ?? ai.spentThisMonth * 1_000_000) / 1_000_000).toFixed(4)}`, tone: 'accent' },
+              { label: t('hist.calls'), value: liveSpend?.month.count ?? 0 },
+              { label: t('hist.totalTokens'), value: `${(((liveSpend?.month.inputTokens ?? 0) + (liveSpend?.month.outputTokens ?? 0)) / 1000).toFixed(1)}k` },
+            ]}
+          />
 
           {/* Budget Progress Bar */}
           {ai.monthlyBudget > 0 && (
             <div className="space-y-1.5 pt-1">
               <div className="flex items-center justify-between text-xs">
-                <span className="text-[color:var(--color-text-dim)]">Monthly Cap Usage</span>
+                <span className="text-[color:var(--color-text-dim)]">{t('set.aiBudget')}</span>
                 <span className="font-semibold" style={{ fontFamily: 'var(--font-mono)' }}>
                   ${((liveSpend?.month.costMicros ?? (ai.spentThisMonth * 1_000_000)) / 1_000_000).toFixed(2)} / ${Number(monthlyBudget || ai.monthlyBudget).toFixed(2)} USD
                   {' '}({liveSpend?.budget.pct ?? Math.round((ai.spentThisMonth / ai.monthlyBudget) * 100)}%)
@@ -1280,7 +1252,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
               </div>
               {(liveSpend?.budget.capped || (liveSpend?.budget.pct ?? 0) >= 100) && (
                 <p className="text-[11px] text-[color:var(--color-red)] font-medium">
-                  ⚠ AI spend cap reached. Additional cloud AI requests are blocked until budget is increased or resets next month.
+                  {t('set.capReached')}
                 </p>
               )}
             </div>
@@ -1355,62 +1327,9 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
             </div>
           )}
 
-          {/* Last 5 Calls (#362, #361) */}
-          <div className="space-y-2 pt-2 border-t border-[color:var(--color-border)]">
-            <div className="flex items-center justify-between">
-              <h5 className="text-xs font-semibold text-[color:var(--color-text-dim)]">
-                Recent AI Calls (Last 5)
-              </h5>
-              <Link
-                href="/history?tab=runs"
-                className="text-xs text-[color:var(--color-accent)] hover:underline flex items-center gap-1"
-              >
-                View full run history →
-              </Link>
-            </div>
-
-            {(liveSpend?.last5Runs ?? ai.recentRuns ?? []).length === 0 ? (
-              <p className="text-xs text-[color:var(--color-text-faint)] py-2 text-center">
-                No AI runs recorded yet.
-              </p>
-            ) : (
-              <div className="divide-y divide-[color:var(--color-border)]/50 border border-[color:var(--color-border)] rounded-lg overflow-hidden bg-[color:var(--color-surface-2)]/30">
-                {(liveSpend?.last5Runs ?? ai.recentRuns ?? []).map((run) => (
-                  <div key={run._id} className="flex items-center justify-between p-2.5 text-xs hover:bg-[color:var(--color-surface-2)]/60 transition-colors">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span
-                        className={cn(
-                          'w-2 h-2 rounded-full shrink-0',
-                          run.status === 'ok'
-                            ? 'bg-[color:var(--color-accent)]'
-                            : run.status === 'blocked'
-                            ? 'bg-[color:var(--color-gold)]'
-                            : 'bg-[color:var(--color-red)]'
-                        )}
-                      />
-                      <span className="font-medium text-[color:var(--color-text)] truncate">
-                        {run.feature}
-                      </span>
-                      <span className="text-[color:var(--color-text-faint)] font-mono text-[11px] hidden sm:inline truncate max-w-[120px]">
-                        {run.model}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-3 shrink-0 font-mono text-[11px]">
-                      <span className="text-[color:var(--color-text-dim)]">
-                        {((run.usage.inputTokens + run.usage.outputTokens) / 1000).toFixed(1)}k tok
-                      </span>
-                      <span className="font-semibold text-[color:var(--color-text)] w-14 text-right">
-                        ${(run.costMicros / 1_000_000).toFixed(4)}
-                      </span>
-                      <span className="text-[11px] text-[color:var(--color-text-faint)] w-16 text-right">
-                        {relTime(new Date(run.at).toISOString(), t)}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          <Link href="/history" className="inline-flex items-center gap-1 text-xs text-[color:var(--color-accent)] hover:underline">
+            {t('set.viewRunHistory')} →
+          </Link>
         </div>
       </div>
 

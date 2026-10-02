@@ -2502,4 +2502,13 @@ export const nl: Partial<Dict> = {
   "hist.errorDetails": "Fout",
   "hist.featTest": "Verbindingstest",
   "reports.nMonths": "{n} mnd",
+  "set.aiAdvanced": "Geavanceerd (optioneel)",
+  "set.adminKey": "Anthropic Admin API-sleutel",
+  "set.adminKeyHint": "Optioneel. Een organisatie-adminsleutel (sk-ant-admin-…) om te lezen wat Anthropic echt heeft gefactureerd.",
+  "set.spendTz": "Tijdzone voor kosten",
+  "set.spendTzHint": "Waar dag en maand beginnen voor de totalen en de limiet.",
+  "set.spendTzBrowser": "Die van de browser",
+  "set.liveSpend": "AI-kosten",
+  "set.viewRunHistory": "Alle aanroepen in de AI-geschiedenis",
+  "set.capReached": "Limiet bereikt: cloud-AI-aanroepen zijn geblokkeerd tot je hem verhoogt of de maand om is.",
 };

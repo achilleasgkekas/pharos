@@ -2598,6 +2598,15 @@ export const en = {
   "hist.errorDetails": "Error",
   "hist.featTest": "Connection test",
   "reports.nMonths": "{n} mo",
+  "set.aiAdvanced": "Advanced (optional)",
+  "set.adminKey": "Anthropic Admin API key",
+  "set.adminKeyHint": "Optional. An organization admin key (sk-ant-admin-…) to read what Anthropic actually billed.",
+  "set.spendTz": "Spend time zone",
+  "set.spendTzHint": "Where a day and a month start for the spend totals and the cap.",
+  "set.spendTzBrowser": "Use this browser’s",
+  "set.liveSpend": "AI spend",
+  "set.viewRunHistory": "Every call in AI history",
+  "set.capReached": "Spend cap reached: cloud AI calls are blocked until you raise it or the month rolls over.",
 } as const;
 
 export type Dict = Record<keyof typeof en, string>;
