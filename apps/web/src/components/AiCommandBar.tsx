@@ -41,7 +41,9 @@ const TYPE_ICON: Record<SearchHit['type'], React.ComponentType<{ size?: number; 
   shoppinglist: ShoppingCart,
 };
 
-export function AiCommandBar() {
+/** `compact`: the phone's top bar shows a search button that opens the bar over the page. */
+export function AiCommandBar({ compact = false }: { compact?: boolean } = {}) {
+  const [expanded, setExpanded] = useState(false);
   const [mode, setMode] = useState<Mode>('search');
   const [value, setValue] = useState('');
   const [open, setOpen] = useState(false);
@@ -72,20 +74,36 @@ export function AiCommandBar() {
   // Close the panel on an outside click.
   useEffect(() => {
     function onDown(e: MouseEvent) {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+        setOpen(false);
+        if (compact) setExpanded(false);
+      }
     }
     document.addEventListener('mousedown', onDown);
     return () => document.removeEventListener('mousedown', onDown);
-  }, []);
+  }, [compact]);
 
-  // Close the AI spotlight on Escape, even when focus is inside the panel.
+  // Escape closes the panel (and the phone's overlay); Ctrl/Cmd+K jumps into the box. The
+  // shell mounts a computer bar and a phone bar, so each answers only on its own screen size.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') setOpen(false);
+      if (e.key === 'Escape') {
+        setOpen(false);
+        if (compact) setExpanded(false);
+        return;
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        const wide = window.matchMedia('(min-width: 1024px)').matches;
+        if (wide === compact) return;
+        e.preventDefault();
+        if (compact) setExpanded(true);
+        setOpen(true);
+        setTimeout(() => inputRef.current?.focus(), 0);
+      }
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  }, [compact]);
 
   // Keep the AI conversation scrolled to the newest message.
   useEffect(() => {
@@ -122,6 +140,7 @@ export function AiCommandBar() {
   function go(hit: SearchHit) {
     router.push(hit.href);
     setOpen(false);
+    if (compact) setExpanded(false);
     setValue('');
     setHits([]);
   }
@@ -180,8 +199,36 @@ export function AiCommandBar() {
   const ph = isAi ? (speech.listening ? t('bar.micListening') : t('bar.aiPlaceholder')) : t('bar.searchPlaceholder');
   const pending = isAi ? aiPending : searchPending;
 
+  if (compact && !expanded) {
+    return (
+      <button
+        type="button"
+        onClick={() => {
+          setExpanded(true);
+          setOpen(true);
+          setTimeout(() => inputRef.current?.focus(), 0);
+        }}
+        aria-label={t('bar.searchTitle')}
+        className="w-11 h-11 grid place-items-center rounded-xl text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]"
+      >
+        <Search size={20} />
+      </button>
+    );
+  }
+
   return (
     <>
+      {compact && !spotlight && (
+        <div
+          className="fixed inset-0 z-40 bg-black/60"
+          style={{ animation: 'pharos-fade-in .15s ease-out' }}
+          onMouseDown={() => {
+            setOpen(false);
+            setExpanded(false);
+          }}
+          aria-hidden
+        />
+      )}
       {/* Beacon backdrop — a light dim only, no blur: the page stays alive behind the
           sweeping beam. Click to close. */}
       {spotlight && (
@@ -199,7 +246,9 @@ export function AiCommandBar() {
           // larger screens. Plain opacity fade — no jump, no transform conflict.
           spotlight
             ? 'fixed z-50 top-3 inset-x-3 sm:inset-x-auto sm:top-[12vh] sm:left-1/2 sm:-translate-x-1/2 sm:w-[640px]'
-            : 'relative w-full max-w-2xl'
+            : compact
+              ? 'fixed z-50 top-2 inset-x-2'
+              : 'relative w-full max-w-xl'
         )}
         style={spotlight ? { animation: 'pharos-fade-in .16s ease-out both' } : undefined}
       >
@@ -350,7 +399,7 @@ export function AiCommandBar() {
           )}
           {messages.length === 0 && !aiPending && (
             <div className="p-2.5">
-              <p className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)] px-1.5 mb-1.5" style={{ fontFamily: 'var(--font-mono)' }}>{t('bar.try')}</p>
+              <p className="text-[11px] text-[color:var(--color-text-faint)] px-1.5 mb-1.5" style={{ fontFamily: 'var(--font-mono)' }}>{t('bar.try')}</p>
               {[t('bar.example1'), t('bar.example2'), t('bar.example3'), t('bar.example4')].map((ex, idx) => (
                 <button
                   key={idx}
@@ -416,7 +465,7 @@ export function AiCommandBar() {
                   <Icon size={15} className="shrink-0 text-[color:var(--color-text-faint)]" />
                   <div className="min-w-0 flex-1">
                     <div className="text-sm font-medium truncate">{h.title}</div>
-                    <div className="text-[10px] text-[color:var(--color-text-faint)] truncate" style={{ fontFamily: 'var(--font-mono)' }}>
+                    <div className="text-[11px] text-[color:var(--color-text-faint)] truncate" style={{ fontFamily: 'var(--font-mono)' }}>
                       {h.subtitle}
                     </div>
                   </div>

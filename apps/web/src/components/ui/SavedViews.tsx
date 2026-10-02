@@ -114,7 +114,7 @@ export function SavedViews<S>({
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-1 text-[0.65rem] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-accent)] underline"
+        className="flex items-center gap-1 text-[11px] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-accent)] underline"
         style={{ fontFamily: 'var(--font-mono)' }}
         aria-expanded={open}
       >

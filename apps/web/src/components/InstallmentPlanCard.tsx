@@ -34,7 +34,7 @@ export function InstallmentPlanCard({
           {label}
         </span>
         <span
-          className="max-w-[45%] text-right text-[10px] text-[color:var(--color-purple)] tabular-nums"
+          className="max-w-[45%] text-right text-[11px] text-[color:var(--color-purple)] tabular-nums"
           style={{ fontFamily: 'var(--font-mono)' }}
         >
           {t('payments.billed')} {plan.paidInstallments}/{plan.totalInstallments}
@@ -47,7 +47,7 @@ export function InstallmentPlanCard({
         />
       </div>
       <div
-        className="flex flex-wrap gap-2 items-center justify-between text-[10px] text-[color:var(--color-text-faint)]"
+        className="flex flex-wrap gap-2 items-center justify-between text-[11px] text-[color:var(--color-text-faint)]"
         style={{ fontFamily: 'var(--font-mono)' }}
       >
         <span>{cur()}{plan.perAmount.toFixed(2)}/mo</span>
@@ -61,7 +61,7 @@ export function InstallmentPlanCard({
       </div>
       {!compact && !plan.done && plan.remainingAmount > 0 && (
         <p
-          className="text-[10px] text-[color:var(--color-text-dim)] mt-1"
+          className="text-[11px] text-[color:var(--color-text-dim)] mt-1"
           style={{ fontFamily: 'var(--font-mono)' }}
         >
           {cur()}{plan.remainingAmount.toFixed(2)} remaining · {cur()}{plan.totalAmount.toFixed(2)} total
@@ -71,7 +71,7 @@ export function InstallmentPlanCard({
           (no "remaining" to anchor it like active plans have). */}
       {plan.done && plan.totalAmount > 0 && (
         <p
-          className="text-[10px] text-[color:var(--color-text-dim)] mt-1"
+          className="text-[11px] text-[color:var(--color-text-dim)] mt-1"
           style={{ fontFamily: 'var(--font-mono)' }}
         >
           {cur()}{plan.totalAmount.toFixed(2)} total

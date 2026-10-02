@@ -165,7 +165,7 @@ export function BackupData() {
   const line = (card: Card) => <StatusLine status={status?.card === card ? status : null} />;
 
   return (
-    <div className="mt-4 pt-4 border-t border-[color:var(--color-border)] grid gap-3 lg:grid-cols-3">
+    <div className="grid gap-4 lg:grid-cols-3">
       <DataCard icon={<Database size={14} />} title={t('set.cardBackupTitle')} desc={t('set.cardBackupDesc')}>
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={exportJson} disabled={working} className={cn(btn, 'text-[color:var(--color-accent)]')}>
@@ -221,7 +221,7 @@ export function BackupData() {
 
 function DataCard({ icon, title, desc, children }: { icon: React.ReactNode; title: string; desc: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-xl border border-[color:var(--color-border)] p-4 space-y-3 min-w-0">
+    <section className="rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-5 space-y-3 min-w-0">
       <div>
         <h3 className="flex items-center gap-2 text-sm font-semibold">{icon} {title}</h3>
         <p className="mt-1 text-[11px] leading-relaxed text-[color:var(--color-text-faint)]">{desc}</p>

@@ -193,7 +193,7 @@ export function PriceSearchPanel({
               <span
                 key={o.domain}
                 className={cn(
-                  'px-1.5 py-0.5 rounded border text-[10px] inline-flex items-center gap-1',
+                  'px-1.5 py-0.5 rounded border text-[11px] inline-flex items-center gap-1',
                   o.status === 'searched' && (o.matchCount ?? 0) > 0
                     ? 'border-[color:var(--color-green)]/30 text-[color:var(--color-green)] bg-[color:var(--color-green)]/5'
                     : o.status === 'failed'
@@ -252,15 +252,15 @@ export function PriceSearchPanel({
                       <span className="flex items-center gap-1.5">
                         <span className="text-sm font-semibold text-[color:var(--color-text)] truncate">{c.store}</span>
                         {isLowest && (
-                          <span className="text-[9px] uppercase tracking-wider font-semibold text-[color:var(--color-green)] bg-[color:var(--color-green)]/10 px-1.5 py-0.5 rounded shrink-0">
+                          <span className="text-[10px] font-semibold text-[color:var(--color-green)] bg-[color:var(--color-green)]/10 px-1.5 py-0.5 rounded shrink-0">
                             Lowest
                           </span>
                         )}
                         {c.alreadyLinked && (
-                          <span className="text-[9px] uppercase tracking-wider text-[color:var(--color-cyan)] shrink-0">already tracked</span>
+                          <span className="text-[10px] text-[color:var(--color-cyan)] shrink-0">already tracked</span>
                         )}
                       </span>
-                      <span className="flex items-center gap-1 text-[10px] text-[color:var(--color-text-faint)]">
+                      <span className="flex items-center gap-1 text-[11px] text-[color:var(--color-text-faint)]">
                         <a
                           href={c.url}
                           target="_blank"
@@ -272,7 +272,7 @@ export function PriceSearchPanel({
                         </a>
                       </span>
                       {c.error && (
-                        <span className="flex items-center gap-1 text-[10px] text-[color:var(--color-gold)] mt-0.5">
+                        <span className="flex items-center gap-1 text-[11px] text-[color:var(--color-gold)] mt-0.5">
                           <AlertTriangle size={10} /> {c.error}
                         </span>
                       )}
@@ -284,7 +284,7 @@ export function PriceSearchPanel({
                           {c.price}
                         </span>
                       ) : (
-                        <span className="text-[10px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
+                        <span className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
                           no price
                         </span>
                       )}

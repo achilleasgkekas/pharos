@@ -165,7 +165,7 @@ export function PricePanel({ item, summary = true, onChanged, onSearchOnline }: 
   return (
     <div className="rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-4">
       <div className="flex items-center justify-between gap-3 mb-3">
-        <span className="text-[10px] uppercase tracking-[0.15em] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
+        <span className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
           {summary ? t('pp.price') : t('pp.priceHistory')}
         </span>
         {summary && v.label && (
@@ -208,7 +208,7 @@ export function PricePanel({ item, summary = true, onChanged, onSearchOnline }: 
                   title={`now ${money(s.bestNow.price)}`}
                 />
               </div>
-              <div className="flex justify-between mt-1.5 text-[10px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
+              <div className="flex justify-between mt-1.5 text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
                 <span className="text-[color:var(--color-accent)]">{t('pp.lowest', { x: money(s.lo!) })}</span>
                 {s.target != null && <span className="text-[color:var(--color-cyan)]">{t('pp.targetBar', { x: money(s.target) })}</span>}
                 <span>{t('pp.highest', { x: money(s.hi!) })}</span>
@@ -219,7 +219,7 @@ export function PricePanel({ item, summary = true, onChanged, onSearchOnline }: 
           {/* Where to buy — cheapest first, each opens the store */}
           {s.stores.length >= 1 && (
             <div className="mt-3.5">
-              <p className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)] mb-1.5" style={{ fontFamily: 'var(--font-mono)' }}>{t('it.whereToBuy')}</p>
+              <p className="text-[11px] text-[color:var(--color-text-faint)] mb-1.5" style={{ fontFamily: 'var(--font-mono)' }}>{t('it.whereToBuy')}</p>
               <div className="space-y-1">
                 {s.stores.slice(0, 5).map((st, i) => (
                   <a key={i} href={st.url} target="_blank" rel="noopener noreferrer"
@@ -229,13 +229,13 @@ export function PricePanel({ item, summary = true, onChanged, onSearchOnline }: 
                     {market && st.url && marketRank(st.url, market) === null && (
                       <span
                         title={t('pp.outOfMarketTitle', { country: regionName(market.country, locale) })}
-                        className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-[color:var(--color-gold)]/15 text-[color:var(--color-gold)]"
+                        className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-[color:var(--color-gold)]/15 text-[color:var(--color-gold)]"
                       >
                         {t('pp.outOfMarket')}
                       </span>
                     )}
                     {/* The headline shop, which is the cheapest one in the shopping market (#319). */}
-                    {st.url === s.bestNow?.url && s.stores.length > 1 && <span className="text-[9px] font-bold text-[color:var(--color-accent)] uppercase">{t('pp.cheapest')}</span>}
+                    {st.url === s.bestNow?.url && s.stores.length > 1 && <span className="text-[10px] font-bold text-[color:var(--color-accent)]">{t('pp.cheapest')}</span>}
                     <span className="font-bold text-[color:var(--color-text)]" style={{ fontFamily: 'var(--font-mono)' }}>{money(st.price)}</span>
                     <ExternalLink size={11} className="text-[color:var(--color-text-faint)] group-hover:text-[color:var(--color-cyan)]" />
                   </a>
@@ -286,7 +286,7 @@ export function PricePanel({ item, summary = true, onChanged, onSearchOnline }: 
           </div>
 
           {/* #330: when the scheduled scrape last looked at this item, and why it read nothing. */}
-          <p className="mt-2 text-[10px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
+          <p className="mt-2 text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
             {linkCount === 0
               ? t('pp.checkNoLink')
               : item.lastPriceCheckAt

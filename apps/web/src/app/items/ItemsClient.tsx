@@ -1,5 +1,5 @@
 'use client';
-import { PAGE_MAIN, PageHeader, ViewToggle, PrimaryAction, FilterLayout, FilterSection, FilterOptions } from '@/components/ui/PageHeader';
+import { PAGE_MAIN, PageHeader, HeaderButton, HeaderTotals, ViewToggle, PrimaryAction, FilterLayout, FilterSection, FilterOptions } from '@/components/ui/PageHeader';
 import { DateInput } from '@/components/ui/DateInput';
 import { Field } from '@/components/ui/Field';
 import { cur } from "@/lib/money";
@@ -46,7 +46,7 @@ import {
 import type { SerializedItem } from '@/types';
 import { VIEW_CONFIG, type ItemView } from '@/lib/itemStatus';
 import { type InstallmentPlan } from '@/lib/installments';
-import { useLocale, useT } from '@/components/LocaleProvider';
+import { useLocale, useMoney, useT } from '@/components/LocaleProvider';
 import type { TKey, TFunc } from '@/lib/i18n';
 
 // value → i18n key maps (so the const arrays stay untouched)
@@ -276,6 +276,7 @@ export function ItemsClient({
   const fx: FxCtx = { base: baseCurrency, enabled: multiCurrency };
   const router = useRouter();
   const t = useT();
+  const money = useMoney();
   const cfg = VIEW_CONFIG[view];
   const viewName = view === 'shopping' ? t('nav.wishlist') : t('nav.inventory');
   const [filter, setFilter] = useState('');
@@ -585,19 +586,20 @@ export function ItemsClient({
   };
 
   // Shared filter controls — rendered in the left sidebar (desktop) and a drawer (mobile)
+  const searchBox = <Input icon={<Search size={15} />} type="search" placeholder={t('it.searchPlaceholder')} aria-label={t('it.searchPlaceholder')} value={search} onChange={(e) => setSearch(e.target.value)} />;
+  const statusSwitch = (
+    <FilterOptions
+      variant="segmented"
+      value={filter}
+      onChange={setFilter}
+      options={cfg.statusFilters.map((f) => ({
+      value: f.value,
+      label: f.value === '' ? t('common.all') : IT_STATUS_KEY[f.value] ? t(IT_STATUS_KEY[f.value]) : f.label,
+      }))}
+    />
+  );
   const filterControls = (
-    <div className="space-y-4">
-      <Input icon={<Search size={14} />} placeholder={t('it.searchPlaceholder')} value={search} onChange={(e) => setSearch(e.target.value)} />
-      <FilterSection label={t('common.status')}>
-        <FilterOptions
-          value={filter}
-          onChange={setFilter}
-          options={cfg.statusFilters.map((f) => ({
-            value: f.value,
-            label: f.value === '' ? t('common.all') : IT_STATUS_KEY[f.value] ? t(IT_STATUS_KEY[f.value]) : f.label,
-          }))}
-        />
-      </FilterSection>
+    <div>
       {stores.length > 0 && (
         <FilterSection label={t('v.fStore')}>
           <SearchableSelect value={storeFilter} onChange={setStoreFilter} options={stores} placeholder={t('it.allStores')} clearable size="sm" className="w-full" />
@@ -646,7 +648,7 @@ export function ItemsClient({
                 key={f.key}
                 onClick={() => toggleFlag(f.key)}
                 className={cn(
-                  'px-2.5 py-1 rounded-full text-[0.6rem] font-semibold uppercase tracking-[0.06em] border transition-all',
+                  'px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-all',
                   on
                     ? 'bg-[color:var(--color-cyan)] text-black border-[color:var(--color-cyan)]'
                     : 'bg-[color:var(--color-surface)] text-[color:var(--color-text-faint)] border-[color:var(--color-border)] hover:text-[color:var(--color-text-dim)]'
@@ -664,7 +666,7 @@ export function ItemsClient({
         {anyFilterActive && (
           <button
             onClick={resetFilters}
-            className="text-[0.65rem] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] underline"
+            className="text-[11px] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] underline"
             style={{ fontFamily: 'var(--font-mono)' }}
           >
             {t('common.resetFilters')}
@@ -679,25 +681,18 @@ export function ItemsClient({
     <BundleNamesContext.Provider value={bundleNames}>
     <ShoppingMarketProvider value={shoppingMarket}>
     <main className={PAGE_MAIN}>
-      <PageHeader title={viewName} count={`${items.length} ${items.length === 1 ? t('it.item') : t('it.items')}`}>
-            {items.length > 0 && view === 'shopping' && (
-              <div className="text-xs text-[color:var(--color-text-dim)]" style={{ fontFamily: 'var(--font-mono)' }}>
-                {t('it.cost')}{' '}
-                <span className="text-[color:var(--color-cyan)] font-semibold">{cur()}{shoppingBudget.toFixed(0)}</span>
-              </div>
-            )}
+      <PageHeader
+        title={viewName}
+        count={filtered.length !== items.length ? `${filtered.length} / ${items.length}` : items.length}
+        summary={items.length > 0 && view === 'shopping' ? <HeaderTotals items={[{ label: t('it.cost'), value: money(shoppingBudget) }]} /> : undefined}
+      >
             {dealsCount > 0 && (
-              <button
-                onClick={() => setFlags(new Set(['deal']))}
-                title={t('it.dealsTitle')}
-                className="flex items-center gap-1 text-xs text-[color:var(--color-accent)] hover:opacity-80"
-                style={{ fontFamily: 'var(--font-mono)' }}
-              >
-                <Target size={13} /> {dealsCount} {dealsCount === 1 ? t('it.deal') : t('it.deals')}
-              </button>
+              <HeaderButton tone="accent" icon={<Target size={15} />} onClick={() => setFlags(new Set(['deal']))} title={t('it.dealsTitle')}>
+                {`${dealsCount} ${dealsCount === 1 ? t('it.deal') : t('it.deals')}`}
+              </HeaderButton>
             )}
             {filtered.length > 0 && (
-              <div className="flex items-center gap-2 flex-wrap" style={{ fontFamily: 'var(--font-mono)' }}>
+              <div className="flex items-center gap-2 shrink-0">
                 {selectMode ? (
                   <>
                     {selectedIds.size > 0 && (
@@ -758,25 +753,16 @@ export function ItemsClient({
                     </button>
                   </>
                 ) : (
-                  <button
-                    onClick={() => setSelectMode(true)}
-                    title={t('it.selectTitle')}
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-text-dim)] hover:text-[color:var(--color-accent)] hover:border-[color:var(--color-accent)] transition-colors"
-                  >
-                    <Check size={14} /> {t('it.select')}
-                  </button>
+                  <HeaderButton icon={<Check size={15} />} onClick={() => setSelectMode(true)} title={t('it.selectTitle')}>
+                    {t('it.select')}
+                  </HeaderButton>
                 )}
               </div>
             )}
             {items.length > 1 && !selectMode && (
-              <button
-                onClick={() => setShowDupes(true)}
-                title={t('it.findDupTitle')}
-                className="hidden sm:flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-text-dim)] hover:text-[color:var(--color-purple)] hover:border-[color:var(--color-purple)] transition-colors"
-                style={{ fontFamily: 'var(--font-mono)' }}
-              >
-                <Merge size={14} /> {t('it.duplicates')}
-              </button>
+              <HeaderButton icon={<Merge size={15} />} onClick={() => setShowDupes(true)} title={t('it.findDupTitle')} className="hidden sm:flex">
+                {t('it.duplicates')}
+              </HeaderButton>
             )}
             {items.length > 0 && !selectMode && (
               <RecomputePricesButton onDone={() => router.refresh()} />
@@ -785,7 +771,7 @@ export function ItemsClient({
             <PrimaryAction onClick={() => setShowCreate(true)} />
       </PageHeader>
 
-      <FilterLayout filters={filterControls} active={anyFilterActive}>
+      <FilterLayout search={searchBox} quick={statusSwitch} filters={filterControls} active={anyFilterActive}>
           {bundleFilter && bundleByName.get(bundleFilter) && (
             <BundleSummaryCard bundle={bundleByName.get(bundleFilter) as BundleSummary} />
           )}
@@ -808,7 +794,7 @@ export function ItemsClient({
               ))}
             </div>
           ) : (
-            <div className="flex flex-col gap-2">
+            <div className="rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] overflow-hidden divide-y divide-[color:var(--color-border)]">
               {filtered.map((item) => (
                 <ItemRow
                   key={item._id}
@@ -851,7 +837,7 @@ export function ItemsClient({
         <UrlImport view={view} onImported={() => setShowCreate(false)} />
         <div className="flex items-center gap-3 my-5">
           <div className="flex-1 h-px bg-[color:var(--color-border)]" />
-          <span className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider" style={{ fontFamily: 'var(--font-mono)' }}>
+          <span className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
             or add manually
           </span>
           <div className="flex-1 h-px bg-[color:var(--color-border)]" />
@@ -953,7 +939,7 @@ function CompareItemsTable({
   const statusLabel = (s: string) => (IT_STATUS_KEY[s] ? t(IT_STATUS_KEY[s]) : s);
   const storeOf = (i: SerializedItem) => bestLinkPrice(i, market)?.store || i.purchasedFrom || '';
   const cell = 'align-top p-2 border-b border-[color:var(--color-border)] text-xs';
-  const label = 'align-top p-2 border-b border-[color:var(--color-border)] text-[10px] uppercase tracking-[0.1em] text-[color:var(--color-text-faint)] whitespace-nowrap';
+  const label = 'align-top p-2 border-b border-[color:var(--color-border)] text-[11px] text-[color:var(--color-text-faint)] whitespace-nowrap';
 
   type Row = { key: string; label: string; render: (i: SerializedItem) => React.ReactNode };
   const rows: Row[] = [
@@ -994,7 +980,7 @@ function CompareItemsTable({
             {i.tags.map((tag) => (
               <span
                 key={tag}
-                className="px-1.5 py-0.5 rounded bg-[color:var(--color-surface-2)] text-[10px] text-[color:var(--color-text-dim)]"
+                className="px-1.5 py-0.5 rounded bg-[color:var(--color-surface-2)] text-[11px] text-[color:var(--color-text-dim)]"
               >
                 {tag}
               </span>
@@ -1052,7 +1038,7 @@ function CompareItemsTable({
         </table>
       </div>
       {truncated && (
-        <p className="text-[10px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
+        <p className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
           {t('it.compareCap')}
         </p>
       )}
@@ -1140,7 +1126,7 @@ function UrlImport({ view, onImported }: { view: ItemView; onImported: () => voi
   return (
     <div>
       <label
-        className="flex items-center gap-1.5 text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider mb-1.5"
+        className="flex items-center gap-1.5 text-[11px] text-[color:var(--color-text-faint)] mb-1.5"
         style={{ fontFamily: 'var(--font-mono)' }}
       >
         <Sparkles size={11} className="text-[color:var(--color-accent)]" /> {t('it.importUrlHint')}
@@ -1163,18 +1149,18 @@ function UrlImport({ view, onImported }: { view: ItemView; onImported: () => voi
         </Button>
       </div>
       {pending && (
-        <p className="text-[10px] text-[color:var(--color-cyan)] mt-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
+        <p className="text-[11px] text-[color:var(--color-cyan)] mt-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
           {t('it.fetchingProduct')}
         </p>
       )}
-      {msg && <p className="text-[10px] text-[color:var(--color-red)] mt-1.5">{msg}</p>}
+      {msg && <p className="text-[11px] text-[color:var(--color-red)] mt-1.5">{msg}</p>}
       {okMsg && (
-        <p className="text-[10px] text-[color:var(--color-accent)] mt-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
+        <p className="text-[11px] text-[color:var(--color-accent)] mt-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
           {okMsg}
         </p>
       )}
       {warnMsg && (
-        <p className="text-[10px] text-[color:var(--color-gold)] mt-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
+        <p className="text-[11px] text-[color:var(--color-gold)] mt-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
           {warnMsg}
         </p>
       )}
@@ -1183,7 +1169,7 @@ function UrlImport({ view, onImported }: { view: ItemView; onImported: () => voi
       {preview && (
         <div className="mt-3 rounded-xl border border-[color:var(--color-accent)] bg-[color:var(--color-surface-2)] p-3">
           {preview.existing && (
-            <p className="text-[10px] text-[color:var(--color-gold)] mb-2 flex items-center gap-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
+            <p className="text-[11px] text-[color:var(--color-gold)] mb-2 flex items-center gap-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
               {t('it.matchesExisting', { title: preview.existing.title })}
             </p>
           )}
@@ -1192,7 +1178,7 @@ function UrlImport({ view, onImported }: { view: ItemView; onImported: () => voi
               <p className="font-semibold text-sm leading-snug" style={{ fontFamily: 'var(--font-display)' }}>
                 {preview.title}
               </p>
-              <p className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider mt-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
+              <p className="text-[11px] text-[color:var(--color-text-faint)] mt-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
                 {preview.category} · {preview.store}
               </p>
               {preview.specs && <p className="text-xs text-[color:var(--color-text-dim)] line-clamp-3 mt-1.5">{preview.specs}</p>}
@@ -1205,7 +1191,7 @@ function UrlImport({ view, onImported }: { view: ItemView; onImported: () => voi
             )}
           </div>
           {preview.currency && (
-            <p className="text-[10px] text-[color:var(--color-gold)] mt-2" style={{ fontFamily: 'var(--font-mono)' }}>
+            <p className="text-[11px] text-[color:var(--color-gold)] mt-2" style={{ fontFamily: 'var(--font-mono)' }}>
               {t(preview.existing ? 'it.foreignPagePriceExisting' : 'it.foreignPagePriceNew', { code: preview.currency })}
             </p>
           )}
@@ -1217,7 +1203,7 @@ function UrlImport({ view, onImported }: { view: ItemView; onImported: () => voi
             <Button variant="ghost" onClick={() => setPreview(null)} disabled={approving}>
               {t('it.discard')}
             </Button>
-            <span className="text-[10px] text-[color:var(--color-text-faint)] ml-auto" style={{ fontFamily: 'var(--font-mono)' }}>
+            <span className="text-[11px] text-[color:var(--color-text-faint)] ml-auto" style={{ fontFamily: 'var(--font-mono)' }}>
               {t('it.photosOnApprove')}
             </span>
           </div>
@@ -1305,26 +1291,26 @@ function BundleSummaryCard({ bundle }: { bundle: BundleSummary }) {
   return (
     <div className="mb-3 bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-xl p-4 flex flex-wrap items-end justify-between gap-4">
       <div className="min-w-0">
-        <div className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider mb-1 flex items-center gap-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
+        <div className="text-[11px] text-[color:var(--color-text-faint)] mb-1 flex items-center gap-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
           <Boxes size={12} />
           {t('it.bundleLabel')}
         </div>
         <div className="text-lg font-bold truncate" style={{ fontFamily: 'var(--font-display)' }}>
           {bundle.name}
         </div>
-        <div className="text-[10px] text-[color:var(--color-text-faint)] mt-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
+        <div className="text-[11px] text-[color:var(--color-text-faint)] mt-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
           {t('it.bundlePartsN', { n: bundle.parts })}
           {stages.length > 0 && ` · ${stages.join(' · ')}`}
         </div>
       </div>
       <div className="flex gap-6" style={{ fontFamily: 'var(--font-mono)' }}>
         <div className="text-right">
-          <div className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider">{t('it.bundleInvested')}</div>
+          <div className="text-[11px] text-[color:var(--color-text-faint)]">{t('it.bundleInvested')}</div>
           <div className="text-sm font-semibold text-[color:var(--color-cyan)]">{cur()}{bundle.invested.toFixed(0)}</div>
         </div>
         {bundle.toBuy > 0 && (
           <div className="text-right">
-            <div className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider">{t('it.bundleToBuy')}</div>
+            <div className="text-[11px] text-[color:var(--color-text-faint)]">{t('it.bundleToBuy')}</div>
             <div className="text-sm font-semibold">{cur()}{bundle.toBuy.toFixed(0)}</div>
           </div>
         )}
@@ -1361,8 +1347,8 @@ function ItemRow({ item, view, base, plan, onClick, selected, onToggleSelect, se
   return (
     <div
       className={cn(
-        'group flex items-center gap-3 bg-[color:var(--color-surface)] border rounded-xl px-3 py-2.5 transition-all',
-        selected ? 'border-[color:var(--color-accent)] ring-1 ring-[color:var(--color-accent)]' : 'border-[color:var(--color-border)] hover:border-[color:var(--color-border-light)]'
+        'group flex items-center gap-3 px-3 sm:px-4 py-2.5 transition-colors',
+        selected ? 'bg-[color:var(--color-accent)]/10' : 'hover:bg-[color:var(--color-surface-2)]'
       )}
     >
       {(selectMode || selected) && (
@@ -1383,12 +1369,12 @@ function ItemRow({ item, view, base, plan, onClick, selected, onToggleSelect, se
         </button>
       )}
       <button onClick={mainClick} className="flex items-center gap-3 flex-1 min-w-0 text-left">
-        <div className="w-11 h-11 rounded-lg bg-[color:var(--color-surface-2)] overflow-hidden shrink-0 grid place-items-center">
+        <div className="w-10 h-10 rounded-lg bg-[color:var(--color-surface-2)] overflow-hidden shrink-0 grid place-items-center">
           {cover ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={fileUrl(cover)} alt={item.title} loading="lazy" className="w-full h-full object-contain" />
           ) : (
-            <span className="text-[9px] uppercase text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
+            <span className="text-[10px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
               {(item.category || '?').slice(0, 3)}
             </span>
           )}
@@ -1400,8 +1386,8 @@ function ItemRow({ item, view, base, plan, onClick, selected, onToggleSelect, se
             </span>
             {item.aiFilledAt && <Sparkles size={10} className="text-[color:var(--color-accent)] shrink-0" />}
           </div>
-          <div className="flex items-center gap-2 flex-wrap text-[10px] text-[color:var(--color-text-faint)] mt-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
-            <span className="uppercase tracking-wider">{item.num ? `${item.num} / ` : ''}{item.category}</span>
+          <div className="flex items-center gap-2 flex-wrap text-[11px] text-[color:var(--color-text-faint)] mt-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
+            <span className="">{item.num ? `${item.num} / ` : ''}{item.category}</span>
             {w && <span style={{ color: w.color }}>{w.label}</span>}
             {lend && <span className="truncate max-w-[14rem]" style={{ color: lend.color }}>{lend.label}</span>}
             {claim && <span className="truncate max-w-[14rem]" style={{ color: claim.color }}>{claim.label}</span>}
@@ -1492,7 +1478,7 @@ function ItemCard({
         <div className={cn('p-4 flex flex-col flex-1', cover && 'pt-3')}>
           {/* Eyebrow: num / category + AI-enriched status (so you don't re-fill it) */}
           <div
-            className="flex items-center justify-between gap-2 text-[0.7rem] text-[color:var(--color-text-faint)] uppercase tracking-[0.1em] mb-1.5"
+            className="flex items-center justify-between gap-2 text-[0.7rem] text-[color:var(--color-text-faint)] mb-1.5"
             style={{ fontFamily: 'var(--font-mono)' }}
           >
             <span className="truncate">{item.num ? `${item.num} / ` : ''}{item.category}</span>
@@ -1532,7 +1518,7 @@ function ItemCard({
             {trend != null && (
               <span
                 className={cn(
-                  'inline-flex items-center gap-0.5 text-[10px] font-semibold',
+                  'inline-flex items-center gap-0.5 text-[11px] font-semibold',
                   trend < 0 ? 'text-[color:var(--color-accent)]' : 'text-[color:var(--color-red)]'
                 )}
                 title={t('it.lastChange', { dir: trend < 0 ? t('pp.down') : t('pp.up'), x: `${cur()}${Math.abs(trend).toFixed(2)}` })}
@@ -1545,7 +1531,7 @@ function ItemCard({
 
           {/* Price-tracker row (shopping): best store price + target/deal */}
           {view === 'shopping' && (best || item.targetPrice) && (
-            <div className="flex items-center gap-2 flex-wrap mt-1.5 text-[10px]" style={{ fontFamily: 'var(--font-mono)' }}>
+            <div className="flex items-center gap-2 flex-wrap mt-1.5 text-[11px]" style={{ fontFamily: 'var(--font-mono)' }}>
               {best && (
                 <span className="text-[color:var(--color-text-dim)]">
                   {best.price !== item.currentPrice ? (
@@ -1560,7 +1546,7 @@ function ItemCard({
               )}
               {item.targetPrice ? (
                 deal ? (
-                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-[color:var(--color-accent)]/10 text-[color:var(--color-accent)] border border-[color:var(--color-accent)]/25 font-semibold uppercase tracking-wide">
+                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-[color:var(--color-accent)]/10 text-[color:var(--color-accent)] border border-[color:var(--color-accent)]/25 font-semibold">
                     <Target size={9} /> {t('it.deal')} ≤{cur()}{item.targetPrice}
                   </span>
                 ) : (
@@ -1583,8 +1569,8 @@ function ItemCard({
               const w = warrantyState(item.warrantyUntil, t);
               return w ? (
                 <span
-                  className="inline-block text-[9px] font-semibold px-1.5 py-0.5 rounded uppercase tracking-wider"
-                  style={{ fontFamily: 'var(--font-mono)', background: `${w.color}1a`, color: w.color, border: `1px solid ${w.color}40` }}
+                  className="inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded"
+                  style={{ fontFamily: 'var(--font-mono)', background: `color-mix(in srgb, ${w.color} 10%, transparent)`, color: w.color, border: `1px solid color-mix(in srgb, ${w.color} 25%, transparent)` }}
                 >
                   {w.label}
                 </span>
@@ -1594,8 +1580,8 @@ function ItemCard({
               const lend = lendBadge(item, t);
               return lend ? (
                 <span
-                  className="inline-flex items-center gap-1 text-[9px] font-semibold px-1.5 py-0.5 rounded uppercase tracking-wider max-w-full"
-                  style={{ fontFamily: 'var(--font-mono)', background: `${lend.color}1a`, color: lend.color, border: `1px solid ${lend.color}40` }}
+                  className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded max-w-full"
+                  style={{ fontFamily: 'var(--font-mono)', background: `color-mix(in srgb, ${lend.color} 10%, transparent)`, color: lend.color, border: `1px solid color-mix(in srgb, ${lend.color} 25%, transparent)` }}
                 >
                   <HandHelping size={9} className="shrink-0" />
                   <span className="truncate">{lend.label}</span>
@@ -1606,8 +1592,8 @@ function ItemCard({
               const claim = claimBadge(item, t);
               return claim ? (
                 <span
-                  className="inline-flex items-center gap-1 text-[9px] font-semibold px-1.5 py-0.5 rounded uppercase tracking-wider max-w-full"
-                  style={{ fontFamily: 'var(--font-mono)', background: `${claim.color}1a`, color: claim.color, border: `1px solid ${claim.color}40` }}
+                  className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded max-w-full"
+                  style={{ fontFamily: 'var(--font-mono)', background: `color-mix(in srgb, ${claim.color} 10%, transparent)`, color: claim.color, border: `1px solid color-mix(in srgb, ${claim.color} 25%, transparent)` }}
                 >
                   <ShieldAlert size={9} className="shrink-0" />
                   <span className="truncate">{claim.label}</span>
@@ -1617,7 +1603,7 @@ function ItemCard({
             {plan && (
               <span
                 className={cn(
-                  'inline-flex items-center gap-1 text-[9px] font-semibold px-1.5 py-0.5 rounded uppercase tracking-wider border',
+                  'inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded border',
                   plan.done
                     ? 'bg-[color:var(--color-accent)]/10 text-[color:var(--color-accent)] border-[color:var(--color-accent)]/25'
                     : 'bg-[color:var(--color-purple)]/10 text-[color:var(--color-purple)] border-[color:var(--color-purple)]/25'
@@ -1648,7 +1634,7 @@ function ItemCard({
             >
               <span className="shrink-0">→</span>
               {l.label && (
-                <span className="shrink-0 text-[0.6rem] uppercase tracking-wider text-[color:var(--color-text-faint)]">{l.label}</span>
+                <span className="shrink-0 text-[11px] text-[color:var(--color-text-faint)]">{l.label}</span>
               )}
               <span className="truncate">{linkHost(l.url)}</span>
             </a>
@@ -1911,11 +1897,11 @@ function ItemDetailModal({
         <div className="flex flex-col gap-3">
           <div className="flex items-center gap-2 flex-wrap">
             <Badge status={item.status} />
-            <span className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider" style={{ fontFamily: 'var(--font-mono)' }}>
+            <span className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
               {item.category}
             </span>
             {item.num && (
-              <span className="text-[10px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
+              <span className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
                 #{item.num}
               </span>
             )}
@@ -1925,7 +1911,7 @@ function ItemDetailModal({
           {/* Price — top-right of the product (paid for owned, current for wishlist) */}
           <div className="bg-[color:var(--color-surface-2)] rounded-xl p-4 flex items-end justify-between gap-4">
             <div>
-              <div className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider mb-1" style={{ fontFamily: 'var(--font-mono)' }}>
+              <div className="text-[11px] text-[color:var(--color-text-faint)] mb-1" style={{ fontFamily: 'var(--font-mono)' }}>
                 {item.purchasedPrice ? t('it.paidLabel') : t('it.currentPriceLabel')}
               </div>
               <div className="flex items-baseline gap-2 flex-wrap">
@@ -1944,7 +1930,7 @@ function ItemDetailModal({
             </div>
             {item.purchasedPrice && item.currentPrice > 0 && item.currentPrice !== item.purchasedPrice && (
               <div className="text-right">
-                <div className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider" style={{ fontFamily: 'var(--font-mono)' }}>{t('it.priceNow')}</div>
+                <div className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>{t('it.priceNow')}</div>
                 <div className="text-sm font-semibold" style={{ fontFamily: 'var(--font-mono)' }}>{cur()}{item.currentPrice}</div>
               </div>
             )}
@@ -1956,7 +1942,7 @@ function ItemDetailModal({
             <div className="bg-[color:var(--color-surface-2)] rounded-xl p-4 flex flex-col gap-3">
               <div className="flex items-end justify-between gap-4">
                 <div>
-                  <div className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider mb-1" style={{ fontFamily: 'var(--font-mono)' }}>
+                  <div className="text-[11px] text-[color:var(--color-text-faint)] mb-1" style={{ fontFamily: 'var(--font-mono)' }}>
                     {t('it.soldForLabel')}
                   </div>
                   <div className="text-2xl font-bold" style={{ fontFamily: 'var(--font-display)' }}>
@@ -1972,7 +1958,7 @@ function ItemDetailModal({
                 </div>
                 {realized != null && (
                   <div className="text-right">
-                    <div className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider" style={{ fontFamily: 'var(--font-mono)' }}>
+                    <div className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
                       {t('it.realizedLabel')}
                     </div>
                     <div
@@ -2013,7 +1999,7 @@ function ItemDetailModal({
                   whole page wider than the viewport rather than clipping. */}
               <div className="flex items-start justify-between gap-2 sm:gap-4 flex-wrap">
                 <div className="min-w-0">
-                  <div className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider mb-1 flex items-center gap-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
+                  <div className="text-[11px] text-[color:var(--color-text-faint)] mb-1 flex items-center gap-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
                     <Truck size={12} />
                     {tracking.carrier?.trim() || t('it.trackingLabel')}
                   </div>
@@ -2049,7 +2035,7 @@ function ItemDetailModal({
                   whole page wider than the viewport rather than clipping. */}
               <div className="flex items-start justify-between gap-2 sm:gap-4 flex-wrap">
                 <div className="min-w-0">
-                  <div className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider mb-1 flex items-center gap-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
+                  <div className="text-[11px] text-[color:var(--color-text-faint)] mb-1 flex items-center gap-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
                     <Wrench size={12} />
                     {t('it.maintLabel')}
                   </div>
@@ -2060,7 +2046,7 @@ function ItemDetailModal({
                         ? t('it.maintOverdue', { n: -maintDays })
                         : t('it.maintDueIn', { n: maintDays })}
                   </div>
-                  <div className="text-[10px] text-[color:var(--color-text-faint)] mt-0.5 break-words" style={{ fontFamily: 'var(--font-mono)' }}>
+                  <div className="text-[11px] text-[color:var(--color-text-faint)] mt-0.5 break-words" style={{ fontFamily: 'var(--font-mono)' }}>
                     {t('it.maintEvery', { n: item.maintenanceIntervalDays as number })}
                     {' · '}
                     {item.lastMaintenanceAt
@@ -2080,14 +2066,14 @@ function ItemDetailModal({
               form, and the roll-up is derived from the parts, never typed. */}
           {bundle && (
             <div className="bg-[color:var(--color-surface-2)] rounded-xl p-4 flex flex-col gap-2">
-              <div className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider flex items-center gap-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
+              <div className="text-[11px] text-[color:var(--color-text-faint)] flex items-center gap-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
                 <Boxes size={12} />
                 {t('it.bundlePartOf')}
               </div>
               <div className="text-sm font-semibold truncate" style={{ fontFamily: 'var(--font-mono)' }}>
                 {bundle.name}
               </div>
-              <div className="text-[10px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
+              <div className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
                 {t('it.bundleInvestedParts', { amount: `${cur()}${bundle.invested.toFixed(0)}`, n: bundle.parts })}
               </div>
               <Button variant="ghost" onClick={() => onShowBundle(bundle.name)} className="self-start">
@@ -2102,14 +2088,14 @@ function ItemDetailModal({
           {lentOut && (
             <div className="bg-[color:var(--color-surface-2)] rounded-xl p-4 flex flex-col gap-3">
               <div className="min-w-0">
-                <div className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider mb-1 flex items-center gap-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
+                <div className="text-[11px] text-[color:var(--color-text-faint)] mb-1 flex items-center gap-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
                   <HandHelping size={12} />
                   {t('it.lendLabel')}
                 </div>
                 <div className="text-sm font-semibold truncate" style={{ fontFamily: 'var(--font-mono)', color: lendColor }}>
                   {t('it.lentToX', { name: item.lentTo })}
                 </div>
-                <div className="text-[10px] text-[color:var(--color-text-faint)] mt-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
+                <div className="text-[11px] text-[color:var(--color-text-faint)] mt-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
                   {lendDays === null
                     ? t('it.lendNoDeadline')
                     : lendDays < 0
@@ -2130,7 +2116,7 @@ function ItemDetailModal({
               edited in the form, which is where the dates and the ticket number are typed. */}
           {claims.length > 0 && (
             <div className="bg-[color:var(--color-surface-2)] rounded-xl p-4 flex flex-col gap-3">
-              <div className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider flex items-center gap-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
+              <div className="text-[11px] text-[color:var(--color-text-faint)] flex items-center gap-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
                 <ShieldAlert size={12} />
                 {t('it.claimsN', { n: claims.length })}
               </div>
@@ -2145,7 +2131,7 @@ function ItemDetailModal({
                       {claimStatusLabel(c.status, t)}
                       {c.ref ? ` · ${c.ref}` : ''}
                     </div>
-                    <div className="text-[10px] text-[color:var(--color-text-faint)] mt-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
+                    <div className="text-[11px] text-[color:var(--color-text-faint)] mt-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
                       {c.reportedAt ? t('it.claimReportedOn', { date: String(c.reportedAt).slice(0, 10) }) : ''}
                       {idle !== null && ` · ${t('it.claimNoUpdateFor', { n: idle })}`}
                       {c.trackingNumber ? ` · ${c.trackingNumber}` : ''}
@@ -2229,7 +2215,7 @@ function ItemDetailModal({
             </button>
           </div>
           {(aiAllFilling || infoFilling) && (
-            <p className="text-[10px] text-[color:var(--color-cyan)]" style={{ fontFamily: 'var(--font-mono)' }}>
+            <p className="text-[11px] text-[color:var(--color-cyan)]" style={{ fontFamily: 'var(--font-mono)' }}>
               {item.links.length === 0
                 ? t('it.searchingWeb')
                 : t('it.readingLinks', { n: item.links.length })}{' '}
@@ -2257,14 +2243,14 @@ function ItemDetailModal({
           <div className="flex items-center gap-2 flex-wrap">
             {warranty && (
               <span
-                className="inline-flex items-center text-[10px] font-semibold px-2 py-1 rounded uppercase tracking-wider border"
+                className="inline-flex items-center text-[11px] font-semibold px-2 py-1 rounded border"
                 style={{ fontFamily: 'var(--font-mono)', color: warranty.color, borderColor: warranty.color, background: 'transparent' }}
               >
                 {warranty.label}
               </span>
             )}
             {item.serialNumber && (
-              <span className="text-[10px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
+              <span className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
                 S/N {item.serialNumber}
               </span>
             )}
@@ -2274,7 +2260,7 @@ function ItemDetailModal({
               are values the user typed for themselves, never links and never markup. */}
           {(item.customFields ?? []).length > 0 && (
             <div>
-              <p className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider mb-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
+              <p className="text-[11px] text-[color:var(--color-text-faint)] mb-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
                 {t('it.customFields')}
               </p>
               <dl className="rounded-lg border border-[color:var(--color-border)] divide-y divide-[color:var(--color-border)] overflow-hidden">
@@ -2293,7 +2279,7 @@ function ItemDetailModal({
           {/* Where to buy (owned items only — wishlist shows store links in the PricePanel below) */}
           {view === 'inventory' && item.links.length > 0 && (
             <div>
-              <p className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider mb-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
+              <p className="text-[11px] text-[color:var(--color-text-faint)] mb-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
                 {t('it.whereToBuy')}
               </p>
               <div className="flex flex-wrap gap-2">
@@ -2325,7 +2311,7 @@ function ItemDetailModal({
           {/* Purchase & payment — right column, under the AI buttons */}
           {hasPayment && (
             <div className="pt-3 mt-1 border-t border-[color:var(--color-border)]">
-          <h4 className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider mb-2" style={{ fontFamily: 'var(--font-mono)' }}>
+          <h4 className="text-[11px] text-[color:var(--color-text-faint)] mb-2" style={{ fontFamily: 'var(--font-mono)' }}>
             {t('it.purchasePayment')}
           </h4>
           <div className="flex flex-wrap gap-2 mb-3">
@@ -2343,7 +2329,7 @@ function ItemDetailModal({
                   <ReceiptIcon size={12} />
                   {r.store || t('it.receiptFallback')}
                   {r.total > 0 && <span className="text-[color:var(--color-text-faint)]">· {cur()}{r.total}</span>}
-                  {r.fileType === 'pdf' && <span className="text-[9px] uppercase text-[color:var(--color-text-faint)]">pdf</span>}
+                  {r.fileType === 'pdf' && <span className="text-[10px] text-[color:var(--color-text-faint)]">pdf</span>}
                 </a>
               ) : (
                 <span
@@ -2397,14 +2383,14 @@ function ItemDetailModal({
                   className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg border border-dashed border-[color:var(--color-border-light)] text-[color:var(--color-cyan)] hover:border-[color:var(--color-cyan)] hover:bg-[color:var(--color-surface-2)] transition-colors"
                 >
                   <Link2 size={13} /> {t('it.linkPlan')}
-                  <span className="text-[10px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
+                  <span className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
                     {t('it.available', { n: unlinkedPlans.length })}
                   </span>
                 </button>
               ) : (
                 <div className="rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] overflow-hidden">
                   <div className="flex items-center justify-between px-3 py-2 border-b border-[color:var(--color-border)]">
-                    <span className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider flex items-center gap-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
+                    <span className="text-[11px] text-[color:var(--color-text-faint)] flex items-center gap-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
                       <Link2 size={11} className="text-[color:var(--color-cyan)]" /> {t('it.pickPlan')}
                     </span>
                     <button onClick={() => setShowLinkPicker(false)} className="text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)]" title={t('common.close')}>
@@ -2424,7 +2410,7 @@ function ItemDetailModal({
                           <span className="truncate">{p.label}</span>
                         </span>
                         <span className="flex items-center gap-2 shrink-0">
-                          <span className="text-[10px] text-[color:var(--color-text-faint)] tabular-nums" style={{ fontFamily: 'var(--font-mono)' }}>
+                          <span className="text-[11px] text-[color:var(--color-text-faint)] tabular-nums" style={{ fontFamily: 'var(--font-mono)' }}>
                             {p.paidInstallments}/{p.totalInstallments} · {cur()}{p.perAmount.toFixed(2)}/mo
                           </span>
                           <Plus size={13} className="text-[color:var(--color-accent)]" />
@@ -2924,7 +2910,7 @@ function ItemForm({
       <div className="md:col-span-2">
         <div className="flex items-center justify-between mb-1.5">
           <label
-            className="block text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider"
+            className="block text-[11px] text-[color:var(--color-text-faint)]"
             style={{ fontFamily: 'var(--font-mono)' }}
           >
             {t('it.linksN', { n: links.length })}
@@ -2932,7 +2918,7 @@ function ItemForm({
           <button
             type="button"
             onClick={addLink}
-            className="text-[10px] text-[color:var(--color-accent)] flex items-center gap-1 hover:opacity-80"
+            className="text-[11px] text-[color:var(--color-accent)] flex items-center gap-1 hover:opacity-80"
             style={{ fontFamily: 'var(--font-mono)' }}
           >
             <Plus size={11} /> {t('common.add')}
@@ -2985,7 +2971,7 @@ function ItemForm({
       <div className="md:col-span-2">
         <div className="flex items-center justify-between mb-1.5">
           <label
-            className="block text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider"
+            className="block text-[11px] text-[color:var(--color-text-faint)]"
             style={{ fontFamily: 'var(--font-mono)' }}
           >
             {t('it.customFieldsN', { n: customFields.length })}
@@ -2993,7 +2979,7 @@ function ItemForm({
           <button
             type="button"
             onClick={addCustomField}
-            className="text-[10px] text-[color:var(--color-accent)] flex items-center gap-1 hover:opacity-80"
+            className="text-[11px] text-[color:var(--color-accent)] flex items-center gap-1 hover:opacity-80"
             style={{ fontFamily: 'var(--font-mono)' }}
           >
             <Plus size={11} /> {t('common.add')}
@@ -3040,7 +3026,7 @@ function ItemForm({
         <div className="md:col-span-2">
           <div className="flex items-center justify-between mb-1.5">
             <label
-              className="block text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider"
+              className="block text-[11px] text-[color:var(--color-text-faint)]"
               style={{ fontFamily: 'var(--font-mono)' }}
             >
               {t('it.claimsN', { n: claims.length })}
@@ -3048,7 +3034,7 @@ function ItemForm({
             <button
               type="button"
               onClick={addClaim}
-              className="text-[10px] text-[color:var(--color-accent)] flex items-center gap-1 hover:opacity-80"
+              className="text-[11px] text-[color:var(--color-accent)] flex items-center gap-1 hover:opacity-80"
               style={{ fontFamily: 'var(--font-mono)' }}
             >
               <Plus size={11} /> {t('common.add')}
@@ -3087,13 +3073,13 @@ function ItemForm({
                   </button>
                 </div>
                 <div className="flex gap-1.5 items-center flex-wrap">
-                  <label className="text-[9px] text-[color:var(--color-text-faint)] uppercase tracking-wider" style={{ fontFamily: 'var(--font-mono)' }}>
+                  <label className="text-[10px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
                     {t('it.fClaimReportedAt')}
                   </label>
                   <div className="w-36">
                     <DateInput value={c.reportedAt ?? ''} onValueChange={(v) => updateClaim(i, 'reportedAt', v)} aria-label={t('it.fClaimReportedAt')} className="py-1.5 text-xs" />
                   </div>
-                  <label className="text-[9px] text-[color:var(--color-text-faint)] uppercase tracking-wider" style={{ fontFamily: 'var(--font-mono)' }}>
+                  <label className="text-[10px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
                     {t('it.fClaimLastUpdateAt')}
                   </label>
                   <div className="w-36">

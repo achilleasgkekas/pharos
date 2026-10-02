@@ -3,14 +3,13 @@ import './globals.css';
 import { SiteNav } from '@/components/SiteNav';
 import { Providers } from '@/components/Providers';
 import { CurrencyInit } from '@/components/CurrencyInit';
-import { ChromeGate } from '@/components/ChromeGate';
+import { ChromeGate, ContentFrame } from '@/components/ChromeGate';
 import { getAppSettings } from '@/lib/appSettings';
 import { currencySymbol } from '@/lib/money';
 import { isAiReady } from '@/lib/ollama';
 import { getSessionUser } from '@/lib/auth';
 import { assertKnownWorkspaceHost } from '@/lib/tenancy/request';
 import { getAiConfig } from '@/lib/aiConfig';
-import { AiOnboardingBanner } from '@/components/AiOnboardingBanner';
 import { FirstRunTour } from '@/components/FirstRunTour';
 import { getServerT } from '@/lib/i18n/server';
 import { LocaleProvider } from '@/components/LocaleProvider';
@@ -40,7 +39,9 @@ export const viewport: Viewport = {
 };
 
 // Apply the saved theme before paint to avoid a flash of the wrong theme.
-const themeScript = `(function(){try{var t=localStorage.getItem('theme')||'dark';document.documentElement.setAttribute('data-theme',t);document.documentElement.style.colorScheme=t;}catch(e){}})();`;
+// The same for the sidebar: a collapsed sidebar is narrower, and the page is laid out around it.
+// It also stores the browser's time zone, so Home greets by the reader's clock (app/page.tsx).
+const themeScript = `(function(){try{var d=document.documentElement;var t=localStorage.getItem('theme')||'dark';d.setAttribute('data-theme',t);d.style.colorScheme=t;if(localStorage.getItem('pharos.sidebar')==='collapsed')d.setAttribute('data-sidebar','collapsed');}catch(e){}try{document.cookie='pharos_tz='+encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone)+';path=/;max-age=31536000;samesite=lax';}catch(e){}})();`;
 
 export default async function RootLayout({
   children,
@@ -67,18 +68,12 @@ export default async function RootLayout({
   // Read the display currency once per request → set server symbol + hand to the client.
   const { currency } = await getAppSettings();
   const symbol = currencySymbol(currency);
-  // Navbar dot = EFFECTIVE AI state (master switch on AND a provider is reachable).
-  // Onboarding nudge: show when signed in, AI isn't usable, and not yet dismissed.
+  // Navbar dot = EFFECTIVE AI state (master switch on AND a provider is reachable). The
+  // "set up AI" nudge is Home's own now (app/page.tsx), not a banner over every page.
   let aiReady = false;
-  let banner: 'off' | 'no-provider' | null = null;
   if (user) {
     const cfg = await getAiConfig();
-    const providerReady = await isAiReady();
-    aiReady = cfg.aiEnabled && providerReady;
-    if (!cfg.aiOnboardingDismissed) {
-      if (!cfg.aiEnabled) banner = 'off';
-      else if (!providerReady) banner = 'no-provider';
-    }
+    aiReady = cfg.aiEnabled && (await isAiReady());
   }
   // P75: who added each record. Null (nothing shown) until the instance has a second user.
   const attribution = user ? await loadAttributionNames() : null;
@@ -114,11 +109,10 @@ export default async function RootLayout({
           {user && (
             <ChromeGate>
               <SiteNav aiReady={aiReady} user={{ name: user.name || 'account', role: user.role }} />
-              {banner && <AiOnboardingBanner reason={banner} />}
               <FirstRunTour />
             </ChromeGate>
           )}
-          {children}
+          <ContentFrame chrome={!!user}>{children}</ContentFrame>
         </Providers>
         </AttributionProvider>
         </LocaleProvider>

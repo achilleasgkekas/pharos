@@ -11,20 +11,25 @@ This page lists what to use for each part of a page. It started with
 ## Page layout
 
 ```text
-Title  count · subtitle                 [stats] [actions…] [grid|list] [+ New]
-───────────────────────────────────────────────────────────────────────────────
-[filters sidebar]   content
+Title (count)                                [actions…] [list|grid] [+ New]
+This month €701,30 · This year €2.238,60     ← summary: one line, no stat cards
+[search……………] [All | Verified | To check] [Filters]
+rows…
 ```
 
 | Part | Use | Notes |
 | --- | --- | --- |
 | Page wrapper | `<main className={PAGE_MAIN}>` | Same width and padding on every page. |
-| Title row | `PageHeader` | Takes `title`, `count` and an optional one-line `subtitle`. No icon in the title: Inventory has none. |
-| Header figures | `HeaderStat` | "to pay €120", "due this month €80". |
-| Secondary actions | `HeaderButton` | Select, Duplicates, Import, Show archived. The outlined style. |
-| View switch | `ViewToggle` | Grid / list, board / list, month / agenda. It lives in the header, never under it. |
-| Main action | `PrimaryAction` | Always last on the right, labelled "New". |
-| Filters | `FilterLayout`, `FilterSection`, `FilterOptions` | A sidebar on desktop and a drawer on phones. `FilterOptions` for a single-choice list such as status. |
+| Title row | `PageHeader` | `title`, `count`, an optional one-line `subtitle`. On a phone the actions stay on the title's line and scroll sideways if they do not fit. |
+| Totals | `HeaderTotals` in `summary` | One line of label + figure pairs. Replaces the big stat cards. |
+| Header figure | `HeaderStat` | "due this month €80". |
+| Secondary actions | `HeaderButton` | Select, Duplicates, Import. With an icon it shows only the icon on a phone. |
+| View switch | `ViewToggle` | List first: rows are the default. Cards only where the photo matters (items, wishlist). |
+| Main action | `PrimaryAction` | Last button on a computer; the round + button above the section bar on a phone. |
+| Filters | `FilterLayout`, `FilterSection`, `FilterOptions` | One row: `search`, the main status switch (`quick`, `FilterOptions variant="segmented"`) and a Filters button that opens the rest (`filters`) in a panel under the row. |
+| Upload | `UploadButton` + `PageFileDrop` (`components/ui/FileDrop.tsx`) | A header button, and a file dropped anywhere on the page. No drop box on the page. |
+
+Lists are rows in one container with dividers (`rounded-2xl border divide-y`), not a card per record.
 
 All of these come from `components/ui/PageHeader.tsx`.
 
@@ -75,20 +80,33 @@ A form ends with the actions on the right: a ghost Cancel, then the primary Save
   `--color-red`, `--color-gold`, `--color-purple`, `--color-orange`, the surfaces and the
   three text shades. Each token has a light-theme value, so the page follows the theme.
 - For a tint, add an opacity to the token: `bg-[color:var(--color-accent)]/10`. A hex value in
-  a class name (`bg-[#00ff8810]`) ignores the light theme and fails the build.
+  a class name (`bg-[#00ff8810]`) ignores the light theme and fails the build. In an inline
+  style, use `color-mix(in srgb, var(--color-gold) 25%, transparent)`: `var(--color-gold)40`
+  is not a colour, and the browser drops it.
+- Green is for the main action and for "good". Selected chips and segments are neutral
+  (`--color-surface-3`); text on a green fill uses `--color-on-accent`.
 
 ## Navigation and menu structure
 
-Navigation structure is defined centrally in `apps/web/src/lib/nav.ts` and shared across desktop and mobile menus:
+Sections and pages are defined once in `apps/web/src/lib/nav.ts`; Settings pages in
+`components/settingsNav.ts`.
 
-- **Desktop**: Sticky top bar provides the logo, AI command bar, direct Home link, 4 dropdown categories (**Money**, **Shopping**, **Home & car**, **Planner**), notification bell, and user account menu.
-- **Account menu**: Holds user profile details, Settings, Jobs, AI history, Trash, language switcher, dark/light theme switch, and sign out.
-- **Mobile (phones)**: Bottom tab bar with 5 primary destinations:
-  - **Home**: (`/`)
-  - **Money**: (`/expenses` and highlights for any Money sub-page)
-  - **Quick Add**: Center action opening a sheet to scan receipts, add expenses, or add to shopping list.
-  - **Calendar**: (`/calendar`)
-  - **More**: Full-height sheet with page search jump-bar, grouped category sections, and account/system tools.
+- **Computer**: a sidebar with Home and every page by section (Money, Shopping, Home & car,
+  Planner), collapsible to icons (remembered per browser). In Settings it lists the Settings
+  pages instead, with "Back to the app". The top bar holds search / the AI bar, the bell and
+  the account menu.
+- **Phone**: a top bar, the current section's pages as tabs under it, and a section bar at the
+  bottom (Home, Money, Shopping, House, Planner). A section opens on the page you last used in
+  it. There is no More page; Jobs, AI history and Trash are in the account menu.
+- **Account menu**: your name (opens Settings → Account), Settings, Jobs, AI history, Trash,
+  sign out. Theme and language live in Settings → Appearance & language only.
+- **AI message**: the "set up AI" line shows on Home only.
+
+## Fonts
+
+Outfit for headings, Manrope for everything else (`--font-mono` is Manrope with tabular
+figures, for amounts and counts). Real monospace (`--font-code`, IBM Plex Mono) only for code,
+tokens, paths and URLs. No all-caps labels.
 
 ## Accessibility
 

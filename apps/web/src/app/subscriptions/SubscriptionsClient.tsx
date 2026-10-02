@@ -16,8 +16,8 @@ import { SavedViews } from '@/components/ui/SavedViews';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { NO_SPACE, matchesSpace, spaceFilterOptions } from '@/lib/spaceFilter';
 import { Button } from '@/components/ui/Button';
-import { PAGE_MAIN, PageHeader, HeaderButton, HeaderStat, ViewToggle, PrimaryAction, FilterLayout, FilterSection, FilterOptions } from '@/components/ui/PageHeader';
-import { Input, controlClass } from '@/components/ui/Input';
+import { PAGE_MAIN, PageHeader, HeaderButton, HeaderTotals, ViewToggle, PrimaryAction, FilterLayout, FilterSection, FilterOptions } from '@/components/ui/PageHeader';
+import { Input, controlClass, filterControlClass } from '@/components/ui/Input';
 import { DateInput } from '@/components/ui/DateInput';
 import { Modal } from '@/components/ui/Modal';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
@@ -129,7 +129,7 @@ export function SubscriptionsClient({
   };
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'cancelled'>('all');
   const [sortBy, setSortBy] = useState<'name' | 'amount' | 'renewal'>('name');
-  const [layout, setLayout] = useState<'grid' | 'list'>('grid');
+  const [layout, setLayout] = useState<'grid' | 'list'>('list');
 
   const active = subscriptions.filter((s) => s.active);
   const categories = useMemo(() => [...new Set(subscriptions.map((s) => s.category).filter(Boolean))].sort(), [subscriptions]);
@@ -194,20 +194,21 @@ export function SubscriptionsClient({
     setStatusFilter((v.statusFilter as typeof statusFilter) ?? 'all');
     setSortBy((v.sortBy as typeof sortBy) ?? 'name');
   };
+  const searchBox = <Input icon={<Search size={15} />} type="search" placeholder={t('sub.searchPlaceholder')} aria-label={t('sub.searchPlaceholder')} value={search} onChange={(e) => setSearch(e.target.value)} />;
+  const statusSwitch = (
+    <FilterOptions
+      variant="segmented"
+      value={statusFilter}
+      onChange={setStatusFilter}
+      options={[
+        { value: 'all', label: t('common.all') },
+        { value: 'active', label: t('v.fActive') },
+        { value: 'cancelled', label: t('sub.fCancelled') },
+      ]}
+    />
+  );
   const filterControls = (
-    <div className="space-y-4">
-      <Input icon={<Search size={14} />} placeholder={t('sub.searchPlaceholder')} value={search} onChange={(e) => setSearch(e.target.value)} />
-      <FilterSection label={t('common.status')}>
-        <FilterOptions
-          value={statusFilter}
-          onChange={setStatusFilter}
-          options={[
-            { value: 'all', label: t('common.all') },
-            { value: 'active', label: t('v.fActive') },
-            { value: 'cancelled', label: t('sub.fCancelled') },
-          ]}
-        />
-      </FilterSection>
+    <div>
       {categories.length > 1 && (
         <FilterSection label={t('common.category')}>
           <SearchableSelect value={categoryFilter} onChange={setCategoryFilter} options={categories} placeholder={t('sub.allCategories')} clearable size="sm" className="w-full" />
@@ -219,19 +220,18 @@ export function SubscriptionsClient({
         </FilterSection>
       )}
       <FilterSection label={t('common.sort')}>
-        <select value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)} className={controlClass} style={{ fontFamily: 'var(--font-mono)' }}>
+        <select value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)} className={filterControlClass} aria-label={t('common.sort')}>
           <option value="name">{t('sub.sortName')}</option>
           <option value="amount">{t('sub.sortCost')}</option>
           <option value="renewal">{t('sub.sortRenewal')}</option>
         </select>
       </FilterSection>
-      <div className="flex items-center gap-3 flex-wrap">
+      <div className="flex items-center gap-3 flex-wrap self-end">
         <SavedViews<SubsView> moduleKey="subscriptions" current={currentView} canSave={anyF} onApply={applyView} />
         {anyF && (
           <button
             onClick={() => { setSearch(''); setCategoryFilter(''); setSpaceFilter(''); setStatusFilter('all'); setSortBy('name'); }}
-            className="text-[0.65rem] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] underline"
-            style={{ fontFamily: 'var(--font-mono)' }}
+            className="h-10 text-sm text-[color:var(--color-text-dim)] hover:text-[color:var(--color-red)] underline"
           >
             {t('common.resetFilters')}
           </button>
@@ -242,9 +242,11 @@ export function SubscriptionsClient({
 
   return (
     <main className={PAGE_MAIN}>
-      <PageHeader title={t('nav.subscriptions')} count={t('v.activeCount', { n: active.length })}>
-        <HeaderStat label={t('sub.monthly')} value={money(monthlyTotal)} color="var(--color-accent)" />
-        <HeaderStat label={t('sub.yearly')} value={money(yearlyTotal)} color="var(--color-gold)" />
+      <PageHeader
+        title={t('nav.subscriptions')}
+        count={t('v.activeCount', { n: active.length })}
+        summary={<HeaderTotals items={[{ label: t('sub.monthly'), value: money(monthlyTotal), tone: 'accent' }, { label: t('sub.yearly'), value: money(yearlyTotal) }]} />}
+      >
         <HeaderButton icon={<Copy size={14} />} onClick={() => setFindingDupes(true)} title={t('subdup.title')} className="hidden sm:flex">
           {t('subdup.find')}
         </HeaderButton>
@@ -254,16 +256,11 @@ export function SubscriptionsClient({
 
       {findingDupes && <SubscriptionDuplicatesModal onClose={() => setFindingDupes(false)} />}
 
-      <FilterLayout filters={filterControls} active={anyF}>
+      <FilterLayout search={searchBox} quick={statusSwitch} filters={filterControls} active={!!(categoryFilter || spaceFilter || sortBy !== 'name')}>
           {/* Upcoming renewals strip */}
           {upcoming.length > 0 && (
-            <div className="mb-6 bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-xl p-4">
-              <h3
-                className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-[0.15em] mb-3"
-                style={{ fontFamily: 'var(--font-mono)' }}
-              >
-                {t('sub.upcoming')}
-              </h3>
+            <div className="mb-4 bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-2xl p-3 sm:p-4">
+              <h2 className="text-sm font-semibold mb-2.5">{t('sub.upcoming')}</h2>
               <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
                 {upcoming.map((s) => {
                   const d = renewalDaysUntil(s.nextRenewal)!;
@@ -274,14 +271,8 @@ export function SubscriptionsClient({
                       className="shrink-0 flex flex-col items-start gap-1 bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-3 py-2 min-w-[120px] hover:border-[color:var(--color-border-light)] transition-colors text-left"
                     >
                       <span className="text-sm font-semibold truncate max-w-[140px]">{s.name}</span>
-                      <span
-                        className={cn(
-                          'text-[10px]',
-                          d <= 3 ? 'text-[color:var(--color-red)]' : 'text-[color:var(--color-gold)]'
-                        )}
-                        style={{ fontFamily: 'var(--font-mono)' }}
-                      >
-                        {d === 0 ? 'today' : d === 1 ? 'tomorrow' : `in ${d} days`} · {money(s.amount)}
+                      <span className={cn('text-xs tabular-nums', d <= 3 ? 'text-[color:var(--color-red)]' : 'text-[color:var(--color-gold)]')}>
+                        {d === 0 ? t('sub.today') : d === 1 ? t('home.tomorrow') : t('home.inDays', { n: d })} · {money(s.amount)}
                       </span>
                     </button>
                   );
@@ -292,13 +283,10 @@ export function SubscriptionsClient({
 
           {/* Discovered untracked recurring charges (P7) */}
           {visibleCandidates.length > 0 && (
-            <div className="mb-6 bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-xl p-4">
-              <h3
-                className="flex items-center gap-1.5 text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-[0.15em] mb-3"
-                style={{ fontFamily: 'var(--font-mono)' }}
-              >
-                <Radar size={12} /> {t('sub.discoveredTitle', { n: visibleCandidates.length })}
-              </h3>
+            <div className="mb-4 bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-2xl p-3 sm:p-4">
+              <h2 className="flex items-center gap-1.5 text-sm font-semibold mb-2.5">
+                <Radar size={14} className="text-[color:var(--color-text-dim)]" /> {t('sub.discoveredTitle', { n: visibleCandidates.length })}
+              </h2>
               <div className="flex flex-col gap-2">
                 {visibleCandidates.map((c) => (
                   <div
@@ -336,7 +324,7 @@ export function SubscriptionsClient({
           {visible.length === 0 ? (
             <EmptyState icon={<CalendarClock />} title={subscriptions.length === 0 ? t('sub.empty') : t('ex.emptyFiltered')} />
           ) : (
-            <div className={cn(layout === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3' : 'flex flex-col gap-2')}>
+            <div className={cn(layout === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3' : 'rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] overflow-hidden divide-y divide-[color:var(--color-border)]')}>
               {visible.map((s) => (
                 <div key={s._id} className={cn(!s.active && 'opacity-60')}>
                   {layout === 'grid' ? (
@@ -376,7 +364,7 @@ function SplitBadge({ split }: { split?: SplitEntry[] }) {
     <span
       title={settledUp ? 'Split — settled up' : `Split — ${money(owed)} owed to you`}
       className={cn(
-        'text-[10px] font-bold rounded-md px-1.5 py-0.5 flex items-center gap-1',
+        'text-[11px] font-bold rounded-md px-1.5 py-0.5 flex items-center gap-1',
         settledUp
           ? 'text-[color:var(--color-accent)] bg-[color:var(--color-accent)]/10 border border-[color:var(--color-accent)]/30'
           : 'text-[color:var(--color-cyan)] bg-[color:var(--color-cyan)]/10 border border-[color:var(--color-cyan)]/30'
@@ -437,7 +425,7 @@ function SubCard({ sub, base, onEdit }: { sub: SerializedSubscription; base: str
           )}
         </div>
         <span
-          className="text-[10px] font-semibold px-2 py-0.5 rounded-md uppercase tracking-wider shrink-0"
+          className="text-[11px] font-semibold px-2 py-0.5 rounded-md shrink-0"
           style={{
             fontFamily: 'var(--font-mono)',
             background: `${meta.hex}20`,
@@ -475,7 +463,7 @@ function SubCard({ sub, base, onEdit }: { sub: SerializedSubscription; base: str
           <button
             onClick={() => startTransition(() => reviewSubscription(sub._id))}
             disabled={pending}
-            className="mr-1 px-2 py-1 rounded-md text-[10px] font-semibold text-[color:var(--color-accent)] hover:bg-[color:var(--color-surface-2)] transition-colors"
+            className="mr-1 px-2 py-1 rounded-md text-[11px] font-semibold text-[color:var(--color-accent)] hover:bg-[color:var(--color-surface-2)] transition-colors"
           >
             <CheckCircle2 size={12} className="inline mr-1" />{t('sub.stillUsing')}
           </button>
@@ -534,18 +522,19 @@ function SubRow({ sub, base, onEdit }: { sub: SerializedSubscription; base: stri
   const t = useT();
   const money = useMoney();
   const { pending, startTransition, handleDelete, meta, d, cycleLabel } = useSubRow(sub);
-  const mono = { fontFamily: 'var(--font-mono)' };
 
   return (
-    <div className="group relative flex items-center gap-3 bg-[color:var(--color-surface)] border border-[color:var(--color-border)] hover:border-[color:var(--color-border-light)] rounded-xl pl-4 pr-2 py-2.5 overflow-hidden transition-colors">
-      <span className="absolute left-0 top-0 bottom-0 w-1" style={{ background: meta.hex }} />
+    <div className="group flex items-center gap-3 pl-3 sm:pl-4 pr-2 py-2.5 hover:bg-[color:var(--color-surface-2)] transition-colors">
       <button type="button" onClick={onEdit} className="min-w-0 flex-1 text-left" aria-label={`${t('common.edit')}: ${sub.name}`}>
-        <span className="block text-sm font-semibold truncate" style={{ fontFamily: 'var(--font-display)' }}>
+        <span className="block text-[15px] font-semibold truncate">
           {sub.name}
           {sub.provider && <span className="text-[color:var(--color-text-faint)] font-normal"> · {sub.provider}</span>}
         </span>
-        <span className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-0.5 text-[10px]" style={mono}>
-          <span className="uppercase tracking-[0.08em]" style={{ color: meta.hex }}>{meta.label}</span>
+        <span className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-0.5 text-xs text-[color:var(--color-text-dim)]">
+          <span className="inline-flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full shrink-0" style={{ background: meta.hex }} aria-hidden />
+            {meta.label}
+          </span>
           {sub.active && d !== null && (
             <span className={renewalTone(d)}>
               {t('sub.renews')} {d < 0 ? t('sub.overdue') : d === 0 ? t('sub.today') : t('sub.inD', { d })}
@@ -556,10 +545,10 @@ function SubRow({ sub, base, onEdit }: { sub: SerializedSubscription; base: stri
         </span>
       </button>
       <div className="text-right shrink-0">
-        <span className="block text-sm font-bold text-[color:var(--color-accent)] tabular-nums" style={{ fontFamily: 'var(--font-display)' }}>
+        <span className="block text-[15px] font-semibold tabular-nums">
           {money(sub.amount)}
         </span>
-        <span className="block text-[10px] text-[color:var(--color-text-faint)]" style={mono}>/ {cycleLabel.toLowerCase()}</span>
+        <span className="block text-xs text-[color:var(--color-text-faint)]">/ {cycleLabel.toLowerCase()}</span>
       </div>
       <div className="flex shrink-0">
         {sub.active && (
@@ -708,7 +697,7 @@ function SubForm({ sub, cards, spaces = [], fx, onSuccess, onDeleted }: { sub?: 
           </Button>
         </div>
         {aiMsg && (
-          <p className="text-[10px] text-[color:var(--color-accent)] mt-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
+          <p className="text-[11px] text-[color:var(--color-accent)] mt-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
             {aiMsg}
           </p>
         )}
@@ -764,7 +753,7 @@ function SubForm({ sub, cards, spaces = [], fx, onSuccess, onDeleted }: { sub?: 
         </Field>
       </div>
       {form.trialEndsAt && (
-        <p className="text-[10px] text-[color:var(--color-purple)] -mt-1" style={{ fontFamily: 'var(--font-mono)' }}>
+        <p className="text-[11px] text-[color:var(--color-purple)] -mt-1" style={{ fontFamily: 'var(--font-mono)' }}>
           {t('sub.trialHint')}
         </p>
       )}
@@ -898,7 +887,7 @@ function SplitEditor({ split, amount, baseCurrency, onChange }: { split: SplitEn
       <div className="flex items-center justify-between mb-2">
         <span className="text-xs font-medium flex items-center gap-1.5"><SplitIcon size={13} className="text-[color:var(--color-cyan)]" /> {t('ex.splitTitle')}{baseCurrency ? ` (${currencySymbol(baseCurrency).trim()})` : ''}</span>
         {split.length > 0 && (
-          <span className="text-[10px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
+          <span className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
             {t('ex.splitOwedYou', { amt: money(totals.owed) })}{totals.settled > 0 ? ` · ${t('ex.splitSettled', { amt: money(totals.settled) })}` : ''}
           </span>
         )}

@@ -1,5 +1,5 @@
 'use client';
-import { PAGE_MAIN, PageHeader, ViewToggle, PrimaryAction, FilterLayout, FilterSection, FilterOptions } from '@/components/ui/PageHeader';
+import { PAGE_MAIN, PageHeader, ViewToggle, PrimaryAction, FilterLayout, FilterOptions } from '@/components/ui/PageHeader';
 import { CreatedBy } from '@/components/CreatedBy';
 import { useState, useTransition, useMemo, useEffect } from 'react';
 import {
@@ -156,17 +156,17 @@ export function TasksClient({ tasks }: { tasks: SerializedTask[] }) {
         <PrimaryAction onClick={() => setShowCreate(true)} />
       </PageHeader>
 
-      {/* Tag filter (applies to both views), in the same sidebar every list page uses. */}
+      {/* Tag filter (applies to both views), in the filter row every list page uses. */}
       <FilterLayout
-        active={!!tagFilter}
-        filters={
-          <FilterSection label={t('tk.tags')}>
+        quick={
+          allTags.length > 0 ? (
             <FilterOptions
+              variant="segmented"
               value={tagFilter}
               onChange={(v) => setTagFilter(v)}
               options={[{ value: '', label: t('tk.allTags') }, ...allTags.map((tag) => ({ value: tag, label: `#${tag}` }))]}
             />
-          </FilterSection>
+          ) : undefined
         }
       >
           {/* Project progress — a selected tag behaves like a project/phase (the old /phases). */}
@@ -176,8 +176,8 @@ export function TasksClient({ tasks }: { tasks: SerializedTask[] }) {
             const done = proj.filter((t) => t.status === 'done').length;
             const pct = Math.round((done / proj.length) * 100);
             return (
-              <div className="mb-5 -mt-2">
-                <div className="flex items-center justify-between text-[10px] mb-1" style={{ fontFamily: 'var(--font-mono)' }}>
+              <div className="mb-4">
+                <div className="flex items-center justify-between text-xs mb-1">
                   <span className="text-[color:var(--color-text-dim)]">#{tagFilter} · {t('tk.projectProgress')}</span>
                   <span className="text-[color:var(--color-accent)]">{t('tk.donePct', { done, total: proj.length, pct })}</span>
                 </div>
@@ -215,19 +215,19 @@ export function TasksClient({ tasks }: { tasks: SerializedTask[] }) {
                   >
                     <div className="flex items-center justify-between px-1.5 py-1 mb-1.5">
                       <span
-                        className="text-[0.7rem] font-bold uppercase tracking-[0.1em] flex items-center gap-1.5"
+                        className="text-[0.7rem] font-bold flex items-center gap-1.5"
                         style={{ fontFamily: 'var(--font-mono)', color: col.accent }}
                       >
                         <span className="w-1.5 h-1.5 rounded-full" style={{ background: col.accent }} />
                         {t(STATUS_KEY[col.value] ?? 'tk.todo')}
                       </span>
-                      <span className="text-[10px] text-[color:var(--color-text-faint)] tabular-nums" style={{ fontFamily: 'var(--font-mono)' }}>
+                      <span className="text-[11px] text-[color:var(--color-text-faint)] tabular-nums" style={{ fontFamily: 'var(--font-mono)' }}>
                         {list.length}
                       </span>
                     </div>
                     <div className="flex flex-col gap-2 min-h-[120px] flex-1">
                       {list.length === 0 ? (
-                        <div className="flex-1 grid place-items-center text-[10px] text-[color:var(--color-text-faint)] italic py-6" style={{ fontFamily: 'var(--font-mono)' }}>
+                        <div className="flex-1 grid place-items-center text-[11px] text-[color:var(--color-text-faint)] italic py-6" style={{ fontFamily: 'var(--font-mono)' }}>
                           {isOver ? t('tk.dropHere') : '—'}
                         </div>
                       ) : (
@@ -352,14 +352,14 @@ function TaskCard({
       {(task.tags.length > 0 || task.steps.length > 0) && (
         <div className="flex items-center gap-1.5 flex-wrap mt-2">
           {task.steps.length > 0 && (
-            <span className="flex items-center gap-1 text-[10px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
+            <span className="flex items-center gap-1 text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
               <ListChecks size={11} /> {doneSteps}/{task.steps.length}
             </span>
           )}
           {task.tags.slice(0, 3).map((tag) => (
             <span
               key={tag}
-              className="text-[9px] px-1.5 py-0.5 bg-[color:var(--color-surface-3)] border border-[color:var(--color-border)] rounded text-[color:var(--color-text-faint)]"
+              className="text-[10px] px-1.5 py-0.5 bg-[color:var(--color-surface-3)] border border-[color:var(--color-border)] rounded text-[color:var(--color-text-faint)]"
               style={{ fontFamily: 'var(--font-mono)' }}
             >
               #{tag}
@@ -447,7 +447,7 @@ function TaskCreateForm({ onClose }: { onClose: () => void }) {
         <Input value={form.tags} onChange={set('tags')} placeholder={t('tk.tagsPlaceholder')} className="flex-1 min-w-[160px]" />
       </div>
       <div>
-        <h3 className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider mb-2" style={{ fontFamily: 'var(--font-mono)' }}>Details</h3>
+        <h3 className="text-[11px] text-[color:var(--color-text-faint)] mb-2" style={{ fontFamily: 'var(--font-mono)' }}>Details</h3>
         <textarea
           value={form.content}
           onChange={set('content')}
@@ -510,7 +510,7 @@ function TaskRow({ task, onOpen }: { task: SerializedTask; onOpen: () => void })
       </button>
 
       {task.steps.length > 0 && (
-        <span className="hidden sm:flex items-center gap-1 text-[10px] text-[color:var(--color-text-faint)] shrink-0" style={{ fontFamily: 'var(--font-mono)' }}>
+        <span className="hidden sm:flex items-center gap-1 text-[11px] text-[color:var(--color-text-faint)] shrink-0" style={{ fontFamily: 'var(--font-mono)' }}>
           <ListChecks size={11} /> {doneSteps}/{task.steps.length}
         </span>
       )}
@@ -519,7 +519,7 @@ function TaskRow({ task, onOpen }: { task: SerializedTask; onOpen: () => void })
         {task.tags.slice(0, 3).map((tag) => (
           <span
             key={tag}
-            className="text-[10px] px-1.5 py-0.5 bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded text-[color:var(--color-text-faint)]"
+            className="text-[11px] px-1.5 py-0.5 bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded text-[color:var(--color-text-faint)]"
             style={{ fontFamily: 'var(--font-mono)' }}
           >
             #{tag}
@@ -629,7 +629,7 @@ function TaskDetailModal({ task, onClose }: { task: SerializedTask; onClose: () 
         {/* Steps */}
         <div>
           <div className="flex items-center justify-between mb-2">
-            <h3 className="flex items-center gap-1.5 text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider" style={{ fontFamily: 'var(--font-mono)' }}>
+            <h3 className="flex items-center gap-1.5 text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
               <ListChecks size={12} /> {t('tk.steps')} {task.steps.length > 0 && `(${doneSteps}/${task.steps.length})`}
             </h3>
           </div>
@@ -662,10 +662,10 @@ function TaskDetailModal({ task, onClose }: { task: SerializedTask; onClose: () 
 
         {/* Content / details */}
         <div>
-          <h3 className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider mb-2" style={{ fontFamily: 'var(--font-mono)' }}>{t('tk.details')}</h3>
+          <h3 className="text-[11px] text-[color:var(--color-text-faint)] mb-2" style={{ fontFamily: 'var(--font-mono)' }}>{t('tk.details')}</h3>
           {task.content && /<\w+/.test(task.content) ? (
             <div
-              className="text-sm text-[color:var(--color-text-dim)] mb-3 [&_h4]:text-[10px] [&_h4]:text-[color:var(--color-text-faint)] [&_h4]:uppercase [&_h4]:tracking-wider [&_h4]:mb-1 [&_h4]:mt-3 [&_ul]:list-disc [&_ul]:pl-4 [&_ul]:space-y-0.5 [&_p]:mb-2"
+              className="text-sm text-[color:var(--color-text-dim)] mb-3 [&_h4]:text-[11px] [&_h4]:text-[color:var(--color-text-faint)] [&_h4]:uppercase [&_h4]:tracking-wider [&_h4]:mb-1 [&_h4]:mt-3 [&_ul]:list-disc [&_ul]:pl-4 [&_ul]:space-y-0.5 [&_p]:mb-2"
               dangerouslySetInnerHTML={{ __html: task.content }}
             />
           ) : null}

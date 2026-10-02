@@ -29,7 +29,7 @@ export function CreatedBy({ id, className }: { id: string | null | undefined; cl
   const name = useCreatedByName(id);
   if (!name) return null;
   return (
-    <span className={cn('text-[10px] text-[color:var(--color-text-faint)]', className)} style={{ fontFamily: 'var(--font-mono)' }}>
+    <span className={cn('text-[11px] text-[color:var(--color-text-faint)]', className)} style={{ fontFamily: 'var(--font-mono)' }}>
       {t('common.addedBy', { name })}
     </span>
   );

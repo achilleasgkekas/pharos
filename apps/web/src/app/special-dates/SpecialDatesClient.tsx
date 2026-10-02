@@ -88,7 +88,7 @@ export function SpecialDatesClient({ dates, leadDays }: { dates: SerializedSpeci
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-semibold text-sm truncate" style={{ fontFamily: 'var(--font-display)' }}>{d.name}</span>
-                  {d.type && <span className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>{d.type}</span>}
+                  {d.type && <span className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>{d.type}</span>}
                 </div>
                 <div className="flex items-center gap-2 flex-wrap text-[11px] text-[color:var(--color-text-faint)] mt-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
                   <span>{dayMonth(d.month, d.day, locale)}</span>

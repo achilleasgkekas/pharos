@@ -24,7 +24,7 @@ import { usePathname } from 'next/navigation';
 // chrome-less: /login and /setup (no session context to hang a nav off yet — /setup signs
 // you in mid-wizard, before there's anything to navigate to) and /capture (a tiny
 // same-origin popup window where a full navbar would eat half its 440x640 real estate).
-function isChromeless(pathname: string): boolean {
+export function isChromeless(pathname: string): boolean {
   return pathname === '/login' || pathname === '/setup' || pathname === '/capture';
 }
 
@@ -33,4 +33,15 @@ export function ChromeGate({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   if (isChromeless(pathname)) return null;
   return <>{children}</>;
+}
+
+/**
+ * Wraps every page. With the app chrome on, it keeps the page clear of the computer's fixed
+ * sidebar. Always rendered (only its class changes), so the page subtree never remounts when
+ * the chrome comes or goes.
+ */
+export function ContentFrame({ chrome, children }: { chrome: boolean; children: ReactNode }) {
+  const pathname = usePathname();
+  const on = chrome && !isChromeless(pathname);
+  return <div className={on ? 'lg:pl-[var(--sidebar-w)]' : undefined}>{children}</div>;
 }

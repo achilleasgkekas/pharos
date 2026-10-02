@@ -193,7 +193,7 @@ await flow('fill a fuel entry from a scanned receipt', async () => {
 // ── Backup: export → restore ──────────────────────────────────────────────
 await flow('export a backup and restore it', async () => {
   await open('/settings');
-  await page.getByRole('button', { name: 'Storage & backup' }).first().click();
+  await page.getByRole('link', { name: 'Backups & exports' }).first().click();
   const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Export JSON' }).click()]);
   const file = await download.path();
   expect(file, 'the export produced no file');
@@ -210,7 +210,7 @@ await flow('export a backup and restore it', async () => {
   await page.getByRole('link', { name: new RegExp(`Golf ${TAG}`) }).waitFor({ state: 'detached' });
 
   await open('/settings');
-  await page.getByRole('button', { name: 'Storage & backup' }).first().click();
+  await page.getByRole('link', { name: 'Backups & exports' }).first().click();
   await page.locator('input[type=file][accept="application/json,.json"]').first().setInputFiles(file);
   await page.getByRole('dialog').getByRole('button', { name: 'Confirm' }).click();
   const done = page.getByText(/✓ Restored \d+ records/);
@@ -229,7 +229,7 @@ await flow('export a backup and restore it', async () => {
 // ── Encrypted backup: the app's own passphrase prompt (#351) ─────────────
 await flow('export an encrypted backup through the passphrase dialog', async () => {
   await open('/settings');
-  await page.getByRole('button', { name: 'Storage & backup' }).first().click();
+  await page.getByRole('link', { name: 'Backups & exports' }).first().click();
   await page.getByRole('button', { name: 'Encrypted export' }).first().click();
   let dialog = page.getByRole('dialog');
   await dialog.locator('input[type=password]').fill('ci-passphrase-1');

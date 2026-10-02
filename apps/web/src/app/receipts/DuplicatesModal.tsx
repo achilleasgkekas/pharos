@@ -131,7 +131,7 @@ export function DuplicatesModal({ open, onClose }: { open: boolean; onClose: () 
                             // eslint-disable-next-line @next/next/no-img-element
                             <img src={fileUrl(r.thumbPath)} alt="" className="w-9 h-9 rounded object-cover bg-[color:var(--color-surface-3)] shrink-0" />
                           ) : (
-                            <span className="w-9 h-9 rounded bg-[color:var(--color-surface-3)] grid place-items-center text-[9px] text-[color:var(--color-text-faint)] shrink-0 uppercase">
+                            <span className="w-9 h-9 rounded bg-[color:var(--color-surface-3)] grid place-items-center text-[10px] text-[color:var(--color-text-faint)] shrink-0">
                               {r.fileType || '?'}
                             </span>
                           )}
@@ -142,9 +142,9 @@ export function DuplicatesModal({ open, onClose }: { open: boolean; onClose: () 
                               ) : (
                                 <span className="text-[color:var(--color-gold)]">{t('dup.unverified')}</span>
                               )}
-                              {isKeep && <span className="text-[9px] uppercase tracking-wider text-[color:var(--color-accent)]">{t('dup.keep')}</span>}
+                              {isKeep && <span className="text-[10px] text-[color:var(--color-accent)]">{t('dup.keep')}</span>}
                             </span>
-                            <span className="block text-[10px] text-[color:var(--color-text-faint)] truncate" style={{ fontFamily: 'var(--font-mono)' }}>
+                            <span className="block text-[11px] text-[color:var(--color-text-faint)] truncate" style={{ fontFamily: 'var(--font-mono)' }}>
                               {t('dup.itemStats', { items: r.lineItemCount, linked: r.itemCount, model: r.aiModel || 'manual' })}
                             </span>
                           </span>
