@@ -192,7 +192,6 @@ These are flagged **(AI)** below with the feature name.
 | POST   | `/items/import`                   | **(AI: itemsImport)** Fetch a product page, AI-parse, add or merge. Body `{ url, view? }` (`view` = `shopping` default \| `inventory`) → `{ ok, id, title, price, store, updated }`. |
 | POST   | `/items/:id/ai-fill`              | **(AI: itemsImport)** Fill specs/category/tags from the item's links or web search. Body `{ mode: 'specs' \| 'info' }`. |
 | POST   | `/items/:id/price`                | Log an observed price. Body `{ price, store? }` (appends to priceHistory, updates currentPrice). |
-| POST   | `/items/:id/convert-to-task`      | Create a Task seeded from this item (title, price, links, tag `shopping`); the item is untouched. |
 | GET    | `/items/:id/plans`                | Installment plans across all statements, each flagged `linked` for this item. Linked first, then active, then by soonest payoff. |
 | POST   | `/items/:id/link-plan`            | Attach this item to a plan (additive). Body `{ signature }`. |
 | DELETE | `/items/:id/link-plan`            | Detach this item from a plan, keeping other products. Body `{ signature }`. |

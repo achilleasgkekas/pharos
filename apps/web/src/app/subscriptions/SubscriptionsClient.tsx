@@ -1,6 +1,7 @@
 'use client';
 import { cur, currencySymbol, CURRENCIES, moneyField } from "@/lib/money";
 import { BILLING_CYCLES, monthlyEquivalent, isBillingCycle } from '@/lib/billingCycle';
+import { chargesByMonth } from '@/lib/subscriptionMonth';
 // The countdown lives with the roll-forward that keeps `nextRenewal` from going stale, so
 // the badge and the derived date can never disagree about the day a renewal stops being today.
 import { renewalDaysUntil } from '@/lib/subscriptionRenewal';
@@ -146,6 +147,13 @@ export function SubscriptionsClient({
     [active]
   );
   const yearlyTotal = monthlyTotal * 12;
+  // What is actually charged month by month: a yearly plan lands in its own month instead of
+  // being spread over twelve. Next month leads the header; the strip shows the year ahead.
+  const months = useMemo(() => chargesByMonth(active, new Date(), 12), [active]);
+  const nextMonth = months[1];
+  const monthName = (m: { year: number; month: number }, style: 'short' | 'long' = 'short') =>
+    new Intl.DateTimeFormat(locale, { month: style, timeZone: 'UTC' }).format(new Date(Date.UTC(m.year, m.month, 1)));
+  const maxMonth = Math.max(1, ...months.map((m) => m.total));
 
   // Upcoming renewals within 30 days
   const upcoming = useMemo(
@@ -246,7 +254,15 @@ export function SubscriptionsClient({
       <PageHeader
         title={t('nav.subscriptions')}
         count={t('v.activeCount', { n: active.length })}
-        summary={<HeaderTotals items={[{ label: t('sub.monthly'), value: money(monthlyTotal), tone: 'accent' }, { label: t('sub.yearly'), value: money(yearlyTotal) }]} />}
+        summary={
+          <HeaderTotals
+            items={[
+              { label: t('sub.nextMonth', { month: monthName(nextMonth, 'long') }), value: money(nextMonth.total), tone: 'accent' },
+              { label: t('sub.avgMonth'), value: money(monthlyTotal) },
+              { label: t('sub.yearly'), value: money(yearlyTotal) },
+            ]}
+          />
+        }
       >
         <HeaderButton icon={<Copy size={14} />} onClick={() => setFindingDupes(true)} title={t('subdup.title')} className="hidden sm:flex">
           {t('subdup.find')}
@@ -256,6 +272,26 @@ export function SubscriptionsClient({
       </PageHeader>
 
       {findingDupes && <SubscriptionDuplicatesModal onClose={() => setFindingDupes(false)} />}
+
+      {active.length > 0 && (
+        <div className="mb-4 rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-3 py-2.5">
+          <p className="mb-2 text-[11px] text-[color:var(--color-text-faint)]">{t('sub.yearAhead')}</p>
+          <div className="flex items-end gap-1 overflow-x-auto no-scrollbar">
+            {months.map((m, i) => (
+              <div key={`${m.year}-${m.month}`} className="flex min-w-[2.75rem] flex-1 flex-col items-center gap-1" title={`${monthName(m, 'long')} ${m.year}: ${money(m.total)}`}>
+                <span className="text-[10px] tabular-nums text-[color:var(--color-text-dim)]">{money(m.total, undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
+                <div className="flex h-10 w-full items-end">
+                  <div
+                    className={i === 1 ? 'w-full rounded-sm bg-[color:var(--color-accent)]' : 'w-full rounded-sm bg-[color:var(--color-border-light)]'}
+                    style={{ height: `${Math.max(4, Math.round((m.total / maxMonth) * 100))}%` }}
+                  />
+                </div>
+                <span className={i === 1 ? 'text-[10px] font-semibold text-[color:var(--color-text)]' : 'text-[10px] text-[color:var(--color-text-faint)]'}>{monthName(m)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <FilterLayout search={searchBox} quick={statusSwitch} filters={filterControls} active={!!(categoryFilter || spaceFilter || sortBy !== 'name')}>
           {/* Upcoming renewals strip */}

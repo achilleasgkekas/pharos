@@ -105,7 +105,6 @@ import {
   searchItemPriceCandidates,
   addPriceLinks,
   refreshItemPrices,
-  recomputeAllItemPrices,
 } from './actions';
 
 function makeItem(overrides: Record<string, any> = {}) {
@@ -500,25 +499,6 @@ describe('refreshItemPrices', () => {
     const r = await refreshItemPrices('i1');
     expect(r.results[0]).toMatchObject({ changed: 'error', error: 'Behind Cloudflare — start the price-scraper profile' });
     expect(r.results[1]).toMatchObject({ changed: 'down', newPrice: 40 });
-  });
-});
-
-describe('recomputeAllItemPrices', () => {
-  it('only saves items whose lowestKnownPrice differs from the stored currentPrice', async () => {
-    const stale = makeItem({ currentPrice: 475, links: [{ label: 'x', url: 'https://a.example.com', price: 300 }] });
-    const upToDate = makeItem({ currentPrice: 50, links: [{ label: 'x', url: 'https://b.example.com', price: 50 }] });
-    const noLinks = makeItem({ currentPrice: 20, links: [] });
-    itemFind.mockResolvedValue([stale, upToDate, noLinks]);
-
-    const r = await recomputeAllItemPrices();
-
-    expect(stale.currentPrice).toBe(300);
-    expect(stale.save).toHaveBeenCalledTimes(1);
-    expect(upToDate.save).not.toHaveBeenCalled();
-    expect(noLinks.save).not.toHaveBeenCalled();
-    expect(r).toEqual({ ok: true, updated: 1 });
-    expect(revalidatePathMock).toHaveBeenCalledWith('/items');
-    expect(revalidatePathMock).toHaveBeenCalledWith('/shopping');
   });
 });
 

@@ -7,10 +7,9 @@ import { createContext, useContext, useState, useTransition, useMemo } from 'rea
 import { ShoppingMarketProvider, useShoppingMarket } from '@/components/ShoppingMarketContext';
 import { isInMarket, marketRank, type ShoppingMarket } from '@/lib/shoppingRegion';
 import { useRouter } from 'next/navigation';
-import { Search, Plus, Trash2, X, Loader2, Sparkles, Link2, ExternalLink, Wand2, ListPlus, Check, FileText, TrendingDown, TrendingUp, Target, Merge, Columns3, ImagePlus, Pencil, Truck, Printer, Wrench, HandHelping, ShieldAlert, Boxes } from 'lucide-react';
+import { Search, Plus, Trash2, X, Loader2, Sparkles, Link2, ExternalLink, Wand2, Check, FileText, TrendingDown, TrendingUp, Target, Merge, Columns3, ImagePlus, Pencil, Truck, Printer, Wrench, HandHelping, ShieldAlert, Boxes } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { RecomputePricesButton } from './RecomputePricesButton';
 import { Input, compactControlClass, controlClass, filterControlClass } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -64,7 +63,7 @@ import { CreatedBy } from '@/components/CreatedBy';
 import { formatDate, compareNames } from '@/lib/i18n/format';
 import { assetLabelSubtitle } from '@/lib/assetLabel';
 import { printAssetTags } from './printAssetTags';
-import { createItem, updateItem, deleteItem, logSaleAsIncome, markItemArrived, markMaintenanceDone, markItemReturned, previewItemFromUrl, confirmImportItem, aiFillItem, aiFillInfo, fetchItemPhotos, mergeItems, bulkUpdateItems, convertItemToTask, type DupItem } from './actions';
+import { createItem, updateItem, deleteItem, logSaleAsIncome, markItemArrived, markMaintenanceDone, markItemReturned, previewItemFromUrl, confirmImportItem, aiFillItem, aiFillInfo, fetchItemPhotos, mergeItems, bulkUpdateItems, type DupItem } from './actions';
 import { useJobs } from '@/components/JobsProvider';
 import { enqueueAiFillItems, getBulkAiGuard } from '@/app/jobActions';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
@@ -74,6 +73,7 @@ import { ItemDuplicatesModal, MergeItemsPicker } from './ItemDuplicatesModal';
 import { PriceSearchPanel } from '@/components/PriceSearchPanel';
 import { estimateTaskCost, formatTaskCost } from '@/lib/claudePricing';
 import { RecordAttachments } from '@/components/RecordAttachments';
+import { MenuButton } from '@/components/ui/MenuButton';
 import { AskManual } from './AskManual';
 
 const CATEGORIES = [
@@ -324,7 +324,6 @@ export function ItemsClient({
   // This dropdown lives in the same component that PROVIDES the list, so it reads it directly —
   // a hook here would see the context default, not the value being provided.
   const fx: FxCtx = { base: baseCurrency, enabled: multiCurrency };
-  const router = useRouter();
   const t = useT();
   const bulkCategoryOptions = categoryOptionsFrom(configuredCategories, t);
   const money = useMoney();
@@ -814,9 +813,6 @@ export function ItemsClient({
               <HeaderButton icon={<Merge size={15} />} onClick={() => setShowDupes(true)} title={t('it.findDupTitle')} className="hidden sm:flex">
                 {t('it.duplicates')}
               </HeaderButton>
-            )}
-            {items.length > 0 && !selectMode && (
-              <RecomputePricesButton onDone={() => router.refresh()} />
             )}
             <ViewToggle value={layout} onChange={setLayout} />
             <PrimaryAction onClick={() => setShowCreate(true)} />
@@ -1817,18 +1813,6 @@ function ItemDetailModal({
     });
   }
 
-  function handleConvertToTask() {
-    setActionMsg(null);
-    startTransition(async () => {
-      const r = await convertItemToTask(item._id);
-      if (!r.ok) {
-        setActionMsg({ text: r.error ?? 'Could not create task', tone: 'err' });
-        return;
-      }
-      setActionMsg({ text: '✓ Task created with the product links', href: '/tasks', tone: 'ok' });
-    });
-  }
-
   // P55 — opt-in only, and guarded server-side by `soldIncomeId` so a double click
   // cannot book the same sale twice.
   function handleLogSaleIncome() {
@@ -2233,56 +2217,40 @@ function ItemDetailModal({
             </div>
           ) : null}
 
-          {/* Separate enrichment actions: photos / info / prices — plus a combined "fill all" */}
+          {/* One AI action that fills whatever is missing (info, prices, photos). The single-part
+              runs sit behind "⋯". Price search is the point of a wishlist entry, so it stays in
+              view there; on an owned item it is a menu entry too. */}
           <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={handlePhotoFetch}
-              disabled={busy}
-              title={t('it.fetchPhotosTitle')}
-              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-cyan)] hover:border-[color:var(--color-cyan)] transition-colors disabled:opacity-50"
-            >
-              {photoFetching ? <Loader2 size={13} className="animate-spin" /> : <ImagePlus size={13} />}
-              {photoFetching ? t('it.photosShort') : t('it.fetchPhotos')}
-            </button>
-            <button
-              type="button"
-              onClick={handleAiFillInfo}
-              disabled={busy}
-              title={t('it.aiFillInfoTitle')}
-              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-gold)] hover:border-[color:var(--color-gold)] transition-colors disabled:opacity-50"
-            >
-              {infoFilling ? <Loader2 size={13} className="animate-spin" /> : <FileText size={13} />}
-              {infoFilling ? t('it.infoShort') : t('it.aiFillInfo')}
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowPriceSearch(true)}
-              disabled={busy}
-              title={t('it.searchPricesTitle')}
-              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-accent)] hover:border-[color:var(--color-accent)] transition-colors disabled:opacity-50"
-            >
-              <Search size={13} /> {t('it.searchPrices')}
-            </button>
             <button
               type="button"
               onClick={handleAiFill}
               disabled={busy}
               title={t('it.aiFillAllTitle')}
-              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-purple)] hover:border-[color:var(--color-purple)] transition-colors disabled:opacity-50"
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[color:var(--color-accent)]/40 bg-[color:var(--color-accent)]/10 px-3 text-xs font-medium text-[color:var(--color-accent)] transition-colors hover:bg-[color:var(--color-accent)]/15 disabled:opacity-50"
             >
-              {aiAllFilling ? <Loader2 size={13} className="animate-spin" /> : <Wand2 size={13} />}
-              {aiAllFilling ? t('it.filling') : t('it.aiFillAllBtn')}
+              {aiAllFilling || infoFilling || photoFetching ? <Loader2 size={13} className="animate-spin" /> : <Wand2 size={13} />}
+              {aiAllFilling || infoFilling || photoFetching ? t('it.filling') : t('it.aiFillAllBtn')}
             </button>
-            <button
-              type="button"
-              onClick={handleConvertToTask}
+            {view === 'shopping' && (
+              <button
+                type="button"
+                onClick={() => setShowPriceSearch(true)}
+                disabled={busy}
+                title={t('it.searchPricesTitle')}
+                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] px-3 text-xs text-[color:var(--color-text)] transition-colors hover:border-[color:var(--color-border-light)] disabled:opacity-50"
+              >
+                <Search size={13} /> {t('it.searchPrices')}
+              </button>
+            )}
+            <MenuButton
+              label={t('common.moreOptions')}
               disabled={busy}
-              title={t('it.convertTaskTitle')}
-              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:border-[color:var(--color-border-light)] transition-colors disabled:opacity-50"
-            >
-              <ListPlus size={13} /> {t('it.convertTask')}
-            </button>
+              items={[
+                { label: t('it.fetchPhotos'), hint: t('it.fetchPhotosTitle'), icon: <ImagePlus size={13} />, onClick: handlePhotoFetch },
+                { label: t('it.aiFillInfo'), hint: t('it.aiFillInfoTitle'), icon: <FileText size={13} />, onClick: handleAiFillInfo },
+                ...(view === 'shopping' ? [] : [{ label: t('it.searchPrices'), hint: t('it.searchPricesTitle'), icon: <Search size={13} />, onClick: () => setShowPriceSearch(true) }]),
+              ]}
+            />
           </div>
           {(aiAllFilling || infoFilling) && (
             <p className="text-[11px] text-[color:var(--color-cyan)]" style={{ fontFamily: 'var(--font-mono)' }}>
@@ -2345,69 +2313,6 @@ function ItemDetailModal({
               </dl>
             </div>
           )}
-
-        </div>
-      </div>
-
-      <div role="tablist" aria-label={item.title} className="mb-5 flex gap-1 overflow-x-auto no-scrollbar border-b border-[color:var(--color-border)]">
-        {ITEM_TABS.map((x) => (
-          <button
-            key={x.key}
-            type="button"
-            role="tab"
-            aria-selected={tab === x.key}
-            onClick={() => setTab(x.key)}
-            className={cn(
-              'shrink-0 px-2.5 sm:px-3 py-2 text-[13px] sm:text-sm border-b-2 -mb-px transition-colors whitespace-nowrap',
-              tab === x.key ? 'border-[color:var(--color-accent)] text-[color:var(--color-text)] font-semibold' : 'border-transparent text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]'
-            )}
-          >
-            {t(x.label)}
-          </button>
-        ))}
-      </div>
-
-      {tab === 'prices' && (
-        <div className="flex flex-col gap-4 mb-5">
-          {/* Where to buy (owned items only — wishlist shows store links in the PricePanel below) */}
-          {view === 'inventory' && item.links.length > 0 && (
-            <div>
-              <p className="text-[11px] text-[color:var(--color-text-faint)] mb-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
-                {t('it.whereToBuy')}
-              </p>
-              <div className="flex flex-wrap gap-2">
-              {item.links.map((link, i) => {
-                const p = link.price ?? latestPriceForUrl(item.priceHistory, link.url);
-                return (
-                  <a
-                    key={i}
-                    href={link.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    title={link.url}
-                    className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg text-[color:var(--color-cyan)] hover:border-[color:var(--color-cyan)] transition-colors"
-                  >
-                    <ExternalLink size={11} />
-                    {link.label}
-                    {p != null && (
-                      <span className="font-bold text-[color:var(--color-accent)] ml-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
-                        {money(p)}
-                      </span>
-                    )}
-                  </a>
-                );
-              })}
-              </div>
-            </div>
-          )}
-
-      {/* Price: ONE home — summary + verdict + log + (folded) full per-store history.
-          Shopping gets the full summary; an owned item only shows its history if any. */}
-      {(view === 'shopping' || item.priceHistory.length > 0) && (
-        <div className="mb-4">
-          <PricePanel item={item} summary={view === 'shopping'} onChanged={() => router.refresh()} onSearchOnline={() => setShowPriceSearch(true)} />
-        </div>
-      )}
 
           {/* Purchase & payment — right column, under the AI buttons */}
           {hasPayment && (
@@ -2525,6 +2430,69 @@ function ItemDetailModal({
           )}
             </div>
           )}
+        </div>
+      </div>
+
+      <div role="tablist" aria-label={item.title} className="mb-5 flex gap-1 overflow-x-auto no-scrollbar border-b border-[color:var(--color-border)]">
+        {ITEM_TABS.map((x) => (
+          <button
+            key={x.key}
+            type="button"
+            role="tab"
+            aria-selected={tab === x.key}
+            onClick={() => setTab(x.key)}
+            className={cn(
+              'shrink-0 px-2.5 sm:px-3 py-2 text-[13px] sm:text-sm border-b-2 -mb-px transition-colors whitespace-nowrap',
+              tab === x.key ? 'border-[color:var(--color-accent)] text-[color:var(--color-text)] font-semibold' : 'border-transparent text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]'
+            )}
+          >
+            {t(x.label)}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'prices' && (
+        <div className="flex flex-col gap-4 mb-5">
+          {/* Where to buy (owned items only — wishlist shows store links in the PricePanel below) */}
+          {view === 'inventory' && item.links.length > 0 && (
+            <div>
+              <p className="text-[11px] text-[color:var(--color-text-faint)] mb-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
+                {t('it.whereToBuy')}
+              </p>
+              <div className="flex flex-wrap gap-2">
+              {item.links.map((link, i) => {
+                const p = link.price ?? latestPriceForUrl(item.priceHistory, link.url);
+                return (
+                  <a
+                    key={i}
+                    href={link.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title={link.url}
+                    className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg text-[color:var(--color-cyan)] hover:border-[color:var(--color-cyan)] transition-colors"
+                  >
+                    <ExternalLink size={11} />
+                    {link.label}
+                    {p != null && (
+                      <span className="font-bold text-[color:var(--color-accent)] ml-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
+                        {money(p)}
+                      </span>
+                    )}
+                  </a>
+                );
+              })}
+              </div>
+            </div>
+          )}
+
+      {/* Price: ONE home — summary + verdict + log + (folded) full per-store history.
+          Shopping gets the full summary; an owned item only shows its history if any. */}
+      {(view === 'shopping' || item.priceHistory.length > 0) && (
+        <div className="mb-4">
+          <PricePanel item={item} summary={view === 'shopping'} onChanged={() => router.refresh()} onSearchOnline={() => setShowPriceSearch(true)} />
+        </div>
+      )}
+
         </div>
       )}
 
