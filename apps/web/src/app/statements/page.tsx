@@ -31,7 +31,7 @@ async function getData(): Promise<{
     const [statements, cards, items, ollamaUp] = await Promise.all([
       Statement.find().sort({ period: -1, card: 1 }).lean(),
       Card.find().sort({ name: 1 }).lean(),
-      Item.find().select('title num category status currentPrice purchasedPrice').sort({ title: 1 }).lean(),
+      Item.find().select('title num category status currentPrice purchasedPrice purchasedAt purchasedFrom photos').sort({ title: 1 }).lean(),
       isAiReady(),
     ]);
     return {
