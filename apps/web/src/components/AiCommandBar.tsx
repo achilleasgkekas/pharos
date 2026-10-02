@@ -41,10 +41,14 @@ const TYPE_ICON: Record<SearchHit['type'], React.ComponentType<{ size?: number; 
   shoppinglist: ShoppingCart,
 };
 
-/** `compact`: the phone's top bar shows a search button that opens the bar over the page. */
-export function AiCommandBar({ compact = false }: { compact?: boolean } = {}) {
+/**
+ * The top bar's two tools, one component: `kind="search"` is the search box (on a phone,
+ * `compact` shows a search button that opens it over the page); `kind="ai"` is the Ask Pharos
+ * button, which opens the conversation in a side panel (full screen on a phone).
+ */
+export function AiCommandBar({ compact = false, kind = 'search', aiReady = true }: { compact?: boolean; kind?: Mode; aiReady?: boolean } = {}) {
   const [expanded, setExpanded] = useState(false);
-  const [mode, setMode] = useState<Mode>('search');
+  const mode: Mode = kind;
   const [value, setValue] = useState('');
   const [open, setOpen] = useState(false);
   // AI state
@@ -62,14 +66,6 @@ export function AiCommandBar({ compact = false }: { compact?: boolean } = {}) {
   const inputRef = useRef<HTMLInputElement>(null);
   // Dictation fills the same input; the user still reviews and presses send (never auto-sent).
   const speech = useSpeechInput(useLocale(), setValue);
-
-  // Restore the last-used mode.
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem('pharosSearchMode');
-      if (saved === 'ai' || saved === 'search') setMode(saved);
-    } catch {}
-  }, []);
 
   // Close the search results on an outside click. The Ask Pharos panel stays open while the
   // page beside it is used; its own close button and Escape close it.
@@ -95,7 +91,7 @@ export function AiCommandBar({ compact = false }: { compact?: boolean } = {}) {
         if (compact) setExpanded(false);
         return;
       }
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+      if (kind === 'search' && (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         const wide = window.matchMedia('(min-width: 1024px)').matches;
         if (wide === compact) return;
         e.preventDefault();
@@ -106,7 +102,7 @@ export function AiCommandBar({ compact = false }: { compact?: boolean } = {}) {
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [compact]);
+  }, [compact, kind]);
 
   // Keep the AI conversation scrolled to the newest message.
   useEffect(() => {
@@ -125,20 +121,6 @@ export function AiCommandBar({ compact = false }: { compact?: boolean } = {}) {
     }, 250);
     return () => clearTimeout(t);
   }, [value, mode]);
-
-  function switchMode(m: Mode) {
-    speech.cancel();
-    speech.clearError();
-    setMode(m);
-    setValue('');
-    setHits([]);
-    setOpen(true);
-    // Switching to AI drops the cursor straight in.
-    if (m === 'ai') setTimeout(() => inputRef.current?.focus(), 0);
-    try {
-      localStorage.setItem('pharosSearchMode', m);
-    } catch {}
-  }
 
   function go(hit: SearchHit) {
     router.push(hit.href);
@@ -210,7 +192,7 @@ export function AiCommandBar({ compact = false }: { compact?: boolean } = {}) {
   const ph = isAi ? (speech.listening ? t('bar.micListening') : t('bar.aiPlaceholder')) : t('bar.searchPlaceholder');
   const pending = isAi ? aiPending : searchPending;
 
-  if (compact && !expanded) {
+  if (kind === 'search' && compact && !expanded) {
     return (
       <button
         type="button"
@@ -243,33 +225,11 @@ export function AiCommandBar({ compact = false }: { compact?: boolean } = {}) {
               : 'border-[color:var(--color-border)] focus-within:border-[color:var(--color-accent)]'
           )}
         >
-          {/* Mode toggle — Search | AI */}
-          <div className="flex items-center shrink-0 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] p-0.5">
-            <button
-              type="button"
-              onClick={() => switchMode('search')}
-              title={t('bar.searchTitle')}
-              className={cn(
-                'grid place-items-center w-6 h-6 rounded-md transition-colors',
-                !isAi ? 'bg-[color:var(--color-accent)]/15 text-[color:var(--color-accent)]' : 'text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)]'
-              )}
-            >
-              <Search size={13} />
-            </button>
-            <button
-              type="button"
-              onClick={() => switchMode('ai')}
-              title={t('bar.aiTitle')}
-              // While the beacon is open, the AI toggle pulses a beacon ring.
-              style={isAi && open ? { animation: 'pharos-beacon-pulse 1.8s ease-out infinite' } : undefined}
-              className={cn(
-                'grid place-items-center w-6 h-6 rounded-md transition-colors',
-                isAi ? 'bg-[color:var(--color-cyan)]/15 text-[color:var(--color-cyan)]' : 'text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)]'
-              )}
-            >
-              <Sparkles size={13} />
-            </button>
-          </div>
+          {isAi ? (
+            <Sparkles size={15} className="ml-1 shrink-0 text-[color:var(--color-cyan)]" />
+          ) : (
+            <Search size={15} className="ml-1 shrink-0 text-[color:var(--color-text-faint)]" />
+          )}
 
           <input
             ref={inputRef}
@@ -407,21 +367,35 @@ export function AiCommandBar({ compact = false }: { compact?: boolean } = {}) {
           </div>
     </>
   );
-  // A stand-in for the box in the top bar while the conversation lives in the side panel or
-  // the bottom dock; clicking it brings the cursor back to the real box.
-  const standIn = (
+  // The Ask Pharos button in the top bar: a pill with the AI status dot on a computer, an
+  // icon on a phone. It stays put while the panel is open, so the bar never shifts.
+  const openAi = () => {
+    setOpen(true);
+    setTimeout(() => inputRef.current?.focus(), 0);
+  };
+  const trigger = (
     <button
       type="button"
-      onClick={() => inputRef.current?.focus()}
-      className="flex h-11 w-full items-center gap-2 rounded-2xl border border-[color:var(--color-cyan)]/40 bg-[color:var(--color-surface)] px-3 text-left text-sm text-[color:var(--color-text-faint)]"
+      onClick={() => (open ? setOpen(false) : openAi())}
+      aria-expanded={open}
+      aria-label={t('bar.aiPanelTitle')}
+      title={aiReady ? `${t('bar.aiPanelTitle')} · ${t('ai.online')}` : `${t('bar.aiPanelTitle')} · ${t('ai.offline')}`}
+      className={cn(
+        compact
+          ? 'relative w-11 h-11 grid place-items-center rounded-xl text-[color:var(--color-cyan)]'
+          : 'relative inline-flex h-10 items-center gap-2 rounded-xl border px-3 text-sm font-semibold transition-colors',
+        !compact && (open ? 'border-[color:var(--color-cyan)]/60 bg-[color:var(--color-cyan)]/10' : 'border-[color:var(--color-border)] hover:border-[color:var(--color-cyan)]/50 hover:bg-[color:var(--color-surface)]')
+      )}
     >
-      <Sparkles size={14} className="text-[color:var(--color-cyan)]" /> {t('bar.aiOpenElsewhere')}
+      <Sparkles size={compact ? 20 : 16} className="text-[color:var(--color-cyan)]" />
+      {!compact && <span>{t('bar.aiPanelTitle')}</span>}
+      <span className={cn('h-1.5 w-1.5 rounded-full', compact && 'absolute right-2 top-2', aiReady ? 'bg-[color:var(--color-accent)]' : 'bg-[color:var(--color-text-faint)]')} aria-hidden />
     </button>
   );
 
   return (
     <>
-      {compact && !floating && (
+      {!isAi && compact && (
         <div
           className="fixed inset-0 z-40 bg-black/60"
           style={{ animation: 'pharos-fade-in .15s ease-out' }}
@@ -432,13 +406,12 @@ export function AiCommandBar({ compact = false }: { compact?: boolean } = {}) {
           aria-hidden
         />
       )}
-      <div ref={wrapRef} className={cn(floating ? (compact ? '' : 'relative w-full max-w-xl') : compact ? 'fixed z-50 top-2 inset-x-2' : 'relative w-full max-w-xl')}>
-        {!floating && barEl}
+      <div ref={wrapRef} className={cn(isAi ? 'relative' : compact ? 'fixed z-50 top-2 inset-x-2' : 'relative w-full max-w-xl')}>
+        {isAi ? trigger : barEl}
 
         {/* Side panel: a conversation column on the right; the page stays usable on the left */}
         {floating && (
           <>
-            {!compact && standIn}
             <aside
               className="fixed inset-0 z-[70] flex flex-col bg-[color:var(--color-surface)] sm:inset-auto sm:bottom-0 sm:right-0 sm:top-0 sm:w-[420px] sm:border-l sm:border-[color:var(--color-border)] sm:shadow-2xl sm:shadow-black/50"
               style={{ animation: 'pharos-slide-in .2s ease-out both' }}

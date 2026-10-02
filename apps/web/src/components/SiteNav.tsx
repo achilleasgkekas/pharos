@@ -78,7 +78,6 @@ function SidebarLink({ item, label, active }: { item: { href: string; icon: Reac
   return (
     <Link
       href={item.href}
-      prefetch={false}
       title={label}
       aria-current={active ? 'page' : undefined}
       className={cn(
@@ -165,12 +164,24 @@ function Sidebar({ user }: { user?: SessionUser }) {
 
   return (
     <aside className="hidden lg:flex fixed inset-y-0 left-0 z-40 w-[var(--sidebar-w)] flex-col border-r border-[color:var(--color-border)] bg-[color:var(--color-bg)]">
-      <Link href="/" prefetch={false} title="PHAROS" className="h-16 shrink-0 flex items-center gap-2.5 px-[26px] hover:opacity-80 transition-opacity">
-        <PharosMark size={22} className="text-[color:var(--color-accent)] shrink-0" />
-        <span className="sb-label tracking-[0.14em] text-[15px]" style={{ fontFamily: 'var(--font-display)', fontWeight: 700 }}>
-          PHAROS
-        </span>
-      </Link>
+      {/* Brand and the collapse button share the top row; collapsed, they stack. */}
+      <div className="sb-head h-16 shrink-0 flex items-center gap-1 pl-[26px] pr-3">
+        <Link href="/" title="PHAROS" className="flex min-w-0 items-center gap-2.5 hover:opacity-80 transition-opacity">
+          <PharosMark size={22} className="text-[color:var(--color-accent)] shrink-0" />
+          <span className="sb-label tracking-[0.14em] text-[15px]" style={{ fontFamily: 'var(--font-display)', fontWeight: 700 }}>
+            PHAROS
+          </span>
+        </Link>
+        <button
+          type="button"
+          onClick={toggle}
+          title={collapsed ? t('nav.expandSidebar') : t('nav.collapseSidebar')}
+          aria-label={collapsed ? t('nav.expandSidebar') : t('nav.collapseSidebar')}
+          className="ml-auto shrink-0 grid place-items-center w-9 h-9 rounded-lg text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface)] transition-colors"
+        >
+          {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+        </button>
+      </div>
       <div className="flex-1 min-h-0 overflow-y-auto thin-scrollbar px-3 pb-4">
         {inSettings && user ? (
           <Suspense fallback={null}>
@@ -179,22 +190,6 @@ function Sidebar({ user }: { user?: SessionUser }) {
         ) : (
           <AppSidebarNav />
         )}
-      </div>
-      <div className="sb-foot shrink-0 border-t border-[color:var(--color-border)] px-3 py-2 flex items-center gap-1">
-        {!inSettings && (
-          <div className="flex-1 min-w-0 w-full">
-            <SidebarLink item={{ href: '/settings', icon: Settings }} label={t('nav.settings')} active={false} />
-          </div>
-        )}
-        <button
-          type="button"
-          onClick={toggle}
-          title={collapsed ? t('nav.expandSidebar') : t('nav.collapseSidebar')}
-          aria-label={collapsed ? t('nav.expandSidebar') : t('nav.collapseSidebar')}
-          className={cn('shrink-0 grid place-items-center w-10 h-10 rounded-lg text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface)] transition-colors', inSettings && 'ml-auto')}
-        >
-          {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
-        </button>
       </div>
     </aside>
   );
@@ -326,7 +321,6 @@ function SectionTabs({ group }: { group: NavGroup }) {
             key={l.href}
             ref={active ? activeRef : undefined}
             href={l.href}
-            prefetch={false}
             aria-current={active ? 'page' : undefined}
             className={cn(
               'shrink-0 flex items-center px-3 text-sm whitespace-nowrap transition-colors',
@@ -388,7 +382,6 @@ function SectionBar() {
           <Link
             key={it.key}
             href={it.href}
-            prefetch={false}
             aria-current={it.active ? 'page' : undefined}
             className={cn(
               'h-16 flex flex-col items-center justify-center gap-1 text-[11px] min-w-0 px-1 transition-colors',
@@ -478,7 +471,6 @@ function useMobileTitle(): string {
 }
 
 export function SiteNav({ aiReady = false, user }: { aiReady?: boolean; user?: SessionUser }) {
-  const t = useT();
   const pathname = usePathname();
   const [notifOpen, setNotifOpen] = useState(false);
   const group = navGroupOf(pathname);
@@ -489,7 +481,7 @@ export function SiteNav({ aiReady = false, user }: { aiReady?: boolean; user?: S
       <Sidebar user={user} />
       <header className="sticky top-0 z-30 border-b border-[color:var(--color-border)] bg-[color:var(--color-bg)] lg:pl-[var(--sidebar-w)]">
         <div className="h-14 lg:h-16 flex items-center gap-1 lg:gap-2 pl-4 pr-2 lg:px-8">
-          <Link href="/" prefetch={false} className="lg:hidden flex items-center gap-2 min-w-0 shrink" aria-label="PHAROS">
+          <Link href="/" className="lg:hidden flex items-center gap-2 min-w-0 shrink" aria-label="PHAROS">
             <PharosMark size={22} className="text-[color:var(--color-accent)] shrink-0" />
             {mobileTitle ? (
               <span className="text-[17px] font-semibold truncate" style={{ fontFamily: 'var(--font-display)' }}>{mobileTitle}</span>
@@ -504,15 +496,12 @@ export function SiteNav({ aiReady = false, user }: { aiReady?: boolean; user?: S
           <div className="lg:hidden">
             <AiCommandBar compact />
           </div>
-          <Link
-            href={settingsHref('ai')}
-            prefetch={false}
-            className={cn('hidden lg:flex items-center gap-1.5 text-xs px-2 h-10 rounded-lg hover:bg-[color:var(--color-surface)]', aiReady ? 'text-[color:var(--color-accent)]' : 'text-[color:var(--color-text-faint)]')}
-            title={aiReady ? t('ai.reachable') : t('ai.notConfigured')}
-          >
-            <span className={cn('h-1.5 w-1.5 rounded-full', aiReady ? 'bg-[color:var(--color-accent)]' : 'bg-[color:var(--color-text-faint)]')} />
-            {aiReady ? t('ai.online') : t('ai.offline')}
-          </Link>
+          <div className="lg:hidden">
+            <AiCommandBar compact kind="ai" aiReady={aiReady} />
+          </div>
+          <div className="hidden lg:block">
+            <AiCommandBar kind="ai" aiReady={aiReady} />
+          </div>
           {user && <NotificationBell open={notifOpen} onOpenChange={setNotifOpen} />}
           {user && <AccountMenu user={user} />}
         </div>
