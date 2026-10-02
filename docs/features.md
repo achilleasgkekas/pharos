@@ -219,6 +219,19 @@ date / total with keyboard shortcuts. You can also:
 - Import receipts in bulk from a Gmail Takeout export (see the project history).
 - **Multi-currency support (P9).** Handle receipts in multiple currencies while keeping reports and budgets in your base currency. When you scan a foreign receipt, the form shows Currency and FX rate fields; all receipt amounts (total, net, VAT, and line item prices) convert together with the same rate. Rates can be auto-extracted where visible or entered manually. A gold badge appears if the rate is unknown, defaulting the stored amount to the printed value rather than guessing 1:1.
 
+## AI inbox (Home)
+
+Drop any file on the Home page, or pick several: a till receipt, a screenshot of a food
+delivery order, a bill PDF, a card statement, an ID. The AI says where it belongs and offers
+two or three other places; you pick, and it is saved there **with the file**: receipts,
+expenses and income, card statements through their own import, bills (To pay) and
+documents read and created with the file kept under Files & links. Each saved file has an
+Open link to its record. Turn it off in Settings → AI (AI inbox).
+
+Scanned files are kept everywhere a scan creates a record: receipts, expenses, statements,
+bills, documents, vehicles, a coupon photo on its voucher, and a meter photo on its
+reading.
+
 ## Expenses & Income
 
 Two views over the same **Expense** model, split by `kind`: **Expenses**

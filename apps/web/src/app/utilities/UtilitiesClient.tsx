@@ -1,7 +1,7 @@
 'use client';
 import { PAGE_MAIN, PageHeader, PrimaryAction } from '@/components/ui/PageHeader';
 import { useMemo, useState, useTransition } from 'react';
-import { Check, Gauge, Trash2, X } from 'lucide-react';
+import { Camera, Check, Gauge, Trash2, X } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { useLocale, useT } from '@/components/LocaleProvider';
 import { withConsumption, type ReadingLike } from '@/lib/meterReadings';
@@ -27,6 +27,7 @@ export function UtilitiesClient({ readings, spaces, scanOn = false }: { readings
   const [value, setValue] = useState('');
   const [unit, setUnit] = useState('');
   const [meter, setMeter] = useState('');
+  const [photo, setPhoto] = useState<File | null>(null); // a scanned meter photo, kept with the reading
   const [error, setError] = useState('');
   const [pending, startTransition] = useTransition();
   const rows = useMemo(() => withConsumption(readings), [readings]);
@@ -35,6 +36,7 @@ export function UtilitiesClient({ readings, spaces, scanOn = false }: { readings
 
   function submit(formData: FormData) {
     setError('');
+    if (photo) formData.set('photo', photo);
     startTransition(async () => {
       const result = await createMeterReading(formData);
       if (result.ok) setOpen(false);
@@ -50,7 +52,7 @@ export function UtilitiesClient({ readings, spaces, scanOn = false }: { readings
   return (
     <main className={PAGE_MAIN}>
       <PageHeader title={t('util.title')} count={readings.length} subtitle={t('util.subtitle')}>
-        <PrimaryAction onClick={() => { setError(''); setReadingAt(todayLocal()); setValue(''); setOpen(true); }} />
+        <PrimaryAction onClick={() => { setError(''); setReadingAt(todayLocal()); setValue(''); setPhoto(null); setOpen(true); }} />
       </PageHeader>
 
       {latestFirst.length === 0 ? (
@@ -79,6 +81,11 @@ export function UtilitiesClient({ readings, spaces, scanOn = false }: { readings
                   <p className="font-medium truncate">{r.meter} <span className="text-xs text-[color:var(--color-text-dim)]">· {r.utilityType}{r.space ? ` · ${r.space}` : ''}</span></p>
                   <p className="text-[11px] text-[color:var(--color-text-faint)]">{date(r.readingAt)} {r.consumption === null ? '' : `· ${t('util.period')}: ${r.consumption.toLocaleString(locale)} ${r.unit}`}</p>
                 </div>
+                {r.photoPath && (
+                  <a href={`/api/files/${r.photoPath.split('/').map(encodeURIComponent).join('/')}`} target="_blank" rel="noopener noreferrer" aria-label={t('util.photo')} title={t('util.photo')} className="p-1.5 rounded-lg text-[color:var(--color-text-faint)] hover:text-[color:var(--color-cyan)]">
+                    <Camera size={15} />
+                  </a>
+                )}
                 <span className="font-mono text-sm">{r.value.toLocaleString(locale)} {r.unit}</span>
                 <button aria-label={t('common.delete')} title={t('common.delete')} className="p-2 rounded-lg text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)]" onClick={() => remove(r._id)}><Trash2 size={15} /></button>
               </div>
@@ -94,8 +101,9 @@ export function UtilitiesClient({ readings, spaces, scanOn = false }: { readings
               kind="meter"
               label={t('ut.scanMeter')}
               accept="image/*"
-              onResult={(r) => {
+              onResult={(r, file) => {
                 if (r.kind !== 'meter') return;
+                setPhoto(file);
                 if (r.data.value !== null) setValue(String(r.data.value));
                 if (r.data.unit) setUnit(r.data.unit === 'm3' ? 'm³' : r.data.unit);
                 if (!readingAt) setReadingAt(todayLocal());

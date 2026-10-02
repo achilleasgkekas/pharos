@@ -14,6 +14,7 @@ const MeterReadingSchema = new Schema(
     value: { type: Number, required: true, min: 0 },
     space: { type: String, default: '', trim: true, index: true },
     notes: { type: String, default: '' },
+    photoPath: { type: String, default: '' }, // the meter photo it was read from, when there is one
   },
   { timestamps: true }
 );

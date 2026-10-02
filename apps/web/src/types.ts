@@ -228,6 +228,7 @@ export type SerializedVoucher = {
   used: boolean;
   url: string;
   notes: string;
+  attachments?: SerializedAttachment[];
   createdAt: string;
   updatedAt: string;
 };

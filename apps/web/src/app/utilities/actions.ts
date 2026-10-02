@@ -7,6 +7,9 @@ import { safeDateOrNull } from '@/lib/dates';
 import { currentModel } from '@/lib/tenancy/connection';
 import { withRequestTenant } from '@/lib/tenancy/request';
 import { MeterReading as MeterReadingModel } from '@/models/MeterReading';
+import { saveFile } from '@/lib/storage';
+
+const PHOTO_EXT = new Set(['jpg', 'jpeg', 'png', 'webp', 'heic']);
 
 const FormSchema = z.object({
   meter: z.string().trim().min(1, 'Meter name required').max(100),
@@ -20,6 +23,8 @@ const FormSchema = z.object({
 
 export async function createMeterReading(formData: FormData): Promise<{ ok: boolean; error?: string }> {
   await assertCanWrite();
+  const photo = formData.get('photo');
+  formData.delete('photo');
   const parsed = FormSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message || 'Invalid reading' };
   const readingAt = safeDateOrNull(parsed.data.readingAt);
@@ -27,7 +32,13 @@ export async function createMeterReading(formData: FormData): Promise<{ ok: bool
   return withRequestTenant(async () => {
     await connectDB();
     const MeterReading = await currentModel(MeterReadingModel);
-    await MeterReading.create({ ...parsed.data, readingAt });
+    // Keep the meter photo the reading was read from, so it can be checked later.
+    let photoPath = '';
+    if (photo instanceof File && photo.size > 0 && photo.size <= 15 * 1024 * 1024) {
+      const ext = (photo.name.split('.').pop() || '').toLowerCase();
+      if (PHOTO_EXT.has(ext)) photoPath = (await saveFile('equipment', Buffer.from(await photo.arrayBuffer()), ext)).relativePath;
+    }
+    await MeterReading.create({ ...parsed.data, readingAt, photoPath });
     revalidatePath('/utilities');
     return { ok: true };
   });

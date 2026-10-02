@@ -2787,6 +2787,23 @@ export const en = {
   "cat.uncategorized": "Uncategorized",
   "cat.other": "Other",
   "set.ownCategories": "These come with the app and are shared by every money page. Add your own below; they go under Other.",
+  "inbox.title": "AI inbox",
+  "inbox.hint": "Drop any file here: a receipt, a screenshot of an order, a bill, a statement, an ID. AI says where it goes; you pick.",
+  "inbox.pick": "Choose files",
+  "inbox.reading": "Reading…",
+  "inbox.saveIn": "Save in {place}",
+  "inbox.saved": "Saved in {place}, with the file.",
+  "inbox.open": "Open",
+  "inbox.saveFailed": "Could not save it",
+  "inbox.to.receipt": "Receipts",
+  "inbox.to.expense": "Expenses",
+  "inbox.to.income": "Income",
+  "inbox.to.bill": "To pay",
+  "inbox.to.statement": "Statements",
+  "inbox.to.document": "Documents",
+  "af.inbox": "AI inbox",
+  "af.inboxDesc": "Drop any file on Home; it says where it belongs and saves it there with the file.",
+  "util.photo": "Meter photo",
 } as const;
 
 export type Dict = Record<keyof typeof en, string>;

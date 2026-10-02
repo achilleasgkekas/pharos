@@ -1,5 +1,5 @@
 'use server';
-// Files and links kept on a record (items, documents, bills, subscriptions, tasks). One set of
+// Files and links kept on a record (items, documents, bills, subscriptions, tasks, vouchers). One set of
 // actions for all of them, so every detail dialog gets the same "Files & links" block.
 import { revalidatePath } from 'next/cache';
 import type { Model } from 'mongoose';
@@ -13,6 +13,7 @@ import { Document } from '@/models/Document';
 import { Bill } from '@/models/Bill';
 import { Subscription } from '@/models/Subscription';
 import { Task } from '@/models/Task';
+import { Voucher } from '@/models/Voucher';
 import { ATTACHMENT_KINDS, cleanAttachmentUrl, type AttachmentKind } from '@/lib/attachments';
 import type { SerializedAttachment } from '@/types';
 
@@ -24,6 +25,7 @@ const MODELS: Record<AttachmentKind, { model: Model<never>; paths: string[] }> =
   bill: { model: Bill as unknown as Model<never>, paths: ['/expenses/to-pay'] },
   subscription: { model: Subscription as unknown as Model<never>, paths: ['/subscriptions'] },
   task: { model: Task as unknown as Model<never>, paths: ['/tasks'] },
+  voucher: { model: Voucher as unknown as Model<never>, paths: ['/vouchers'] },
 };
 
 const FILE_MIME: Record<string, string> = {

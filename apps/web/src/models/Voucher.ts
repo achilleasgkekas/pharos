@@ -1,6 +1,7 @@
 import { Schema, model, models, type Model, type InferSchemaType } from 'mongoose';
 import { softDeletePlugin } from '@/lib/softDelete';
 import { createdByPlugin } from '@/lib/createdBy';
+import { AttachmentSchema } from '@/lib/attachmentSchema';
 
 const VoucherSchema = new Schema(
   {
@@ -12,6 +13,7 @@ const VoucherSchema = new Schema(
     used: { type: Boolean, default: false, index: true },
     url: { type: String, default: '' },
     notes: { type: String, default: '' },
+    attachments: { type: [AttachmentSchema], default: [] }, // the scanned coupon, and any files or links
   },
   { timestamps: true }
 );

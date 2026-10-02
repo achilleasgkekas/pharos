@@ -1,4 +1,5 @@
 'use client';
+import { useOpenParam } from '@/components/useOpenParam';
 import { PAGE_MAIN, PageHeader, HeaderButton, PrimaryAction } from '@/components/ui/PageHeader';
 import { useState, useMemo, useTransition } from 'react';
 import { Trash2, Check, Archive, ArchiveRestore, Pencil, X, IdCard } from 'lucide-react';
@@ -68,6 +69,12 @@ export function DocumentsClient({ documents, leadDays, scanOn = false }: { docum
     setScannedFile(null);
     setEditing(d);
   }
+
+  // `/documents?open=<id>` opens that document (search, the AI inbox, alerts).
+  useOpenParam((id) => {
+    const found = documents.find((d) => d._id === id);
+    if (found) openEdit(found);
+  });
 
   function applyScan(d: DocumentScan, file: File) {
     setEditing((prev) => {
