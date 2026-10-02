@@ -30,6 +30,7 @@ const EXPECTED_KEYS: AiFeatureKey[] = [
   'manualQa',
   'giftIdeas',
   'reportSummary',
+  'savingsPlan',
   'commandBar',
 ];
 
