@@ -487,7 +487,7 @@ export function SiteNav({ aiReady = false, user }: { aiReady?: boolean; user?: S
   return (
     <>
       <Sidebar user={user} />
-      <header className="sticky top-0 z-30 border-b border-[color:var(--color-border)] bg-[color:var(--color-bg)]/95 backdrop-blur-md lg:pl-[var(--sidebar-w)]">
+      <header className="sticky top-0 z-30 border-b border-[color:var(--color-border)] bg-[color:var(--color-bg)] lg:pl-[var(--sidebar-w)]">
         <div className="h-14 lg:h-16 flex items-center gap-1 lg:gap-2 pl-4 pr-2 lg:px-8">
           <Link href="/" prefetch={false} className="lg:hidden flex items-center gap-2 min-w-0 shrink" aria-label="PHAROS">
             <PharosMark size={22} className="text-[color:var(--color-accent)] shrink-0" />

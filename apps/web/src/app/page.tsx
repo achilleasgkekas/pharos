@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { connectDB } from '@/lib/db';
+import { sumBase } from '@/lib/fx';
 import { Receipt as ReceiptModel } from '@/models/Receipt';
 import { Subscription as SubscriptionModel } from '@/models/Subscription';
 import { Expense as ExpenseModel } from '@/models/Expense';
@@ -49,7 +50,7 @@ async function getDashboard(locale: string) {
       Expense.find({
         $or: [{ period: monthKey }, { period: { $in: ['', null] }, date: { $gte: monthStart, $lt: nextMonth } }],
       })
-        .select('kind amount')
+        .select('kind amount currency origAmount fxRate')
         .lean(),
       Expense.find().sort({ date: -1, createdAt: -1 }).limit(6).select('kind vendor category amount date').lean(),
       Subscription.find({ active: true }).select('amount billingCycle').lean(),
@@ -65,7 +66,9 @@ async function getDashboard(locale: string) {
 
     const spent = monthRows.filter((r) => r.kind !== 'income');
     const earned = monthRows.filter((r) => r.kind === 'income');
-    const sum = (rows: { amount?: number | null }[]) => rows.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+    // Base currency only, as on the Expenses page: a foreign record still waiting for its
+    // exchange rate holds the printed figure, which must not join the total.
+    const sum = (rows: Parameters<typeof sumBase>[0]) => sumBase(rows, appSettings.currency).total;
 
     // Agenda dates are local days stored as ISO instants: compare them as dates, never as text.
     const today = startOfDay(now);

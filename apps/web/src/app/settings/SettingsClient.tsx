@@ -207,7 +207,9 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
   const visible = groups.flatMap((g) => g.tabs);
   const requested = normalizeSettingsTab(searchParams.get('tab'));
   const current = visible.find((d) => d.id === requested) ?? null;
-  const [accountData, setAccountData] = useState<AccountData | null>(null);
+  // Loaded for the page it was fetched on: Account and My notifications each read it fresh,
+  // so a change made on one shows on the other (and after coming back).
+  const [account, setAccount] = useState<{ tab: string; data: AccountData } | null>(null);
 
   // A computer lists the settings in the sidebar, so a bare /settings opens the page you had
   // open last (General the first time). A phone shows the list itself first.
@@ -233,10 +235,18 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentId]);
 
-  const needsAccount = currentId === 'account' || currentId === 'my-notifications';
+  const accountTab = currentId === 'account' || currentId === 'my-notifications' ? currentId : null;
   useEffect(() => {
-    if (needsAccount && !accountData) getAccountData().then(setAccountData).catch(() => {});
-  }, [needsAccount, accountData]);
+    if (!accountTab) return;
+    let live = true;
+    getAccountData()
+      .then((data) => live && setAccount({ tab: accountTab, data }))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [accountTab]);
+  const accountData = account && account.tab === accountTab ? account.data : null;
 
   // On a computer a bare /settings shows General for the moment until the redirect lands.
   const shown = current ?? visible.find((d) => d.id === 'general') ?? visible[0];
