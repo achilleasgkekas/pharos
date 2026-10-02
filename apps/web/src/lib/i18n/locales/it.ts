@@ -981,7 +981,7 @@ export const it: Partial<Dict> = {
   'cal.empty': 'Niente in programma. Rinnovi, rate, bollette ricorrenti e scadenze appariranno qui.',
   'cal.nothingDue': 'niente da pagare',
   'cal.nothingScheduled': 'Niente in programma.',
-  'cal.out': 'uscite',
+  'cal.out': 'da pagare',
   'cal.in': 'entrate',
 
   'v.activeCount': '{n} attivi',
@@ -2609,4 +2609,13 @@ export const it: Partial<Dict> = {
   "af.savingsPlanDesc": "Trasforma un obiettivo di risparmio in pochi passi con importi, da entrate, spese e pagamenti.",
   "ex.tabToPay": "Da pagare",
   "ex.toPayHint": "Bollette ancora da pagare. Segnata pagata, viene registrata una volta in Spese.",
+  "cal.more": "+{n} altri",
+  "cal.thisMonth": "Questo mese",
+  "cal.prevMonth": "Mese precedente",
+  "cal.nextMonth": "Mese successivo",
+  "cal.spent": "Speso",
+  "cal.receipts": "Scontrini",
+  "cal.nothingRecorded": "Niente registrato",
+  "cal.lblSpent": "Spesa",
+  "cal.lblReceipt": "Scontrino",
 };

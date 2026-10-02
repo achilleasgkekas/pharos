@@ -981,7 +981,7 @@ export const nl: Partial<Dict> = {
   'cal.empty': 'Niets gepland. Verlengingen, termijnen, terugkerende rekeningen en vervaldatums verschijnen hier.',
   'cal.nothingDue': 'niets verschuldigd',
   'cal.nothingScheduled': 'Niets gepland.',
-  'cal.out': 'uit',
+  'cal.out': 'te betalen',
   'cal.in': 'in',
 
   'v.activeCount': '{n} actief',
@@ -2609,4 +2609,13 @@ export const nl: Partial<Dict> = {
   "af.savingsPlanDesc": "Maakt van een spaardoel een paar stappen met bedragen, op basis van inkomen, uitgaven en betalingen.",
   "ex.tabToPay": "Te betalen",
   "ex.toPayHint": "Rekeningen die je nog moet betalen. Markeer er een als betaald en hij komt één keer bij Uitgaven.",
+  "cal.more": "+{n} meer",
+  "cal.thisMonth": "Deze maand",
+  "cal.prevMonth": "Vorige maand",
+  "cal.nextMonth": "Volgende maand",
+  "cal.spent": "Uitgegeven",
+  "cal.receipts": "Bonnen",
+  "cal.nothingRecorded": "Niets vastgelegd",
+  "cal.lblSpent": "Uitgave",
+  "cal.lblReceipt": "Bon",
 };

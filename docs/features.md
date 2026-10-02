@@ -530,8 +530,11 @@ click (tagged `gift`).
 
 ## Calendar
 
-One calendar (`/calendar`), with **Month** and **Agenda** views, that unifies
-everything with a date:
+One calendar (`/calendar`): a month grid with a panel for the selected day (beside the
+grid on a computer, under it on a phone). It goes **12 months back** and 3 months ahead.
+
+Behind today it shows what actually happened: the expenses, income and receipts you
+recorded, each opening its record. From today it shows what is coming:
 
 - subscription renewals (repeated per cycle),
 - credit-card installments aggregated per month,
@@ -542,7 +545,8 @@ everything with a date:
   already funded stays quiet),
 - warranty and voucher expiries.
 
-Each month shows money-out / money-in totals and a "due this month" header.
+Each month shows what you spent, receipts, what is still to pay and income, and the
+header shows what is still due this month.
 Everything is derived live from your data; nothing extra is stored.
 
 **Calendar subscription feed.** The same three-month agenda is published as a

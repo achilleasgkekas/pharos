@@ -330,7 +330,7 @@ export const en = {
   'cal.empty': 'Nothing scheduled. Renewals, installments, recurring bills and expiries will show up here.',
   'cal.nothingDue': 'nothing due',
   'cal.nothingScheduled': 'Nothing scheduled.',
-  'cal.out': 'out',
+  'cal.out': 'to pay',
   'cal.in': 'in',
 
   // ── Vouchers ─────────────────────────────────────────────────────────────
@@ -2705,6 +2705,15 @@ export const en = {
   "af.savingsPlanDesc": "Turn a savings goal into a few steps with amounts, from what you earn, spend and pay.",
   "ex.tabToPay": "To pay",
   "ex.toPayHint": "Bills you still have to pay. Mark one paid and it is logged in Expenses, once.",
+  "cal.more": "+{n} more",
+  "cal.thisMonth": "This month",
+  "cal.prevMonth": "Previous month",
+  "cal.nextMonth": "Next month",
+  "cal.spent": "Spent",
+  "cal.receipts": "Receipts",
+  "cal.nothingRecorded": "Nothing recorded",
+  "cal.lblSpent": "Expense",
+  "cal.lblReceipt": "Receipt",
 } as const;
 
 export type Dict = Record<keyof typeof en, string>;
