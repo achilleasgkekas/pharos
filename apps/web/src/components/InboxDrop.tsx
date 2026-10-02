@@ -34,7 +34,7 @@ type Row = {
   savedId?: string;
 };
 
-const MAX_BYTES = 15 * 1024 * 1024;
+const MAX_BYTES = 40 * 1024 * 1024;
 
 /** React masks a server error in production ("Minified React error #441"); say what it means. */
 function readable(e: unknown, fallback: string): string {

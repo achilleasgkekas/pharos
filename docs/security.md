@@ -128,7 +128,7 @@ These protections are always on; you do not configure them.
   rejects private, loopback, link-local, and internal addresses before any
   URL-import or image fetch, so the scraper cannot be pointed at Mongo, SearXNG,
   Ollama, or the rest of your LAN. Fetched images are capped at 20 MB.
-- **Upload caps** — receipt and expense uploads reject files over 15 MB.
+- **Upload caps** — receipt and expense uploads reject files over 40 MB.
 - **Import sanitisation** — JSON restore strips attacker-controlled
   `filePath` / `thumbPath` / `photos` before writing.
 - **Untrusted HTML receipts** — email-sourced HTML served from `/api/files` gets a

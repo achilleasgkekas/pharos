@@ -21,7 +21,7 @@ import { canonicalCategory, isBuiltInCategory } from '@/lib/categories';
 import { Bill as BillModel } from '@/models/Bill';
 import { Document as DocumentModel } from '@/models/Document';
 
-const MAX_BYTES = 15 * 1024 * 1024;
+const MAX_BYTES = 40 * 1024 * 1024;
 const MIME: Record<string, string> = { pdf: 'application/pdf', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', heic: 'image/heic' };
 
 type FileIn = { file: File; ext: string; bytes: Buffer };
@@ -29,7 +29,7 @@ type FileIn = { file: File; ext: string; bytes: Buffer };
 async function readFileIn(formData: FormData): Promise<FileIn | string> {
   const file = formData.get('file');
   if (!(file instanceof File) || file.size === 0) return 'No file';
-  if (file.size > MAX_BYTES) return 'File too large (max 15MB)';
+  if (file.size > MAX_BYTES) return 'File too large (max 40MB)';
   const ext = (file.name.split('.').pop() || '').toLowerCase();
   if (!MIME[ext]) return 'Use a photo or a PDF';
   return { file, ext, bytes: Buffer.from(await file.arrayBuffer()) };

@@ -2790,7 +2790,7 @@ export const es: Partial<Dict> = {
   "reports.subBigCharge": "{name} cobra {amount} de una vez en {n} días.",
   "reports.subReview": "{name} lleva {m} meses sin revisarse. ¿Lo sigues usando?",
   "reports.subBySpace": "Por espacio",
-  "inbox.tooLarge": "El archivo supera 15 MB. Redúcelo e inténtalo de nuevo.",
+  "inbox.tooLarge": "El archivo supera 40 MB. Redúcelo e inténtalo de nuevo.",
   "inbox.serverError": "El servidor se detuvo al leer el archivo. Inténtalo de nuevo; el registro del servidor dice por qué.",
   "set.descAccountPeople": "Tu perfil, contraseña y verificación en dos pasos, y las personas que usan Pharos.",
   "nav.jobsHistory": "Tareas e historial",

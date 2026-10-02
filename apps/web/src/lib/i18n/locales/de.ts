@@ -2790,7 +2790,7 @@ export const de: Partial<Dict> = {
   "reports.subBigCharge": "{name} bucht in {n} Tagen {amount} auf einmal ab.",
   "reports.subReview": "{name} wurde seit {m} Monaten nicht geprüft. Nutzt du es noch?",
   "reports.subBySpace": "Nach Bereich",
-  "inbox.tooLarge": "Die Datei ist größer als 15 MB. Verkleinere sie und versuche es erneut.",
+  "inbox.tooLarge": "Die Datei ist größer als 40 MB. Verkleinere sie und versuche es erneut.",
   "inbox.serverError": "Der Server hat beim Lesen der Datei abgebrochen. Versuche es erneut; das Server-Log nennt den Grund.",
   "set.descAccountPeople": "Dein Profil, Passwort und Zwei-Faktor-Anmeldung sowie die Personen, die Pharos nutzen.",
   "nav.jobsHistory": "Aufgaben & Verlauf",

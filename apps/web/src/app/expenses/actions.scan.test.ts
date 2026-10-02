@@ -153,11 +153,11 @@ describe('scanExpenseImage', () => {
     expect(res).toEqual({ ok: false, error: 'No file' });
   });
 
-  it('rejects a file over the 15MB cap', async () => {
+  it('rejects a file over the 40MB cap', async () => {
     const fd = new FormData();
-    fd.set('file', makeFile('bill.jpg', 'x', 'image/jpeg', 16 * 1024 * 1024));
+    fd.set('file', makeFile('bill.jpg', 'x', 'image/jpeg', 41 * 1024 * 1024));
     const res = await scanExpenseImage(fd);
-    expect(res).toEqual({ ok: false, error: 'File too large (max 15MB)' });
+    expect(res).toEqual({ ok: false, error: 'File too large (max 40MB)' });
   });
 
   it('image, OCR usable: runs OCR then the TEXT parser, model prefixed "ocr+"', async () => {
@@ -204,11 +204,11 @@ describe('uploadExpense', () => {
     expect(saveFileMock).not.toHaveBeenCalled();
   });
 
-  it('rejects a file over the 15MB cap', async () => {
+  it('rejects a file over the 40MB cap', async () => {
     const fd = new FormData();
-    fd.set('file', makeFile('bill.pdf', 'x', 'application/pdf', 16 * 1024 * 1024));
+    fd.set('file', makeFile('bill.pdf', 'x', 'application/pdf', 41 * 1024 * 1024));
     const res = await uploadExpense(fd);
-    expect(res).toEqual({ ok: false, error: 'File too large (max 15MB)' });
+    expect(res).toEqual({ ok: false, error: 'File too large (max 40MB)' });
   });
 
   it('returns a friendly error when saving the file throws', async () => {

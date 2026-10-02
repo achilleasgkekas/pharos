@@ -160,11 +160,11 @@ describe('uploadReceipt — validation', () => {
     expect(saveFileMock).not.toHaveBeenCalled();
   });
 
-  it('rejects a file over the 15MB cap', async () => {
+  it('rejects a file over the 40MB cap', async () => {
     const fd = new FormData();
-    fd.set('file', makeFile('r.pdf', 'x', 'application/pdf', 16 * 1024 * 1024));
+    fd.set('file', makeFile('r.pdf', 'x', 'application/pdf', 41 * 1024 * 1024));
     const res = await uploadReceipt(fd);
-    expect(res).toEqual({ ok: false, error: 'File too large (max 15MB)' });
+    expect(res).toEqual({ ok: false, error: 'File too large (max 40MB)' });
     expect(saveFileMock).not.toHaveBeenCalled();
   });
 

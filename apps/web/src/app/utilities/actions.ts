@@ -34,7 +34,7 @@ export async function createMeterReading(formData: FormData): Promise<{ ok: bool
     const MeterReading = await currentModel(MeterReadingModel);
     // Keep the meter photo the reading was read from, so it can be checked later.
     let photoPath = '';
-    if (photo instanceof File && photo.size > 0 && photo.size <= 15 * 1024 * 1024) {
+    if (photo instanceof File && photo.size > 0 && photo.size <= 40 * 1024 * 1024) {
       const ext = (photo.name.split('.').pop() || '').toLowerCase();
       if (PHOTO_EXT.has(ext)) photoPath = (await saveFile('equipment', Buffer.from(await photo.arrayBuffer()), ext)).relativePath;
     }

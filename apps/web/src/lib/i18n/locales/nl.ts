@@ -2790,7 +2790,7 @@ export const nl: Partial<Dict> = {
   "reports.subBigCharge": "{name} schrijft over {n} dagen {amount} in één keer af.",
   "reports.subReview": "{name} is al {m} maanden niet gecontroleerd. Gebruik je het nog?",
   "reports.subBySpace": "Per ruimte",
-  "inbox.tooLarge": "Het bestand is groter dan 15 MB. Maak het kleiner en probeer opnieuw.",
+  "inbox.tooLarge": "Het bestand is groter dan 40 MB. Maak het kleiner en probeer opnieuw.",
   "inbox.serverError": "De server stopte bij het lezen van dit bestand. Probeer opnieuw; het serverlog zegt waarom.",
   "set.descAccountPeople": "Je profiel, wachtwoord en tweestapsaanmelding, en wie Pharos gebruikt.",
   "nav.jobsHistory": "Taken & geschiedenis",

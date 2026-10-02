@@ -119,10 +119,10 @@ describe('multipart intake', () => {
 
 describe('uploadReceipt failure passthrough', () => {
   it('not-ok → 400 { error } with the action message, no read-back', async () => {
-    uploadReceipt.mockResolvedValueOnce({ ok: false, error: 'File too large (max 15MB)' });
+    uploadReceipt.mockResolvedValueOnce({ ok: false, error: 'File too large (max 40MB)' });
     const res = await POST(makeReq());
     expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({ error: 'File too large (max 15MB)' });
+    expect(await res.json()).toEqual({ error: 'File too large (max 40MB)' });
     expect(receiptFindById).not.toHaveBeenCalled();
   });
 

@@ -2886,7 +2886,7 @@ export const en = {
   "reports.subBigCharge": "{name} charges {amount} in one go in {n} days.",
   "reports.subReview": "{name} has not been checked for {m} months. Still using it?",
   "reports.subBySpace": "By space",
-  "inbox.tooLarge": "This file is over 15 MB. Make it smaller (or print fewer pages) and try again.",
+  "inbox.tooLarge": "This file is over 40 MB. Make it smaller (or print fewer pages) and try again.",
   "inbox.serverError": "The server stopped while reading this file. Try again; if it keeps happening, the server log says why.",
   "set.descAccountPeople": "Your profile, password and two-factor sign-in, and the people who can use Pharos.",
   "nav.jobsHistory": "Jobs & history",
