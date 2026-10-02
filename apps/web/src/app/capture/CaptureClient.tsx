@@ -1,4 +1,5 @@
 'use client';
+import { useCategoryLabel } from '@/components/CategoryBadge';
 import { useEffect, useState, useTransition } from 'react';
 import { Sparkles, Link2, Loader2, ShoppingCart, Package, X } from 'lucide-react';
 import { Input } from '@/components/ui/Input';
@@ -25,6 +26,7 @@ type PreviewData = {
  *  confirmImportItem), just in a single-purpose layout sized for a small popup window. */
 export function CaptureClient({ initialUrl }: { initialUrl: string }) {
   const t = useT();
+  const catLabel = useCategoryLabel();
   const [url, setUrl] = useState(initialUrl);
   const [pending, startTransition] = useTransition();
   const [saving, startSave] = useTransition();
@@ -135,7 +137,7 @@ export function CaptureClient({ initialUrl }: { initialUrl: string }) {
                 )}
                 <p className="font-semibold text-sm leading-snug" style={{ fontFamily: 'var(--font-display)' }}>{preview.title}</p>
                 <p className="text-[11px] text-[color:var(--color-text-faint)] mt-0.5">
-                  {preview.category} · {preview.store}
+                  {catLabel(preview.category)} · {preview.store}
                 </p>
                 {preview.price > 0 && (
                   <p className="text-sm font-semibold text-[color:var(--color-accent)] mt-1.5">

@@ -74,6 +74,7 @@ import {
 } from '@/lib/fx';
 import { formatDate } from '@/lib/i18n/format';
 import { RescanControl } from '@/components/RescanControl';
+import { CategoryBadge } from '@/components/CategoryBadge';
 
 export type ItemOption = {
   _id: string;
@@ -1243,8 +1244,8 @@ function TransactionRow({
           <span className="flex items-center gap-1.5 flex-wrap">
             <InstallmentEditor tx={tx} statementId={statementId} />
             {tx.category && tx.category !== 'uncategorized' && (
-              <span className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
-                {tx.category}
+              <span className="text-[11px] text-[color:var(--color-text-faint)]">
+                <CategoryBadge category={tx.category} plain />
               </span>
             )}
             {credit && (

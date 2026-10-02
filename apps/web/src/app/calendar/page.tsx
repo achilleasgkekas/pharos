@@ -10,6 +10,7 @@ import { Expense as ExpenseModel } from '@/models/Expense';
 import { Bill as BillModel } from '@/models/Bill';
 import { Goal as GoalModel } from '@/models/Goal';
 import { Receipt as ReceiptModel } from '@/models/Receipt';
+import { categoryLabel } from '@/lib/categories';
 import { billRemaining } from '@/lib/bill';
 import { getAppSettings } from '@/lib/appSettings';
 import { formatMoney } from '@/lib/fx';
@@ -127,7 +128,7 @@ async function getAgenda(t: TFunc, intlTag: string): Promise<{ months: MonthBloc
         id: String(x._id),
         kind: income ? 'earned' : 'spent',
         label: x.vendor || t(income ? 'cal.lblIncome' : 'cal.lblSpent'),
-        sub: x.category || '',
+        sub: x.category ? categoryLabel(t, x.category) : '',
         amount: x.amount || 0,
         details: { id: String(x._id), kind: income ? 'earned' : 'spent', title: x.vendor || '', amount: x.amount || 0, editUrl: `/${income ? 'income' : 'expenses'}?open=${x._id}` },
       });

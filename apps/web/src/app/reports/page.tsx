@@ -2,6 +2,7 @@ import { connectDB } from '@/lib/db';
 import { monthlyFactor } from '@/lib/billingCycle';
 import { Item as ItemModel } from '@/models/Item';
 import { Receipt as ReceiptModel } from '@/models/Receipt';
+import { canonicalCategory } from '@/lib/categories';
 import { Statement as StatementModel } from '@/models/Statement';
 import { Subscription as SubscriptionModel } from '@/models/Subscription';
 import { Expense as ExpenseModel } from '@/models/Expense';
@@ -173,7 +174,7 @@ async function getReports(period: ReportPeriod, locale = 'en') {
     const amt = e.amount || 0;
     if (amt <= 0) continue;
     const isIncome = e.kind === 'income';
-    const cat = e.category || 'other';
+    const cat = canonicalCategory(e.category);
     // Bucket by period (YYYY-MM) if present, else by date.
     let mk = e.period && /^\d{4}-\d{2}$/.test(e.period) ? e.period : '';
     if (!mk && e.date) mk = monthKeyOfDate(e.date);
@@ -224,14 +225,15 @@ async function getReports(period: ReportPeriod, locale = 'en') {
   // ήδη το δικό τους "Monthly spend" chart παραπάνω και θα μετριόντουσαν δύο φορές.
   const rcSpend = receiptCategorySpend(receipts);
   for (const [mk, byCat] of rcSpend.byMonth) {
-    if (inPrev(mk)) for (const [cat, amt] of byCat) prevCatMap.set(cat, (prevCatMap.get(cat) ?? 0) + amt);
+    if (inPrev(mk)) for (const [raw, amt] of byCat) { const cat = canonicalCategory(raw); prevCatMap.set(cat, (prevCatMap.get(cat) ?? 0) + amt); }
     if (!inWin(mk)) continue;
-    for (const [cat, amt] of byCat) expCatMap.set(cat, (expCatMap.get(cat) ?? 0) + amt);
+    for (const [raw, amt] of byCat) { const cat = canonicalCategory(raw); expCatMap.set(cat, (expCatMap.get(cat) ?? 0) + amt); }
   }
   for (const [mk, byCat] of rcSpend.byMonth) {
     let target = catByMonth.get(mk);
     if (!target) catByMonth.set(mk, (target = new Map<string, number>()));
-    for (const [cat, amt] of byCat) {
+    for (const [raw, amt] of byCat) {
+      const cat = canonicalCategory(raw);
       target.set(cat, (target.get(cat) ?? 0) + amt);
       if (mk === thisMonthKey) thisMonthCat.set(cat, (thisMonthCat.get(cat) ?? 0) + amt);
     }
@@ -275,10 +277,10 @@ async function getReports(period: ReportPeriod, locale = 'en') {
   const budgetVsActual = Object.entries(appSettings.budgets)
     .map(([name, budget]) => {
       const base = Math.round(budget);
-      const actual = Math.round(thisMonthCat.get(name) ?? 0);
+      const actual = Math.round(thisMonthCat.get(canonicalCategory(name)) ?? 0);
       const projected = projectedFor(actual);
       if (!appSettings.budgetRollover) return { name, budget: base, actual, projected };
-      const priorSpends = rolloverMonthKeys.map((mk) => catByMonth.get(mk)?.get(name) ?? 0);
+      const priorSpends = rolloverMonthKeys.map((mk) => catByMonth.get(mk)?.get(canonicalCategory(name)) ?? 0);
       const { carried, effective } = categoryRollover(base, priorSpends);
       // Whole euro still unspent in the envelope, offered to a savings goal. Zero once
       // the category is on/over its limit, or once this month was already swept.

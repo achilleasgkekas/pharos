@@ -1,5 +1,7 @@
 'use client';
 import { ExpenseTabs } from './ExpenseTabs';
+import { CategoryBadge, CategoryIcon, CategoryOptions, useCategoryLabel, useCategoryOptionLabels } from '@/components/CategoryBadge';
+import { canonicalCategory, INCOME_CATEGORIES } from '@/lib/categories';
 import { cur, currencySymbol, CURRENCIES, moneyField } from '@/lib/money';
 import { CreatedBy } from '@/components/CreatedBy';
 import { isForeignCurrency, normalizeCurrency, convertToBase, deriveFxRate, sumBase } from '@/lib/fx';
@@ -69,6 +71,8 @@ export function ExpensesClient({ kind, expenses, cards, vendors, ollamaUp, categ
   const money = useMoney();
   const isIncome = kind === 'income';
   const label = isIncome ? t('nav.income') : t('nav.expenses');
+  const catLabel = useCategoryLabel();
+  const catOptionLabels = useCategoryOptionLabels(categories);
 
   const [selected, setSelected] = useState<SerializedExpense | null>(null);
   const [creating, setCreating] = useState(false);
@@ -154,13 +158,13 @@ export function ExpensesClient({ kind, expenses, cards, vendors, ollamaUp, categ
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
     const out = expenses.filter((e) => {
-      if (catFilter && e.category !== catFilter) return false;
+      if (catFilter && canonicalCategory(e.category) !== canonicalCategory(catFilter)) return false;
       // The month a record counts in, as on Reports: its period, else its date.
       if (monthRange && !inPeriod(/^\d{4}-\d{2}$/.test(e.period || '') ? e.period : e.date.slice(0, 7), monthRange.from, monthRange.to)) return false;
       if (!matchesSpace(e.space, spaceFilter)) return false;
       if (taxOnly && !e.taxDeductible) return false;
       if (statusFilter !== 'all' && statusOf(e) !== statusFilter) return false;
-      if (q && !`${e.vendor} ${e.category} ${e.notes} ${e.space}`.toLowerCase().includes(q)) return false;
+      if (q && !`${e.vendor} ${e.category} ${catLabel(e.category)} ${e.notes} ${e.space}`.toLowerCase().includes(q)) return false;
       return true;
     });
     return out.sort((a, b) => {
@@ -242,7 +246,7 @@ export function ExpensesClient({ kind, expenses, cards, vendors, ollamaUp, categ
   const filterControls = (
     <div>
       <FilterSection label={t('common.category')}>
-        <SearchableSelect value={catFilter} onChange={setCatFilter} options={categories} placeholder={t('sub.allCategories')} clearable size="sm" className="w-full" />
+        <SearchableSelect value={catFilter} onChange={setCatFilter} options={categories} labels={catOptionLabels} placeholder={t('sub.allCategories')} clearable size="sm" className="w-full" />
       </FilterSection>
       {hasSpaces && (
         <FilterSection label={t('ex.space')}>
@@ -397,9 +401,7 @@ export function ExpensesClient({ kind, expenses, cards, vendors, ollamaUp, categ
           <Field label={t('common.category')}>
             <select value={bulkCategory} onChange={(e) => setBulkCategory(e.target.value)} className={controlClass}>
               <option value="">{t('common.noChange')}</option>
-              {categories.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
+              <CategoryOptions categories={categories} />
             </select>
           </Field>
           <div className="flex justify-end gap-2 pt-1">
@@ -480,7 +482,7 @@ function Thumb({ expense }: { expense: SerializedExpense }) {
       {thumb ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={fileUrl(thumb)} alt={expense.vendor} loading="lazy" className="w-full h-full object-cover object-top" />
-      ) : expense.filePath ? <FileText size={18} /> : <Wallet size={18} />}
+      ) : expense.filePath ? <FileText size={18} /> : <CategoryIcon category={expense.category} size={18} />}
     </div>
   );
 }
@@ -510,6 +512,7 @@ function SelectCheckbox({ selectMode, selected, onToggleSelect }: SelectProps) {
 function ExpenseRow({ expense, isIncome, series, fx, onClick, selectMode, selected, onToggleSelect }: { expense: SerializedExpense; isIncome: boolean; series: number; fx: FxCtx; onClick: () => void } & SelectProps) {
   const locale = useLocale();
   const t = useT();
+  const catLabel = useCategoryLabel();
   const money = useMoney();
   const mainClick = selectMode ? onToggleSelect : onClick;
   return (
@@ -520,7 +523,7 @@ function ExpenseRow({ expense, isIncome, series, fx, onClick, selectMode, select
         <div className="min-w-0 flex-1">
           <span className="font-semibold text-[15px] truncate block">{expense.vendor || t('ex.unknown')}{expense.series ? ` · ${expense.series}` : ''}</span>
           <span className="text-xs text-[color:var(--color-text-dim)] block mt-0.5 truncate">
-            {fmtDate(expense.date, locale)} · {expense.category}{expense.space ? ` · ${expense.space}` : ''}{expense.recurring ? ` · ${t('ex.recurringTag')}` : ''}{series > 1 ? ` · ×${series}` : ''}
+            {fmtDate(expense.date, locale)} · {catLabel(expense.category)}{expense.space ? ` · ${expense.space}` : ''}{expense.recurring ? ` · ${t('ex.recurringTag')}` : ''}{series > 1 ? ` · ×${series}` : ''}
           </span>
         </div>
       </button>
@@ -551,7 +554,7 @@ function ExpenseCard({ expense, isIncome, series, fx, onClick, selectMode, selec
             <Thumb expense={expense} />
             <div className="min-w-0">
               <p className="font-semibold truncate">{expense.vendor || t('ex.unknown')}{expense.series ? ` · ${expense.series}` : ''}</p>
-              <p className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>{expense.category}</p>
+              <p className="text-[11px] text-[color:var(--color-text-faint)]"><CategoryBadge category={expense.category} plain /></p>
             </div>
           </button>
         </div>
@@ -637,7 +640,7 @@ function TotalsNoRate({ n }: { n: number }) {
 function toForm(e: SerializedExpense, base: string): FormState {
   const foreign = isForeignCurrency(e.currency, base);
   return {
-    kind: e.kind, vendor: e.vendor, category: e.category, space: e.space || '', taxDeductible: e.taxDeductible, taxCategory: e.taxCategory || '',
+    kind: e.kind, vendor: e.vendor, category: canonicalCategory(e.category), space: e.space || '', taxDeductible: e.taxDeductible, taxCategory: e.taxCategory || '',
     // Money with its cents ("51.30", not "51.3"), as everywhere else it is shown.
     amount: moneyField(foreign ? e.origAmount || e.amount : e.amount),
     currency: foreign ? normalizeCurrency(e.currency) : base,
@@ -670,7 +673,7 @@ function FormFields({ form, set, cards, vendors, categories, spaces, fx, seriesB
         </Field>
         <Field label={t('common.category')}>
           <select value={form.category} onChange={(e) => set({ category: e.target.value })} className={controlClass}>
-            {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+            <CategoryOptions categories={form.kind === 'income' ? [...INCOME_CATEGORIES, ...categories.filter((c) => !INCOME_CATEGORIES.includes(c))] : categories} current={form.category} />
           </select>
         </Field>
       </div>

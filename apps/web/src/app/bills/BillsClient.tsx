@@ -1,5 +1,7 @@
 'use client';
 import { ExpenseTabs } from '@/app/expenses/ExpenseTabs';
+import { CategoryOptions, useCategoryLabel } from '@/components/CategoryBadge';
+import { canonicalCategory, isBuiltInCategory } from '@/lib/categories';
 import { ymd } from '@/lib/calendarDay';
 import { useState, useTransition, useMemo } from 'react';
 import { RECURRING_CYCLES, type RecurringCycle } from '@/lib/billingCycle';
@@ -247,6 +249,7 @@ function BillRow({
 }) {
   const money = useMoney();
   const t = useT();
+  const catLabel = useCategoryLabel();
   const locale = useLocale();
   const paidSoFar = billPaidAmount(bill.payments);
   const total = bill.amount || 0;
@@ -262,7 +265,7 @@ function BillRow({
       <button onClick={onOpen} className="flex-1 min-w-0 text-left">
         <div className="flex items-center gap-2">
           <p className="text-xs text-[color:var(--color-text-dim)] flex items-center gap-1 min-w-0 truncate">
-            <CalendarClock size={12} className="shrink-0" /> {bill.vendor || bill.category || t('bill.fallback')}
+            <CalendarClock size={12} className="shrink-0" /> {bill.vendor || (bill.category ? catLabel(bill.category) : '') || t('bill.fallback')}
           </p>
           {bill.cycle && (
             <span className="inline-flex items-center gap-0.5 text-[10px] px-1 py-0.5 rounded text-[color:var(--color-text-faint)] bg-[color:var(--color-surface-2)]" style={{ fontFamily: 'var(--font-mono)' }}>
@@ -378,8 +381,8 @@ function BillForm({
       d.consumption !== null && t('bill.consumption', { value: String(d.consumption), unit: d.consumptionUnit }),
       d.periodFrom && d.periodTo && t('bill.period', { from: d.periodFrom, to: d.periodTo }),
     ].filter(Boolean).join(' · ');
-    const lower = categories.map((c) => c.toLowerCase());
-    const category = lower.includes(d.category) ? categories[lower.indexOf(d.category)] : lower.includes('utilities') ? categories[lower.indexOf('utilities')] : undefined;
+    // The scan's category if it is one of ours ("electricity", or "electric" read as it), else utilities.
+    const category = isBuiltInCategory(d.category || '') ? canonicalCategory(d.category) : 'utilities';
     setPrefill({
       title: bill?.title || d.title || d.vendor || undefined,
       vendor: bill?.vendor || d.vendor || undefined,
@@ -469,12 +472,9 @@ function BillForm({
           </select>
         </Field>
         <Field label={t('common.category')}>
-          <Input name="category" defaultValue={prefill.category ?? (bill?.category || 'other')} list="bill-categories" placeholder={t('bill.categoryHint')} />
-          <datalist id="bill-categories">
-            {categories.map((c) => (
-              <option key={c} value={c} />
-            ))}
-          </datalist>
+          <select name="category" defaultValue={canonicalCategory(prefill.category ?? (bill?.category || 'utilities'))} className={controlClass}>
+            <CategoryOptions categories={categories} current={canonicalCategory(prefill.category ?? bill?.category)} />
+          </select>
         </Field>
         {/* #14 (P68): which property this bill belongs to. Hidden until a space is named in
             Settings, like the Expenses/Receipts/Subscriptions forms; while hidden nothing is
