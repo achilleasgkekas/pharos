@@ -117,14 +117,16 @@ html[data-sidebar='collapsed'] {
 html[data-sidebar='collapsed'] .sb-label {
   display: none;
 }
-/* 72px fits one 40px button, not two side by side: settings and the expand button stack. */
-html[data-sidebar='collapsed'] .sb-foot {
+/* 72px fits the logo or the expand button, not both side by side: they stack. */
+html[data-sidebar='collapsed'] .sb-head {
   flex-direction: column;
-  align-items: stretch;
+  justify-content: center;
+  height: auto;
+  padding: 14px 0 6px;
+  gap: 6px;
 }
-html[data-sidebar='collapsed'] .sb-foot > * {
+html[data-sidebar='collapsed'] .sb-head > button {
   margin-left: 0;
-  align-self: center;
 }
 
 /* Brand dot pulse (matches reference @keyframes pulse). */
