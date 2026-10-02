@@ -28,7 +28,7 @@ for line in lock.read_text().splitlines():
         # CLI scans and token encode/decode are verified with this exact override.
         if (canonicalize_name(locked.name) == 'semgrep' and installed == '1.178.0'
                 and canonicalize_name(required.name) == 'pyjwt'
-                and str(required.specifier) == '~=2.13.0' and dependency_version == '2.14.0'):
+                and str(required.specifier) == '~=2.13.0' and dependency_version == '2.15.0'):
             continue
         raise SystemExit(f'{locked.name}: {required} is incompatible with installed {dependency_version}')
 # Exercise the patched whole-JWK-set failure and Semgrep's token-decoding dependency.
