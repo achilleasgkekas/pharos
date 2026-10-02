@@ -14,6 +14,8 @@ import type { TKey } from '@/lib/i18n';
 import { formatDate } from '@/lib/i18n/format';
 import { useShoppingMarket } from '@/components/ShoppingMarketContext';
 import { isInMarket, marketRank, type ShoppingMarket } from '@/lib/shoppingRegion';
+import { compactControlClass } from '@/components/ui/Input';
+import { cn } from '@/components/ui/cn';
 
 const VERDICT_KEY: Record<string, TKey> = { deal: 'pp.vDeal', dropping: 'pp.vDropping', rising: 'pp.vRising', good: 'pp.vGood', high: 'pp.vHigh' };
 
@@ -250,7 +252,7 @@ export function PricePanel({ item, summary = true, onChanged, onSearchOnline }: 
               <span className="flex items-center gap-1.5">
                 <Target size={13} className="text-[color:var(--color-cyan)]" />
                 <input autoFocus type="number" value={targetVal} onChange={(e) => setTargetVal(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && saveTarget()}
-                  placeholder={t('pp.targetPlaceholder', { cur: cur() })} className="w-24 text-xs px-2 py-1 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-cyan)] outline-none" style={{ fontFamily: 'var(--font-mono)' }} />
+                  placeholder={t('pp.targetPlaceholder', { cur: cur() })} className={cn(compactControlClass, 'w-24')} style={{ fontFamily: 'var(--font-mono)' }} />
                 <button onClick={saveTarget} disabled={pending} className="text-[color:var(--color-accent)]"><Check size={14} /></button>
                 <button onClick={() => { setEditTarget(false); setTargetVal(s.target ? String(s.target) : ''); }} className="text-[color:var(--color-text-faint)]">{t('common.cancel')}</button>
               </span>
@@ -333,9 +335,9 @@ export function PricePanel({ item, summary = true, onChanged, onSearchOnline }: 
           {logging && (
             <div className="mt-2.5 flex items-center gap-1.5 flex-wrap">
               <input autoFocus type="number" value={price} onChange={(e) => setPrice(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submitPrice()}
-                placeholder={t('pp.pricePlaceholder', { cur: cur() })} className="w-24 text-xs px-2.5 py-1.5 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] focus:border-[color:var(--color-accent)] outline-none" style={{ fontFamily: 'var(--font-mono)' }} />
+                placeholder={t('pp.pricePlaceholder', { cur: cur() })} className={cn(compactControlClass, 'w-24')} style={{ fontFamily: 'var(--font-mono)' }} />
               <input value={store} onChange={(e) => setStore(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submitPrice()} list="price-stores"
-                placeholder={t('pp.storePlaceholder')} className="w-28 text-xs px-2.5 py-1.5 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] focus:border-[color:var(--color-accent)] outline-none" />
+                placeholder={t('pp.storePlaceholder')} className={cn(compactControlClass, 'w-28')} />
               <datalist id="price-stores">{storeNames.map((st) => <option key={st} value={st} />)}</datalist>
               <button onClick={submitPrice} disabled={pending || !(Number(price) > 0)} className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg bg-[color:var(--color-accent)] text-black font-semibold hover:opacity-90 disabled:opacity-50">
                 {pending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} {t('common.save')}

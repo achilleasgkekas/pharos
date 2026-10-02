@@ -48,6 +48,18 @@ All of these come from `components/ui/PageHeader.tsx`.
 
 ## Forms and dialogs
 
+- Every field (input, select, textarea, date, searchable dropdown) uses the shared field look
+  from `components/ui/Input.tsx`: `controlClass` (40px high), `compactControlClass` for a
+  dense row (a receipt line), `filterControlClass` in the filter bar. A test fails the build
+  on a field that spells out its own border and fill.
+- Native selects get the same chevron as the searchable dropdown (globals.css), and their
+  option list follows the theme.
+- In a row of fields every cell has a label on top and a field-high control (a toggle sits in
+  a field-high box), so hints under one field do not push the others out of line.
+- Amount fields show cents: `moneyField()` from `lib/money`.
+- Dialog footers: the main action is `<Button variant="primary">`, the others
+  `variant="secondary"`, Delete is `variant="danger"` on the right, all the default size.
+
 | Need | Use |
 | --- | --- |
 | A dialog or a form over the page | `Modal` from `components/ui/Modal` (Radix Dialog: focus trap, Escape, an accessible title). Never a hand-made `fixed inset-0` overlay. |

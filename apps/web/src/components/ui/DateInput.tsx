@@ -4,6 +4,7 @@ import { CalendarDays } from 'lucide-react';
 import { useLocale, useT } from '@/components/LocaleProvider';
 import { formatIsoDate, parseLocaleDate, datePlaceholder } from '@/lib/dateInput';
 import { cn } from './cn';
+import { fieldBase } from './Input';
 
 interface DateInputProps {
   /** ISO `YYYY-MM-DD`, or '' for no date. Same contract as a native date input's value. */
@@ -32,8 +33,7 @@ interface DateInputProps {
   onProblemChange?: (problem: string) => void;
 }
 
-const base =
-  'w-full bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg text-sm text-[color:var(--color-text)] placeholder:text-[color:var(--color-text-faint)] focus:outline-none focus:border-[color:var(--color-accent)] transition-colors pl-3 pr-9 py-2';
+const base = cn(fieldBase, 'pl-3 pr-9 py-2 min-h-10');
 
 /**
  * Date field that shows the APP's locale order (ΗΗ/ΜΜ/ΕΕΕΕ in Greek) instead of the operating

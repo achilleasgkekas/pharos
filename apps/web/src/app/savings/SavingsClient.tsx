@@ -19,6 +19,8 @@ import {
 import { createGoal, addGoalContribution, deleteGoal } from '@/app/reports/goalsActions';
 import type { SavingsData, SavingsGoal } from './types';
 import { formatDate } from '@/lib/i18n/format';
+import { compactControlClass } from '@/components/ui/Input';
+import { cn } from '@/components/ui/cn';
 
 // The Save tab. Everything shown here is derived by lib/savingsPlan.ts from the ledger
 // the rest of the app already keeps — no new bookkeeping, and no number on this page is
@@ -253,7 +255,7 @@ export function SavingsClient({ data }: { data: SavingsData }) {
               value={planAmount}
               onChange={(e) => setPlanAmount(e.target.value)}
               placeholder="5000"
-              className="w-32 bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-2 py-1.5 text-sm text-[color:var(--color-text)] focus:outline-none focus:border-[color:var(--color-accent)]"
+              className={cn(compactControlClass, 'w-32')}
             />
           </label>
           <label className="flex flex-col gap-1 text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
@@ -436,7 +438,7 @@ function GoalPlanCard({ goal, data }: { goal: SavingsGoal; data: SavingsData }) 
             onChange={(e) => setAmount(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && contribute()}
             placeholder={t('sav.gAddAmount')}
-            className="flex-1 min-w-0 bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-lg px-2 py-1 text-[11px] text-[color:var(--color-text)] focus:outline-none focus:border-[color:var(--color-accent)]"
+            className={cn(compactControlClass, 'flex-1 min-w-0')}
           />
           <button
             onClick={contribute}
@@ -491,7 +493,7 @@ function SaveAsGoal({ amount, date, dateProblem }: { amount: number; date: strin
             onChange={(e) => setTitle(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && save()}
             placeholder={t('sav.newGoalPlaceholder')}
-            className="w-44 bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-2 py-1.5 text-sm text-[color:var(--color-text)] focus:outline-none focus:border-[color:var(--color-accent)]"
+            className={cn(compactControlClass, 'w-44')}
           />
         </label>
         <button

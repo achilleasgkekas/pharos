@@ -2511,4 +2511,6 @@ export const de: Partial<Dict> = {
   "set.liveSpend": "KI-Kosten",
   "set.viewRunHistory": "Alle Aufrufe im KI-Verlauf",
   "set.capReached": "Kostenlimit erreicht: Cloud-KI-Aufrufe sind blockiert, bis du es erhöhst oder der Monat wechselt.",
+  "it.photoAdd": "Produktfotos hinzufügen",
+  "it.photoUploading": "Wird hochgeladen…",
 };

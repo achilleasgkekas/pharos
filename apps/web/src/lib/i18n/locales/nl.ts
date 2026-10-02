@@ -2511,4 +2511,6 @@ export const nl: Partial<Dict> = {
   "set.liveSpend": "AI-kosten",
   "set.viewRunHistory": "Alle aanroepen in de AI-geschiedenis",
   "set.capReached": "Limiet bereikt: cloud-AI-aanroepen zijn geblokkeerd tot je hem verhoogt of de maand om is.",
+  "it.photoAdd": "Productfoto’s toevoegen",
+  "it.photoUploading": "Uploaden…",
 };

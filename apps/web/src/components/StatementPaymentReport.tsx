@@ -4,6 +4,8 @@ import { useLocale, useT } from '@/components/LocaleProvider';
 import { formatDate } from '@/lib/i18n/format';
 import { cur } from '@/lib/money';
 import type { StatementPaymentReport as Report } from '@/lib/statementPayments';
+import { compactControlClass } from '@/components/ui/Input';
+import { cn } from '@/components/ui/cn';
 
 export function StatementPaymentReport({ report }: { report: Report }) {
   const t = useT(), locale = useLocale();
@@ -21,7 +23,7 @@ export function StatementPaymentReport({ report }: { report: Report }) {
   return <section className="min-w-0 space-y-4 rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-4 sm:p-5">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <h2 className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>{t('payments.title')}</h2>
-      <select aria-label={t('st.cards', { n: cards.size })} value={selectedCard} onChange={e => setCard(e.target.value)} className="min-w-0 max-w-full rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] px-3 py-2 text-xs text-[color:var(--color-text)] focus:outline-none focus:border-[color:var(--color-accent)]">
+      <select aria-label={t('st.cards', { n: cards.size })} value={selectedCard} onChange={e => setCard(e.target.value)} className={cn(compactControlClass, 'min-w-0 max-w-full')}>
         <option value="">{t('st.allCards')}</option>
         {[...cards].map(([id,label]) => <option key={id} value={id}>{label}</option>)}
       </select>

@@ -2511,4 +2511,6 @@ export const it: Partial<Dict> = {
   "set.liveSpend": "Spesa IA",
   "set.viewRunHistory": "Tutte le chiamate nella cronologia IA",
   "set.capReached": "Limite raggiunto: le chiamate all’IA cloud sono bloccate finché non lo alzi o cambia il mese.",
+  "it.photoAdd": "Aggiungi foto del prodotto",
+  "it.photoUploading": "Caricamento…",
 };

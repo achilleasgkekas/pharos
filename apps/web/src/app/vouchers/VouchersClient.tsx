@@ -6,7 +6,7 @@ import { DateInput } from '@/components/ui/DateInput';
 import { Field } from '@/components/ui/Field';
 import { Button } from '@/components/ui/Button';
 import { PAGE_MAIN, PageHeader, ViewToggle, PrimaryAction, FilterLayout, FilterSection, FilterOptions } from '@/components/ui/PageHeader';
-import { Input, filterControlClass } from '@/components/ui/Input';
+import { Input, compactControlClass, controlClass, filterControlClass } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
@@ -390,7 +390,7 @@ function VoucherForm({ voucher, onSuccess, onDeleted }: { voucher?: SerializedVo
             onChange={(e) => setAiText(e.target.value)}
             rows={2}
             placeholder={t('v.aiPlaceholder')}
-            className="w-full bg-[color:var(--color-surface-3)] border border-[color:var(--color-border)] rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-[color:var(--color-accent)]"
+            className={cn(compactControlClass, 'w-full resize-y')}
           />
           <div className="flex items-center gap-2 flex-wrap">
             <button type="button" onClick={scanText} disabled={pending || !aiText.trim()} className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-[color:var(--color-accent)] text-black font-semibold disabled:opacity-50">
@@ -431,7 +431,7 @@ function VoucherForm({ voucher, onSuccess, onDeleted }: { voucher?: SerializedVo
           value={form.notes}
           onChange={set('notes')}
           rows={2}
-          className="w-full bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[color:var(--color-accent)] resize-none"
+          className={cn(controlClass, 'w-full resize-none')}
         />
       </Field>
       {error && <p className="text-xs text-[color:var(--color-red)]">{error}</p>}
@@ -440,8 +440,8 @@ function VoucherForm({ voucher, onSuccess, onDeleted }: { voucher?: SerializedVo
           {pending ? t('v.saving') : voucher ? t('common.save') : t('v.create')}
         </Button>
         {voucher && onDeleted && (
-          <Button type="button" variant="danger" size="sm" className="ml-auto" onClick={handleDelete} disabled={pending}>
-            <Trash2 size={13} /> {t('common.delete')}
+          <Button type="button" variant="danger" className="ml-auto" onClick={handleDelete} disabled={pending}>
+            <Trash2 size={15} /> {t('common.delete')}
           </Button>
         )}
       </div>
