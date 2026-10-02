@@ -36,7 +36,6 @@ import {
 } from '@/lib/cardUtilization';
 import { computeInstallmentPlans, type InstallmentPlan } from '@/lib/installments';
 import { InstallmentPlanCard } from '@/components/InstallmentPlanCard';
-import { ReconcilePanel } from './ReconcilePanel';
 import { useOpenParam } from '@/components/useOpenParam';
 import {
   createStatement,
@@ -129,7 +128,6 @@ export function StatementsClient({
   const fx: FxCtx = { base: baseCurrency, enabled: multiCurrency };
   const [showCreate, setShowCreate] = useState(false);
   const [showCards, setShowCards] = useState(false);
-  const [showReconcile, setShowReconcile] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [cardFilter, setCardFilter] = useState('all');
   const [uploading, setUploading] = useState(false);
@@ -249,9 +247,6 @@ export function StatementsClient({
           )
         }
       >
-        {statements.length > 0 && (
-          <HeaderButton icon={<Link2 size={15} />} onClick={() => setShowReconcile(true)}>{t('rec.title')}</HeaderButton>
-        )}
         <HeaderButton icon={<Wallet size={15} />} onClick={() => setShowCards(true)}>{t('st.cards', { n: cards.length })}</HeaderButton>
         <UploadButton onFiles={(f) => handlePdf(f)} accept="application/pdf,.pdf" label={t('st.importPdf')} busy={uploading} />
         <PrimaryAction onClick={() => setShowCreate(true)} />
@@ -328,9 +323,6 @@ export function StatementsClient({
         <CardsManager cards={cards} statements={statements} utilization={utilization} />
       </Modal>
 
-      <Modal open={showReconcile} onClose={() => setShowReconcile(false)} title={t('rec.title')} size="lg">
-        <ReconcilePanel statements={statements.map((s) => ({ _id: s._id, card: s.card, period: s.period }))} />
-      </Modal>
     </main>
   );
 }

@@ -26,7 +26,8 @@ import { goalProgress } from '@/lib/goals';
 import { buildMonthReview } from '@/lib/monthReview';
 import { buildYearOverYear } from '@/lib/yearOverYear';
 import { listEntriesNeedingRate } from '@/lib/fxAudit';
-import { reportWindowStart, inReportWindow, monthKeyOfDate } from '@/lib/reportWindow';
+import { monthKeyOfDate } from '@/lib/reportWindow';
+import { inPeriod, periodMonths, resolveReportPeriod, type ReportPeriod } from '@/lib/reportPeriod';
 import type { SerializedStatement } from '@/types';
 import { ReportsClient } from './ReportsClient';
 import { formatDate } from '@/lib/i18n/format';
@@ -75,7 +76,13 @@ function labelFromKey(key: string, locale = 'en'): string {
   return y && m ? monthLabel(new Date(y, m - 1, 1), locale) : key;
 }
 
-async function getReports(monthsBack = 12, locale = 'en') {
+/** "Oct 26" for one month, "Nov 25 – Oct 26" for a run. */
+function periodLabelText(p: { start: string; end: string }, locale: string): string {
+  return p.start === p.end ? labelFromKey(p.start, locale) : `${labelFromKey(p.start, locale)} – ${labelFromKey(p.end, locale)}`;
+}
+
+async function getReports(period: ReportPeriod, locale = 'en') {
+  const monthsBack = period.months;
   return withRequestTenant(async () => {
   await connectDB();
   const Receipt = await currentModel(ReceiptModel);
@@ -101,14 +108,16 @@ async function getReports(monthsBack = 12, locale = 'en') {
   const now = new Date();
   // Everything labelled with the selected period is computed from these (#122). Month-by-month
   // history (year-over-year, rollover, calendar-year totals) still reads the full record set.
-  const windowStart = reportWindowStart(now, monthsBack);
-  const windowReceipts = receipts.filter((r) => inReportWindow(monthKeyOfDate(r.date), windowStart));
+  const inWin = (mk: string) => inPeriod(mk, period.start, period.end);
+  const windowReceipts = receipts.filter((r) => inWin(monthKeyOfDate(r.date)));
+  // The comparison period (#reports): the same number of months just before this one.
+  const inPrev = (mk: string) => inPeriod(mk, period.prevStart, period.prevEnd);
+  const prevReceipts = receipts.filter((r) => inPrev(monthKeyOfDate(r.date)));
 
   // ── Monthly spend (last 12 months, from receipts) ────────────────────────
   const months: { key: string; label: string; total: number; count: number }[] = [];
-  for (let i = monthsBack - 1; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    months.push({ key: axisMonthKey(d), label: monthLabel(d, locale), total: 0, count: 0 });
+  for (const key of periodMonths(period.start, period.end)) {
+    months.push({ key, label: labelFromKey(key, locale), total: 0, count: 0 });
   }
   const mIdx = new Map(months.map((m, i) => [m.key, i]));
   let receiptsTotal = 0;
@@ -148,6 +157,11 @@ async function getReports(monthsBack = 12, locale = 'en') {
   let incomeMonth = 0;
   let expenseMonth = 0;
   const expCatMap = new Map<string, number>();
+  const prevCatMap = new Map<string, number>(); // the same, over the comparison period
+  let periodIncome = 0;
+  let periodExpense = 0;
+  let prevIncome = 0;
+  let prevExpense = 0;
   const expSpaceMap = new Map<string, number>(); // expense per space/ledger tag (P34); '' = unassigned
   const thisMonthCat = new Map<string, number>(); // expense per category, THIS month (for budgets)
   // Per (month → category) expense totals + per-month expense total, used by the
@@ -163,7 +177,17 @@ async function getReports(monthsBack = 12, locale = 'en') {
     let mk = e.period && /^\d{4}-\d{2}$/.test(e.period) ? e.period : '';
     if (!mk && e.date) mk = monthKeyOfDate(e.date);
     if (!mk) continue;
-    if (!isIncome && inReportWindow(mk, windowStart)) {
+    if (inWin(mk)) {
+      if (isIncome) periodIncome += amt;
+      else periodExpense += amt;
+    } else if (inPrev(mk)) {
+      if (isIncome) prevIncome += amt;
+      else {
+        prevExpense += amt;
+        prevCatMap.set(cat, (prevCatMap.get(cat) ?? 0) + amt);
+      }
+    }
+    if (!isIncome && inWin(mk)) {
       expCatMap.set(cat, (expCatMap.get(cat) ?? 0) + amt);
       const sp = (e.space || '').trim();
       expSpaceMap.set(sp, (expSpaceMap.get(sp) ?? 0) + amt);
@@ -199,7 +223,8 @@ async function getReports(monthsBack = 12, locale = 'en') {
   // ήδη το δικό τους "Monthly spend" chart παραπάνω και θα μετριόντουσαν δύο φορές.
   const rcSpend = receiptCategorySpend(receipts);
   for (const [mk, byCat] of rcSpend.byMonth) {
-    if (!inReportWindow(mk, windowStart)) continue;
+    if (inPrev(mk)) for (const [cat, amt] of byCat) prevCatMap.set(cat, (prevCatMap.get(cat) ?? 0) + amt);
+    if (!inWin(mk)) continue;
     for (const [cat, amt] of byCat) expCatMap.set(cat, (expCatMap.get(cat) ?? 0) + amt);
   }
   for (const [mk, byCat] of rcSpend.byMonth) {
@@ -261,7 +286,7 @@ async function getReports(monthsBack = 12, locale = 'en') {
     })
     .sort((a, b) => b.budget - a.budget);
   const expenseByCategory = [...expCatMap.entries()]
-    .map(([name, value]) => ({ name, value: Math.round(value) }))
+    .map(([name, value]) => ({ name, value: Math.round(value), prev: Math.round(prevCatMap.get(name) ?? 0) }))
     .sort((a, b) => b.value - a.value)
     .slice(0, 8);
   // Per-space / per-property breakdown (P34). Only surfaced once the user has actually
@@ -281,7 +306,9 @@ async function getReports(monthsBack = 12, locale = 'en') {
   // The current month is excluded inside the helper (it is partial), and the card
   // is dropped entirely unless at least one month has a prior-year figure, so a
   // fresh install never sees a chart drawn against zeros.
-  const yoyRaw = buildYearOverYear(totalByMonth, { now, months: monthsBack });
+  const [endY, endM] = period.end.split('-').map(Number);
+  const yoyNow = period.end >= axisMonthKey(now) ? now : new Date(endY, endM, 1);
+  const yoyRaw = buildYearOverYear(totalByMonth, { now: yoyNow, months: Math.min(monthsBack, 24) });
   const yearOverYear =
     yoyRaw.comparable > 0
       ? {
@@ -306,8 +333,10 @@ async function getReports(monthsBack = 12, locale = 'en') {
     e.count += 1;
     storeMap.set(k, e);
   }
+  const prevStoreMap = new Map<string, number>();
+  for (const r of prevReceipts) prevStoreMap.set(r.store || '—', (prevStoreMap.get(r.store || '—') ?? 0) + (r.total || 0));
   const spendByStore = [...storeMap.entries()]
-    .map(([name, v]) => ({ name, total: Math.round(v.total), count: v.count }))
+    .map(([name, v]) => ({ name, total: Math.round(v.total), count: v.count, prev: Math.round(prevStoreMap.get(name) ?? 0) }))
     .sort((a, b) => b.total - a.total)
     .slice(0, 8);
 
@@ -375,7 +404,7 @@ async function getReports(monthsBack = 12, locale = 'en') {
   const installmentsActive = allPlans.filter((p) => !p.done);
   const installmentsRemaining = installmentsActive.reduce((s, p) => s + p.remainingAmount, 0);
 
-  const statementPayments = buildStatementPaymentReport(serializedStatements, titleById, now, monthsBack);
+  const statementPayments = buildStatementPaymentReport(serializedStatements, titleById, now, Math.min(monthsBack, 24));
   const outstanding = cardBalanceSummary(serializedStatements).due;
 
   const subsByCat = new Map<string, number>();
@@ -440,7 +469,18 @@ async function getReports(monthsBack = 12, locale = 'en') {
   // install skips five queries and never sees the card.
   const fxIssues = appSettings.multiCurrency ? await listEntriesNeedingRate(appSettings.currency) : [];
 
+  const prevReceiptsTotal = prevReceipts.reduce((n, r) => n + (r.total || 0), 0);
   return {
+    period: { ...period, label: periodLabelText(period, locale), prevLabel: periodLabelText({ start: period.prevStart, end: period.prevEnd }, locale) },
+    // The period's totals and the same totals over the comparison period (#reports).
+    totals: {
+      expense: Math.round(periodExpense),
+      income: Math.round(periodIncome),
+      receipts: Math.round(receiptsTotal),
+      prevExpense: Math.round(prevExpense),
+      prevIncome: Math.round(prevIncome),
+      prevReceipts: Math.round(prevReceiptsTotal),
+    },
     fxIssues,
     baseCurrency: appSettings.currency,
     netWorth: { accountsTotal: Math.round(accountsTotal), series: netWorthSeries, accounts: appSettings.assetAccounts },
@@ -482,9 +522,13 @@ async function getReports(monthsBack = 12, locale = 'en') {
   });
 }
 
-export default async function ReportsPage({ searchParams }: { searchParams: Promise<{ months?: string }> }) {
+export default async function ReportsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ months?: string; period?: string; from?: string; to?: string; tab?: string }>;
+}) {
   const sp = await searchParams;
-  const months = [6, 12, 24].includes(Number(sp.months)) ? Number(sp.months) : 12;
-  const data = await getReports(months, await getLocaleSafe());
-  return <ReportsClient data={data} months={months} />;
+  const period = resolveReportPeriod(sp, new Date());
+  const data = await getReports(period, await getLocaleSafe());
+  return <ReportsClient data={data} initialTab={sp.tab} />;
 }

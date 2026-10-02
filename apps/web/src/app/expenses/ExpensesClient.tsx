@@ -20,7 +20,9 @@ import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { useOpenParam } from '@/components/useOpenParam';
 import { cn } from '@/components/ui/cn';
 import { shrinkImage } from '@/lib/clientImage';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { inPeriod, monthRangeLabel } from '@/lib/reportPeriod';
+import { FilterChips } from '@/components/ui/FilterChips';
 import type { SerializedExpense, SerializedCard } from '@/types';
 import { uploadExpense, updateExpense, addExpense, deleteExpense, rescanExpense, settlePerson, bulkUpdateExpenses } from './actions';
 import { equalSplit, splitTotals, computeBalances, type SplitEntry } from '@/lib/split';
@@ -74,8 +76,15 @@ export function ExpensesClient({ kind, expenses, cards, vendors, ollamaUp, categ
   const [showBalances, setShowBalances] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadMsg, setUploadMsg] = useState<string | null>(null);
-  const [search, setSearch] = useState('');
-  const [catFilter, setCatFilter] = useState('');
+  // A link from Reports opens the list already filtered: ?category=…&from=YYYY-MM&to=YYYY-MM.
+  const params = useSearchParams();
+  const [search, setSearch] = useState(() => params.get('q') ?? '');
+  const [catFilter, setCatFilter] = useState(() => params.get('category') ?? '');
+  const [monthRange, setMonthRange] = useState<{ from: string; to: string } | null>(() => {
+    const from = params.get('from') ?? '';
+    const to = params.get('to') ?? from;
+    return /^\d{4}-\d{2}$/.test(from) && /^\d{4}-\d{2}$/.test(to) ? { from, to } : null;
+  });
   const [spaceFilter, setSpaceFilter] = useState('');
   const [taxOnly, setTaxOnly] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'all' | Status>('all');
@@ -138,13 +147,15 @@ export function ExpensesClient({ kind, expenses, cards, vendors, ollamaUp, categ
   const hasSpaces = spaces.length > 0;
   const balances = useMemo(() => computeBalances(expenses), [expenses]);
   const totalOwedToYou = useMemo(() => balances.reduce((s, b) => s + b.owed, 0), [balances]);
-  const anyFilter = !!(catFilter || spaceFilter || taxOnly || statusFilter !== 'all' || search || sortBy !== 'recent');
-  function resetFilters() { setCatFilter(''); setSpaceFilter(''); setTaxOnly(false); setStatusFilter('all'); setSearch(''); setSortBy('recent'); }
+  const anyFilter = !!(catFilter || monthRange || spaceFilter || taxOnly || statusFilter !== 'all' || search || sortBy !== 'recent');
+  function resetFilters() { setCatFilter(''); setMonthRange(null); setSpaceFilter(''); setTaxOnly(false); setStatusFilter('all'); setSearch(''); setSortBy('recent'); }
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
     const out = expenses.filter((e) => {
       if (catFilter && e.category !== catFilter) return false;
+      // The month a record counts in, as on Reports: its period, else its date.
+      if (monthRange && !inPeriod(/^\d{4}-\d{2}$/.test(e.period || '') ? e.period : e.date.slice(0, 7), monthRange.from, monthRange.to)) return false;
       if (!matchesSpace(e.space, spaceFilter)) return false;
       if (taxOnly && !e.taxDeductible) return false;
       if (statusFilter !== 'all' && statusOf(e) !== statusFilter) return false;
@@ -160,7 +171,7 @@ export function ExpensesClient({ kind, expenses, cards, vendors, ollamaUp, categ
         default: return new Date(b.date).getTime() - new Date(a.date).getTime();
       }
     });
-  }, [expenses, search, catFilter, spaceFilter, taxOnly, statusFilter, sortBy]);
+  }, [expenses, search, catFilter, monthRange, spaceFilter, taxOnly, statusFilter, sortBy]);
 
   const selectAllFiltered = () => setSelectedIds(new Set(visible.map((e) => e._id)));
 
@@ -324,6 +335,14 @@ export function ExpensesClient({ kind, expenses, cards, vendors, ollamaUp, categ
             </p>
           )}
           {!uploading && uploadMsg && <p role="status" className="mb-3 text-sm text-[color:var(--color-accent)]">{uploadMsg}</p>}
+          {(monthRange || catFilter) && (
+            <FilterChips
+              chips={[
+                monthRange && { label: monthRangeLabel(monthRange, locale), onClear: () => setMonthRange(null) },
+                catFilter && { label: catFilter, onClear: () => setCatFilter('') },
+              ]}
+            />
+          )}
           {visible.length === 0 ? (
             <EmptyState icon={isIncome ? <Banknote /> : <Wallet />} title={expenses.length === 0 ? t('ex.emptyNone', { label: label.toLowerCase() }) : t('ex.emptyFiltered')} />
           ) : layout === 'grid' ? (
