@@ -1,4 +1,5 @@
 'use client';
+import { CategoryIcon, useCategoryLabel } from '@/components/CategoryBadge';
 import { PAGE_MAIN, PageHeader } from '@/components/ui/PageHeader';
 import { useState, useTransition } from 'react';
 import { StatementPaymentReport } from '@/components/StatementPaymentReport';
@@ -380,6 +381,7 @@ function FxIssueLine({ row, base, fallbackRate }: { row: FxIssueRow; base: strin
 export function ReportsClient({ data, initialTab, summaryOn = false, currency = 'EUR' }: { data: Data; initialTab?: string; summaryOn?: boolean; currency?: string }) {
   const locale = useLocale();
   const t = useT();
+  const catLabel = useCategoryLabel();
   const money = useMoney();
   const s = data.summary;
   const P = data.period;
@@ -486,7 +488,7 @@ export function ReportsClient({ data, initialTab, summaryOn = false, currency = 
                 prevIncome: T.prevIncome,
                 receipts: T.receipts,
                 prevReceipts: T.prevReceipts,
-                categories: data.expenseByCategory.slice(0, 8).map((r) => ({ name: r.name.slice(0, 80), value: r.value, prev: r.prev ?? 0 })),
+                categories: data.expenseByCategory.slice(0, 8).map((r) => ({ name: catLabel(r.name).slice(0, 80), value: r.value, prev: r.prev ?? 0 })),
                 stores: data.spendByStore.slice(0, 8).map((r) => ({ name: r.name.slice(0, 80), value: r.total, prev: r.prev ?? 0 })),
               }}
             />
@@ -546,7 +548,7 @@ export function ReportsClient({ data, initialTab, summaryOn = false, currency = 
           <div className="mt-3 flex flex-wrap gap-2 text-[11px]" style={{ fontFamily: 'var(--font-mono)' }}>
             {data.monthReview.overBudget.map((b) => (
               <span key={`b-${b.category}`} className="px-2 py-1 rounded-md border border-[color:var(--color-red)]/40 text-[color:var(--color-red)]">
-                {b.category} {money(b.actual)}/{money(b.budget)}
+                {catLabel(b.category)} {money(b.actual)}/{money(b.budget)}
               </span>
             ))}
             {data.monthReview.priceChanges.slice(0, 5).map((p) => (
@@ -640,7 +642,7 @@ export function ReportsClient({ data, initialTab, summaryOn = false, currency = 
             <Empty text={t('reports.noExpenses')} />
           ) : (
             <RankList
-              rows={data.expenseByCategory.map((r) => ({ name: r.name, value: r.value, prev: r.prev, href: listHref('/expenses', { category: r.name }) }))}
+              rows={data.expenseByCategory.map((r) => ({ name: catLabel(r.name), icon: <CategoryIcon category={r.name} size={14} />, value: r.value, prev: r.prev, href: listHref('/expenses', { category: r.name }) }))}
               prevLabel={P.prevLabel}
             />
           )}
@@ -764,7 +766,8 @@ export function ReportsClient({ data, initialTab, summaryOn = false, currency = 
                 <div key={b.name}>
                   <div className="flex items-center justify-between text-xs mb-1">
                     <span className="text-[color:var(--color-text-dim)] flex items-center gap-1.5">
-                      {b.name}
+                      <CategoryIcon category={b.name} size={13} />
+                      {catLabel(b.name)}
                       {rollover && carried !== 0 && (
                         <span
                           title={t('reports.budgetCarriedHint')}
@@ -1339,7 +1342,7 @@ function Kpi({ label, value, prev, upIsGood, href }: { label: string; value: num
 }
 
 /** Ranked rows (category, store): a bar for the share, the total, the change, and a link to the records. */
-function RankList({ rows, prevLabel }: { rows: { name: string; value: number; prev: number; sub?: string; href: string }[]; prevLabel: string }) {
+function RankList({ rows, prevLabel }: { rows: { name: string; icon?: React.ReactNode; value: number; prev: number; sub?: string; href: string }[]; prevLabel: string }) {
   const money = useMoney();
   const t = useT();
   const max = Math.max(1, ...rows.map((r) => r.value));
@@ -1350,7 +1353,7 @@ function RankList({ rows, prevLabel }: { rows: { name: string; value: number; pr
           <Link href={r.href} prefetch={false} className="flex items-center gap-3 px-2 py-2.5 rounded-lg hover:bg-[color:var(--color-surface-2)] transition-colors">
             <span className="min-w-0 flex-1">
               <span className="flex items-baseline justify-between gap-2">
-                <span className="text-sm font-medium truncate">{r.name}</span>
+                <span className="flex min-w-0 items-center gap-1.5 text-sm font-medium">{r.icon}<span className="truncate">{r.name}</span></span>
                 <span className="shrink-0 text-sm font-semibold tabular-nums">{money(r.value)}</span>
               </span>
               <span className="mt-1.5 block h-1.5 rounded-full bg-[color:var(--color-surface-3)] overflow-hidden">

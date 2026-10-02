@@ -1,4 +1,5 @@
 'use client';
+import { CategoryOptions } from '@/components/CategoryBadge';
 import { PAGE_MAIN, PageHeader, HeaderButton, ViewToggle, PrimaryAction, FilterLayout, FilterSection, FilterOptions } from '@/components/ui/PageHeader';
 import { DateInput } from '@/components/ui/DateInput';
 import { Field } from '@/components/ui/Field';
@@ -1286,15 +1287,10 @@ function ReceiptDetailModal({
                         onChange={(e) => updateLine(i, 'category', e.target.value)}
                         title={t('rc.lineCategory')}
                         className={cn(compactControlClass, 'shrink-0 max-w-[9rem]')}
-                        style={{ fontFamily: 'var(--font-mono)' }}
                       >
                         <option value="">{t('rc.lineCategoryNone')}</option>
                         {/* A category saved before the taxonomy was edited must stay selectable. */}
-                        {(categories.includes(li.category) || !li.category ? categories : [li.category, ...categories]).map((c) => (
-                          <option key={c} value={c}>
-                            {c}
-                          </option>
-                        ))}
+                        <CategoryOptions categories={categories} current={li.category || undefined} />
                       </select>
                       <div
                         className="shrink-0 flex items-center gap-1 text-[11px] text-[color:var(--color-text-faint)] whitespace-nowrap"

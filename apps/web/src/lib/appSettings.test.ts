@@ -151,7 +151,8 @@ describe('normalizeSettings', () => {
 
   it('resolves taxonomy overrides from the lists map', () => {
     const v = normalizeSettings({ lists: { expenseCategories: ['a', 'b'], itemCategories: ['x'] } });
-    expect(v.expenseCategories).toEqual(['a', 'b']);
+    // Money categories keep the shared list; stored ones are added after it.
+    expect(v.expenseCategories).toEqual([...DEFAULT_EXPENSE_CATEGORIES, 'a', 'b']);
     expect(v.itemCategories).toEqual(['x']);
     // untouched taxonomy falls back to default
     expect(v.subscriptionCategories).toEqual(DEFAULT_SUBSCRIPTION_CATEGORIES);

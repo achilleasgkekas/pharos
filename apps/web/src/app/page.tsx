@@ -22,6 +22,7 @@ import { AiOnboardingBanner } from '@/components/AiOnboardingBanner';
 import { cookies } from 'next/headers';
 import { PAGE_MAIN } from '@/components/ui/PageHeader';
 import { getServerT } from '@/lib/i18n/server';
+import { categoryLabel } from '@/lib/categories';
 import type { TFunc, TKey } from '@/lib/i18n';
 
 export const dynamic = 'force-dynamic';
@@ -297,7 +298,7 @@ export default async function HomePage() {
                       <span className="min-w-0 flex-1">
                         <span className="block text-sm font-semibold truncate">{r.vendor || t(income ? 'nav.income' : 'nav.expenses')}</span>
                         <span className="block text-xs text-[color:var(--color-text-dim)] truncate">
-                          {[r.category, r.date ? formatDate(r.date, locale, { day: 'numeric', month: 'short' }) : ''].filter(Boolean).join(' · ')}
+                          {[r.category ? categoryLabel(t, r.category) : '', r.date ? formatDate(r.date, locale, { day: 'numeric', month: 'short' }) : ''].filter(Boolean).join(' · ')}
                         </span>
                       </span>
                       <span className={`shrink-0 text-sm font-semibold tabular-nums ${income ? 'text-[color:var(--color-accent)]' : ''}`}>

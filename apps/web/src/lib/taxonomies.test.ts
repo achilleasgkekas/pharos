@@ -94,13 +94,19 @@ describe('resolveTaxonomy', () => {
   });
 
   it('coerces override members to strings', () => {
-    const overrides = { expenseCategories: [1, 2, 'three'] };
-    expect(resolveTaxonomy('expenseCategories', overrides, fallback)).toEqual(['1', '2', 'three']);
+    const overrides = { itemCategories: [1, 2, 'three'] };
+    expect(resolveTaxonomy('itemCategories', overrides, fallback)).toEqual(['1', '2', 'three']);
+  });
+
+  it('keeps the shared money list and adds stored extras after it', () => {
+    const overrides = { expenseCategories: ['rent', 'Boat Club', 'food'] };
+    // rent is built in, "food" reads as groceries (built in), "boat-club" is the user's own
+    expect(resolveTaxonomy('expenseCategories', overrides, DEFAULT_EXPENSE_CATEGORIES)).toEqual([...DEFAULT_EXPENSE_CATEGORIES, 'boat-club']);
   });
 
   it('reads the requested key only (ignores sibling keys)', () => {
-    const overrides = { itemCategories: ['ignored'] };
-    expect(resolveTaxonomy('expenseCategories', overrides, fallback)).toBe(fallback);
+    const overrides = { expenseCategories: ['ignored'] };
+    expect(resolveTaxonomy('itemCategories', overrides, fallback)).toBe(fallback);
   });
 });
 

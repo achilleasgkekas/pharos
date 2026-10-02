@@ -1,9 +1,13 @@
 // User-editable dropdown lists (categories). Defaults here; overrides live in
 // AppConfig.lists and are resolved by getAppSettings(). Pure/isomorphic.
 
-export const DEFAULT_EXPENSE_CATEGORIES = ['rent', 'utilities', 'fuel', 'salary', 'insurance', 'telecom', 'groceries', 'transport', 'health', 'tax', 'subscription', 'other'];
+import { ALL_CATEGORIES, CATEGORY_GROUPS, withCustomCategories } from './categories';
+
+// Money categories come from the shared grouped list (lib/categories). A stored list no longer
+// replaces it: its own additions are kept after the built-in ones.
+export const DEFAULT_EXPENSE_CATEGORIES = ALL_CATEGORIES;
 export const DEFAULT_ITEM_CATEGORIES = ['network', 'storage', 'compute', 'audio', 'video', 'mobile', 'peripheral', 'consumable', 'other'];
-export const DEFAULT_SUBSCRIPTION_CATEGORIES = ['streaming', 'cloud', 'software', 'gaming', 'news', 'fitness', 'other'];
+export const DEFAULT_SUBSCRIPTION_CATEGORIES = [...(CATEGORY_GROUPS.find((g) => g.key === 'subscriptions')?.categories ?? []), 'other'];
 
 export type TaxonomyKey = 'expenseCategories' | 'itemCategories' | 'subscriptionCategories';
 
@@ -31,8 +35,10 @@ export function normalizeList(items: string[]): string[] {
 /** Resolve a taxonomy from a stored overrides map (falls back to the default). */
 export function resolveTaxonomy(key: TaxonomyKey, overrides: Record<string, unknown> | undefined, fallback: string[]): string[] {
   const v = overrides?.[key];
-  if (Array.isArray(v) && v.length) return v.map(String);
-  return fallback;
+  const stored = Array.isArray(v) && v.length ? v.map(String) : [];
+  // Money categories: the shared list always, plus the user's own additions.
+  if (key === 'expenseCategories' || key === 'subscriptionCategories') return withCustomCategories(stored, fallback);
+  return stored.length ? stored : fallback;
 }
 
 // ── Spaces / ledgers (P34) ────────────────────────────────────────────────

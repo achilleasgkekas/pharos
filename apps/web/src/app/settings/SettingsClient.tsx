@@ -1,4 +1,6 @@
 'use client';
+import { CategoryOptions, CategoryIcon } from '@/components/CategoryBadge';
+import { categoryGroupLabel, categoryLabel, groupCategories } from '@/lib/categories';
 import { useState, useTransition, useRef, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
@@ -2253,10 +2255,7 @@ function CategoryRulesManager({ settings }: { settings: AppSettings }) {
             <span className="text-[color:var(--color-text-faint)] text-xs">→</span>
             <select value={r.category} onChange={(e) => set(i, { category: e.target.value })} className={cellCls}>
               <option value="">{t('set.rulesPickCategory')}</option>
-              {cats.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-              {r.category && !cats.includes(r.category) && <option value={r.category}>{r.category}</option>}
+              <CategoryOptions categories={cats} current={r.category || undefined} />
             </select>
             <label className="flex items-center gap-1 text-[11px] text-[color:var(--color-text-dim)]" title={t('set.rulesRecurringHint')}>
               <input type="checkbox" checked={r.recurring} onChange={(e) => set(i, { recurring: e.target.checked })} />
@@ -3659,14 +3658,18 @@ function ListsManager({ lists }: { lists: ListEditorEntry[] }) {
 
 function ListEditor({ entry }: { entry: ListEditorEntry }) {
   const t = useT();
-  const [values, setValues] = useState<string[]>(entry.values);
+  // Money categories are the shared grouped list (lib/categories): those are shown, not
+  // removed; only your own additions are kept in the stored list.
+  const shared = entry.key === 'expenseCategories' || entry.key === 'subscriptionCategories';
+  const builtIn = new Set(shared ? entry.default : []);
+  const [values, setValues] = useState<string[]>(shared ? entry.values.filter((v) => !builtIn.has(v)) : entry.values);
   const [input, setInput] = useState('');
   const [pending, startTransition] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
 
   function add() {
     const v = input.trim().toLowerCase().replace(/\s+/g, '-');
-    if (v && !values.includes(v)) setValues((s) => [...s, v]);
+    if (v && !values.includes(v) && !builtIn.has(v)) setValues((s) => [...s, v]);
     setInput('');
   }
   function save(next: string[]) {
@@ -3682,10 +3685,27 @@ function ListEditor({ entry }: { entry: ListEditorEntry }) {
         <span className="text-sm font-medium">{entry.label}</span>
         <span className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>{entry.where}</span>
       </div>
+      {shared && (
+        <div className="mb-3 space-y-1.5">
+          {groupCategories(entry.default).map(({ group, categories }) => (
+            <div key={group.key} className="flex flex-wrap items-center gap-1.5">
+              <span className="inline-flex w-36 shrink-0 items-center gap-1.5 text-xs font-medium">
+                <CategoryIcon category={categories[0]} size={13} /> {categoryGroupLabel(t, group.key)}
+              </span>
+              {categories.map((c) => (
+                <span key={c} className="text-[11px] px-2 py-0.5 rounded-full bg-[color:var(--color-surface-2)] text-[color:var(--color-text-dim)]">
+                  {categoryLabel(t, c)}
+                </span>
+              ))}
+            </div>
+          ))}
+          <p className="pt-1 text-[11px] text-[color:var(--color-text-faint)]">{t('set.ownCategories')}</p>
+        </div>
+      )}
       <div className="flex flex-wrap gap-1.5 mb-2">
         {values.map((v) => (
           <span key={v} className="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)]" style={{ fontFamily: 'var(--font-mono)' }}>
-            {v}
+            {shared ? categoryLabel(t, v) : v}
             {v !== 'other' && <button onClick={() => setValues((s) => s.filter((x) => x !== v))} className="text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)]"><X size={11} /></button>}
           </span>
         ))}
@@ -3694,7 +3714,7 @@ function ListEditor({ entry }: { entry: ListEditorEntry }) {
         <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') add(); }} placeholder={t('set.addCategoryPlaceholder')} className={cn(controlClass, 'text-xs py-1.5')} />
         <button onClick={add} className={ghostBtn}><Plus size={13} /></button>
         <button onClick={() => save(values)} disabled={pending} className={saveBtn}>{pending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} {t('common.save')}</button>
-        <button onClick={() => { setValues(entry.default); save(entry.default); }} disabled={pending} title={t('set.resetDefault')} className={ghostBtn}><RotateCcw size={13} /></button>
+        <button onClick={() => { const d = shared ? [] : entry.default; setValues(d); save(d); }} disabled={pending} title={t('set.resetDefault')} className={ghostBtn}><RotateCcw size={13} /></button>
         {msg && <span className="text-[11px] text-[color:var(--color-accent)]" style={{ fontFamily: 'var(--font-mono)' }}>{msg}</span>}
       </div>
     </div>

@@ -225,6 +225,16 @@ Two views over the same **Expense** model, split by `kind`: **Expenses**
 (`/expenses`, money out) and **Income** (`/income`, money in). The UI mirrors
 Receipts: dropzone scan, manual add, grid / list, and a filter sidebar.
 
+**One set of categories.** Every money page (expenses and income, bills, subscriptions,
+receipt lines, statements, budgets, reports and category rules) uses the same list
+(`lib/categories.ts`): ten groups (Home, Bills, Food, Getting around, Health, Fun,
+Shopping, Subscriptions, Money matters, Other), each with an icon and a colour, and the
+categories under them, named in your language. Pickers are grouped by them. Older or
+differently spelled values are read as the category they mean ("food" is Groceries,
+"electric" is Electricity) and are saved that way the next time the record is edited;
+anything unknown shows as it is under Other. Settings → Categories shows the list and
+lets you add your own. Inventory item types keep their own list.
+
 - **AI scan** of bills, invoices, and payslips extracts vendor, amount, date,
   category, and period.
 - **Recurring series.** A `vendorKey` normalises vendor names (including Greek to

@@ -27,12 +27,14 @@ import { CardSelect } from '@/components/CardSelect';
 import { useOpenParam } from '@/components/useOpenParam';
 import type { SerializedSubscription, SerializedCard } from '@/types';
 import { useT, useMoney } from '@/components/LocaleProvider';
-import type { TKey } from '@/lib/i18n';
+import type { TFunc, TKey } from '@/lib/i18n';
 import type { RecurringCandidate } from '@/lib/recurringDiscovery';
 import { equalSplit, splitTotals, type SplitEntry } from '@/lib/split';
 import { compareNames } from '@/lib/i18n/format';
 import { useLocale } from '@/components/LocaleProvider';
 import { RecordAttachments } from '@/components/RecordAttachments';
+import { CategoryOptions, useCategoryOptionLabels } from '@/components/CategoryBadge';
+import { canonicalCategory, categoryGroup, categoryLabel } from '@/lib/categories';
 import {
   createSubscription,
   updateSubscription,
@@ -66,8 +68,12 @@ function subCategoryOptions(current?: string): { value: string; label: string }[
 
 
 
-function categoryMeta(cat: string) {
-  return CATEGORIES.find((c) => c.value === cat) ?? CATEGORIES[CATEGORIES.length - 1];
+/** Colour per subscription kind (a custom one takes its group's colour); the name comes
+ *  from the shared category names. */
+function categoryMeta(cat: string, t: TFunc) {
+  const c = canonicalCategory(cat);
+  const hex = CATEGORIES.find((x) => x.value === c)?.hex ?? categoryGroup(c).color;
+  return { value: c, hex, label: categoryLabel(t, c) };
 }
 
 /** P9: the base code always comes first, even when it is not one of the built-ins. */
@@ -134,7 +140,8 @@ export function SubscriptionsClient({
   const [layout, setLayout] = useState<'grid' | 'list'>('list');
 
   const active = subscriptions.filter((s) => s.active);
-  const categories = useMemo(() => [...new Set(subscriptions.map((s) => s.category).filter(Boolean))].sort(), [subscriptions]);
+  const categories = useMemo(() => [...new Set(subscriptions.map((s) => canonicalCategory(s.category)).filter(Boolean))].sort(), [subscriptions]);
+  const catOptionLabels = useCategoryOptionLabels(categories);
 
   // Deep-link from global search
   useOpenParam((id) => {
@@ -172,7 +179,7 @@ export function SubscriptionsClient({
     const out = subscriptions.filter((s) => {
       if (statusFilter === 'active' && !s.active) return false;
       if (statusFilter === 'cancelled' && s.active) return false;
-      if (categoryFilter && s.category !== categoryFilter) return false;
+      if (categoryFilter && canonicalCategory(s.category) !== canonicalCategory(categoryFilter)) return false;
       if (!matchesSpace(s.space, spaceFilter)) return false;
       // P68: "Kalamos" finds every subscription charged to the summer house.
       if (q && !`${s.name} ${s.provider} ${s.notes} ${s.space || ''}`.toLowerCase().includes(q)) return false;
@@ -220,7 +227,7 @@ export function SubscriptionsClient({
     <div>
       {categories.length > 1 && (
         <FilterSection label={t('common.category')}>
-          <SearchableSelect value={categoryFilter} onChange={setCategoryFilter} options={categories} placeholder={t('sub.allCategories')} clearable size="sm" className="w-full" />
+          <SearchableSelect value={categoryFilter} onChange={setCategoryFilter} options={categories} labels={catOptionLabels} placeholder={t('sub.allCategories')} clearable size="sm" className="w-full" />
         </FilterSection>
       )}
       {spaces.length > 0 && (
@@ -438,7 +445,7 @@ function useSubRow(sub: SerializedSubscription) {
     pending,
     startTransition,
     handleDelete,
-    meta: categoryMeta(sub.category),
+    meta: categoryMeta(sub.category, t),
     d: renewalDaysUntil(sub.nextRenewal),
     cycleLabel: isBillingCycle(sub.billingCycle) ? t(`cyc.${sub.billingCycle}` as TKey) : sub.billingCycle,
   };
@@ -748,9 +755,7 @@ function SubForm({ sub, cards, spaces = [], fx, onSuccess, onDeleted }: { sub?: 
         </Field>
         <Field label={t('sub.fCategory')}>
           <select value={form.category} onChange={set('category')} className={controlClass}>
-            {subCategoryOptions(form.category).map((c) => (
-              <option key={c.value} value={c.value}>{c.label}</option>
-            ))}
+            <CategoryOptions categories={subCategoryOptions(form.category).map((c) => c.value)} current={form.category} />
           </select>
         </Field>
       </div>
