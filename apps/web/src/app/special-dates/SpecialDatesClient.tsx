@@ -1,7 +1,8 @@
 'use client';
 import { PAGE_MAIN, PageHeader, HeaderButton, PrimaryAction } from '@/components/ui/PageHeader';
 import { useState, useMemo, useTransition } from 'react';
-import { Trash2, Check, Archive, ArchiveRestore, Pencil, X, Cake } from 'lucide-react';
+import { Trash2, Check, Archive, ArchiveRestore, Pencil, X, Cake, Gift } from 'lucide-react';
+import { GiftIdeasModal } from './GiftIdeasModal';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Field } from '@/components/ui/Field';
@@ -29,7 +30,7 @@ const dayColor = (days: number, lead: number) => (days === 0 ? 'var(--color-acce
 
 type Draft = Partial<SerializedSpecialDate> | null;
 
-export function SpecialDatesClient({ dates, leadDays }: { dates: SerializedSpecialDate[]; leadDays: number }) {
+export function SpecialDatesClient({ dates, leadDays, giftsOn = false, currency = 'EUR' }: { dates: SerializedSpecialDate[]; leadDays: number; giftsOn?: boolean; currency?: string }) {
   const t = useT();
   const locale = useLocale();
   const months = useMemo(() => monthNames(locale), [locale]);
@@ -38,6 +39,7 @@ export function SpecialDatesClient({ dates, leadDays }: { dates: SerializedSpeci
   const [showArchived, setShowArchived] = useState(false);
   const [editing, setEditing] = useState<Draft>(null);
   const [error, setError] = useState('');
+  const [gifting, setGifting] = useState<SerializedSpecialDate | null>(null);
 
   const rows = useMemo(() => {
     return dates
@@ -97,6 +99,9 @@ export function SpecialDatesClient({ dates, leadDays }: { dates: SerializedSpeci
                 </div>
               </div>
               <div className="flex items-center gap-1 shrink-0">
+                {giftsOn && !d.archived && (
+                  <button onClick={() => setGifting(d)} title={t('gift.ideas')} aria-label={t('gift.ideas')} className="p-1.5 rounded-lg text-[color:var(--color-text-faint)] hover:text-[color:var(--color-accent)]"><Gift size={14} /></button>
+                )}
                 <button onClick={() => { setError(''); setEditing(d); }} title={t('common.edit')} aria-label={t('common.edit')} className="p-1.5 rounded-lg text-[color:var(--color-text-faint)] hover:text-[color:var(--color-accent)]"><Pencil size={14} /></button>
                 <button onClick={() => startTransition(async () => { await setSpecialDateArchived(d._id, !d.archived); })} title={d.archived ? t('common.unarchive') : t('common.archive')} aria-label={d.archived ? t('common.unarchive') : t('common.archive')} className="p-1.5 rounded-lg text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)]">
                   {d.archived ? <ArchiveRestore size={14} /> : <Archive size={14} />}
@@ -140,6 +145,7 @@ export function SpecialDatesClient({ dates, leadDays }: { dates: SerializedSpeci
           </div>
         </form>
       </Modal>
+      {gifting && <GiftIdeasModal date={gifting} currency={currency} onClose={() => setGifting(null)} />}
     </main>
   );
 }

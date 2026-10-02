@@ -15,13 +15,18 @@ import { Modal } from '@/components/ui/Modal';
 import { formatDate } from '@/lib/i18n/format';
 import { createMeterReading, deleteMeterReading } from './actions';
 import { todayLocal } from '@/lib/dates';
+import { ScanFileButton } from '@/components/ScanFileButton';
 
-export function UtilitiesClient({ readings, spaces }: { readings: ReadingLike[]; spaces: string[] }) {
+export function UtilitiesClient({ readings, spaces, scanOn = false }: { readings: ReadingLike[]; spaces: string[]; scanOn?: boolean }) {
   const t = useT();
   const locale = useLocale();
   const confirm = useConfirm();
   const [open, setOpen] = useState(false);
   const [readingAt, setReadingAt] = useState('');
+  // Controlled so a meter photo can fill them; the rest of the form stays uncontrolled.
+  const [value, setValue] = useState('');
+  const [unit, setUnit] = useState('');
+  const [meter, setMeter] = useState('');
   const [error, setError] = useState('');
   const [pending, startTransition] = useTransition();
   const rows = useMemo(() => withConsumption(readings), [readings]);
@@ -45,7 +50,7 @@ export function UtilitiesClient({ readings, spaces }: { readings: ReadingLike[];
   return (
     <main className={PAGE_MAIN}>
       <PageHeader title={t('util.title')} count={readings.length} subtitle={t('util.subtitle')}>
-        <PrimaryAction onClick={() => { setError(''); setReadingAt(todayLocal()); setOpen(true); }} />
+        <PrimaryAction onClick={() => { setError(''); setReadingAt(todayLocal()); setValue(''); setOpen(true); }} />
       </PageHeader>
 
       {latestFirst.length === 0 ? (
@@ -84,14 +89,28 @@ export function UtilitiesClient({ readings, spaces }: { readings: ReadingLike[];
 
       <Modal open={open} onClose={() => setOpen(false)} title={t('util.add')} size="md">
         <form action={submit} className="space-y-3">
+          {scanOn && (
+            <ScanFileButton
+              kind="meter"
+              label={t('ut.scanMeter')}
+              accept="image/*"
+              onResult={(r) => {
+                if (r.kind !== 'meter') return;
+                if (r.data.value !== null) setValue(String(r.data.value));
+                if (r.data.unit) setUnit(r.data.unit === 'm3' ? 'm³' : r.data.unit);
+                if (!readingAt) setReadingAt(todayLocal());
+              }}
+            />
+          )}
           <Field label={t('util.meter')}>
-            <Input name="meter" required placeholder={t('util.meterHint')} />
+            <Input name="meter" required placeholder={t('util.meterHint')} value={meter} onChange={(e) => setMeter(e.target.value)} list="utility-meters" />
+            <datalist id="utility-meters">{[...new Set(readings.map((r) => r.meter))].map((m) => <option key={m} value={m} />)}</datalist>
           </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label={t('util.type')}><Input name="utilityType" required placeholder={t('util.typeHint')} /></Field>
-            <Field label={t('util.unit')}><Input name="unit" required placeholder="kWh / m³" /></Field>
+            <Field label={t('util.unit')}><Input name="unit" required placeholder="kWh / m³" value={unit} onChange={(e) => setUnit(e.target.value)} /></Field>
             <Field label={t('util.date')}><DateInput name="readingAt" required value={readingAt} onValueChange={setReadingAt} /></Field>
-            <Field label={t('util.reading')}><Input name="value" type="number" min="0" step="any" required /></Field>
+            <Field label={t('util.reading')}><Input name="value" type="number" min="0" step="any" required value={value} onChange={(e) => setValue(e.target.value)} /></Field>
           </div>
           <Field label={t('util.space')}>
             <Input name="space" list="utility-spaces" />

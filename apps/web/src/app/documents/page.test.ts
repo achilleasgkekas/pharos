@@ -40,6 +40,7 @@ vi.mock('@/models/Document', () => ({
   Document: { __isDocumentMock: true },
 }));
 
+vi.mock('@/lib/aiFeatures.server', () => ({ aiFeatureStatus: async () => 'disabled' }));
 vi.mock('@/lib/appSettings', () => ({
   getAppSettings: async () => {
     getAppSettingsMock();
@@ -61,6 +62,7 @@ describe('DocumentsPage', () => {
     expect(currentModelMock).toHaveBeenCalled();
     expect(elementProps.documents).toEqual([{ _id: 'doc1', title: 'Test Document' }]);
     expect(elementProps.leadDays).toBe(30);
+    expect(elementProps.scanOn).toBe(false);
 
     // Assert that find was called without an explicit soft-delete filter
     expect(documentFindMock).toHaveBeenCalledWith(undefined);

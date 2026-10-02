@@ -12,6 +12,7 @@ import { marketFor } from '@/lib/shoppingRegion';
 import type { SerializedItem, SerializedStatement } from '@/types';
 import { loadBundleSummaries } from './bundleData';
 import type { BundleSummary } from '@/lib/bundles';
+import { aiFeatureStatus } from '@/lib/aiFeatures.server';
 
 export const dynamic = 'force-dynamic';
 
@@ -47,7 +48,7 @@ async function getData(): Promise<{
 }
 
 export default async function ItemsPage() {
-  const [{ items, plans, unlinkedPlans, receipts, bundles }, settings] = await Promise.all([getData(), getAppSettings()]);
+  const [{ items, plans, unlinkedPlans, receipts, bundles }, settings, manualQa] = await Promise.all([getData(), getAppSettings(), aiFeatureStatus('manualQa')]);
   return (
     <ItemsClient
       items={items}
@@ -61,6 +62,7 @@ export default async function ItemsPage() {
       baseCurrency={settings.currency}
       multiCurrency={settings.multiCurrency} // P9: off = no per-item currency controls at all
       shoppingMarket={marketFor(settings.shoppingCountry, settings.shoppingExtraShops)}
+      manualQaOn={manualQa === 'ready'}
     />
   );
 }

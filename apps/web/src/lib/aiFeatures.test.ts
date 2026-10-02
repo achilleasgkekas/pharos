@@ -24,6 +24,12 @@ const EXPECTED_KEYS: AiFeatureKey[] = [
   'itemsImport',
   'productPhoto',
   'vehicles',
+  'documents',
+  'bills',
+  'meters',
+  'manualQa',
+  'giftIdeas',
+  'reportSummary',
   'commandBar',
 ];
 
@@ -61,7 +67,7 @@ describe('AI_FEATURES', () => {
 
   it('groups features under the known Settings areas', () => {
     const areas = new Set(AI_FEATURES.map((f) => f.area));
-    expect(areas).toEqual(new Set(['Documents', 'Shopping & items', 'Assistant']));
+    expect(areas).toEqual(new Set(['Documents', 'Shopping & items', 'Insights', 'Assistant']));
   });
 
   it('keeps same-area features contiguous (so the Settings UI can group by first-seen order)', () => {

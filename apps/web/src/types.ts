@@ -9,7 +9,10 @@ export type SerializedPriceEntry = {
 };
 
 export type SerializedAttachment = {
+  /** Storage-relative file; '' for a link. */
   path: string;
+  /** http(s) link; '' (or absent on old items) for a file. */
+  url?: string;
   name: string;
   mimeType: string;
   size: number;
@@ -101,6 +104,8 @@ export type SerializedStep = {
 
 export type SerializedTask = {
   _id: string;
+  /** Files and links kept with it. Absent on records saved before they existed. */
+  attachments?: SerializedAttachment[];
   /** P75: the User who created it. Absent/null = unknown (pre-P75, or a background job). */
   createdBy?: string | null;
   title: string;
@@ -230,6 +235,8 @@ export type SerializedVoucher = {
 // P28 — a manually-paid bill/payable whose status (paid/overdue/due-soon) is derived.
 export type SerializedBill = {
   _id: string;
+  /** Files and links kept with it. Absent on records saved before they existed. */
+  attachments?: SerializedAttachment[];
   /** P75: the User who created it. Absent/null = unknown (pre-P75, or a background job). */
   createdBy?: string | null;
   title: string;
@@ -273,6 +280,8 @@ export type SerializedSpecialDate = {
 // P42: personal document expiry tracker.
 export type SerializedDocument = {
   _id: string;
+  /** Files and links kept with it. Absent on records saved before they existed. */
+  attachments?: SerializedAttachment[];
   /** P75: the User who created it. Absent/null = unknown (pre-P75, or a background job). */
   createdBy?: string | null;
   title: string;
@@ -304,6 +313,8 @@ export type SerializedCard = {
 
 export type SerializedSubscription = {
   _id: string;
+  /** Files and links kept with it. Absent on records saved before they existed. */
+  attachments?: SerializedAttachment[];
   /** P75: the User who created it. Absent/null = unknown (pre-P75, or a background job). */
   createdBy?: string | null;
   name: string;

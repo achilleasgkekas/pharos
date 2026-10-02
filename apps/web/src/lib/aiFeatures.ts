@@ -13,6 +13,12 @@ export type AiFeatureKey =
   | 'itemsImport'
   | 'productPhoto'
   | 'vehicles'
+  | 'documents'
+  | 'bills'
+  | 'meters'
+  | 'manualQa'
+  | 'giftIdeas'
+  | 'reportSummary'
   | 'commandBar';
 
 export type AiFeatureStatus = 'disabled' | 'no-provider' | 'ready';
@@ -26,9 +32,15 @@ export const AI_FEATURES: { key: AiFeatureKey; label: string; description: strin
   { key: 'vouchers', label: 'Voucher scanning', description: 'Read code, discount and expiry from a coupon.', area: 'Documents' },
   { key: 'cards', label: 'Card photo scan', description: 'Read name, last-4 and bank from a photo of a payment card.', area: 'Documents' },
   { key: 'vehicles', label: 'Vehicle receipt scan', description: 'Fill a fuel fill-up or a service from a photo of the pump receipt or the garage invoice.', area: 'Documents' },
+  { key: 'documents', label: 'Document scan', description: 'Fill title, number, holder and expiry from a photo or PDF of an ID, licence or policy.', area: 'Documents' },
+  { key: 'bills', label: 'Bill reading', description: 'Fill amount, due date, payment code and consumption from a utility bill.', area: 'Documents' },
+  { key: 'meters', label: 'Meter photo', description: 'Read the number from a photo of an electricity, water or gas meter.', area: 'Documents' },
   { key: 'subscriptions', label: 'Subscription autofill', description: 'Fill provider, price and cycle from a subscription name.', area: 'Shopping & items' },
   { key: 'itemsImport', label: 'Product import & AI-fill', description: 'Import items from a URL and fill specs, price and photos.', area: 'Shopping & items' },
   { key: 'productPhoto', label: 'Product photo scan', description: 'Read a product from a photo of its packaging for the shopping list.', area: 'Shopping & items' },
+  { key: 'manualQa', label: 'Ask the manual', description: 'Answer a question from the manual PDF kept on an item.', area: 'Shopping & items' },
+  { key: 'giftIdeas', label: 'Gift ideas', description: 'Suggest gifts for a birthday or nameday, to add to the wishlist.', area: 'Shopping & items' },
+  { key: 'reportSummary', label: 'Report summary', description: 'Explain the period in a few sentences on the Reports page, when you ask for it.', area: 'Insights' },
   { key: 'commandBar', label: 'AI command bar', description: 'Natural-language assistant in the top bar (add expenses, items, tasks…).', area: 'Assistant' },
 ];
 

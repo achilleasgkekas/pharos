@@ -77,7 +77,7 @@ function printedAmount(bill: { amount?: number | null; origAmount?: number | nul
   return (Number(bill.origAmount) || 0) > 0 ? Number(bill.origAmount) : Number(bill.amount) || 0;
 }
 
-export async function createBill(formData: FormData): Promise<{ ok: boolean; error?: string }> {
+export async function createBill(formData: FormData): Promise<{ ok: boolean; id?: string; error?: string }> {
   await assertCanWrite();
   const parsed = BillFormSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { ok: false, error: formatZodError(parsed.error) };
@@ -87,9 +87,9 @@ export async function createBill(formData: FormData): Promise<{ ok: boolean; err
   return withRequestTenant(async () => {
     await connectDB();
     const Bill = await currentModel(BillModel);
-    await Bill.create({ ...raw, ...(await resolveBillFx(raw)), space: (raw.space ?? '').trim(), dueDate: due, paidAt: null, archived: false });
+    const created = await Bill.create({ ...raw, ...(await resolveBillFx(raw)), space: (raw.space ?? '').trim(), dueDate: due, paidAt: null, archived: false });
     revalidatePath('/bills');
-    return { ok: true };
+    return { ok: true, id: created?._id ? String(created._id) : undefined };
   });
 }
 

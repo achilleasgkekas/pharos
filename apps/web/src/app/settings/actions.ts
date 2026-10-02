@@ -118,7 +118,9 @@ import { detectBudgetExceeded, type BudgetAlertRow } from '@/lib/budgetAlert';
 import { estimatedItemValue } from '@/lib/depreciation';
 import { buildInsuranceCsv, buildInsuranceHtml, type InsuranceItem } from '@/lib/insuranceExport';
 import { buildTaxCsv, buildTaxHtml, type TaxExpenseRow } from '@/lib/taxExport';
+import { cleanAttachmentUrl } from '@/lib/attachments';
 import JSZip from 'jszip';
+import { BILL_SCAN_PROMPT, DOCUMENT_SCAN_PROMPT, METER_SCAN_PROMPT } from '@/lib/homeScan';
 import {
   getEventWebhooks,
   dispatchEventWebhooks,
@@ -1338,6 +1340,9 @@ const PROMPT_DEFAULTS: Record<PromptKey, string> = {
   productPhoto: PRODUCT_PHOTO_PROMPT,
   vehicleFuel: FUEL_SCAN_PROMPT,
   vehicleService: SERVICE_SCAN_PROMPT,
+  document: DOCUMENT_SCAN_PROMPT,
+  bill: BILL_SCAN_PROMPT,
+  meter: METER_SCAN_PROMPT,
   scraperPrice: DEFAULT_SCRAPER_PRICE_PROMPT,
 };
 
@@ -2465,9 +2470,13 @@ export async function importData(json: string): Promise<{ ok: boolean; restored:
       }
       if (Array.isArray(rest.photos)) rest.photos = rest.photos.filter(isSafeStoredPath);
       if (Array.isArray(rest.attachments)) {
-        rest.attachments = (rest.attachments as unknown[]).filter(
-          (a) => a && typeof a === 'object' && isSafeStoredPath((a as Record<string, unknown>).path)
-        );
+        // A file must point inside storage; a link (no path) must be a plain http(s) URL.
+        rest.attachments = (rest.attachments as unknown[]).filter((a) => {
+          if (!a || typeof a !== 'object') return false;
+          const r = a as Record<string, unknown>;
+          if (r.path) return isSafeStoredPath(r.path);
+          return typeof r.url === 'string' && cleanAttachmentUrl(r.url) === r.url;
+        });
       }
       // `exportData` only dumps live documents, so anything in a backup was NOT in the Trash when
       // it was written. If the copy in the database has been trashed since, `$set` alone cannot
@@ -2621,6 +2630,10 @@ export async function purgeTrashEntry(type: TrashType, id: string): Promise<{ ok
 
   if (type === 'receipt' || type === 'expense') {
     for (const fp of [doc.filePath, doc.thumbPath]) if (fp) await deleteFile(String(fp)).catch(() => {});
+  }
+  // Files kept on a document, bill, subscription or task go with it (items do this below).
+  if (type !== 'item') {
+    for (const a of (doc.attachments as { path?: string }[] | undefined) ?? []) if (a.path) await deleteFile(a.path).catch(() => {});
   }
   if (type === 'receipt') {
     await (await scoped(Item)).updateMany({ receiptIds: oid }, { $pull: { receiptIds: oid } });

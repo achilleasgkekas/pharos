@@ -22,6 +22,9 @@ const CANONICAL_KEYS: PromptKey[] = [
   'productPhoto',
   'vehicleFuel',
   'vehicleService',
+  'document',
+  'bill',
+  'meter',
   'scraperPrice',
 ];
 

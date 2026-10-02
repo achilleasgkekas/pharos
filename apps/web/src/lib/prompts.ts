@@ -3,7 +3,7 @@ import { AppConfig } from '@/models/AppConfig';
 import { currentModel } from './tenancy/connection';
 import { currentTenant } from './tenancy/current';
 
-export type PromptKey = 'receipt' | 'statement' | 'product' | 'card' | 'subscription' | 'category' | 'expense' | 'voucher' | 'productPhoto' | 'vehicleFuel' | 'vehicleService' | 'scraperPrice';
+export type PromptKey = 'receipt' | 'statement' | 'product' | 'card' | 'subscription' | 'category' | 'expense' | 'voucher' | 'productPhoto' | 'vehicleFuel' | 'vehicleService' | 'document' | 'bill' | 'meter' | 'scraperPrice';
 
 // Shared output contract for the built-in prompts (#364/#366); lives in promptRules.ts so a
 // module that only needs the rule does not pull in the DB-backed override store.
@@ -40,6 +40,9 @@ export const PROMPT_META: { key: PromptKey; label: string; where: string }[] = [
   { key: 'productPhoto', label: 'Product photo', where: 'Shopping list: scan a product photo' },
   { key: 'vehicleFuel', label: 'Fuel receipt', where: 'Vehicles: scan a pump receipt' },
   { key: 'vehicleService', label: 'Service invoice', where: 'Vehicles: scan a garage invoice' },
+  { key: 'document', label: 'Document scan', where: 'Documents: scan an ID, licence or policy' },
+  { key: 'bill', label: 'Bill reading', where: 'Bills: read a utility bill' },
+  { key: 'meter', label: 'Meter photo', where: 'Utilities: read a meter photo' },
   { key: 'scraperPrice', label: 'Scraper price', where: 'Price scraper service: extract current price' },
 ];
 

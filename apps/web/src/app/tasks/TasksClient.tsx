@@ -29,6 +29,7 @@ import { useOpenParam } from '@/components/useOpenParam';
 import type { SerializedTask } from '@/types';
 import { useT } from '@/components/LocaleProvider';
 import type { TKey } from '@/lib/i18n';
+import { RecordAttachments } from '@/components/RecordAttachments';
 import {
   createTask,
   updateTaskStatus,
@@ -677,6 +678,8 @@ function TaskDetailModal({ task, onClose }: { task: SerializedTask; onClose: () 
             className={cn(controlClass, 'w-full resize-y')}
           />
         </div>
+
+        <RecordAttachments kind="task" id={task._id} attachments={task.attachments ?? []} />
 
         {/* Actions */}
         <div className="flex gap-2 pt-2 border-t border-[color:var(--color-border)]">

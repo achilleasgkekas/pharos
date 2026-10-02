@@ -14,8 +14,12 @@ import { documentDaysUntilExpiry, documentStatus, type DocStatus } from '@/lib/d
 import type { SerializedDocument } from '@/types';
 import type { TFunc } from '@/lib/i18n';
 import { createDocument, updateDocument, deleteDocument, setDocumentArchived } from './actions';
+import { addAttachmentFiles } from '@/app/attachmentActions';
+import { ScanFileButton } from '@/components/ScanFileButton';
+import type { DocumentScan } from '@/lib/homeScan';
 import { formatDate } from '@/lib/i18n/format';
 import { useLocale, useT } from '@/components/LocaleProvider';
+import { RecordAttachments } from '@/components/RecordAttachments';
 
 // P42: personal document expiry tracker.
 
@@ -35,7 +39,7 @@ const toInputDate = (s: string | null) => {
 
 type Draft = Partial<SerializedDocument> | null;
 
-export function DocumentsClient({ documents, leadDays }: { documents: SerializedDocument[]; leadDays: number }) {
+export function DocumentsClient({ documents, leadDays, scanOn = false }: { documents: SerializedDocument[]; leadDays: number; scanOn?: boolean }) {
   const t = useT();
   const locale = useLocale();
   const confirm = useConfirm();
@@ -43,6 +47,10 @@ export function DocumentsClient({ documents, leadDays }: { documents: Serialized
   const [showArchived, setShowArchived] = useState(false);
   const [editing, setEditing] = useState<Draft>(null); // {} = new, {…} = edit, null = closed
   const [error, setError] = useState('');
+  // A scan prefills the form (remounted by `formKey`, the inputs are uncontrolled) and its file
+  // is kept with the document once it is saved.
+  const [formKey, setFormKey] = useState(0);
+  const [scannedFile, setScannedFile] = useState<File | null>(null);
 
   const visible = useMemo(
     () => documents.filter((d) => showArchived || !d.archived),
@@ -52,11 +60,28 @@ export function DocumentsClient({ documents, leadDays }: { documents: Serialized
 
   function openNew() {
     setError('');
+    setScannedFile(null);
     setEditing({});
   }
   function openEdit(d: SerializedDocument) {
     setError('');
+    setScannedFile(null);
     setEditing(d);
+  }
+
+  function applyScan(d: DocumentScan, file: File) {
+    setEditing((prev) => {
+      const next: Partial<SerializedDocument> = { ...(prev || {}) };
+      if (d.title && !prev?.title) next.title = d.title;
+      if (d.type && !prev?.type) next.type = d.type;
+      if (d.holder && !prev?.holder) next.holder = d.holder;
+      if (d.number && !prev?.number) next.number = d.number;
+      if (d.issuedAt) next.issuedAt = d.issuedAt;
+      if (d.expiryDate) next.expiryDate = d.expiryDate;
+      return next;
+    });
+    setScannedFile(file);
+    setFormKey((k) => k + 1);
   }
 
   function submit(fd: FormData) {
@@ -64,8 +89,15 @@ export function DocumentsClient({ documents, leadDays }: { documents: Serialized
     startTransition(async () => {
       const id = editing && editing._id;
       const r = id ? await updateDocument(id, fd) : await createDocument(fd);
-      if (r.ok) setEditing(null);
-      else setError(r.error || t('common.saveFailed'));
+      if (!r.ok) return setError(r.error || t('common.saveFailed'));
+      const savedId = editing?._id || (r as { id?: string }).id;
+      if (scannedFile && savedId) {
+        const files = new FormData();
+        files.append('files', scannedFile);
+        await addAttachmentFiles('document', savedId, files).catch(() => {});
+      }
+      setScannedFile(null);
+      setEditing(null);
     });
   }
 
@@ -143,7 +175,14 @@ export function DocumentsClient({ documents, leadDays }: { documents: Serialized
       )}
 
       <Modal open={editing !== null} onClose={() => setEditing(null)} title={editing && editing._id ? t('doc.edit') : t('doc.new')} size="md">
+        {/* Outside the keyed form, so its "filled in" note survives the remount a scan causes. */}
+        {scanOn && (
+          <div className="mb-3">
+            <ScanFileButton kind="document" label={t('doc.scan')} onResult={(r, file) => r.kind === 'document' && applyScan(r.data, file)} />
+          </div>
+        )}
         <form
+          key={formKey}
           action={submit}
           className="space-y-3"
         >
@@ -178,6 +217,11 @@ export function DocumentsClient({ documents, leadDays }: { documents: Serialized
             </Button>
           </div>
         </form>
+        {editing?._id && (
+          <div className="mt-5 border-t border-[color:var(--color-border)] pt-4">
+            <RecordAttachments kind="document" id={editing._id} attachments={editing.attachments ?? []} />
+          </div>
+        )}
       </Modal>
     </main>
   );

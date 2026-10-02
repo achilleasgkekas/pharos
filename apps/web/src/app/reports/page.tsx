@@ -32,6 +32,7 @@ import type { SerializedStatement } from '@/types';
 import { ReportsClient } from './ReportsClient';
 import { formatDate } from '@/lib/i18n/format';
 import { getLocaleSafe } from '@/lib/i18n/server';
+import { aiFeatureStatus } from '@/lib/aiFeatures.server';
 
 export const dynamic = 'force-dynamic';
 
@@ -529,6 +530,6 @@ export default async function ReportsPage({
 }) {
   const sp = await searchParams;
   const period = resolveReportPeriod(sp, new Date());
-  const data = await getReports(period, await getLocaleSafe());
-  return <ReportsClient data={data} initialTab={sp.tab} />;
+  const [data, summary, settings] = await Promise.all([getReports(period, await getLocaleSafe()), aiFeatureStatus('reportSummary'), getAppSettings()]);
+  return <ReportsClient data={data} initialTab={sp.tab} summaryOn={summary === 'ready'} currency={settings.currency} />;
 }

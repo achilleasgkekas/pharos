@@ -313,3 +313,18 @@ export async function getJobAiStats(jobId: string): Promise<{
     runs: Number(s.runs) || 0,
   };
 }
+
+/** This calendar month's AI use per feature (runs that reached a provider, and their cost),
+ *  for the per-feature list in Settings → AI. */
+export async function getAiFeatureUsageThisMonth(now: Date = new Date()): Promise<Record<string, { runs: number; costMicros: number }>> {
+  await connectDB();
+  const Model = await withRequestTenant(() => currentModel(AiRun));
+  const since = new Date(now.getFullYear(), now.getMonth(), 1);
+  const rows = await Model.aggregate([
+    { $match: { at: { $gte: since }, status: { $ne: 'blocked' } } },
+    { $group: { _id: '$feature', runs: { $sum: 1 }, costMicros: { $sum: '$costMicros' } } },
+  ]);
+  const out: Record<string, { runs: number; costMicros: number }> = {};
+  for (const r of rows) out[String(r._id)] = { runs: Number(r.runs) || 0, costMicros: Number(r.costMicros) || 0 };
+  return out;
+}

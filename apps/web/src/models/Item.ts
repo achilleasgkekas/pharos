@@ -1,6 +1,7 @@
 import { Schema, model, models, type Model, type InferSchemaType } from 'mongoose';
 import { softDeletePlugin } from '@/lib/softDelete';
 import { createdByPlugin } from '@/lib/createdBy';
+import { AttachmentSchema } from '@/lib/attachmentSchema';
 
 // Single source of truth for item status. Used by the schema enum AND by the
 // /api/v1/items POST + PATCH routes (whitelist validation) so they never drift.
@@ -32,16 +33,6 @@ const LinkSchema = new Schema(
 
 // Document / manual vault (P21): manuals, warranty certs, serial-number photos —
 // an ongoing per-item repository, distinct from `photos` (product gallery shots).
-const AttachmentSchema = new Schema(
-  {
-    path: { type: String, required: true }, // storage-relative path (equipment bucket, reused)
-    name: { type: String, default: '' },
-    mimeType: { type: String, default: '' },
-    size: { type: Number, default: 0 },
-    uploadedAt: { type: Date, default: Date.now },
-  },
-  { _id: false }
-);
 
 // P70: user-named attributes (MAC address, rack unit, firmware revision, licence key).
 // Distinct from `specs`, which is one free text blob: here the value carries its own label,

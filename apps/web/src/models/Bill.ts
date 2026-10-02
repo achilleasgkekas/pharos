@@ -1,6 +1,7 @@
 import { Schema, model, models, type Model, type InferSchemaType } from 'mongoose';
 import { softDeletePlugin } from '@/lib/softDelete';
 import { createdByPlugin } from '@/lib/createdBy';
+import { AttachmentSchema } from '@/lib/attachmentSchema';
 
 // P28 — bill / payable status tracker (due → paid → overdue). Distinct from
 // Subscription (an AUTOMATIC recurring charge) and from /calendar (which only
@@ -57,6 +58,7 @@ const BillSchema = new Schema(
     // κληρονομεί αυτό το tag — αλλιώς ένας πληρωμένος λογαριασμός θα μετριόταν δύο φορές.
     space: { type: String, default: '', index: true },
     archived: { type: Boolean, default: false, index: true },
+    attachments: { type: [AttachmentSchema], default: [] }, // files and links kept with it
     linkedExpenseId: { type: String, default: '' }, // set when "mark paid" also logged an expense
   },
   { timestamps: true }

@@ -56,10 +56,13 @@ import { SHOPPING_COUNTRIES, SHOPPING_PRESETS } from '@/lib/shoppingRegion';
 import { ForeignShopsEditor } from './ForeignShopsEditor';
 import type { TKey } from '@/lib/i18n';
 import { formatDate, formatTime, formatDateTime } from '@/lib/i18n/format';
+import { formatTaskCost } from '@/lib/claudePricing';
 
 type ProviderId = 'ollama' | 'anthropic' | 'openai' | 'gemini' | 'openrouter' | 'custom';
 
 type AiInfo = {
+  /** This month's runs and cost (USD micros) per AI feature. */
+  usage?: Record<string, { runs: number; costMicros: number }>;
   selectedProvider: ProviderId;
   effectiveProvider: ProviderId;
   ollamaHost: string;
@@ -377,6 +380,7 @@ function AiStatusChip({ status }: { status: 'ready' | 'no-provider' }) {
 const AREA_KEY: Record<string, TKey> = {
   Documents: 'af.areaDocuments',
   'Shopping & items': 'af.areaShopping',
+  Insights: 'af.areaInsights',
   Assistant: 'af.areaAssistant',
 };
 
@@ -396,6 +400,11 @@ function AiMasterAndFeatures({ ai, canEdit }: { ai: AiInfo; canEdit: boolean }) 
   }
 
   const areas = [...new Set(AI_FEATURES.map((f) => f.area))];
+  const [showFeatures, setShowFeatures] = useState(false);
+  const usage = ai.usage ?? {};
+  const onCount = AI_FEATURES.filter((f) => features[f.key] !== false).length;
+  const totalRuns = AI_FEATURES.reduce((n, f) => n + (usage[f.key]?.runs ?? 0), 0);
+  const totalMicros = AI_FEATURES.reduce((n, f) => n + (usage[f.key]?.costMicros ?? 0), 0);
 
   return (
     <Section title={t('set.aiFeaturesTitle')} icon={<Sparkles size={15} />}>
@@ -421,17 +430,42 @@ function AiMasterAndFeatures({ ai, canEdit }: { ai: AiInfo; canEdit: boolean }) 
           once here, not as a chip on every feature. */}
       {enabled && !ai.ready && <p className="text-xs text-[color:var(--color-gold)] mt-2">{t('set.noProviderWarn')}</p>}
 
-      <div className={cn('mt-4 space-y-3', !enabled && 'opacity-50 pointer-events-none')}>
+      {/* The per-feature switches are for the few who want them (cost, or keeping one kind of
+          paper off the cloud), so they fold away behind one line that says where things stand. */}
+      <button
+        type="button"
+        onClick={() => setShowFeatures((v) => !v)}
+        aria-expanded={showFeatures}
+        disabled={!enabled}
+        className="mt-3 flex w-full items-center justify-between gap-3 rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] px-3 py-2.5 text-left disabled:opacity-50"
+      >
+        <span className="min-w-0">
+          <span className="block text-sm font-medium">{t('set.aiPerFeature')}</span>
+          <span className="block text-xs text-[color:var(--color-text-faint)]">
+            {t('set.aiPerFeatureLine', { on: onCount, all: AI_FEATURES.length })}
+            {totalRuns > 0 && ` · ${t('set.aiUsageLine', { runs: totalRuns, cost: formatTaskCost(totalMicros / 1e6) })}`}
+          </span>
+        </span>
+        <ChevronDown size={16} className={cn('shrink-0 text-[color:var(--color-text-faint)] transition-transform', showFeatures && 'rotate-180')} />
+      </button>
+
+      {showFeatures && (
+      <div className={cn('mt-3 space-y-3', !enabled && 'opacity-50 pointer-events-none')}>
         {areas.map((area) => (
           <div key={area}>
             <div className="text-xs font-medium text-[color:var(--color-text-faint)] mb-1.5">{AREA_KEY[area] ? t(AREA_KEY[area]) : area}</div>
             <div className="rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] divide-y divide-[color:var(--color-border)]">
-              {AI_FEATURES.filter((f) => f.area === area).map((f) => (
-                <div key={f.key} className="flex items-center gap-3 px-3 py-2.5">
+              {AI_FEATURES.filter((f) => f.area === area).map((f) => {
+                const u = usage[f.key];
+                return (
+                <div key={f.key} className="flex items-center gap-3 px-3 py-2">
                   <div className="min-w-0 flex-1">
                     <div className="text-sm font-medium">{t(('af.' + f.key) as TKey)}</div>
-                    {/* The name says enough on a phone; the line under it is for the wider screen. */}
-                    <div className="hidden sm:block text-xs text-[color:var(--color-text-faint)]">{t(('af.' + f.key + 'Desc') as TKey)}</div>
+                    <div className="text-xs text-[color:var(--color-text-faint)]">
+                      {u && u.runs > 0 ? t('set.aiUsageLine', { runs: u.runs, cost: formatTaskCost(u.costMicros / 1e6) }) : t('set.aiUnused')}
+                      {/* The name says enough on a phone; the line under it is for the wider screen. */}
+                      <span className="hidden sm:inline"> · {t(('af.' + f.key + 'Desc') as TKey)}</span>
+                    </div>
                   </div>
                   {canEdit ? (
                     <Switch label={t(('af.' + f.key) as TKey)} checked={features[f.key] !== false} onChange={(v) => toggleFeature(f.key, v)} />
@@ -439,11 +473,13 @@ function AiMasterAndFeatures({ ai, canEdit }: { ai: AiInfo; canEdit: boolean }) 
                     <span className="shrink-0 text-xs text-[color:var(--color-text-faint)]">{features[f.key] !== false ? t('set.on') : t('set.off')}</span>
                   )}
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         ))}
       </div>
+      )}
     </Section>
   );
 }

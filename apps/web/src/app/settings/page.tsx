@@ -14,7 +14,7 @@ import { getAppSettings } from '@/lib/appSettings';
 import { getStores } from '@/lib/storeService';
 import { SettingsClient } from './SettingsClient';
 import { listOllamaModels, getPromptsForEditor, getScraperAi, getStorageInfo, getListsForEditor, getImapInfo } from './actions';
-import { getRecentAiRuns } from '@/lib/aiRun';
+import { getAiFeatureUsageThisMonth, getRecentAiRuns } from '@/lib/aiRun';
 import { requireUser } from '@/lib/auth';
 import type { SerializedCard } from '@/types';
 
@@ -94,6 +94,7 @@ async function getInfo() {
       // Optional-AI controls
       enabled: doc?.aiEnabled !== false, // master switch, default ON
       features: (doc?.aiFeatures as Record<string, boolean>) || {},
+      usage: await getAiFeatureUsageThisMonth().catch(() => ({})), // runs + cost per feature, this month
       ready: aiReady, // provider-aware readiness (drives per-feature status chips)
       // #359: saved models swapped because Anthropic retired them; shown once in Settings → AI.
       // The read of `doc` above can race the swap in getAiConfig on the first load, so a swap not

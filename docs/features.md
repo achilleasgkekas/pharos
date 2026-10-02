@@ -397,6 +397,10 @@ Highlights:
 
 ## Bills & payables
 
+**Read the bill (AI, optional):** pick the PDF or a photo of a utility bill and the AI fills
+the amount, the due date and the payee, and adds the payment code, the consumption and
+the billed period to the notes. The bill file is kept under **Files & links**.
+
 A tracker (`/bills`) for the bills you pay **by hand**, such as electricity, telephone, or building fees. This is distinct from
 Subscriptions (an **automatic** recurring charge) and from the Calendar (which only
 **projects** the future): a bill has a lifecycle you follow, "is it due?, did I
@@ -446,6 +450,9 @@ other meter. Each reading has a meter name, a utility type, a unit and a date.
 PHAROS works out the consumption between readings and draws the trend, so you can
 see what is behind each bill. Readings can be tagged to a space (for example a
 second home).
+
+**Photo of the meter (AI, optional):** in the add form, take a photo of the meter and the
+AI reads the number (and the unit), ready for you to check and save.
 
 ## Vehicles
 
@@ -506,11 +513,20 @@ holder (for households), a number, and an expiry date. The list shows how long
 each one has left, and an alert fires ahead of the expiry (lead time in
 Settings → Alerts) and keeps nagging once it has lapsed.
 
+**Scan the document (AI, optional):** take a photo or pick a PDF of the document and the
+AI fills the title, type, holder, number and dates. The scanned file is kept with the
+document under **Files & links**, where you can also add other files or links.
+
 ## Special dates
 
 Birthdays, anniversaries and namedays (`/special-dates`). Stored as a day and a
 month, with an optional year so the reminder can say how old someone turns. An
 alert fires a few days ahead (lead time in Settings → Alerts).
+
+**Gift ideas (AI, optional):** the gift button on a date asks for five ideas, with an
+optional budget and a hint about what the person likes. Only the name, the occasion,
+the date's notes and your hint go to the AI. Each idea goes to the Wishlist with one
+click (tagged `gift`).
 
 ## Calendar
 
@@ -587,6 +603,10 @@ expenses by category, spending by store, biggest purchases, year over year), **G
 **Subscriptions** and **Assets & debts** (net worth, inventory value, warranties, card
 payments, installments).
 
+**Explain this period (AI, optional):** a button on the Overview tab sends the period's
+totals and its top categories and stores (not the records themselves) to the AI and
+shows three or four sentences on what changed and why. It runs only when you press it.
+
 - **Period.** This month, last month, the last 3 / 6 / 12 months, this year, last year,
   or any run of months (`?period=custom&from=2026-01&to=2026-03`). Every figure is
   compared with the run of the same length just before it ("+12%" next to it). Old
@@ -657,6 +677,14 @@ A planner (`/tasks`) with a **Kanban board** (Todo / In-Progress / Blocked / Don
 plus a list view. Quick-add with `#tag` parsing, drag-and-drop or arrow-key moves
 between columns, and a per-project progress bar when you filter by tag. Items from
 Inventory / Shopping can be converted into tasks.
+
+## Files & links
+
+Items, documents, bills, subscriptions and tasks have a **Files & links** block in their
+dialog: upload PDFs, photos or office files, or keep a link (for example the manual
+online). Files and links save straight away. On an item it is called **Manuals, files &
+links**, and with a manual PDF there you can **ask the manual** (AI, optional): type a
+question and get an answer taken from the manual, with the pages it used.
 
 ## AI command bar & history
 

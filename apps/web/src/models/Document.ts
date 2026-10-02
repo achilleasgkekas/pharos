@@ -1,6 +1,7 @@
 import { Schema, model, models, type Model, type InferSchemaType } from 'mongoose';
 import { softDeletePlugin } from '@/lib/softDelete';
 import { createdByPlugin } from '@/lib/createdBy';
+import { AttachmentSchema } from '@/lib/attachmentSchema';
 
 // P42 — personal document expiry tracker (passport, ID card, driving licence, residence
 // permit, vehicle registration/MOT). PHAROS is a "Personal Hub", but nothing tracked the
@@ -22,6 +23,7 @@ const DocumentSchema = new Schema(
     expiryDate: { type: Date, required: true, index: true },
     notes: { type: String, default: '' },
     archived: { type: Boolean, default: false, index: true },
+    attachments: { type: [AttachmentSchema], default: [] }, // files and links kept with it
   },
   { timestamps: true }
 );
