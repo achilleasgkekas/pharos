@@ -754,7 +754,10 @@ avoid blocking a re-import of the same month.)
 
 ## Settings
 
-Settings is split into small pages, grouped in the sidebar (a single picker on a phone).
+Settings is the one place for every setting, your own included (there is no separate
+Account page: `/account` and `/profile` open Settings → Account). It is split into small
+pages: on a computer they are listed in the sidebar, on a phone Settings opens on a
+searchable list of them.
 Each page opens with one line on what it holds. `?tab=<id>` links straight to a page;
 the old tab ids (`workspace`, `money`, `data`, `profile`) still land on the page that now
 holds their settings.
@@ -763,7 +766,10 @@ holds their settings.
   - **Account** (`account`): profile, password, sign out other devices, **two-factor
     authentication** (TOTP, opt-in: enroll with an authenticator app, confirm a code,
     save the one-time recovery codes; see
-    [Security](security.md#1-session-cookie-the-web-ui)), theme and language.
+    [Security](security.md#1-session-cookie-the-web-ui)).
+  - **Appearance & language** (`appearance`): theme and language, for this browser.
+  - **My notifications** (`my-notifications`): your notification email, push on this
+    device, and the alert topics you follow.
 - **Workspace**
   - **General** (`general`): currency, default VAT, default item view, warranty and
     return-window defaults, shopping country, auto-add stores, multi-currency.
@@ -787,12 +793,12 @@ holds their settings.
   - **Import & sample data** (`import`): migration import (YNAB) and demo data (load
     a realistic set to see Pharos in use, or clear every sample record).
 - **Connections**
-  - **Notifications** (`notifications`): alert channels (ntfy, Discord, Slack, Telegram,
+  - **Notification channels** (`notifications`): the household's alert channels (ntfy, Discord, Slack, Telegram,
     email, web push), per-category switches, quiet hours, test and check-now buttons.
   - **Integrations** (`integrations`): event webhooks, the API / MCP connector, the
     calendar feed, email-in (IMAP) and the bookmarklet.
 - **Administration**
-  - **Users & Access** (`users`, admin): household members and viewers, roles.
+  - **Users & access** (`users`, admin): household members and viewers, roles.
   - **Activity** (`activity`, once there is a second account): who added or trashed what.
   - **System status** (`system`, admin): database latency, free disk space, job queue.
   - **About & updates** (`about`): version, update check, privacy.
