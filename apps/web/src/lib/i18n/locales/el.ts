@@ -2821,4 +2821,8 @@ export const el: Partial<Dict> = {
   "reports.subBigCharge": "Το {name} χρεώνει {amount} μονομιάς σε {n} μέρες.",
   "reports.subReview": "Το {name} δεν έχει ελεγχθεί εδώ και {m} μήνες. Το χρησιμοποιείς ακόμα;",
   "reports.subBySpace": "Ανά χώρο",
+  "inbox.tooLarge": "Το αρχείο είναι πάνω από 40 MB. Κάνε το μικρότερο (ή τύπωσε λιγότερες σελίδες) και ξαναδοκίμασε.",
+  "inbox.serverError": "Ο server σταμάτησε ενώ διάβαζε το αρχείο. Ξαναδοκίμασε· αν συνεχίσει, ο λόγος είναι στα logs του server.",
+  "set.descAccountPeople": "Το προφίλ σου, ο κωδικός και ο έλεγχος δύο βημάτων, και τα άτομα που χρησιμοποιούν το Pharos.",
+  "nav.jobsHistory": "Εργασίες & ιστορικό",
 };

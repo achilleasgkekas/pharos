@@ -18,7 +18,7 @@ import { addExpense } from '@/app/expenses/actions';
 
 type Result = { ok: boolean; id?: string; error?: string };
 
-const MAX_UPLOAD_BYTES = 15 * 1024 * 1024;
+const MAX_UPLOAD_BYTES = 40 * 1024 * 1024;
 const optionalDate = z.string().max(40).default('');
 /** '' (not set) or a non-negative number, as a number input sends it. */
 const optionalNumber = z.union([z.literal(''), z.coerce.number().finite().min(0)]).default('');
@@ -179,7 +179,7 @@ export async function setVehiclePhoto(id: string, formData: FormData): Promise<R
   await assertCanWrite();
   const file = formData.get('file');
   if (!(file instanceof File) || file.size === 0) return { ok: false, error: 'No image' };
-  if (file.size > MAX_UPLOAD_BYTES) return { ok: false, error: 'File too large (max 15MB)' };
+  if (file.size > MAX_UPLOAD_BYTES) return { ok: false, error: 'File too large (max 40MB)' };
   if (!IMAGE_EXTS.has(extOf(file))) return { ok: false, error: 'Unsupported image type' };
   return withRequestTenant(async () => {
     await connectDB();
@@ -210,7 +210,7 @@ export async function uploadVehicleDocuments(id: string, formData: FormData): Pr
       const { relativePath } = await saveFile('equipment', Buffer.from(await f.arrayBuffer()), ext);
       docs.push({ path: relativePath, name: f.name.slice(0, 200), mimeType: DOC_MIME[ext], size: f.size, uploadedAt: new Date() });
     }
-    if (!docs.length) return { ok: false, error: 'Unsupported file type (PDF or image, max 15MB)' };
+    if (!docs.length) return { ok: false, error: 'Unsupported file type (PDF or image, max 40MB)' };
     await Vehicle.updateOne({ _id: id }, { $push: { attachments: { $each: docs } } });
     revalidateVehicle(id);
     return { ok: true, added: docs.length };
@@ -237,7 +237,7 @@ export async function deleteVehicleDocument(id: string, path: string): Promise<R
 async function saveLogFile(formData: FormData): Promise<string | { error: string }> {
   const file = formData.get('file');
   if (!(file instanceof File) || file.size === 0) return '';
-  if (file.size > MAX_UPLOAD_BYTES) return { error: 'File too large (max 15MB)' };
+  if (file.size > MAX_UPLOAD_BYTES) return { error: 'File too large (max 40MB)' };
   const ext = extOf(file);
   if (!DOC_MIME[ext]) return { error: 'Unsupported file type' };
   const { relativePath } = await saveFile('expenses', Buffer.from(await file.arrayBuffer()), ext);
@@ -342,7 +342,7 @@ export async function scanVehicleDocument(kind: VehicleScanKind, formData: FormD
   if (!(await isFeatureEnabled('vehicles'))) return { ok: false, error: 'Vehicle scanning (AI) is turned off. Turn it on in Settings → AI.' };
   const file = formData.get('file');
   if (!(file instanceof File) || file.size === 0) return { ok: false, error: 'No file' };
-  if (file.size > MAX_UPLOAD_BYTES) return { ok: false, error: 'File too large (max 15MB)' };
+  if (file.size > MAX_UPLOAD_BYTES) return { ok: false, error: 'File too large (max 40MB)' };
   const ext = extOf(file);
   if (!DOC_MIME[ext]) return { ok: false, error: 'Use a photo or a PDF' };
   try {

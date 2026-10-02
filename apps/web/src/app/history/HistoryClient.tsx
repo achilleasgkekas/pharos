@@ -5,6 +5,7 @@ import { MessageSquare, Search, Trash2, Check, ChevronDown, Activity, Download, 
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Input, filterControlClass } from '@/components/ui/Input';
 import { PAGE_MAIN, PageHeader, HeaderButton, HeaderTotals, FilterLayout, FilterSection, FilterOptions } from '@/components/ui/PageHeader';
+import { ActivityTabs } from '@/components/ui/ActivityTabs';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { cn } from '@/components/ui/cn';
 import { Modal } from '@/components/ui/Modal';
@@ -406,6 +407,7 @@ export function HistoryClient({
           </HeaderButton>
         )}
       </PageHeader>
+      <ActivityTabs />
 
       <div role="tablist" aria-label={t('nav.history')} className="mb-4 flex gap-1 overflow-x-auto no-scrollbar border-b border-[color:var(--color-border)]">
         {TABS.map((tab) => (

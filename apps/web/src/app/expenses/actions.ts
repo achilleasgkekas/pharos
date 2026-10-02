@@ -95,7 +95,7 @@ export async function scanExpenseImage(formData: FormData): Promise<ScanExpenseR
   if (!(await isFeatureEnabled('expenses'))) return { ok: false, error: 'Bill scanning (AI) is turned off.' };
   const file = formData.get('file');
   if (!file || !(file instanceof File) || file.size === 0) return { ok: false, error: 'No file' };
-  if (file.size > MAX_UPLOAD_BYTES) return { ok: false, error: 'File too large (max 15MB)' };
+  if (file.size > MAX_UPLOAD_BYTES) return { ok: false, error: 'File too large (max 40MB)' };
   try {
     const ext = (file.name.split('.').pop() || 'bin').toLowerCase();
     const isPdf = ext === 'pdf' || file.type === 'application/pdf';
@@ -234,7 +234,7 @@ export type UploadExpenseResult = { ok: true; id: string; aiUsed: boolean; aiErr
 
 /** Upload + scan a bill/payslip → draft Expense (verified:false) for the user to confirm. */
 // Matches next.config serverActions.bodySizeLimit; also bounds in-memory buffering + OCR.
-const MAX_UPLOAD_BYTES = 15 * 1024 * 1024;
+const MAX_UPLOAD_BYTES = 40 * 1024 * 1024;
 
 export async function uploadExpense(formData: FormData): Promise<UploadExpenseResult> {
   await assertCanWrite();
@@ -242,7 +242,7 @@ export async function uploadExpense(formData: FormData): Promise<UploadExpenseRe
   const file = formData.get('file');
   const kind = asKind(formData.get('kind'));
   if (!file || !(file instanceof File) || file.size === 0) return { ok: false, error: 'No file found' };
-  if (file.size > MAX_UPLOAD_BYTES) return { ok: false, error: 'File too large (max 15MB)' };
+  if (file.size > MAX_UPLOAD_BYTES) return { ok: false, error: 'File too large (max 40MB)' };
 
   const ext = (file.name.split('.').pop() || 'bin').toLowerCase();
   const isPdf = ext === 'pdf' || file.type === 'application/pdf';

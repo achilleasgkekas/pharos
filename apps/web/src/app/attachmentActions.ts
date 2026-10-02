@@ -41,7 +41,7 @@ const FILE_MIME: Record<string, string> = {
   xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   txt: 'text/plain',
 };
-const MAX_FILE_BYTES = 15 * 1024 * 1024;
+const MAX_FILE_BYTES = 40 * 1024 * 1024;
 const MAX_ATTACHMENTS = 50;
 
 type Result = { ok: boolean; attachments: SerializedAttachment[]; error?: string };
@@ -83,7 +83,7 @@ export async function addAttachmentFiles(kind: AttachmentKind, id: string, formD
       doc.markModified('attachments');
       await doc.save();
     }
-    return { ok: added > 0, attachments: serialize(doc), error: added ? undefined : 'Unsupported file type or too large (max 15MB)' };
+    return { ok: added > 0, attachments: serialize(doc), error: added ? undefined : 'Unsupported file type or too large (max 40MB)' };
   });
 }
 

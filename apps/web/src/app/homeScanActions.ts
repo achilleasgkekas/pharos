@@ -7,7 +7,7 @@ import { withRequestTenant } from '@/lib/tenancy/request';
 import { scanHomeFile } from '@/lib/homeScan.server';
 import type { BillScan, DocumentScan, HomeScanKind, MeterScan } from '@/lib/homeScan';
 
-const MAX_BYTES = 15 * 1024 * 1024;
+const MAX_BYTES = 40 * 1024 * 1024;
 const EXTS = new Set(['pdf', 'jpg', 'jpeg', 'png', 'webp', 'heic']);
 const FEATURE = { document: 'documents', bill: 'bills', meter: 'meters' } as const;
 
@@ -24,7 +24,7 @@ export async function scanHomeDocument(kind: HomeScanKind, formData: FormData): 
     if (!(await isFeatureEnabled(FEATURE[kind]))) return { ok: false, error: 'This scan (AI) is turned off. Turn it on in Settings → AI.' };
     const file = formData.get('file');
     if (!(file instanceof File) || file.size === 0) return { ok: false, error: 'No file' };
-    if (file.size > MAX_BYTES) return { ok: false, error: 'File too large (max 15MB)' };
+    if (file.size > MAX_BYTES) return { ok: false, error: 'File too large (max 40MB)' };
     const ext = (file.name.split('.').pop() || '').toLowerCase();
     if (!EXTS.has(ext)) return { ok: false, error: 'Use a photo or a PDF' };
     try {

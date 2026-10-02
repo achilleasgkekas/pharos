@@ -45,8 +45,8 @@ describe('routeSharedFile · the picker only decides WHERE, the module does the 
   });
 
   it('keeps the staged file when the module rejects it, so the user can retry', async () => {
-    uploadReceipt.mockResolvedValueOnce({ ok: false, error: 'File too large (max 15MB)' });
-    expect(await routeSharedFile(TICKET, 'receipt')).toEqual({ ok: false, error: 'File too large (max 15MB)' });
+    uploadReceipt.mockResolvedValueOnce({ ok: false, error: 'File too large (max 40MB)' });
+    expect(await routeSharedFile(TICKET, 'receipt')).toEqual({ ok: false, error: 'File too large (max 40MB)' });
     expect(discardSharedFile).not.toHaveBeenCalled();
   });
 

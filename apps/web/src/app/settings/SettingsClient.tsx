@@ -240,7 +240,7 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentId]);
 
-  const accountTab = currentId === 'account' || currentId === 'my-notifications' ? currentId : null;
+  const accountTab = currentId === 'account' || currentId === 'notifications' ? currentId : null;
   useEffect(() => {
     if (!accountTab) return;
     let live = true;
@@ -275,12 +275,29 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
         </Link>
         <PageHeader title={t(shown.label)} subtitle={t(shown.desc)} />
         <div className="space-y-4">
-          {shown.id === 'account' && (accountData ? <AccountManager initialData={accountData} panel="account" /> : loading)}
+          {shown.id === 'account' && (
+            <>
+              {accountData ? <AccountManager initialData={accountData} panel="account" /> : loading}
+              {/* The people on this install sit with your own account (one place for accounts). */}
+              {isAdmin && <UsersManager currentUserId={currentUser.id} />}
+              {multiUser && <ActivityFeed />}
+            </>
+          )}
           {shown.id === 'appearance' && <AppearancePanel />}
-          {shown.id === 'my-notifications' && (accountData ? <AccountManager initialData={accountData} panel="notifications" /> : loading)}
+          {/* Everything that reaches you, in one page: what you follow and where it lands,
+              how far ahead each kind of date warns, the household's shared channels, and
+              webhooks for other apps. */}
+          {shown.id === 'notifications' && (
+            <>
+              {accountData ? <AccountManager initialData={accountData} panel="topics" /> : loading}
+              <DefaultsManager settings={info.settings} part="alerts" />
+              {accountData && <AccountManager initialData={accountData} panel="channels" />}
+              <NotificationsManager />
+              <WebhookManager />
+            </>
+          )}
 
           {shown.id === 'general' && <DefaultsManager settings={info.settings} part="general" />}
-          {shown.id === 'alerts' && <DefaultsManager settings={info.settings} part="alerts" />}
 
           {shown.id === 'categories' && (
             <>
@@ -328,11 +345,9 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
             </>
           )}
 
-          {shown.id === 'notifications' && <NotificationsManager />}
 
           {shown.id === 'integrations' && (
             <>
-              <WebhookManager />
               <Section title={t('set.mobileMcpTitle')} icon={<Plug size={15} />}>
                 <McpManager />
               </Section>
@@ -346,8 +361,6 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
             </>
           )}
 
-          {shown.id === 'users' && <UsersManager currentUserId={currentUser.id} />}
-          {shown.id === 'activity' && <ActivityFeed />}
 
           {shown.id === 'system' && (
             <Section title={t('sys.title')} icon={<Activity size={15} />}>

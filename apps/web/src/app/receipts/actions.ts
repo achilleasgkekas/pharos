@@ -148,7 +148,7 @@ async function runReceiptParse(bytes: Buffer, ext: string, isPdf: boolean, mode:
  * Degrades gracefully if Ollama is offline — creates an empty draft.
  */
 // Matches next.config serverActions.bodySizeLimit; also bounds in-memory buffering + OCR.
-const MAX_UPLOAD_BYTES = 15 * 1024 * 1024;
+const MAX_UPLOAD_BYTES = 40 * 1024 * 1024;
 
 /** P68 — μια νέα απόδειξη κληρονομεί τον χώρο από την τελευταία απόδειξη του ΙΔΙΟΥ
  *  καταστήματος, ακριβώς όπως ένα νέο έξοδο κληρονομεί το `space` του vendor του (P34,
@@ -190,7 +190,7 @@ async function uploadReceiptInner(formData: FormData): Promise<UploadResult> {
     return { ok: false, error: 'No file found' };
   }
   if (file.size > MAX_UPLOAD_BYTES) {
-    return { ok: false, error: 'File too large (max 15MB)' };
+    return { ok: false, error: 'File too large (max 40MB)' };
   }
 
   const bytes = Buffer.from(await file.arrayBuffer());

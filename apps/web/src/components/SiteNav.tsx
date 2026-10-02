@@ -8,7 +8,6 @@ import {
   Settings,
   LogOut,
   Activity,
-  MessageSquare,
   Trash2,
   Home,
   Wallet,
@@ -199,8 +198,7 @@ function Sidebar({ user }: { user?: SessionUser }) {
 
 const ACCOUNT_MENU: { href: string; key: TKey; icon: React.ComponentType<{ size?: number; className?: string }> }[] = [
   { href: '/settings', key: 'nav.settings', icon: Settings },
-  { href: '/jobs', key: 'nav.jobs', icon: Activity },
-  { href: '/history', key: 'nav.history', icon: MessageSquare },
+  { href: '/jobs', key: 'nav.jobsHistory', icon: Activity },
   { href: '/trash', key: 'nav.trash', icon: Trash2 },
 ];
 
